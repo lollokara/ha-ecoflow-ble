@@ -1,5 +1,6 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
+#include "NimBLEScan.h"
 
 static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
@@ -32,7 +33,7 @@ bool EcoflowESP32::begin()
 
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
     NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setAdvertisedDeviceCallbacks(_advertisedDeviceCallbacks);
+    pScan->setCallbacks(_advertisedDeviceCallbacks);
     pScan->setActiveScan(true);
     pScan->start(scanTime, false);
     return _advertisedDeviceCallbacks->pAdvertisedDevice;
