@@ -5,6 +5,23 @@ static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 
+// A global pointer to the found device
+static NimBLEAdvertisedDevice* pAdvertisedDevice;
+
+void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+    if (advertisedDevice->haveManufacturerData()) {
+        std::string manufacturerData = advertisedDevice->getManufacturerData();
+        if (manufacturerData.length() >= 2) {
+            uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
+            if (manufacturerId == 46517) { // 0xB5B5
+                Serial.println("Found Ecoflow device by manufacturer data");
+                advertisedDevice->getScan()->stop();
+                pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice); // Create a copy
+            }
+        }
+    }
+}
+
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 EcoflowESP32::EcoflowESP32() : pClient(nullptr)
@@ -14,6 +31,9 @@ EcoflowESP32::EcoflowESP32() : pClient(nullptr)
 
 EcoflowESP32::~EcoflowESP32()
 {
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+    }
 }
 
 bool EcoflowESP32::begin()
@@ -23,16 +43,13 @@ bool EcoflowESP32::begin()
 }
 
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
+    pAdvertisedDevice = nullptr;
     NimBLEScan* pScan = NimBLEDevice::getScan();
+    pScan->setScanCallbacks(new EcoflowScanCallbacks());
     pScan->setActiveScan(true);
-    NimBLEScanResults results = pScan->getResults(scanTime);
-    for (int i = 0; i < results.getCount(); i++) {
-        const NimBLEAdvertisedDevice* device = results.getDevice(i);
-        if (device->haveServiceUUID() && device->isAdvertisingService(serviceUUID)) {
-            return new NimBLEAdvertisedDevice(*device);
-        }
-    }
-    return nullptr;
+    pScan->start(scanTime, false); // blocking call
+    _pAdvertisedDevice = pAdvertisedDevice;
+    return _pAdvertisedDevice;
 }
 
 

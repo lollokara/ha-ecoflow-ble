@@ -4,11 +4,15 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "EcoflowData.h"
-#include "NimBLEScan.h"
+
+class EcoflowScanCallbacks : public NimBLEScanCallbacks {
+public:
+    void onResult(NimBLEAdvertisedDevice* advertisedDevice);
+};
 
 class EcoflowESP32 : public NimBLEClientCallbacks
 {
-  public:
+public:
     /**
      * @brief Construct a new EcoflowESP32 object.
      */
@@ -93,7 +97,7 @@ class EcoflowESP32 : public NimBLEClientCallbacks
      */
     bool isUsbOn();
 
-  private:
+private:
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
     static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
@@ -105,6 +109,8 @@ class EcoflowESP32 : public NimBLEClientCallbacks
     NimBLERemoteCharacteristic* pReadChr;
     EcoflowData _data;
     static EcoflowESP32* _instance;
+
+    NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
 };
 
 #endif
