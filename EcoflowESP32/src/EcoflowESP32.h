@@ -10,7 +10,7 @@ class EcoflowESP32; // Forward declaration
 class EcoflowScanCallbacks : public NimBLEScanCallbacks {
 public:
     EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32);
-    void onResult(NimBLEAdvertisedDevice* advertisedDevice);
+    void onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) override;
 private:
     EcoflowESP32* _pEcoflowESP32;
 };

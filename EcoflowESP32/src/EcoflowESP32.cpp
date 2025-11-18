@@ -7,7 +7,7 @@ static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 
 EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) : _pEcoflowESP32(pEcoflowESP32) {}
 
-void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) {
     Serial.print("Device found: ");
     Serial.print(advertisedDevice->getAddress().toString().c_str());
     
@@ -39,7 +39,7 @@ void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
             if (manufacturerId == 46517) { // 0xB5B5
                 Serial.println("  Found Ecoflow device by manufacturer data");
                 advertisedDevice->getScan()->stop();
-                _pEcoflowESP32->setAdvertisedDevice(advertisedDevice);
+                _pEcoflowESP32->setAdvertisedDevice(const_cast<NimBLEAdvertisedDevice*>(advertisedDevice));
             }
         }
     }
