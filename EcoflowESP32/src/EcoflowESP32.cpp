@@ -1,16 +1,16 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 
-static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
-static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
-static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
+static NimBLEUUID serviceUUID("deebb2a2-e64e-462a-886d-88b9c21b3433");
+static NimBLEUUID writeCharUUID("deebb2a3-e64e-462a-886d-88b9c21b3433");
+static NimBLEUUID readCharUUID("deebb2a4-e64e-462a-886d-88b9c21b3433");
 
 EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) : _pEcoflowESP32(pEcoflowESP32) {}
 
 void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) {
     Serial.print("Device found: ");
     Serial.print(advertisedDevice->getAddress().toString().c_str());
-    
+
     if (advertisedDevice->haveName()) {
         Serial.print(", Name: ");
         Serial.print(advertisedDevice->getName().c_str());
@@ -20,7 +20,7 @@ void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertised
         Serial.print(", Service UUID: ");
         Serial.print(advertisedDevice->getServiceUUID().toString().c_str());
     }
-    
+
     Serial.println();
 
     if (advertisedDevice->haveManufacturerData()) {
@@ -33,10 +33,9 @@ void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertised
 
         if (manufacturerData.length() >= 2) {
             uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
-            Serial.print("  Parsed Manufacturer ID: ");
-            Serial.println(manufacturerId);
+            Serial.printf("  Parsed Manufacturer ID: 0x%04X\n", manufacturerId);
 
-            if (manufacturerId == 46517) { // 0xB5B5
+            if (manufacturerId == 0xB5B5) {
                 Serial.println("  Found Ecoflow device by manufacturer data");
                 advertisedDevice->getScan()->stop();
                 _pEcoflowESP32->setAdvertisedDevice(const_cast<NimBLEAdvertisedDevice*>(advertisedDevice));
