@@ -57,22 +57,18 @@ EcoflowESP32::EcoflowESP32() : pClient(nullptr)
 EcoflowESP32::~EcoflowESP32()
 {
     delete _scanCallbacks;
-    if (_pServerAddress) {
-        delete _pServerAddress;
-    }
 }
 
 void EcoflowESP32::setAdvertisedDevice(NimBLEAdvertisedDevice* device) {
-    if (_pServerAddress) {
-        delete _pServerAddress;
+    if (m_pAdvertisedDevice == nullptr) {
+        m_pAdvertisedDevice = device;
+        NimBLEDevice::getScan()->stop();
     }
-    _pServerAddress = new NimBLEAddress(device->getAddress());
-    device->getScan()->stop();
 }
 
 bool EcoflowESP32::begin()
 {
-    Serial.println(">>>>>>>>>>>>> EcoflowESP32 Library Version: 2.5 <<<<<<<<<<<<<");
+    Serial.println(">>>>>>>>>>>>> EcoflowESP32 Library Version: 3.0 <<<<<<<<<<<<<");
     NimBLEDevice::init("");
     return true;
 }
@@ -84,79 +80,65 @@ bool EcoflowESP32::scan(uint32_t scanTime) {
     pScan->setWindow(99);
     pScan->setActiveScan(true);
     pScan->start(scanTime, false);
-    return _pServerAddress != nullptr;
+    return m_pAdvertisedDevice != nullptr;
+}
+
+
+void EcoflowESP32::onConnect(NimBLEClient* pclient) {
+  Serial.println("Connected");
+}
+
+void EcoflowESP32::onDisconnect(NimBLEClient* pclient, int reason) {
+  Serial.print("Disconnected, reason: ");
+  Serial.println(reason);
+}
+
+bool EcoflowESP32::connectToDevice(NimBLEAdvertisedDevice* device) {
+    m_pAdvertisedDevice = device;
+    return connectToServer();
 }
 
 bool EcoflowESP32::connectToServer() {
     if (pClient == nullptr) {
         pClient = NimBLEDevice::createClient();
+        pClient->setClientCallbacks(this);
     }
 
-    Serial.println("Attempting to connect...");
-    if (!_pServerAddress) {
+    Serial.println("Attempting to connect…");
+    if (m_pAdvertisedDevice == nullptr) {
         Serial.println("No device address set");
         return false;
     }
 
-    if (!pClient->connect(*_pServerAddress)) {
+    if (!pClient->connect(m_pAdvertisedDevice)) {
         Serial.println("Failed to connect");
         return false;
     }
     Serial.println("Connected successfully");
 
-    // Let's try to find the characteristics by iterating through services
-    auto services = pClient->getServices();
+    auto services = pClient->getServices(true);
     if(services.empty()) {
         Serial.println("Failed to get services");
         pClient->disconnect();
         return false;
     }
 
+    Serial.println("Services and Characteristics:");
     for(auto service : services) {
-        Serial.printf("Found service: %s\n", service->getUUID().toString().c_str());
-        if (service->getUUID().equals(serviceUUID1) || service->getUUID().equals(serviceUUID2)) {
-             pWriteChr = service->getCharacteristic(writeCharUUID1);
-             if(pWriteChr)
-             {
-                pReadChr = service->getCharacteristic(readCharUUID1);
-                if(pReadChr)
-                    break;
-             }
-             pWriteChr = service->getCharacteristic(writeCharUUID2);
-             if(pWriteChr)
-             {
-                pReadChr = service->getCharacteristic(readCharUUID2);
-                if(pReadChr)
-                    break;
-             }
+        Serial.printf("Service: %s\n", service->getUUID().toString().c_str());
+        auto characteristics = service->getCharacteristics(true);
+        for(auto characteristic : characteristics) {
+            Serial.printf("  Characteristic: %s", characteristic->getUUID().toString().c_str());
+            if(characteristic->canRead()) Serial.print(" R");
+            if(characteristic->canWrite()) Serial.print(" W");
+            if(characteristic->canNotify()) Serial.print(" N");
+            if(characteristic->canIndicate()) Serial.print(" I");
+            Serial.println();
         }
     }
 
-
-    if (!pWriteChr || !pReadChr) {
-        Serial.println("Failed to get characteristics");
-        pClient->disconnect();
-        return false;
-    }
-    Serial.println("Characteristics found");
-    Serial.printf("Write characteristic: %s\n", pWriteChr->getUUID().toString().c_str());
-    Serial.printf("Read characteristic: %s\n", pReadChr->getUUID().toString().c_str());
-
-
-    if(pReadChr->canNotify()) {
-        Serial.println("Subscribing to notifications...");
-        if(!pReadChr->subscribe(true, notifyCallback)) {
-            Serial.println("Failed to subscribe to notifications");
-            pClient->disconnect();
-            return false;
-        }
-    }
-
-    Serial.println("Sending request for data...");
-    sendCommand(CMD_REQUEST_DATA, sizeof(CMD_REQUEST_DATA));
-
-    delay(500); // Wait for notifications
-    return true;
+    pClient->disconnect();
+    return false;
 }
 
 bool EcoflowESP32::sendCommand(const uint8_t* command, size_t size) {
@@ -184,15 +166,6 @@ void EcoflowESP32::parse(uint8_t* pData, size_t length) {
         Serial.printf("%02X ", pData[i]);
     }
     Serial.println();
-
-    // The parsing logic from the python code needs to be ported here.
-    // For now, let's just print the raw data.
-    // _data.batteryLevel = get_int(pData, 35);
-    // _data.outputPower = get_int(pData, 18);
-    // _data.inputPower = get_int(pData, 22);
-    // _data.acOn = get_int(pData, 62) != 0;
-    // _data.dcOn = get_int(pData, 83) != 0;
-    // _data.usbOn = (get_int(pData, 79) & 0x1) != 0;
 }
 
 void EcoflowESP32::setAC(bool on) {

@@ -47,6 +47,12 @@ public:
      * @param device A pointer to the advertised device to connect to.
      * @return true if the connection was successful, false otherwise.
      */
+    bool connectToDevice(NimBLEAdvertisedDevice* device);
+
+    /**
+     * @brief Connect to an Ecoflow device.
+     * @return true if the connection was successful, false otherwise.
+     */
     bool connectToServer();
 
     /**
@@ -106,6 +112,8 @@ public:
     void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
 
 private:
+    void onConnect(NimBLEClient* pclient);
+    void onDisconnect(NimBLEClient* pclient, int reason);
     static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
     void parse(uint8_t* pData, size_t length);
     bool sendCommand(const uint8_t* command, size_t size);
@@ -117,7 +125,7 @@ private:
     static EcoflowESP32* _instance;
 
     EcoflowScanCallbacks* _scanCallbacks;
-    NimBLEAddress* _pServerAddress = nullptr;
+    NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
 };
 
 #endif

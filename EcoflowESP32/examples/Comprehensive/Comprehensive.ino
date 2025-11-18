@@ -9,12 +9,8 @@ void setup() {
   ecoflow.begin();
 
   Serial.println("Scanning for Ecoflow device for 5 seconds...");
-  NimBLEAdvertisedDevice* pDevice = ecoflow.scan(5);
-
-  if (pDevice != nullptr) {
-    Serial.print("Found device: ");
-    Serial.println(pDevice->getAddress().toString().c_str());
-    if (ecoflow.connectToDevice(pDevice)) {
+  if (ecoflow.scan(5)) {
+    if (ecoflow.connectToServer()) {
       Serial.println("Connected to device. Waiting for data...");
     } else {
       Serial.println("Failed to connect to device.");
