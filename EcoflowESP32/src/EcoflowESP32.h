@@ -6,11 +6,6 @@
 #include "EcoflowData.h"
 #include "NimBLEScan.h"
 
-class AdvertisedDeviceCallbacks;
-
-/**
- * @brief Main class for interacting with Ecoflow devices.
- */
 class EcoflowESP32 : public NimBLEClientCallbacks
 {
   public:
@@ -110,7 +105,6 @@ class EcoflowESP32 : public NimBLEClientCallbacks
     NimBLERemoteCharacteristic* pReadChr;
     EcoflowData _data;
     static EcoflowESP32* _instance;
-    AdvertisedDeviceCallbacks* _advertisedDeviceCallbacks;
 };
 
 #endif
