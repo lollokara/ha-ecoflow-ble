@@ -1,4 +1,5 @@
 #include <EcoflowESP32.h>
+#include "EcoflowProtocol.h"
 
 EcoflowESP32 ecoflow;
 
@@ -9,9 +10,12 @@ void setup() {
 }
 
 void loop() {
-  if (ecoflow.scan(10)) {
-    ecoflow.connectToServer();
-  }
-  Serial.println("Scan finished. Waiting 10 seconds to restart...");
-  delay(10000);
+    if (ecoflow.scan(10)) {
+        if (ecoflow.connectToServer()) {
+            Serial.println("Sending command to request data...");
+            ecoflow.sendCommand(CMD_REQUEST_DATA, sizeof(CMD_REQUEST_DATA));
+        }
+    }
+    Serial.println("Scan finished. Waiting 10 seconds to restart...");
+    delay(10000);
 }
