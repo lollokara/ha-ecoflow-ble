@@ -7,27 +7,12 @@ void setup() {
   Serial.println("Starting EcoflowESP32 BareMinimum example...");
 
   ecoflow.begin();
-
-  Serial.println("Scanning for Ecoflow device for 5 seconds...");
-  NimBLEAdvertisedDevice* pDevice = ecoflow.scan(5);
-
-  if (pDevice != nullptr) {
-    Serial.print("Found device: ");
-    Serial.println(pDevice->getAddress().toString().c_str());
-    if (ecoflow.connectToDevice(pDevice)) {
-      Serial.println("Connected to device. Waiting for data...");
-    } else {
-      Serial.println("Failed to connect to device.");
-    }
-  } else {
-    Serial.println("No Ecoflow device found.");
-  }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  delay(1000);
+  // Data is updated via notifications, so we can just read the latest values here.
   NimBLEAdvertisedDevice* pDevice = ecoflow.scan(5);
+
   if (pDevice != nullptr) {
     Serial.print("Found device: ");
     Serial.println(pDevice->getAddress().toString().c_str());
@@ -61,4 +46,6 @@ void loop() {
   Serial.println(ecoflow.isUsbOn() ? "On" : "Off");
 
   Serial.println("--------------------");
+
+  delay(1000);
 }

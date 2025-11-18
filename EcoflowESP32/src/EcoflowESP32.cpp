@@ -69,7 +69,9 @@ void EcoflowESP32::setAdvertisedDevice(NimBLEAdvertisedDevice* device) {
 
 bool EcoflowESP32::begin()
 {
+    Serial.println(">>>>>>>>>>>>> EcoflowESP32 Library Version: 2.0 <<<<<<<<<<<<<");
     NimBLEDevice::init("");
+    NimBLEDevice::setMTU(256);
     return true;
 }
 
@@ -102,25 +104,32 @@ bool EcoflowESP32::connectToDevice(NimBLEAdvertisedDevice* device) {
         pClient->setClientCallbacks(this);
     }
 
+    Serial.println("Attempting to connect...");
     if (!pClient->connect(device)) {
         Serial.println("Failed to connect");
         return false;
     }
+    Serial.println("Connected successfully");
 
     NimBLERemoteService* pSvc = nullptr;
 
+    Serial.println("Getting service...");
     pSvc = pClient->getService(serviceUUID);
     if(pSvc) {
+        Serial.println("Getting characteristics...");
         pWriteChr = pSvc->getCharacteristic(writeCharUUID);
         pReadChr = pSvc->getCharacteristic(readCharUUID);
     }
 
     if (!pWriteChr || !pReadChr) {
+        Serial.println("Failed to get characteristics");
         pClient->disconnect();
         return false;
     }
+    Serial.println("Characteristics found");
 
     if(pReadChr->canNotify()) {
+        Serial.println("Subscribing to notifications...");
         pReadChr->subscribe(true, notifyCallback);
     }
 
