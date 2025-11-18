@@ -8,10 +8,24 @@ static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) : _pEcoflowESP32(pEcoflowESP32) {}
 
 void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-    Serial.print("Called");
+    Serial.print("Device found: ");
+    Serial.print(advertisedDevice->getAddress().toString().c_str());
+    
+    if (advertisedDevice->haveName()) {
+        Serial.print(", Name: ");
+        Serial.print(advertisedDevice->getName().c_str());
+    }
+
+    if (advertisedDevice->haveServiceUUID()) {
+        Serial.print(", Service UUID: ");
+        Serial.print(advertisedDevice->getServiceUUID().toString().c_str());
+    }
+    
+    Serial.println();
+
     if (advertisedDevice->haveManufacturerData()) {
         std::string manufacturerData = advertisedDevice->getManufacturerData();
-        Serial.print("Raw Manufacturer Data: ");
+        Serial.print("  Raw Manufacturer Data: ");
         for (int i = 0; i < manufacturerData.length(); i++) {
             Serial.printf("%02X ", (uint8_t)manufacturerData[i]);
         }
@@ -19,11 +33,11 @@ void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
 
         if (manufacturerData.length() >= 2) {
             uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
-            Serial.print("Parsed Manufacturer ID: ");
+            Serial.print("  Parsed Manufacturer ID: ");
             Serial.println(manufacturerId);
 
             if (manufacturerId == 46517) { // 0xB5B5
-                Serial.println("Found Ecoflow device by manufacturer data");
+                Serial.println("  Found Ecoflow device by manufacturer data");
                 advertisedDevice->getScan()->stop();
                 _pEcoflowESP32->setAdvertisedDevice(advertisedDevice);
             }
