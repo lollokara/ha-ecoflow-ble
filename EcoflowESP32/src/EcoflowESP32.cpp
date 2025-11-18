@@ -1,16 +1,24 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 #include "NimBLEScan.h"
+#include "NimBLEAdvertisedDevice.h"
 
 static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 
-class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
+class AdvertisedDeviceCallbacks: public NimBLEScanCallbacks {
     void onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-        if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID)) {
-            NimBLEDevice::getScan()->stop();
-            pAdvertisedDevice = advertisedDevice;
+        if (advertisedDevice->haveManufacturerData()) {
+            std::string manufacturerData = advertisedDevice->getManufacturerData();
+            if (manufacturerData.length() >= 2) {
+                uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
+                if (manufacturerId == 46517) {
+                    Serial.println("Found Ecoflow device by manufacturer data");
+                    pAdvertisedDevice = advertisedDevice;
+                    NimBLEDevice::getScan()->stop();
+                }
+            }
         }
     }
     public:
@@ -33,7 +41,7 @@ bool EcoflowESP32::begin()
 
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
     NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setCallbacks(_advertisedDeviceCallbacks);
+    pScan->setScanCallbacks(_advertisedDeviceCallbacks);
     pScan->setActiveScan(true);
     pScan->start(scanTime, false);
     return _advertisedDeviceCallbacks->pAdvertisedDevice;
