@@ -27,11 +27,12 @@ void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertised
             Serial.printf("%02X ", (uint8_t)manufacturerData[i]);
         }
 
-        if (manufacturerData.length() >= 2) {
-            uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
-             if (manufacturerId == 0xB5B5) {
+        if (advertisedDevice->getManufacturerData().length() >= 2) {
+            uint16_t manufacturerId = (advertisedDevice->getManufacturerData()[1] << 8) | advertisedDevice->getManufacturerData()[0];
+            if (manufacturerId == 46517) { // Ecoflow manufacturer ID
                 Serial.println(" - Ecoflow device found!");
                 _pEcoflowESP32->setAdvertisedDevice(const_cast<NimBLEAdvertisedDevice*>(advertisedDevice));
+                NimBLEDevice::getScan()->stop();
             }
         }
     }
@@ -114,30 +115,47 @@ bool EcoflowESP32::connectToServer() {
         Serial.println("Failed to connect");
         return false;
     }
-    Serial.println("Connected successfully");
+    pWriteChr = nullptr;
+    pReadChr = nullptr;
 
-    auto services = pClient->getServices(true);
-    if(services.empty()) {
-        Serial.println("Failed to get services");
+    NimBLERemoteService* pService = nullptr;
+
+    // Try first service UUID
+    pService = pClient->getService(serviceUUID1);
+    if (pService) {
+        pWriteChr = pService->getCharacteristic(writeCharUUID1);
+        pReadChr = pService->getCharacteristic(readCharUUID1);
+    }
+
+    // If characteristics not found, try second service UUID
+    if (!pWriteChr || !pReadChr) {
+        pService = pClient->getService(serviceUUID2);
+        if (pService) {
+            pWriteChr = pService->getCharacteristic(writeCharUUID2);
+            pReadChr = pService->getCharacteristic(readCharUUID2);
+        }
+    }
+
+    if (!pWriteChr || !pReadChr) {
+        Serial.println("Failed to find characteristics");
         pClient->disconnect();
         return false;
     }
 
-    Serial.println("Services and Characteristics:");
-    for(auto service : services) {
-        Serial.printf("Service: %s\n", service->getUUID().toString().c_str());
-        auto characteristics = service->getCharacteristics(true);
-        for(auto characteristic : characteristics) {
-            Serial.printf("  Characteristic: %s", characteristic->getUUID().toString().c_str());
-            if(characteristic->canRead()) Serial.print(" R");
-            if(characteristic->canWrite()) Serial.print(" W");
-            if(characteristic->canNotify()) Serial.print(" N");
-            if(characteristic->canIndicate()) Serial.print(" I");
-            Serial.println();
+    Serial.println("Found characteristics");
+
+    if(pReadChr->canNotify()) {
+        if(pReadChr->subscribe(true, notifyCallback)) {
+            Serial.println("Subscribed to notifications");
+            return true;
+        } else {
+            Serial.println("Failed to subscribe to notifications");
+            pClient->disconnect();
+            return false;
         }
     }
 
-    pClient->disconnect();
+    Serial.println("Read characteristic does not support notifications");
     return false;
 }
 
