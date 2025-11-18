@@ -6,21 +6,9 @@ static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 
-class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
-    void onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-        if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID)) {
-            NimBLEDevice::getScan()->stop();
-            pAdvertisedDevice = advertisedDevice;
-        }
-    }
-    public:
-     NimBLEAdvertisedDevice* pAdvertisedDevice = nullptr;
-};
-
-
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
-EcoflowESP32::EcoflowESP32() : pClient(nullptr), _advertisedDeviceCallbacks(new AdvertisedDeviceCallbacks())
+EcoflowESP32::EcoflowESP32() : pClient(nullptr), _pAdvertisedDevice(nullptr)
 {
     _instance = this;
 }
@@ -31,12 +19,20 @@ bool EcoflowESP32::begin()
     return true;
 }
 
+void EcoflowESP32::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+    if (advertisedDevice->haveServiceUUID() && advertisedDevice->isAdvertisingService(serviceUUID)) {
+        NimBLEDevice::getScan()->stop();
+        _pAdvertisedDevice = advertisedDevice;
+    }
+}
+
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
     NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setCallbacks(_advertisedDeviceCallbacks);
+    pScan->setScanCallbacks(this);
     pScan->setActiveScan(true);
+    _pAdvertisedDevice = nullptr;
     pScan->start(scanTime, false);
-    return _advertisedDeviceCallbacks->pAdvertisedDevice;
+    return _pAdvertisedDevice;
 }
 
 

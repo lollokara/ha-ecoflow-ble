@@ -5,12 +5,10 @@
 #include "NimBLEDevice.h"
 #include "EcoflowData.h"
 
-class AdvertisedDeviceCallbacks;
-
 /**
  * @brief Main class for interacting with Ecoflow devices.
  */
-class EcoflowESP32 : public NimBLEClientCallbacks
+class EcoflowESP32 : public NimBLEClientCallbacks, public NimBLEAdvertisedDeviceCallbacks
 {
   public:
     /**
@@ -95,6 +93,7 @@ class EcoflowESP32 : public NimBLEClientCallbacks
   private:
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
+    void onResult(NimBLEAdvertisedDevice* advertisedDevice);
     static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
     void parse(uint8_t* pData, size_t length);
     bool sendCommand(const uint8_t* command, size_t size);
@@ -104,7 +103,7 @@ class EcoflowESP32 : public NimBLEClientCallbacks
     NimBLERemoteCharacteristic* pReadChr;
     EcoflowData _data;
     static EcoflowESP32* _instance;
-    AdvertisedDeviceCallbacks* _advertisedDeviceCallbacks;
+    NimBLEAdvertisedDevice* _pAdvertisedDevice;
 };
 
 #endif
