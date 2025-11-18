@@ -1,9 +1,9 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 
-static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
-static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
-static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
+static NimBLEUUID serviceUUID("deebb2a2-e64e-462a-886d-88b9c21b3433");
+static NimBLEUUID writeCharUUID("deebb2a3-e64e-462a-886d-88b9c21b3433");
+static NimBLEUUID readCharUUID("deebb2a4-e64e-462a-886d-88b9c21b3433");
 
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
@@ -25,11 +25,16 @@ bool EcoflowESP32::begin()
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
     NimBLEScan* pScan = NimBLEDevice::getScan();
     pScan->setActiveScan(true);
-    NimBLEScanResults results = pScan->getResults(scanTime);
-    for (int i = 0; i < results.getCount(); i++) {
-        const NimBLEAdvertisedDevice* device = results.getDevice(i);
-        if (device->haveServiceUUID() && device->isAdvertisingService(serviceUUID)) {
-            return new NimBLEAdvertisedDevice(*device);
+    pScan->setInterval(100);
+    pScan->setWindow(99);
+
+    if (pScan->start(scanTime, false)) {
+        NimBLEScanResults results = pScan->getResults();
+        for (int i = 0; i < results.getCount(); i++) {
+            const NimBLEAdvertisedDevice* device = results.getDevice(i);
+            if (device->haveServiceUUID() && device->isAdvertisingService(serviceUUID)) {
+                return new NimBLEAdvertisedDevice(*device);
+            }
         }
     }
     return nullptr;
