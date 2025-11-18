@@ -4,12 +4,8 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "EcoflowData.h"
+#include "NimBLEScan.h"
 
-class AdvertisedDeviceCallbacks;
-
-/**
- * @brief Main class for interacting with Ecoflow devices.
- */
 class EcoflowESP32 : public NimBLEClientCallbacks
 {
   public:
@@ -17,6 +13,11 @@ class EcoflowESP32 : public NimBLEClientCallbacks
      * @brief Construct a new EcoflowESP32 object.
      */
     EcoflowESP32();
+
+    /**
+     * @brief Destroy the EcoflowESP32 object.
+     */
+    ~EcoflowESP32();
 
     /**
      * @brief Initialize the BLE stack.
@@ -104,7 +105,6 @@ class EcoflowESP32 : public NimBLEClientCallbacks
     NimBLERemoteCharacteristic* pReadChr;
     EcoflowData _data;
     static EcoflowESP32* _instance;
-    AdvertisedDeviceCallbacks* _advertisedDeviceCallbacks;
 };
 
 #endif
