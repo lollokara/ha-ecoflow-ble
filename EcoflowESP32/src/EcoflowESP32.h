@@ -110,13 +110,13 @@ public:
     bool isUsbOn();
 
     void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
+    bool sendCommand(const uint8_t* command, size_t size);
 
 private:
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient, int reason);
     static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
     void parse(uint8_t* pData, size_t length);
-    bool sendCommand(const uint8_t* command, size_t size);
 
     NimBLEClient* pClient;
     NimBLERemoteCharacteristic* pWriteChr;
@@ -126,6 +126,8 @@ private:
 
     EcoflowScanCallbacks* _scanCallbacks;
     NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
+    std::string m_deviceAddress;
+    uint8_t m_deviceAddressType;
 };
 
 #endif
