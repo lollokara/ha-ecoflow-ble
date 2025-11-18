@@ -5,18 +5,27 @@ static NimBLEUUID serviceUUID("00000001-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID writeCharUUID("00000002-0000-1000-8000-00805f9b34fb");
 static NimBLEUUID readCharUUID("00000003-0000-1000-8000-00805f9b34fb");
 
-// A global pointer to the found device
-static NimBLEAdvertisedDevice* pAdvertisedDevice;
+EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) : _pEcoflowESP32(pEcoflowESP32) {}
 
 void EcoflowScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+    Serial.print("Called");
     if (advertisedDevice->haveManufacturerData()) {
         std::string manufacturerData = advertisedDevice->getManufacturerData();
+        Serial.print("Raw Manufacturer Data: ");
+        for (int i = 0; i < manufacturerData.length(); i++) {
+            Serial.printf("%02X ", (uint8_t)manufacturerData[i]);
+        }
+        Serial.println();
+
         if (manufacturerData.length() >= 2) {
             uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
+            Serial.print("Parsed Manufacturer ID: ");
+            Serial.println(manufacturerId);
+
             if (manufacturerId == 46517) { // 0xB5B5
                 Serial.println("Found Ecoflow device by manufacturer data");
                 advertisedDevice->getScan()->stop();
-                pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice); // Create a copy
+                _pEcoflowESP32->setAdvertisedDevice(advertisedDevice);
             }
         }
     }
@@ -27,13 +36,22 @@ EcoflowESP32* EcoflowESP32::_instance = nullptr;
 EcoflowESP32::EcoflowESP32() : pClient(nullptr)
 {
     _instance = this;
+    _scanCallbacks = new EcoflowScanCallbacks(this);
 }
 
 EcoflowESP32::~EcoflowESP32()
 {
+    delete _scanCallbacks;
     if (_pAdvertisedDevice) {
         delete _pAdvertisedDevice;
     }
+}
+
+void EcoflowESP32::setAdvertisedDevice(NimBLEAdvertisedDevice* device) {
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+    }
+    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
 }
 
 bool EcoflowESP32::begin()
@@ -43,12 +61,16 @@ bool EcoflowESP32::begin()
 }
 
 NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
-    pAdvertisedDevice = nullptr;
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
+    }
     NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setScanCallbacks(new EcoflowScanCallbacks());
+    pScan->setScanCallbacks(_scanCallbacks);
+    pScan->setInterval(100);
+    pScan->setWindow(99);
     pScan->setActiveScan(true);
     pScan->start(scanTime, false); // blocking call
-    _pAdvertisedDevice = pAdvertisedDevice;
     return _pAdvertisedDevice;
 }
 

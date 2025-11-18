@@ -5,9 +5,14 @@
 #include "NimBLEDevice.h"
 #include "EcoflowData.h"
 
+class EcoflowESP32; // Forward declaration
+
 class EcoflowScanCallbacks : public NimBLEScanCallbacks {
 public:
+    EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32);
     void onResult(NimBLEAdvertisedDevice* advertisedDevice);
+private:
+    EcoflowESP32* _pEcoflowESP32;
 };
 
 class EcoflowESP32 : public NimBLEClientCallbacks
@@ -97,6 +102,8 @@ public:
      */
     bool isUsbOn();
 
+    void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
+
 private:
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
@@ -110,6 +117,7 @@ private:
     EcoflowData _data;
     static EcoflowESP32* _instance;
 
+    EcoflowScanCallbacks* _scanCallbacks;
     NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
 };
 
