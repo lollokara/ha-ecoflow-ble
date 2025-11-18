@@ -1,47 +1,49 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 
-static NimBLEUUID serviceUUID("deebb2a2-e64e-462a-886d-88b9c21b3433");
-static NimBLEUUID writeCharUUID("deebb2a3-e64e-462a-886d-88b9c21b3433");
-static NimBLEUUID readCharUUID("deebb2a4-e64e-462a-886d-88b9c21b3433");
+// UUIDs from the Python library
+static NimBLEUUID serviceUUID1("00001801-0000-1000-8000-00805f9b34fb");
+static NimBLEUUID serviceUUID2("70D51000-2C7F-4E75-AE8A-D758951CE4E0");
+
+static NimBLEUUID writeCharUUID1("70D51001-2C7F-4E75-AE8A-D758951CE4E0");
+static NimBLEUUID readCharUUID1("70D51002-2C7F-4E75-AE8A-D758951CE4E0");
+
+static NimBLEUUID writeCharUUID2("0000ff01-0000-1000-8000-00805f9b34fb");
+static NimBLEUUID readCharUUID2("0000ff02-0000-1000-8000-00805f9b34fb");
+
 
 EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) : _pEcoflowESP32(pEcoflowESP32) {}
 
 void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) {
-    Serial.print("Device found: ");
+    Serial.print("Found device: ");
     Serial.print(advertisedDevice->getAddress().toString().c_str());
-
-    if (advertisedDevice->haveName()) {
-        Serial.print(", Name: ");
-        Serial.print(advertisedDevice->getName().c_str());
-    }
-
-    if (advertisedDevice->haveServiceUUID()) {
-        Serial.print(", Service UUID: ");
-        Serial.print(advertisedDevice->getServiceUUID().toString().c_str());
-    }
-
-    Serial.println();
+    Serial.print(" Name: ");
+    Serial.print(advertisedDevice->getName().c_str());
 
     if (advertisedDevice->haveManufacturerData()) {
         std::string manufacturerData = advertisedDevice->getManufacturerData();
-        Serial.print("  Raw Manufacturer Data: ");
-        for (int i = 0; i < manufacturerData.length(); i++) {
+        Serial.print(" Manufacturer Data: ");
+        for(int i=0; i<manufacturerData.length(); i++) {
             Serial.printf("%02X ", (uint8_t)manufacturerData[i]);
         }
-        Serial.println();
 
         if (manufacturerData.length() >= 2) {
             uint16_t manufacturerId = (static_cast<uint8_t>(manufacturerData[1]) << 8) | static_cast<uint8_t>(manufacturerData[0]);
-            Serial.printf("  Parsed Manufacturer ID: 0x%04X\n", manufacturerId);
-
-            if (manufacturerId == 0xB5B5) {
-                Serial.println("  Found Ecoflow device by manufacturer data");
-                advertisedDevice->getScan()->stop();
+             if (manufacturerId == 0xB5B5) {
+                Serial.println(" - Ecoflow device found!");
                 _pEcoflowESP32->setAdvertisedDevice(const_cast<NimBLEAdvertisedDevice*>(advertisedDevice));
             }
         }
     }
+
+    if(advertisedDevice->haveServiceUUID()) {
+        Serial.print(" Service UUIDs: ");
+        for (int i = 0; i < advertisedDevice->getServiceUUIDCount(); i++) {
+            Serial.print(advertisedDevice->getServiceUUID(i).toString().c_str());
+            Serial.print(" ");
+        }
+    }
+    Serial.println();
 }
 
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
@@ -55,71 +57,81 @@ EcoflowESP32::EcoflowESP32() : pClient(nullptr)
 EcoflowESP32::~EcoflowESP32()
 {
     delete _scanCallbacks;
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
+    if (_pServerAddress) {
+        delete _pServerAddress;
     }
 }
 
 void EcoflowESP32::setAdvertisedDevice(NimBLEAdvertisedDevice* device) {
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
+    if (_pServerAddress) {
+        delete _pServerAddress;
     }
-    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
+    _pServerAddress = new NimBLEAddress(device->getAddress());
+    device->getScan()->stop();
 }
 
 bool EcoflowESP32::begin()
 {
-    Serial.println(">>>>>>>>>>>>> EcoflowESP32 Library Version: 2.0 <<<<<<<<<<<<<");
+    Serial.println(">>>>>>>>>>>>> EcoflowESP32 Library Version: 2.5 <<<<<<<<<<<<<");
     NimBLEDevice::init("");
-    NimBLEDevice::setMTU(256);
     return true;
 }
 
-NimBLEAdvertisedDevice* EcoflowESP32::scan(uint32_t scanTime) {
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
-        _pAdvertisedDevice = nullptr;
-    }
+bool EcoflowESP32::scan(uint32_t scanTime) {
     NimBLEScan* pScan = NimBLEDevice::getScan();
     pScan->setScanCallbacks(_scanCallbacks);
     pScan->setInterval(100);
     pScan->setWindow(99);
     pScan->setActiveScan(true);
-    pScan->start(scanTime, false); // blocking call
-    return _pAdvertisedDevice;
+    pScan->start(scanTime, false);
+    return _pServerAddress != nullptr;
 }
 
-
-void EcoflowESP32::onConnect(NimBLEClient* pclient) {
-  Serial.println("Connected");
-}
-
-void EcoflowESP32::onDisconnect(NimBLEClient* pclient) {
-  Serial.println("Disconnected");
-}
-
-bool EcoflowESP32::connectToDevice(NimBLEAdvertisedDevice* device) {
+bool EcoflowESP32::connectToServer() {
     if (pClient == nullptr) {
         pClient = NimBLEDevice::createClient();
-        pClient->setClientCallbacks(this);
     }
 
     Serial.println("Attempting to connect...");
-    if (!pClient->connect(device)) {
+    if (!_pServerAddress) {
+        Serial.println("No device address set");
+        return false;
+    }
+
+    if (!pClient->connect(*_pServerAddress)) {
         Serial.println("Failed to connect");
         return false;
     }
     Serial.println("Connected successfully");
 
-    NimBLERemoteService* pSvc = nullptr;
-
-    Serial.println("Getting service...");
-    pSvc = pClient->getService(serviceUUID);
-    if(pSvc) {
-        Serial.println("Getting characteristics...");
-        pWriteChr = pSvc->getCharacteristic(writeCharUUID);
-        pReadChr = pSvc->getCharacteristic(readCharUUID);
+    // Let's try to find the characteristics by iterating through services
+    auto services = pClient->getServices();
+    if(services.empty()) {
+        Serial.println("Failed to get services");
+        pClient->disconnect();
+        return false;
     }
+
+    for(auto service : services) {
+        Serial.printf("Found service: %s\n", service->getUUID().toString().c_str());
+        if (service->getUUID().equals(serviceUUID1) || service->getUUID().equals(serviceUUID2)) {
+             pWriteChr = service->getCharacteristic(writeCharUUID1);
+             if(pWriteChr)
+             {
+                pReadChr = service->getCharacteristic(readCharUUID1);
+                if(pReadChr)
+                    break;
+             }
+             pWriteChr = service->getCharacteristic(writeCharUUID2);
+             if(pWriteChr)
+             {
+                pReadChr = service->getCharacteristic(readCharUUID2);
+                if(pReadChr)
+                    break;
+             }
+        }
+    }
+
 
     if (!pWriteChr || !pReadChr) {
         Serial.println("Failed to get characteristics");
@@ -127,12 +139,23 @@ bool EcoflowESP32::connectToDevice(NimBLEAdvertisedDevice* device) {
         return false;
     }
     Serial.println("Characteristics found");
+    Serial.printf("Write characteristic: %s\n", pWriteChr->getUUID().toString().c_str());
+    Serial.printf("Read characteristic: %s\n", pReadChr->getUUID().toString().c_str());
+
 
     if(pReadChr->canNotify()) {
         Serial.println("Subscribing to notifications...");
-        pReadChr->subscribe(true, notifyCallback);
+        if(!pReadChr->subscribe(true, notifyCallback)) {
+            Serial.println("Failed to subscribe to notifications");
+            pClient->disconnect();
+            return false;
+        }
     }
 
+    Serial.println("Sending request for data...");
+    sendCommand(CMD_REQUEST_DATA, sizeof(CMD_REQUEST_DATA));
+
+    delay(500); // Wait for notifications
     return true;
 }
 
@@ -150,21 +173,26 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacte
     }
 }
 
-static int get_int(const uint8_t* data, int offset) {
-    return (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
-}
-
 void EcoflowESP32::parse(uint8_t* pData, size_t length) {
-    if (length < 123) {
+    // TODO: This parsing is likely incorrect and needs to be updated based on the protocol
+    if (length < 20) { // Reduced length check for now
         return;
     }
 
-    _data.batteryLevel = get_int(pData, 35);
-    _data.outputPower = get_int(pData, 18);
-    _data.inputPower = get_int(pData, 22);
-    _data.acOn = get_int(pData, 62) != 0;
-    _data.dcOn = get_int(pData, 83) != 0;
-    _data.usbOn = (get_int(pData, 79) & 0x1) != 0;
+    Serial.print("Received data: ");
+    for(int i=0; i<length; i++) {
+        Serial.printf("%02X ", pData[i]);
+    }
+    Serial.println();
+
+    // The parsing logic from the python code needs to be ported here.
+    // For now, let's just print the raw data.
+    // _data.batteryLevel = get_int(pData, 35);
+    // _data.outputPower = get_int(pData, 18);
+    // _data.inputPower = get_int(pData, 22);
+    // _data.acOn = get_int(pData, 62) != 0;
+    // _data.dcOn = get_int(pData, 83) != 0;
+    // _data.usbOn = (get_int(pData, 79) & 0x1) != 0;
 }
 
 void EcoflowESP32::setAC(bool on) {

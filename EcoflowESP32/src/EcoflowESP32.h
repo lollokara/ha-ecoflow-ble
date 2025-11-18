@@ -17,6 +17,7 @@ private:
 
 class EcoflowESP32 : public NimBLEClientCallbacks
 {
+    friend class EcoflowScanCallbacks;
 public:
     /**
      * @brief Construct a new EcoflowESP32 object.
@@ -39,14 +40,14 @@ public:
      * @param scanTime The duration of the scan in seconds.
      * @return A pointer to the advertised device if found, nullptr otherwise.
      */
-    NimBLEAdvertisedDevice* scan(uint32_t scanTime = 5);
+    bool scan(uint32_t scanTime = 5);
 
     /**
      * @brief Connect to an Ecoflow device.
      * @param device A pointer to the advertised device to connect to.
      * @return true if the connection was successful, false otherwise.
      */
-    bool connectToDevice(NimBLEAdvertisedDevice* device);
+    bool connectToServer();
 
     /**
      * @brief Turn the AC output on or off.
@@ -105,8 +106,6 @@ public:
     void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
 
 private:
-    void onConnect(NimBLEClient* pclient);
-    void onDisconnect(NimBLEClient* pclient);
     static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
     void parse(uint8_t* pData, size_t length);
     bool sendCommand(const uint8_t* command, size_t size);
@@ -118,7 +117,7 @@ private:
     static EcoflowESP32* _instance;
 
     EcoflowScanCallbacks* _scanCallbacks;
-    NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
+    NimBLEAddress* _pServerAddress = nullptr;
 };
 
 #endif

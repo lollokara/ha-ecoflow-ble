@@ -4,48 +4,41 @@ EcoflowESP32 ecoflow;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting EcoflowESP32 BareMinimum example...");
-
+  Serial.println("Starting EcoflowESP32 example...");
   ecoflow.begin();
 }
 
 void loop() {
-  // Data is updated via notifications, so we can just read the latest values here.
-  NimBLEAdvertisedDevice* pDevice = ecoflow.scan(5);
+  if (ecoflow.scan(5)) {
+    if (ecoflow.connectToServer()) {
+      Serial.println("Connected! Now reading data for 10 seconds...");
+      for (int i = 0; i < 5; i++) {
+        delay(2000);
+        Serial.print("Battery Level: ");
+        Serial.print(ecoflow.getBatteryLevel());
+        Serial.println("%");
 
-  if (pDevice != nullptr) {
-    Serial.print("Found device: ");
-    Serial.println(pDevice->getAddress().toString().c_str());
-    if (ecoflow.connectToDevice(pDevice)) {
-      Serial.println("Connected to device. Waiting for data...");
-    } else {
-      Serial.println("Failed to connect to device.");
+        Serial.print("Input Power: ");
+        Serial.print(ecoflow.getInputPower());
+        Serial.println("W");
+
+        Serial.print("Output Power: ");
+        Serial.print(ecoflow.getOutputPower());
+        Serial.println("W");
+
+        Serial.print("AC Status: ");
+        Serial.println(ecoflow.isAcOn() ? "On" : "Off");
+
+        Serial.print("DC Status: ");
+        Serial.println(ecoflow.isDcOn() ? "On" : "Off");
+
+        Serial.print("USB Status: ");
+        Serial.println(ecoflow.isUsbOn() ? "On" : "Off");
+
+        Serial.println("--------------------");
+      }
     }
-  } else {
-    Serial.println("No Ecoflow device found.");
   }
-  Serial.print("Battery Level: ");
-  Serial.print(ecoflow.getBatteryLevel());
-  Serial.println("%");
-
-  Serial.print("Input Power: ");
-  Serial.print(ecoflow.getInputPower());
-  Serial.println("W");
-
-  Serial.print("Output Power: ");
-  Serial.print(ecoflow.getOutputPower());
-  Serial.println("W");
-
-  Serial.print("AC Status: ");
-  Serial.println(ecoflow.isAcOn() ? "On" : "Off");
-
-  Serial.print("DC Status: ");
-  Serial.println(ecoflow.isDcOn() ? "On" : "Off");
-
-  Serial.print("USB Status: ");
-  Serial.println(ecoflow.isUsbOn() ? "On" : "Off");
-
-  Serial.println("--------------------");
 
   delay(1000);
 }
