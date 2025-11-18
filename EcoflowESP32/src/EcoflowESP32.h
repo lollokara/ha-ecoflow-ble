@@ -125,7 +125,7 @@ private:
     static EcoflowESP32* _instance;
 
     EcoflowScanCallbacks* _scanCallbacks;
-    NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
+    NimBLEAddress* m_pDeviceAddress = nullptr;
 };
 
 #endif
