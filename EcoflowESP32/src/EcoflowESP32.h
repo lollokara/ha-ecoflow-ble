@@ -1,76 +1,83 @@
+/*
+ * EcoflowESP32.h - Header file (Updated - getInstance moved to .cpp)
+ */
+
 #ifndef EcoflowESP32_h
 #define EcoflowESP32_h
 
-#include "Arduino.h"
-#include "NimBLEDevice.h"
+#include <NimBLEDevice.h>
 #include "EcoflowData.h"
-#include <string>
+#include "EcoflowProtocol.h"
 
-/**
- * @file EcoflowESP32.h
- * @brief Ecoflow BLE communication library for ESP32
- *
- * Compatible with multiple NimBLE-Arduino versions
- */
+// Forward declaration
+struct EcoflowData;
 
-class EcoflowESP32 : public NimBLEClientCallbacks {
-
+class EcoflowESP32 {
 public:
     EcoflowESP32();
     ~EcoflowESP32();
 
+    // Lifecycle
     bool begin();
     bool scan(uint32_t scanTime = 5);
     bool connectToServer();
     void disconnect();
+    void update();
 
-    bool sendCommand(const uint8_t* command, size_t size);
-    bool requestData();
+    // Connection status
+    bool isConnected();
 
-    bool setAC(bool on);
-    bool setDC(bool on);
-    bool setUSB(bool on);
-
+    // Getters
     int getBatteryLevel();
     int getInputPower();
     int getOutputPower();
-
     bool isAcOn();
     bool isDcOn();
     bool isUsbOn();
-    bool isConnected();
 
-    void update();
-    void parse(uint8_t* pData, size_t length);
-    void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
+    // Commands
+    bool requestData();
+    bool setAC(bool on);
+    bool setDC(bool on);
+    bool setUSB(bool on);
+    bool sendCommand(const uint8_t* command, size_t size);
+
+    // Callbacks (for connection/disconnection only)
+    void onConnect(NimBLEClient* pclient);
+    void onDisconnect(NimBLEClient* pclient);
     
-    // NEW: Service discovery diagnostic
-    void dumpAllServices();
+    // Notification handler (called from lambda callback)
+    void onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                  uint8_t* pData,
+                  size_t length,
+                  bool isNotify);
 
-protected:
-    void onConnect(NimBLEClient* pclient) override;
-    void onDisconnect(NimBLEClient* pclient) override;
+    // Singleton - defined in .cpp
+    static EcoflowESP32* getInstance();
 
 private:
+    // BLE objects
     NimBLEClient* pClient;
     NimBLERemoteCharacteristic* pWriteChr;
     NimBLERemoteCharacteristic* pReadChr;
     NimBLEAdvertisedDevice* m_pAdvertisedDevice;
 
+    // State
+    EcoflowData _data;
     bool _connected;
     bool _authenticated;
     bool _running;
     bool _subscribedToNotifications;
-
     TaskHandle_t _keepAliveTaskHandle;
-    unsigned long _lastDataTime;
-    EcoflowData _data;
+    uint32_t _lastDataTime;
 
+    // Static instance
     static EcoflowESP32* _instance;
 
+    // Internal methods
     bool _resolveCharacteristics();
-    void _keepAliveTask();
-    static void _keepAliveTaskStatic(void* pvParameters);
+    void parse(uint8_t* pData, size_t length);
+    void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
 };
 
-#endif // EcoflowESP32_h
+#endif
