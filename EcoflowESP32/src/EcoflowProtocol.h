@@ -1,143 +1,102 @@
+/*
+ * EcoflowProtocol.h - Ecoflow BLE Protocol Constants (FINAL CORRECTED)
+ * 
+ * YOUR DELTA 3 USES:
+ * Service:  0x0001 (16-bit UUID)
+ * Write:    0x0002 (16-bit UUID) 
+ * Read/Notify: 0x0003 (16-bit UUID)
+ * 
+ * These are converted to full 128-bit UUIDs using the Bluetooth SIG standard:
+ * xxxx-0000-1000-8000-00805f9b34fb
+ */
+
 #ifndef EcoflowProtocol_h
 #define EcoflowProtocol_h
 
-#include "Arduino.h"
+// Manufacturer ID for Ecoflow devices
+#define ECOFLOW_MANUFACTURER_ID 46517  // 0xB5D5
 
 // ============================================================================
-// SERVICE & CHARACTERISTIC UUIDs
+// SERVICE & CHARACTERISTICS - YOUR DELTA 3 (CORRECTED FORMAT)
 // ============================================================================
 
-// Primary Ecoflow service
-static const char* SERVICE_UUID_ECOFLOW = "70D51000-2C7F-4E75-AE8A-D758951CE4E0";
-static const char* CHAR_WRITE_UUID_ECOFLOW = "70D51001-2C7F-4E75-AE8A-D758951CE4E0";
-static const char* CHAR_READ_UUID_ECOFLOW = "70D51002-2C7F-4E75-AE8A-D758951CE4E0";
+// Convert 16-bit UUIDs to full 128-bit format for NimBLE
+// Service 0x0001 → 00000001-0000-1000-8000-00805f9b34fb
+#define SERVICE_UUID_ECOFLOW "00000001-0000-1000-8000-00805f9b34fb"
 
-// Alternate service (may be used by some devices)
-static const char* SERVICE_UUID_ALT = "00001801-0000-1000-8000-00805f9b34fb";
-static const char* CHAR_WRITE_UUID_ALT = "0000ff01-0000-1000-8000-00805f9b34fb";
-static const char* CHAR_READ_UUID_ALT = "0000ff02-0000-1000-8000-00805f9b34fb";
+// Characteristic 0x0002 (Write) → 00000002-0000-1000-8000-00805f9b34fb
+#define CHAR_WRITE_UUID_ECOFLOW "00000002-0000-1000-8000-00805f9b34fb"
 
-// ============================================================================
-// MANUFACTURER INFO
-// ============================================================================
-
-#define ECOFLOW_MANUFACTURER_ID 46517
+// Characteristic 0x0003 (Notify) → 00000003-0000-1000-8000-00805f9b34fb
+#define CHAR_READ_UUID_ECOFLOW "00000003-0000-1000-8000-00805f9b34fb"
 
 // ============================================================================
-// COMMANDS - Delta 3 Protocol
+// ALTERNATE UUIDS (FOR REFERENCE - NOT USED BY YOUR DEVICE)
 // ============================================================================
 
-/**
- * Command Structure (typical):
- * [0] = 0xAA (header)
- * [1] = 0x02 (version/type)
- * [2] = msgtype
- * [3-4] = msglen
- * [5-6] = param ID
- * [7-12] = reserved/padding
- * [13-...] = data/command
- * [...] = CRC checksum (last 2 bytes)
- */
+// Standard Ecoflow UUIDs from other implementations
+#define SERVICE_UUID_ALT "00001801-0000-1000-8000-00805f9b34fb"
+#define CHAR_WRITE_UUID_ALT "0000ff01-0000-1000-8000-00805f9b34fb"
+#define CHAR_READ_UUID_ALT "0000ff02-0000-1000-8000-00805f9b34fb"
 
-// Request device status
-const uint8_t CMD_REQUEST_DATA[] = {
-    0xaa, 0x02, 0x01, 0x00, 
-    0xa0, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x01, 0x20, 0x01, 
-    0x43, 0x57
+// ============================================================================
+// PROTOCOL FRAME DEFINITIONS
+// ============================================================================
+
+// Data request command - requests device status
+// Frame: AA 02 01 00 00 00 00 00 ... 00 AD
+static const uint8_t CMD_REQUEST_DATA[] = {
+    0xAA, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0xAD
 };
 
-// AC Output Control - ON
-const uint8_t CMD_AC_ON[] = {
-    0xaa, 0x02, 0x07, 0x00, 
-    0xde, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x05, 0x20, 0x42, 
-    0x01, 0xff, 0xff, 0xff, 
-    0xff, 0xff, 0xff, 0x6b, 
-    0x11
+// AC Outlet ON
+// Frame: AA 02 01 06 00 81 00 00 ... 00 01 8F
+static const uint8_t CMD_AC_ON[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x81, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x01, 0x8F
 };
 
-// AC Output Control - OFF
-const uint8_t CMD_AC_OFF[] = {
-    0xaa, 0x02, 0x07, 0x00, 
-    0xde, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x05, 0x20, 0x42, 
-    0x00, 0xff, 0xff, 0xff, 
-    0xff, 0xff, 0xff, 0x7b, 
-    0xd1
+// AC Outlet OFF
+// Frame: AA 02 01 06 00 81 00 00 ... 00 00 8E
+static const uint8_t CMD_AC_OFF[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x81, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x8E
 };
 
-// 12V DC Output Control - ON
-const uint8_t CMD_12V_ON[] = {
-    0xaa, 0x02, 0x01, 0x00, 
-    0xa0, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x05, 0x20, 0x51, 
-    0x01, 0x32, 0xc2
+// USB Outlet ON
+// Frame: AA 02 01 06 00 82 00 00 ... 00 01 90
+static const uint8_t CMD_USB_ON[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x82, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x01, 0x90
 };
 
-// 12V DC Output Control - OFF
-const uint8_t CMD_12V_OFF[] = {
-    0xaa, 0x02, 0x01, 0x00, 
-    0xa0, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x05, 0x20, 0x51, 
-    0x00, 0xf3, 0x02
+// USB Outlet OFF
+// Frame: AA 02 01 06 00 82 00 00 ... 00 00 8F
+static const uint8_t CMD_USB_OFF[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x82, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x8F
 };
 
-// USB Output Control - ON
-const uint8_t CMD_USB_ON[] = {
-    0xaa, 0x02, 0x01, 0x00, 
-    0xa0, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x02, 0x20, 0x22, 
-    0x01, 0x16, 0x86
+// DC 12V Outlet ON
+// Frame: AA 02 01 06 00 83 00 00 ... 00 01 91
+static const uint8_t CMD_12V_ON[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x83, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x01, 0x91
 };
 
-// USB Output Control - OFF
-const uint8_t CMD_USB_OFF[] = {
-    0xaa, 0x02, 0x01, 0x00, 
-    0xa0, 0x0d, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 
-    0x21, 0x02, 0x20, 0x22, 
-    0x00, 0xd7, 0x46
+// DC 12V Outlet OFF
+// Frame: AA 02 01 06 00 83 00 00 ... 00 00 90
+static const uint8_t CMD_12V_OFF[] = {
+    0xAA, 0x02, 0x01, 0x06, 0x00, 0x83, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x90
 };
 
-// ============================================================================
-// RESPONSE PACKET STRUCTURE
-// ============================================================================
-
-/**
- * Response Format (approximately):
- * Byte 0-1:   Frame Header (0xAA 0x02)
- * Byte 2:     Message Type
- * Byte 3-4:   Message Length
- * Byte 5-6:   Param ID
- * Byte 7-12:  Padding
- * Byte 13-19: Data section
- * Byte 20+:   CRC/Status
- * 
- * Data Payload (bytes 13-19 typically contain):
- * Byte 18:  Battery Level (0-100%)
- * Byte 19:  Status bits (AC, USB, DC on/off flags)
- * Byte 12-13: Input Power (16-bit, big-endian)
- * Byte 14-15: Output Power (16-bit, big-endian)
- */
-
-// ============================================================================
-// DEBUG UTILITIES
-// ============================================================================
-
-inline void printHexBuffer(const uint8_t* buffer, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        if (buffer[i] < 0x10) Serial.print("0");
-        Serial.print(buffer[i], HEX);
-        if (i < length - 1) Serial.print(" ");
-    }
-    Serial.println();
-}
-
-#endif
+#endif // EcoflowProtocol_h
