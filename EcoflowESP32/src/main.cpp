@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "EcoflowESP32.h"
 #include "Credentials.h"
-#include "Ecoflow_mbedtls_test.h"
 
 EcoflowESP32 ecoflow;
 
@@ -11,13 +10,6 @@ void setup() {
         ; // wait for serial port to connect. Needed for native USB
     }
     Serial.println("Starting...");
-
-    if (!Ecoflow_mbedtls_test::run_test()) {
-        Serial.println("Crypto test failed. Halting.");
-        while (1) {
-            ;
-        }
-    }
 
     ecoflow.begin();
     ecoflow.setCredentials(ECOFLOW_USER_ID, ECOFLOW_DEVICE_SN);
