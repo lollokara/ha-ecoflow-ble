@@ -348,21 +348,27 @@ bool EcoflowESP32::_startAuthentication() {
 }
 
 void EcoflowESP32::_sendPublicKey() {
-    uint8_t pubKey[65]; // Increased size for larger keys
-    size_t key_len;
-    EcoflowECDH::generate_public_key(pubKey, &key_len, _private_key);
-
-    auto cmd = EcoflowCommands::buildPublicKey(pubKey, key_len);
-    _sendCommand(cmd);
-    _setState(ConnectionState::PUBLIC_KEY_SENT);
+    uint8_t pubKey[40];
+    if (EcoflowECDH::generate_public_key(pubKey, _private_key)) {
+        auto cmd = EcoflowCommands::buildPublicKey(pubKey, sizeof(pubKey));
+        _sendCommand(cmd);
+        _setState(ConnectionState::PUBLIC_KEY_SENT);
+    } else {
+        Serial.println(">>> [ERROR] Failed to generate public key");
+        disconnect();
+    }
 }
 
 void EcoflowESP32::_handlePublicKeyExchange(const std::vector<uint8_t>& payload) {
     if (!payload.empty()) {
-        EcoflowECDH::compute_shared_secret(payload.data(), payload.size(), _shared_key, _private_key);
-        mbedtls_md5(_shared_key, 32, _iv);
-        memcpy(_sessionIV, _iv, 16); // Use the same IV for the session
-        _requestSessionKey();
+        if (EcoflowECDH::compute_shared_secret(payload.data(), _shared_key, _private_key)) {
+            mbedtls_md5(_shared_key, 20, _iv);
+            memcpy(_sessionIV, _iv, 16); // Use the same IV for the session
+            _requestSessionKey();
+        } else {
+            Serial.println(">>> [ERROR] Failed to compute shared secret");
+            disconnect();
+        }
     }
 }
 
@@ -373,10 +379,13 @@ void EcoflowESP32::_requestSessionKey() {
 }
 
 void EcoflowESP32::_handleSessionKeyResponse(const std::vector<uint8_t>& payload) {
-    if (payload.size() >= 17+56) {
-        EcoflowECDH::generateSessionKey(payload.data() + 1, payload.data() + 17, _sessionKey);
+    if (payload.size() >= 17) { // 1 byte something + 16 bytes seed
+        EcoflowECDH::generateSessionKey(payload.data() + 1, _shared_key, _sessionKey);
         _sessionKeyEstablished = true;
         _requestAuthStatus();
+    } else {
+        Serial.println(">>> [ERROR] Session key response too short");
+        disconnect();
     }
 }
 

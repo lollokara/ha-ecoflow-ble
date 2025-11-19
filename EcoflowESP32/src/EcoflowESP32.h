@@ -107,7 +107,7 @@ private:
     bool _notificationReceived = false;
 
     uint8_t _private_key[21];
-    uint8_t _shared_key[32]; // Increased to 32 for SHA256, although MD5 uses less
+    uint8_t _shared_key[20];
     uint8_t _sessionKey[16];
     uint8_t _sessionIV[16];
     uint8_t _iv[16];

@@ -1,11 +1,12 @@
 #include "EcoflowECDH.h"
 #include <Arduino.h>
-#include "Ecoflow_mbedtls.h"
-#include "mbedtls/ecdh.h"
-#include "mbedtls/ecp.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
 #include "mbedtls/md5.h"
+#include "esp_system.h" // For esp_random
+
+extern "C" {
+#include "uECC.h"
+}
+
 extern "C" {
 #include "Credentials.h"
 }
@@ -13,136 +14,38 @@ extern "C" {
 
 namespace EcoflowECDH {
 
-// Helper to initialize the RNG
-static int init_rng(mbedtls_ctr_drbg_context *ctr_drbg, mbedtls_entropy_context *entropy) {
-    const char *pers = "ecflow_esp32";
-    mbedtls_entropy_init(entropy);
-    mbedtls_ctr_drbg_init(ctr_drbg);
-    return mbedtls_ctr_drbg_seed(ctr_drbg, mbedtls_entropy_func, entropy,
-                               (const unsigned char *)pers, strlen(pers));
+// RNG function for uECC
+static int ecoflow_uECC_rng(uint8_t *dest, unsigned size) {
+    esp_fill_random(dest, size);
+    return 1;
 }
 
-void generate_public_key(uint8_t* buf, size_t* len, uint8_t* private_key_out) {
-    mbedtls_ecp_group grp;
-    mbedtls_mpi d;
-    mbedtls_ecp_point q;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-    int ret = 0;
+bool generate_public_key(uint8_t* public_key, uint8_t* private_key) {
+    const struct ecoflow_uECC_Curve_t * curve = ecoflow_uECC_secp160r1();
+    ecoflow_uECC_set_rng(&ecoflow_uECC_rng);
 
-    mbedtls_mpi_init(&d);
-    mbedtls_ecp_point_init(&q);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_entropy_init(&entropy);
-
-    if (init_rng(&ctr_drbg, &entropy) != 0) {
-        Serial.printf("Failed to init rng\n");
-        goto cleanup;
+    if (!ecoflow_uECC_make_key(public_key, private_key, curve)) {
+        Serial.println("ecoflow_uECC_make_key() failed");
+        return false;
     }
-
-    ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
-    if(ret != 0) {
-        Serial.printf("Failed to load group: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_ecdh_gen_public(&grp, &d, &q, mbedtls_ctr_drbg_random, &ctr_drbg);
-    if(ret != 0) {
-        Serial.printf("Failed to gen public key: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_mpi_write_binary(&d, private_key_out, 21);
-    if(ret != 0) {
-        Serial.printf("Failed to write private key: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_ecp_point_write_binary(&grp, &q,
-                                         MBEDTLS_ECP_PF_UNCOMPRESSED, len,
-                                         buf, 65);
-    if(ret != 0) {
-        Serial.printf("Failed to write public key: %d\n", ret);
-        *len = 0;
-    }
-
-
-cleanup:
-    mbedtls_ecp_group_free(&grp);
-    mbedtls_mpi_free(&d);
-    mbedtls_ecp_point_free(&q);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    return true;
 }
 
-void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t* shared_secret_out, const uint8_t* private_key) {
-    mbedtls_ecp_group grp;
-    mbedtls_mpi d, z;
-    mbedtls_ecp_point qp;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-    int ret = 0;
-
-    mbedtls_mpi_init(&d);
-    mbedtls_mpi_init(&z);
-    mbedtls_ecp_point_init(&qp);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_entropy_init(&entropy);
-
-    if (init_rng(&ctr_drbg, &entropy) != 0) {
-        Serial.printf("Failed to init rng\n");
-        goto cleanup;
+bool compute_shared_secret(const uint8_t* peer_pub_key, uint8_t* shared_secret, const uint8_t* private_key) {
+    const struct ecoflow_uECC_Curve_t * curve = ecoflow_uECC_secp160r1();
+    if (!ecoflow_uECC_shared_secret(peer_pub_key, private_key, shared_secret, curve)) {
+        Serial.println("ecoflow_uECC_shared_secret() failed");
+        return false;
     }
-
-    ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
-    if(ret != 0) {
-        Serial.printf("Failed to load group: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_mpi_read_binary(&d, private_key, 21);
-    if(ret != 0) {
-        Serial.printf("Failed to read private key: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_ecp_point_read_binary(&grp, &qp, peer_pub_key, peer_len);
-    if(ret != 0) {
-        Serial.printf("Failed to read peer public key: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_ecdh_compute_shared(&grp, &z, &qp, &d,
-                                      mbedtls_ctr_drbg_random, &ctr_drbg);
-    if(ret != 0) {
-        Serial.printf("Failed to compute shared secret: %d\n", ret);
-        goto cleanup;
-    }
-
-    ret = mbedtls_mpi_write_binary(&z, shared_secret_out, 20);
-    if(ret != 0) {
-        Serial.printf("Failed to write shared secret: %d\n", ret);
-    }
-
-cleanup:
-    mbedtls_ecp_group_free(&grp);
-    mbedtls_mpi_free(&d);
-    mbedtls_mpi_free(&z);
-    mbedtls_ecp_point_free(&qp);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    return true;
 }
 
-void generateSessionKey(const uint8_t* sRand, const uint8_t* seed, uint8_t* sessionKey) {
-    uint8_t data[32];
-
+void generateSessionKey(const uint8_t* seed, const uint8_t* shared_secret, uint8_t* sessionKey) {
+    uint8_t data[16 + 20]; // 16 from keydata, 20 from shared secret
     int pos = seed[0] * 16 + (seed[1] - 1) * 256;
-
-    memcpy(data, &ECOFLOW_KEYDATA[pos], 8);
-    memcpy(data + 8, &ECOFLOW_KEYDATA[pos + 8], 8);
-    memcpy(data + 16, sRand, 16);
-
-    mbedtls_md5(data, 32, sessionKey);
+    memcpy(data, &ECOFLOW_KEYDATA[pos], 16);
+    memcpy(data + 16, shared_secret, 20);
+    mbedtls_md5(data, sizeof(data), sessionKey);
 }
 
 } // namespace EcoflowECDH
