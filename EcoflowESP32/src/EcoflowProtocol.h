@@ -41,6 +41,7 @@ public:
 
     EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload, uint16_t seq, uint8_t device_sn, const uint8_t* key, const uint8_t* iv);
     static EncPacket* fromBytes(const uint8_t* data, size_t len, const uint8_t* key, const uint8_t* iv);
+    static std::vector<uint8_t> parseSimple(const uint8_t* data, size_t len);
 
     std::vector<uint8_t> toBytes() const;
     const std::vector<uint8_t>& getPayload() const { return _payload; }
@@ -51,6 +52,8 @@ private:
     std::vector<uint8_t> _payload;
     uint16_t _seq;
     uint8_t _device_sn;
+    const uint8_t* _key;
+    const uint8_t* _iv;
 };
 
 namespace EcoflowCommands {

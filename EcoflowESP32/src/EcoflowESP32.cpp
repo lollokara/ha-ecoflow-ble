@@ -308,13 +308,11 @@ void EcoflowESP32::_sendPublicKey() {
 }
 
 void EcoflowESP32::_handlePublicKeyExchange(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, nullptr, nullptr);
-    if (encPkt) {
-        const auto& payload = encPkt->getPayload();
+    auto payload = EncPacket::parseSimple(pData, length);
+    if (!payload.empty()) {
         EcoflowECDH::compute_shared_secret(payload.data() + 3, payload.size() - 3, _shared_key, _private_key);
         mbedtls_md5(_shared_key, 20, _iv);
         _requestSessionKey();
-        delete encPkt;
     }
 }
 
