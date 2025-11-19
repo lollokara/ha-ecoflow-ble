@@ -1,6 +1,6 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
-#include <mbedtls/md5.h>
+#include "uECC.h"
 
 // ============================================================================
 // Static instance & callbacks
@@ -62,9 +62,6 @@ void keepAliveTask(void* param) {
           try {
             std::string val = pThis->pReadChr->readValue();
             if (!val.empty()) {
-              Serial.print(">>> [POLL] Read ");
-              Serial.print(val.size());
-              Serial.println(" bytes from notify characteristic");
               pThis->_decryptAndParseNotification((uint8_t*)val.data(), val.size());
             }
           } catch (...) {
@@ -92,22 +89,8 @@ void handleNotificationCallback(NimBLERemoteCharacteristic* pRemoteCharacteristi
     return;
   }
 
-  Serial.print(">>> [NOTIFY] Received ");
-  Serial.print(length);
-  Serial.print(" bytes: ");
-  size_t maxDump = length < 25 ? length : 25;
-  for (size_t i = 0; i < maxDump; ++i) {
-    if (pData[i] < 0x10) Serial.print("0");
-    Serial.print(pData[i], HEX);
-    Serial.print(" ");
-  }
-  if (length > 25) Serial.print("...");
-  Serial.println();
-
   EcoflowESP32* inst = EcoflowESP32::getInstance();
   if (inst) {
-    inst->_notificationReceived = true;
-    inst->_lastNotificationTime = millis();
     inst->onNotify(pRemoteCharacteristic, pData, length, isNotify);
   }
 }
@@ -144,7 +127,8 @@ EcoflowESP32::EcoflowESP32()
       _authenticated(false),
       _subscribedToNotifications(false),
       _keepAliveTaskHandle(nullptr),
-      _sessionKeyEstablished(false) {
+      _sessionKeyEstablished(false),
+      _authState(IDLE) {
   _instance = this;
   memset(_sessionKey, 0, 16);
   memset(_sessionIV, 0, 16);
@@ -261,39 +245,10 @@ bool EcoflowESP32::connectToServer() {
     return false;
   }
 
-  // Reuse existing client if connected with notifications
   if (pClient && pClient->isConnected()) {
-    if (pWriteChr && pReadChr && _subscribedToNotifications) {
-      Serial.println(">>> Already connected with notifications active");
-      _connected = true;
-
-      if (!_authenticated) {
-        if (!_authenticate()) {
-          Serial.println(">>> ERROR: Authentication failed on reused client");
-          _connected = false;
-          return false;
-        }
-      }
-
-      _startKeepAliveTask();
-      return true;
-    }
-
-    try {
-      pClient->disconnect();
-    } catch (...) {
-    }
-    try {
-      NimBLEDevice::deleteClient(pClient);
-    } catch (...) {
-    }
-    pClient = nullptr;
-    pWriteChr = nullptr;
-    pReadChr = nullptr;
-    _subscribedToNotifications = false;
+    return true;
   }
 
-  // Connect with retries
   for (uint8_t attempt = 1; attempt <= CONNECT_RETRIES; ++attempt) {
     Serial.print(">>> Connection attempt ");
     Serial.print(attempt);
@@ -309,9 +264,6 @@ bool EcoflowESP32::connectToServer() {
       }
 
       pClient->setClientCallbacks(&g_clientCallback, false);
-
-      Serial.print(">>> Connecting to ");
-      Serial.println(m_pAdvertisedDevice->getAddress().toString().c_str());
 
       if (!pClient->connect(m_pAdvertisedDevice, false)) {
         Serial.println(">>> Failed to connect");
@@ -338,7 +290,6 @@ bool EcoflowESP32::connectToServer() {
 
       _connected = true;
 
-      // Subscribe to notifications
       if (pReadChr) {
         try {
           pReadChr->subscribe(true, handleNotificationCallback, false);
@@ -358,7 +309,6 @@ bool EcoflowESP32::connectToServer() {
         }
       }
 
-      // Authenticate
       if (!_authenticate()) {
         Serial.println(">>> ERROR: Authentication failed");
         try {
@@ -372,14 +322,6 @@ bool EcoflowESP32::connectToServer() {
         if (attempt < CONNECT_RETRIES) delay(CONNECT_RETRY_DELAY_MS);
         continue;
       }
-
-      // Start keep-alive
-      _startKeepAliveTask();
-
-      Serial.println("\n╔════════════════════════════════════════╗");
-      Serial.println("║ ✓ Successfully connected & authenticated ║");
-      Serial.println("║ Device ready for commands ║");
-      Serial.println("╚════════════════════════════════════════╝\n");
 
       return true;
 
@@ -429,69 +371,36 @@ bool EcoflowESP32::_resolveCharacteristics() {
 }
 
 bool EcoflowESP32::_authenticate() {
-  if (!pWriteChr || !_connected) {
-    Serial.println(">>> [AUTH] ERROR: Write characteristic not ready");
-    return false;
-  }
-
   Serial.println(">>> [AUTH] Starting authentication sequence...");
+  _authState = WAITING_FOR_DEVICE_PUBLIC_KEY;
 
-  // Generate session key via ECDH
-  uint8_t sRand[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-  uint8_t seed[2] = {0x00, 0x01};
+  EcoflowECDH::generateKeys();
+  const uint8_t* public_key = EcoflowECDH::getPublicKey();
 
-  EcoflowECDH::generateSessionKey(sRand, seed, _sessionKey, _sessionIV);
-  _sessionKeyEstablished = true;
+  std::vector<uint8_t> payload;
+  payload.push_back(0x01);
+  payload.push_back(0x00);
+  payload.insert(payload.end(), public_key, public_key + ef_uECC_BYTES * 2);
 
-  Serial.print(">>> [AUTH] Session key: ");
-  for (int i = 0; i < 16; i++) {
-    if (_sessionKey[i] < 0x10) Serial.print("0");
-    Serial.print(_sessionKey[i], HEX);
-  }
-  Serial.println();
-
-  // Build auto-auth command
-  auto authCmd = EcoflowCommands::buildAutoAuthentication(_userId, _deviceSn);
-
-  // Wrap in encrypted EncPacket
   EncPacket enc(ENCPACKET_FRAME_TYPE_COMMAND, ENCPACKET_PAYLOAD_TYPE_VX_PROTOCOL,
-                authCmd.data(), authCmd.size(),
-                0, 0, _sessionKey, _sessionIV);
+                payload.data(), payload.size());
 
   auto encBytes = enc.toBytes();
+  sendEncryptedCommand(encBytes);
 
-  // Send encrypted auth
-  _authResponseReceived = false;
-  try {
-    pWriteChr->writeValue(encBytes.data(), encBytes.size(), true);
-    Serial.println(">>> [AUTH] ✓ Sent encrypted auth command");
-  } catch (...) {
-    Serial.println(">>> [AUTH] ERROR: Failed to send auth command");
-    return false;
-  }
-
-  // Wait for auth response
-  Serial.println(">>> [AUTH] Waiting for device to authenticate...");
   uint32_t authStart = millis();
   while (millis() - authStart < AUTH_TIMEOUT_MS) {
-    if (_authResponseReceived) {
-      Serial.println(">>> [AUTH] ✓ Device authenticated successfully");
-      _authenticated = true;
+    if (_authenticated) {
+      Serial.println("\n╔════════════════════════════════════════╗");
+      Serial.println("║ ✓ Successfully connected & authenticated ║");
+      Serial.println("║ Device ready for commands ║");
+      Serial.println("╚════════════════════════════════════════╝\n");
+      _startKeepAliveTask();
       return true;
     }
     delay(100);
   }
-
-  // Some devices don't send explicit auth response, but accept the auth
-  if (_notificationReceived) {
-    Serial.println(">>> [AUTH] ✓ Received data notification (assuming auth OK)");
-    _authenticated = true;
-    return true;
-  }
-
-  Serial.println(">>> [AUTH] WARNING: No response, but proceeding...");
-  _authenticated = true;
-  return true;
+  return false;
 }
 
 void EcoflowESP32::disconnect() {
@@ -551,9 +460,6 @@ bool EcoflowESP32::sendEncryptedCommand(const std::vector<uint8_t>& packet) {
 
   try {
     pWriteChr->writeValue((uint8_t*)packet.data(), packet.size(), true);
-    Serial.print(">>> [SEND] Sent ");
-    Serial.print(packet.size());
-    Serial.println(" encrypted bytes");
     return true;
   } catch (...) {
     Serial.println(">>> [SEND] ERROR: Write failed");
@@ -628,14 +534,100 @@ bool EcoflowESP32::setUSB(bool on) {
 // ============================================================================
 // Notification handling & parsing
 // ============================================================================
+void EcoflowESP32::onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                            uint8_t* pData, size_t length, bool isNotify) {
+    switch(_authState) {
+        case WAITING_FOR_DEVICE_PUBLIC_KEY:
+            initBleSessionKeyHandler(pRemoteCharacteristic, pData, length, isNotify);
+            break;
+        case WAITING_FOR_SRAND_SEED:
+            getKeyInfoReqHandler(pRemoteCharacteristic, pData, length, isNotify);
+            break;
+        case WAITING_FOR_AUTH_RESPONSE:
+            authHandler(pRemoteCharacteristic, pData, length, isNotify);
+            break;
+        default:
+            _decryptAndParseNotification(pData, length);
+    }
+}
+
+
+void EcoflowESP32::initBleSessionKeyHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                                            uint8_t* pData, size_t length, bool isNotify) {
+    EncPacket* enc_packet = EncPacket::fromBytes(pData, length);
+    if (enc_packet) {
+        const auto& payload = enc_packet->getPayload();
+        uint8_t device_public_key[ef_uECC_BYTES * 2];
+        memcpy(device_public_key, payload.data() + 3, ef_uECC_BYTES * 2);
+        EcoflowECDH::computeSharedSecret(device_public_key);
+
+        std::vector<uint8_t> req_payload;
+        req_payload.push_back(0x02);
+        EncPacket req_enc(ENCPACKET_FRAME_TYPE_COMMAND, ENCPACKET_PAYLOAD_TYPE_VX_PROTOCOL,
+                          req_payload.data(), req_payload.size());
+        auto encBytes = req_enc.toBytes();
+        sendEncryptedCommand(encBytes);
+        _authState = WAITING_FOR_SRAND_SEED;
+        delete enc_packet;
+    }
+}
+
+void EcoflowESP32::getKeyInfoReqHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                                       uint8_t* pData, size_t length, bool isNotify) {
+    EncPacket* enc_packet = EncPacket::fromBytes(pData, length);
+    if (enc_packet) {
+        const auto& encrypted_payload = enc_packet->getPayload();
+
+        // The IV for this step is derived from the shared key itself
+        uint8_t temp_iv[16];
+        mbedtls_md5_context md5_ctx;
+        mbedtls_md5_init(&md5_ctx);
+        mbedtls_md5_starts_ret(&md5_ctx);
+        mbedtls_md5_update(&md5_ctx, EcoflowECDH::getSharedKey().data(), EcoflowECDH::getSharedKey().size());
+        mbedtls_md5_finish(&md5_ctx, temp_iv);
+        mbedtls_md5_free(&md5_ctx);
+
+        auto decrypted_payload = EncPacket::decryptPayload(encrypted_payload.data() + 1, encrypted_payload.size() - 1, EcoflowECDH::getSharedKey().data(), temp_iv);
+
+        uint8_t sRand[16];
+        uint8_t seed[2];
+        memcpy(sRand, decrypted_payload.data(), 16);
+        memcpy(seed, decrypted_payload.data() + 16, 2);
+
+        EcoflowECDH::generateSessionKey(sRand, seed, _sessionKey, _sessionIV);
+        _sessionKeyEstablished = true;
+
+        auto authCmd = EcoflowCommands::buildAutoAuthentication(_userId, _deviceSn);
+        EncPacket auth_enc(ENCPACKET_FRAME_TYPE_COMMAND, ENCPACKET_PAYLOAD_TYPE_VX_PROTOCOL,
+                           authCmd.data(), authCmd.size(), 0, 0, _sessionKey, _sessionIV);
+        auto encBytes = auth_enc.toBytes();
+        sendEncryptedCommand(encBytes);
+        _authState = WAITING_FOR_AUTH_RESPONSE;
+        delete enc_packet;
+    }
+}
+
+void EcoflowESP32::authHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                               uint8_t* pData, size_t length, bool isNotify) {
+    EncPacket* enc_packet = EncPacket::fromBytes(pData, length, _sessionKey, _sessionIV);
+    if (enc_packet) {
+        Packet* packet = Packet::fromBytes(enc_packet->getPayload().data(), enc_packet->getPayload().size());
+        if (packet) {
+            if (packet->getPayload()[0] == 0x00) {
+                _authenticated = true;
+                _authState = IDLE;
+            }
+            delete packet;
+        }
+        delete enc_packet;
+    }
+}
 
 bool EcoflowESP32::_decryptAndParseNotification(const uint8_t* pData, size_t length) {
   if (length < 6) return false;
 
   // Check for EncPacket prefix (0x5a 0x5a)
   if (pData[0] != 0x5a || pData[1] != 0x5a) {
-    Serial.println(">>> [PARSE] Not an EncPacket, trying raw parse");
-    parse((uint8_t*)pData, length);
     return true;
   }
 
@@ -647,25 +639,12 @@ bool EcoflowESP32::_decryptAndParseNotification(const uint8_t* pData, size_t len
   }
 
   const auto& decrypted = pEncPacket->getPayload();
-  Serial.print(">>> [DECRYPT] Decrypted ");
-  Serial.print(decrypted.size());
-  Serial.println(" bytes");
 
   // Parse inner Packet (0xaa)
   if (decrypted.size() > 0 && decrypted[0] == 0xaa) {
     Packet* pPkt = Packet::fromBytes(decrypted.data(), decrypted.size());
     if (pPkt) {
-      const auto& payload = pPkt->getPayload();
-      Serial.print(">>> [PACKET] cmd_id=");
-      Serial.print(pPkt->getCmdId());
-      Serial.print(", payload_len=");
-      Serial.println(payload.size());
-
-      // Detect auth response
-      if (pPkt->getCmdId() == PACKET_CMD_ID_GET_AUTH_STATUS) {
-        _authResponseReceived = true;
-        Serial.println(">>> [AUTH] Auth status response received");
-      } else if (pPkt->getCmdId() == PACKET_CMD_ID_REQUEST_STATUS) {
+      if (pPkt->getCmdId() == PACKET_CMD_ID_REQUEST_STATUS) {
         // Parse status
         EcoflowDelta3::Status status;
         if (EcoflowDelta3::parseStatusResponse(pPkt, status)) {
@@ -679,39 +658,13 @@ bool EcoflowESP32::_decryptAndParseNotification(const uint8_t* pData, size_t len
           _data.dcOn = status.dcOn;
           _data.usbOn = status.usbOn;
 
-          Serial.print(">>> [STATUS] Batt:");
-          Serial.print(_data.batteryLevel);
-          Serial.print("% In:");
-          Serial.print(_data.inputPower);
-          Serial.print("W Out:");
-          Serial.print(_data.outputPower);
-          Serial.print("W AC:");
-          Serial.print(_data.acOn ? "ON" : "OFF");
-          Serial.println();
         }
       }
-
       delete pPkt;
     }
-  } else {
-    parse((uint8_t*)decrypted.data(), decrypted.size());
   }
-
   delete pEncPacket;
   return true;
-}
-
-void EcoflowESP32::parse(uint8_t* pData, size_t length) {
-  // Legacy v1 frame parser (optional, for backwards compat)
-  if (length >= 21 && pData[0] == 0xaa && pData[1] == 0x02) {
-    Serial.println(">>> [PARSE] Legacy v1 frame detected");
-    // Extract fields from legacy format if needed
-  }
-}
-
-void EcoflowESP32::onNotify(NimBLERemoteCharacteristic* /*pRemoteCharacteristic*/,
-                            uint8_t* pData, size_t length, bool /*isNotify*/) {
-  _decryptAndParseNotification(pData, length);
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* /*pclient*/) {
