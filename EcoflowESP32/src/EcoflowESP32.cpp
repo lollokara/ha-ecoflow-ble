@@ -96,10 +96,6 @@ void EcoflowESP32::onAuthenticationComplete(ble_gap_conn_desc* desc) {
     Serial.println("Authentication successful");
 }
 
-bool EcoflowESP32::connectToDevice(NimBLEAdvertisedDevice* device) {
-    m_pAdvertisedDevice = device;
-    return connectToServer();
-}
 
 bool EcoflowESP32::connectToServer() {
     if (pClient == nullptr) {
