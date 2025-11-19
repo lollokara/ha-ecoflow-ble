@@ -64,46 +64,29 @@ std::vector<uint8_t> Packet::toBytes() const {
 
 
 EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload, uint16_t seq, uint8_t device_sn, const uint8_t* key, const uint8_t* iv) :
-    _frame_type(frame_type), _payload_type(payload_type), _payload(payload), _seq(seq), _device_sn(device_sn) {
-    if (key && iv) {
-        mbedtls_aes_context aes;
-        mbedtls_aes_init(&aes);
-        mbedtls_aes_setkey_enc(&aes, key, 128);
-
-        uint8_t p_payload[_payload.size()];
-        memcpy(p_payload, _payload.data(), _payload.size());
-
-        // PKCS7 padding
-        int padding = 16 - (_payload.size() % 16);
-        std::vector<uint8_t> padded_payload = _payload;
-        for (int i = 0; i < padding; ++i) {
-            padded_payload.push_back(padding);
-        }
-
-        _payload.resize(padded_payload.size());
-        uint8_t temp_iv[16];
-        memcpy(temp_iv, iv, 16);
-        mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_payload.size(), temp_iv, padded_payload.data(), _payload.data());
-        mbedtls_aes_free(&aes);
-    }
+    _frame_type(frame_type), _payload_type(payload_type), _payload(payload), _seq(seq), _device_sn(device_sn), _key(key), _iv(iv) {
 }
 
 EncPacket* EncPacket::fromBytes(const uint8_t* data, size_t len, const uint8_t* key, const uint8_t* iv) {
     if (len < 8 || (data[0] | (data[1] << 8)) != PREFIX) {
         return nullptr;
     }
-    uint16_t payload_len = data[4] | (data[5] << 8);
-    if (len < 8 + payload_len) {
-        return nullptr;
-    }
-    uint16_t crc = data[6 + payload_len] | (data[7 + payload_len] << 8);
-    if (crc != crc16(data, 6 + payload_len)) {
+
+    uint16_t len_field = data[4] | (data[5] << 8);
+    size_t data_end = 6 + len_field;
+
+    if (len < data_end) {
         return nullptr;
     }
 
-    std::vector<uint8_t> payload(data + 6, data + 6 + payload_len);
+    uint16_t crc = data[data_end - 2] | (data[data_end - 1] << 8);
+    if (crc != crc16(data, data_end - 2)) {
+        return nullptr;
+    }
 
-    if(key && iv) {
+    std::vector<uint8_t> payload(data + 6, data + data_end - 2);
+
+    if (key && iv) {
         mbedtls_aes_context aes;
         mbedtls_aes_init(&aes);
         mbedtls_aes_setkey_dec(&aes, key, 128);
@@ -113,27 +96,85 @@ EncPacket* EncPacket::fromBytes(const uint8_t* data, size_t len, const uint8_t* 
         mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, payload.size(), temp_iv, payload.data(), decrypted_payload.data());
         mbedtls_aes_free(&aes);
 
-        // Remove PKCS7 padding
-        uint8_t padding = decrypted_payload.back();
-        decrypted_payload.resize(decrypted_payload.size() - padding);
+        // Remove PKCS7 padding if the decrypted data is not empty
+        if (!decrypted_payload.empty()) {
+            uint8_t padding = decrypted_payload.back();
+            if (padding > 0 && padding <= 16 && padding <= decrypted_payload.size()) {
+                 bool padding_valid = true;
+                 for(size_t i = 0; i < padding; i++) {
+                     if(decrypted_payload[decrypted_payload.size() - 1 - i] != padding) {
+                         padding_valid = false;
+                         break;
+                     }
+                 }
+                 if(padding_valid) {
+                    decrypted_payload.resize(decrypted_payload.size() - padding);
+                 }
+            }
+        }
         payload = decrypted_payload;
     }
 
-    return new EncPacket(data[2], data[3], payload, 0, 0, nullptr, nullptr);
+    return new EncPacket(data[2] >> 4, data[3], payload, 0, 0, nullptr, nullptr);
+}
+
+std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
+    if (len < 8) {
+        return {};
+    }
+
+    uint16_t len_field = data[4] | (data[5] << 8);
+    size_t data_end = 6 + len_field;
+
+    if (len < data_end) {
+        return {};
+    }
+
+    uint16_t crc = data[data_end - 2] | (data[data_end - 1] << 8);
+    if (crc != crc16(data, data_end - 2)) {
+        return {};
+    }
+
+    return std::vector<uint8_t>(data + 6, data + data_end - 2);
 }
 
 std::vector<uint8_t> EncPacket::toBytes() const {
     std::vector<uint8_t> bytes;
+    std::vector<uint8_t> payload = _payload;
+
+    if (_key && _iv) {
+        mbedtls_aes_context aes;
+        mbedtls_aes_init(&aes);
+        mbedtls_aes_setkey_enc(&aes, _key, 128);
+
+        int padding = 16 - (payload.size() % 16);
+        std::vector<uint8_t> padded_payload = payload;
+        for (int i = 0; i < padding; ++i) {
+            padded_payload.push_back(padding);
+        }
+
+        payload.resize(padded_payload.size());
+        uint8_t temp_iv[16];
+        memcpy(temp_iv, _iv, 16);
+        mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_payload.size(), temp_iv, padded_payload.data(), payload.data());
+        mbedtls_aes_free(&aes);
+    }
+
     bytes.push_back(PREFIX & 0xFF);
     bytes.push_back((PREFIX >> 8) & 0xFF);
-    bytes.push_back(_frame_type);
-    bytes.push_back(_payload_type);
-    bytes.push_back(_payload.size() & 0xFF);
-    bytes.push_back((_payload.size() >> 8) & 0xFF);
-    bytes.insert(bytes.end(), _payload.begin(), _payload.end());
+    bytes.push_back(_frame_type << 4);
+    bytes.push_back(0x01); // Unknown byte
+
+    uint16_t len_field = payload.size() + 2; // +2 for CRC
+    bytes.push_back(len_field & 0xFF);
+    bytes.push_back((len_field >> 8) & 0xFF);
+
+    bytes.insert(bytes.end(), payload.begin(), payload.end());
+
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);
+
     return bytes;
 }
 
@@ -143,7 +184,7 @@ namespace EcoflowCommands {
         payload.push_back(0x01);
         payload.push_back(0x00);
         payload.insert(payload.end(), pub_key, pub_key + len);
-        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload, 0, 0, nullptr, nullptr);
+        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, 0, payload, 0, 0, nullptr, nullptr);
         return pkt.toBytes();
     }
 
