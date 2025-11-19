@@ -55,6 +55,9 @@ uint16_t EcoflowCRC::crc16(const uint8_t* data, size_t len) {
 // PACKET CLASS IMPLEMENTATION
 // ============================================================================
 
+constexpr uint8_t Packet::PREFIX;
+constexpr size_t Packet::HEADER_SIZE;
+
 Packet::Packet(uint8_t src, uint8_t dst, uint8_t cmd_set, uint8_t cmd_id,
                const uint8_t* payload, size_t payload_len,
                uint8_t dsrc, uint8_t ddst, uint8_t version, uint32_t seq)
@@ -144,6 +147,10 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
 // ============================================================================
 // ENCPACKET CLASS IMPLEMENTATION
 // ============================================================================
+
+constexpr uint8_t EncPacket::PREFIX_0;
+constexpr uint8_t EncPacket::PREFIX_1;
+constexpr size_t EncPacket::HEADER_SIZE;
 
 EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type,
                      const uint8_t* payload, size_t payload_len,
@@ -300,7 +307,7 @@ std::vector<uint8_t> EcoflowCommands::buildAutoAuthentication(
 
   mbedtls_md5_context md5;
   mbedtls_md5_init(&md5);
-  mbedtls_md5_starts(&md5);
+  mbedtls_md5_starts_ret(&md5);
   mbedtls_md5_update(&md5, (const uint8_t*)combined.c_str(), combined.length());
   mbedtls_md5_finish(&md5, digest);
   mbedtls_md5_free(&md5);

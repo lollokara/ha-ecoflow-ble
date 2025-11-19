@@ -9,8 +9,8 @@
 // ECDH IMPLEMENTATION with micro-ecc
 // ============================================================================
 
-static uint8_t _private_key[uECC_BYTES];
-static uint8_t _public_key[uECC_BYTES * 2];
+static uint8_t _private_key[ef_uECC_BYTES];
+static uint8_t _public_key[ef_uECC_BYTES * 2];
 static std::vector<uint8_t> _shared_key;
 static bool _keys_generated = false;
 
@@ -21,11 +21,11 @@ static int esp32_rng(uint8_t *dest, unsigned size) {
 }
 
 void EcoflowECDH::init() {
-    uECC_set_rng(&esp32_rng);
+    ef_uECC_set_rng(&esp32_rng);
 }
 
 bool EcoflowECDH::generateKeys() {
-    if (uECC_make_key(_public_key, _private_key)) {
+    if (ef_uECC_make_key(_public_key, _private_key)) {
         _keys_generated = true;
         return true;
     }
@@ -40,9 +40,9 @@ bool EcoflowECDH::computeSharedSecret(const uint8_t* device_public_key) {
     if (!_keys_generated) {
         return false;
     }
-    uint8_t secret[uECC_BYTES];
-    if (uECC_shared_secret(device_public_key, _private_key, secret)) {
-        _shared_key.assign(secret, secret + uECC_BYTES);
+    uint8_t secret[ef_uECC_BYTES];
+    if (ef_uECC_shared_secret(device_public_key, _private_key, secret)) {
+        _shared_key.assign(secret, secret + ef_uECC_BYTES);
         return true;
     }
     return false;
@@ -87,7 +87,7 @@ void EcoflowECDH::generateSessionKey(const uint8_t* sRand, const uint8_t* seed,
 
   mbedtls_md5_context md5_session;
   mbedtls_md5_init(&md5_session);
-  mbedtls_md5_starts(&md5_session);
+  mbedtls_md5_starts_ret(&md5_session);
   mbedtls_md5_update(&md5_session, session_input.data(), session_input.size());
   mbedtls_md5_finish(&md5_session, out_key);
   mbedtls_md5_free(&md5_session);
@@ -111,7 +111,7 @@ void EcoflowECDH::generateSessionKey(const uint8_t* sRand, const uint8_t* seed,
 
   mbedtls_md5_context md5_iv;
   mbedtls_md5_init(&md5_iv);
-  mbedtls_md5_starts(&md5_iv);
+  mbedtls_md5_starts_ret(&md5_iv);
   mbedtls_md5_update(&md5_iv, (const uint8_t*)iv_input, 4);
   mbedtls_md5_finish(&md5_iv, out_iv);
   mbedtls_md5_free(&md5_iv);

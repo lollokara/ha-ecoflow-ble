@@ -69,11 +69,7 @@ class EcoflowESP32 {
   // Public parser
   void parse(uint8_t* pData, size_t length);
 
-  // Commands
-  bool requestData();
-  bool setAC(bool on);
-  bool setDC(bool on);
-  bool setUSB(bool on);
+  NimBLERemoteCharacteristic* pReadChr = nullptr;
 
  private:
   // Internal helpers
@@ -87,7 +83,6 @@ class EcoflowESP32 {
   // BLE members
   NimBLEClient* pClient = nullptr;
   NimBLERemoteCharacteristic* pWriteChr = nullptr;
-  NimBLERemoteCharacteristic* pReadChr = nullptr;
   NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
 
   // State

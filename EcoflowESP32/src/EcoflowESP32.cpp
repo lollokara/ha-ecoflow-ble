@@ -380,7 +380,7 @@ bool EcoflowESP32::_authenticate() {
   std::vector<uint8_t> payload;
   payload.push_back(0x01);
   payload.push_back(0x00);
-  payload.insert(payload.end(), public_key, public_key + uECC_BYTES * 2);
+  payload.insert(payload.end(), public_key, public_key + ef_uECC_BYTES * 2);
 
   EncPacket enc(ENCPACKET_FRAME_TYPE_COMMAND, ENCPACKET_PAYLOAD_TYPE_VX_PROTOCOL,
                 payload.data(), payload.size());
@@ -557,8 +557,8 @@ void EcoflowESP32::initBleSessionKeyHandler(NimBLERemoteCharacteristic* pRemoteC
     EncPacket* enc_packet = EncPacket::fromBytes(pData, length);
     if (enc_packet) {
         const auto& payload = enc_packet->getPayload();
-        uint8_t device_public_key[uECC_BYTES * 2];
-        memcpy(device_public_key, payload.data() + 3, uECC_BYTES * 2);
+        uint8_t device_public_key[ef_uECC_BYTES * 2];
+        memcpy(device_public_key, payload.data() + 3, ef_uECC_BYTES * 2);
         EcoflowECDH::computeSharedSecret(device_public_key);
 
         std::vector<uint8_t> req_payload;
@@ -582,7 +582,7 @@ void EcoflowESP32::getKeyInfoReqHandler(NimBLERemoteCharacteristic* pRemoteChara
         uint8_t temp_iv[16];
         mbedtls_md5_context md5_ctx;
         mbedtls_md5_init(&md5_ctx);
-        mbedtls_md5_starts(&md5_ctx);
+        mbedtls_md5_starts_ret(&md5_ctx);
         mbedtls_md5_update(&md5_ctx, EcoflowECDH::getSharedKey().data(), EcoflowECDH::getSharedKey().size());
         mbedtls_md5_finish(&md5_ctx, temp_iv);
         mbedtls_md5_free(&md5_ctx);
