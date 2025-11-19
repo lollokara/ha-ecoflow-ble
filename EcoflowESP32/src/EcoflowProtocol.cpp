@@ -137,6 +137,44 @@ std::vector<uint8_t> EncPacket::toBytes() const {
     return bytes;
 }
 
+std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
+    if (len < 8) { // Minimum length: 6 header + 2 crc
+        return {};
+    }
+    if ((data[0] | (data[1] << 8)) != PREFIX) {
+        return {};
+    }
+
+    // Length field from the packet
+    uint16_t len_from_packet = data[4] | (data[5] << 8);
+
+    size_t frame_end = 6 + len_from_packet;
+    if (len < frame_end) {
+        return {};
+    }
+
+    if (len_from_packet < 2) { // Must contain at least a 2-byte CRC
+        return {};
+    }
+    size_t payload_size = len_from_packet - 2;
+
+    std::vector<uint8_t> for_crc;
+    for_crc.insert(for_crc.end(), data, data + 6); // header
+    if (payload_size > 0) {
+        for_crc.insert(for_crc.end(), data + 6, data + 6 + payload_size);
+    }
+
+    uint16_t calculated_crc = crc16(for_crc.data(), for_crc.size());
+    uint16_t received_crc = data[frame_end - 2] | (data[frame_end - 1] << 8);
+
+    if (calculated_crc != received_crc) {
+        return {};
+    }
+
+    // Return just the payload
+    return std::vector<uint8_t>(data + 6, data + 6 + payload_size);
+}
+
 namespace EcoflowCommands {
     std::vector<uint8_t> buildPublicKey(const uint8_t* pub_key, size_t len) {
         std::vector<uint8_t> payload;

@@ -5,8 +5,10 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/md5.h"
+extern "C" {
 #include "Credentials.h"
-#include <string.h>
+}
+#include <cstring>
 
 namespace EcoflowECDH {
 
@@ -115,7 +117,7 @@ cleanup:
     mbedtls_entropy_free(&entropy);
 }
 
-void generateSessionKey(const uint8_t* sRand, const uint8_t* seed, uint8_t* sessionKey, uint8_t* iv) {
+void generateSessionKey(const uint8_t* sRand, const uint8_t* seed, uint8_t* sessionKey) {
     uint8_t data[32];
 
     int pos = seed[0] * 16 + (seed[1] - 1) * 256;
@@ -125,9 +127,6 @@ void generateSessionKey(const uint8_t* sRand, const uint8_t* seed, uint8_t* sess
     memcpy(data + 16, sRand, 16);
 
     mbedtls_md5(data, 32, sessionKey);
-
-    uint8_t iv_input[4] = {seed[0], seed[1], seed[0], seed[1]};
-    mbedtls_md5(iv_input, 4, iv);
 }
 
 } // namespace EcoflowECDH

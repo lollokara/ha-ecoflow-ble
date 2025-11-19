@@ -1,6 +1,7 @@
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 #include "mbedtls/md5.h"
+#include "mbedtls/aes.h"
 #include "EcoflowECDH.h"
 #include "EcoflowDataParser.h"
 
@@ -17,6 +18,42 @@ static const uint32_t SERVICE_DISCOVERY_DELAY = 1000;
 static const uint32_t KEEPALIVE_INTERVAL_MS = 3000;
 static const uint32_t KEEPALIVE_CHECK_MS = 500;
 static const uint32_t AUTH_TIMEOUT_MS = 10000;
+
+static uint8_t getEcdhTypeSize(uint8_t curve_num) {
+    switch (curve_num) {
+        case 1: return 52;
+        case 2: return 56;
+        case 3:
+        case 4: return 64;
+        default: return 40;
+    }
+}
+
+static std::vector<uint8_t> decryptShared(const std::vector<uint8_t>& payload, const uint8_t* key, const uint8_t* iv) {
+    if (payload.empty()) {
+        return {};
+    }
+    
+    std::vector<uint8_t> decrypted_payload(payload.size());
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_dec(&aes, key, 128);
+    
+    uint8_t temp_iv[16];
+    memcpy(temp_iv, iv, 16);
+    
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, payload.size(), temp_iv, payload.data(), decrypted_payload.data());
+    mbedtls_aes_free(&aes);
+
+    // Remove PKCS7 padding
+    if (decrypted_payload.empty()) return {};
+    uint8_t padding = decrypted_payload.back();
+    if (padding > 16 || padding == 0) return {}; // Invalid padding
+    if (padding > decrypted_payload.size()) return {};
+    decrypted_payload.resize(decrypted_payload.size() - padding);
+    
+    return decrypted_payload;
+}
 
 void keepAliveTask(void* param) {
     EcoflowESP32* pThis = static_cast<EcoflowESP32*>(param);
@@ -308,13 +345,13 @@ void EcoflowESP32::_sendPublicKey() {
 }
 
 void EcoflowESP32::_handlePublicKeyExchange(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, nullptr, nullptr);
-    if (encPkt) {
-        const auto& payload = encPkt->getPayload();
-        EcoflowECDH::compute_shared_secret(payload.data() + 3, payload.size() - 3, _shared_key, _private_key);
+    auto payload = EncPacket::parseSimple(pData, length);
+    if (!payload.empty()) {
+        uint8_t key_size = getEcdhTypeSize(payload[2]);
+        EcoflowECDH::compute_shared_secret(payload.data() + 3, key_size, _shared_key, _private_key);
         mbedtls_md5(_shared_key, 20, _iv);
+        memcpy(_sessionIV, _iv, 16); // Use the same IV for the session
         _requestSessionKey();
-        delete encPkt;
     }
 }
 
@@ -325,13 +362,16 @@ void EcoflowESP32::_requestSessionKey() {
 }
 
 void EcoflowESP32::_handleSessionKeyResponse(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, _shared_key, _iv);
-    if (encPkt) {
-        const auto& payload = encPkt->getPayload();
-        EcoflowECDH::generateSessionKey(payload.data() + 1, payload.data() + 17, _sessionKey, _sessionIV);
-        _sessionKeyEstablished = true;
-        _requestAuthStatus();
-        delete encPkt;
+    auto encrypted_data = EncPacket::parseSimple(pData, length);
+    if (!encrypted_data.empty()) {
+        std::vector<uint8_t> inner_payload(encrypted_data.begin() + 1, encrypted_data.end());
+        auto decrypted_payload = decryptShared(inner_payload, _shared_key, _iv);
+
+        if(!decrypted_payload.empty()) {
+             EcoflowECDH::generateSessionKey(decrypted_payload.data(), decrypted_payload.data() + 16, _sessionKey);
+            _sessionKeyEstablished = true;
+            _requestAuthStatus();
+        }
     }
 }
 
