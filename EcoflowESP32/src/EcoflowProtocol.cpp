@@ -177,18 +177,15 @@ std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
 
 namespace EcoflowCommands {
     std::vector<uint8_t> buildPublicKey(const uint8_t* pub_key, size_t len) {
-        std::vector<uint8_t> payload;
-        payload.push_back(0x01);
-        payload.push_back(0x00);
-        payload.insert(payload.end(), pub_key, pub_key + len);
-        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload, 0, 0, nullptr, nullptr);
+        std::vector<uint8_t> payload(pub_key, pub_key + len);
+        Packet inner_pkt(0x01, 0x01, 2, 1, payload, 0x01, 0x00, 0x02);
+        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, nullptr, nullptr);
         return pkt.toBytes();
     }
 
     std::vector<uint8_t> buildSessionKeyRequest() {
-        std::vector<uint8_t> payload;
-        payload.push_back(0x02);
-        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload, 0, 0, nullptr, nullptr);
+        Packet inner_pkt(0x01, 0x01, 2, 2, {}, 0x01, 0x00, 0x02);
+        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, nullptr, nullptr);
         return pkt.toBytes();
     }
 

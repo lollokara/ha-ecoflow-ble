@@ -3,63 +3,40 @@
 
 namespace Ecoflow_mbedtls {
 
-// All values are big-endian
+// All values are big-endian hex strings
 
-// Prime (P)
-const uint8_t secp160r1_p[] = {
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF
-};
+const char* secp160r1_p_hex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFF";
+const char* secp160r1_a_hex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFC";
+const char* secp160r1_b_hex = "1C97BEFC54BD7A8B65ACF89F81D4D4ADC565FA45";
 
-// Coefficient A
-const uint8_t secp160r1_a[] = {
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFC
-};
-
-// Coefficient B
-const uint8_t secp160r1_b[] = {
-    0x1C, 0x97, 0xBE, 0xFC, 0x54, 0xBD, 0x7A, 0x8B, 0x65, 0xAC, 0xF8, 0x9F,
-    0x81, 0xD4, 0xD4, 0xAD, 0xC5, 0x65, 0xFA, 0x45
-};
-
-// Base point G (uncompressed)
-const uint8_t secp160r1_g[] = {
-    0x04,
-    0x4A, 0x96, 0xB5, 0x68, 0x8E, 0xF5, 0x73, 0x28, 0x46, 0x64, 0x69, 0x89,
-    0x68, 0xC3, 0x8B, 0xB9, 0x13, 0xCB, 0xFC, 0x82,
-    0x23, 0xA6, 0x28, 0x55, 0x31, 0x68, 0x94, 0x7D, 0x59, 0xDC, 0xC9, 0x12,
-    0x04, 0x23, 0x51, 0x37, 0x7A, 0xC5, 0xFB, 0x32
-};
-
-// Order N
-const uint8_t secp160r1_n[] = {
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xF4,
-    0xC8, 0xF9, 0x27, 0xAE, 0xD3, 0xCA, 0x75, 0x22, 0x57
-};
+const char* secp160r1_g_x_hex = "4A96B5688EF573284664698968C38BB913CBFC82";
+const char* secp160r1_g_y_hex = "23A628553168947D59DCC912042351377AC5FB32";
+const char* secp160r1_n_hex = "0100000000000000000001F4C8F927AED3CA752257";
 
 int load_secp160r1_group(mbedtls_ecp_group *grp) {
     int ret;
 
     mbedtls_ecp_group_init(grp);
 
-    // Load prime
-    MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&grp->P, secp160r1_p, sizeof(secp160r1_p)));
+    // Load prime and coefficients from hex strings
+    MBEDTLS_MPI_CHK(mbedtls_mpi_read_string(&grp->P, 16, secp160r1_p_hex));
+    MBEDTLS_MPI_CHK(mbedtls_mpi_read_string(&grp->A, 16, secp160r1_a_hex));
+    MBEDTLS_MPI_CHK(mbedtls_mpi_read_string(&grp->B, 16, secp160r1_b_hex));
 
-    // Load coefficients
-    MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&grp->A, secp160r1_a, sizeof(secp160r1_a)));
-    MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&grp->B, secp160r1_b, sizeof(secp160r1_b)));
+    // Load base point from hex string (X and Y coordinates separately)
+    MBEDTLS_MPI_CHK(mbedtls_ecp_point_read_string(&grp->G, 16, secp160r1_g_x_hex, secp160r1_g_y_hex));
 
-    // Load base point
-    MBEDTLS_MPI_CHK(mbedtls_ecp_point_read_binary(grp, &grp->G, secp160r1_g, sizeof(secp160r1_g)));
-
-    // Load order
-    MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&grp->N, secp160r1_n, sizeof(secp160r1_n)));
+    // Load order from hex string
+    MBEDTLS_MPI_CHK(mbedtls_mpi_read_string(&grp->N, 16, secp160r1_n_hex));
 
     grp->pbits = 160;
-    grp->nbits = 161; // As per the 'n' value
+    grp->nbits = 161;
 
 cleanup:
+    if (ret != 0) {
+        // If something failed, free the group to avoid memory leaks
+        mbedtls_ecp_group_free(grp);
+    }
     return ret;
 }
 

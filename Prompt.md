@@ -3,12 +3,14 @@ Read the BLE protocol handling files.
 
 i'm porting the development to ESP32 to bring a cloud indipendent local control solution that allow to toggle outputs (ac, dc) and monitor battery status locally without any cloud connection. 
 
-My current implementation is now able to connect but crashes right after connecting. 
+My current implementation is now able to connect but the connection gets killed right after connecting. We need to fix this, probably due to a wrong authentication. 
+Study deeply the implementation in python and find what are the differences and fix the bug.  
 
 Investigate closely on how the Python code handles the connection, use notifications  and complete the implementation.
 
 Read closely the python implementation (that is 100% working) 
 
+D NimBLEScan: discovery complete; reason=0
 Device found! Connecting…
 D NimBLEClient: >> connect(7c:2c:67:44:a4:3e)
 D NimBLEClient: Got Client event 
@@ -21,10 +23,10 @@ D NimBLEClient: Accepted peer params
 D NimBLEClient: Got Client event 
 I NimBLEClient: mtu update event; conn_handle=1 mtu=247
 I NimBLEClient: Connection established
-D NimBLEClient: >> deleteServices
-D NimBLEClient: << deleteServices
 D NimBLEClient: Got Client event 
 I NimBLEClient: mtu update event; conn_handle=1 mtu=247
+D NimBLEClient: >> deleteServices
+D NimBLEClient: << deleteServices
 D NimBLEClient: >> getService: uuid: 00000001-0000-1000-8000-00805f9b34fb
 D NimBLEClient: >> retrieveServices
 D NimBLEClient: Service Discovered >> status: 14 handle: -1
@@ -39,12 +41,12 @@ D NimBLEClient: << Service Discovered
 D NimBLEClient: << retrieveServices
 D NimBLERemoteService: >> getCharacteristic: uuid: 00000002-0000-1000-8000-00805f9b34fb
 D NimBLERemoteService: >> retrieveCharacteristics() for service: 0x0001
+D NimBLEClient: Got Client event 
+I NimBLEClient: Connection parameters updated.
 D NimBLERemoteService: Characteristic Discovered >> status: 14 handle: -1
 D NimBLERemoteService: << Characteristic Discovered
 D NimBLERemoteService: << retrieveCharacteristics()
 D NimBLERemoteService: >> retrieveCharacteristics() for service: 0x0001
-D NimBLEClient: Got Client event 
-I NimBLEClient: Connection parameters updated.
 D NimBLERemoteService: Characteristic Discovered >> status: 0 handle: 16
 D NimBLERemoteCharacteristic: >> NimBLERemoteCharacteristic()
 D NimBLERemoteCharacteristic: << NimBLERemoteCharacteristic(): 0x0002
@@ -74,14 +76,19 @@ D NimBLERemoteCharacteristic: << Descriptor Discovered. status: 0
 D NimBLERemoteCharacteristic: << retrieveDescriptors(): Found 1 descriptors.
 D NimBLERemoteCharacteristic: << setNotify()
 D NimBLERemoteDescriptor: >> Descriptor writeValue: Descriptor: uuid: 0x2902, handle: 19
+I NimBLERemoteDescriptor: Write complete; status=0 conn_handle=1
+D NimBLERemoteDescriptor: << Descriptor writeValue, rc: 0
+D NimBLERemoteCharacteristic: >> writeValue(), length: 10
+I NimBLERemoteCharacteristic: Write complete; status=0 conn_handle=1
+D NimBLERemoteCharacteristic: << writeValue, rc: 0
+D NimBLEClient: << connect()
+D NimBLEClient: Got Client event 
+I NimBLEClient: disconnect; reason=531, 
+Scanning for Ecoflow device…
+D NimBLEScan: >> start: duration=5
+D NimBLEScan: << start()
 
-abort() was called at PC 0x42048917 on core 1
-
-
-Backtrace: 0x403767c5:0x3fcebb30 0x40381619:0x3fcebb50 0x403880e9:0x3fcebb70 0x42048917:0x3fcebbf0 0x4204894c:0x3fcebc10 0x42048a27:0x3fcebc30 0x42048c77:0x3fcebc50 0x42018492:0x3fcebc70 0x42019267:0x3fcebc90 0x42017b45:0x3fcebcf0 0x42017ba1:0x3fcebd50 0x42017bbb:0x3fcebd70 0x42017bcf:0x3fcebd90 0x42004996:0x3fcebdb0 0x42004a26:0x3fcebe20 0x4201801a:0x3fcebe50 0x420193d5:0x3fcebea0 0x4201c50c:0x3fcebec0 0x4038230d:0x3fcebee0
-
-
-
+As for folder structure, in the folder you'll find the Python Implementation (working) for the Ecoflow BLE (it's just a clone of the original repo), code is instead in the EcoflowESP32 folder. To compile use platformio (install via pip).
 
 
 As for folder structure, in the folder you'll find the Python Implementation (working) for the Ecoflow BLE, code is instead in the EcoflowESP32 folder. To compile use python3.10 and call platformio from it. do not use the system wide python since the version is uncompatible.

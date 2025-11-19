@@ -1,4 +1,6 @@
 #ifndef ECOFLOW_MBEDTLS_H
+#include "mbedtls/ecp.h"
+#include "mbedtls/ecp.h"
 #define ECOFLOW_MBEDTLS_H
 
 #include "mbedtls/ecp.h"

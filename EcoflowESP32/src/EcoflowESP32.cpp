@@ -19,42 +19,6 @@ static const uint32_t KEEPALIVE_INTERVAL_MS = 3000;
 static const uint32_t KEEPALIVE_CHECK_MS = 500;
 static const uint32_t AUTH_TIMEOUT_MS = 10000;
 
-static uint8_t getEcdhTypeSize(uint8_t curve_num) {
-    switch (curve_num) {
-        case 1: return 52;
-        case 2: return 56;
-        case 3:
-        case 4: return 64;
-        default: return 40;
-    }
-}
-
-static std::vector<uint8_t> decryptShared(const std::vector<uint8_t>& payload, const uint8_t* key, const uint8_t* iv) {
-    if (payload.empty()) {
-        return {};
-    }
-    
-    std::vector<uint8_t> decrypted_payload(payload.size());
-    mbedtls_aes_context aes;
-    mbedtls_aes_init(&aes);
-    mbedtls_aes_setkey_dec(&aes, key, 128);
-    
-    uint8_t temp_iv[16];
-    memcpy(temp_iv, iv, 16);
-    
-    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, payload.size(), temp_iv, payload.data(), decrypted_payload.data());
-    mbedtls_aes_free(&aes);
-
-    // Remove PKCS7 padding
-    if (decrypted_payload.empty()) return {};
-    uint8_t padding = decrypted_payload.back();
-    if (padding > 16 || padding == 0) return {}; // Invalid padding
-    if (padding > decrypted_payload.size()) return {};
-    decrypted_payload.resize(decrypted_payload.size() - padding);
-    
-    return decrypted_payload;
-}
-
 void keepAliveTask(void* param) {
     EcoflowESP32* pThis = static_cast<EcoflowESP32*>(param);
     Serial.println(">>> Keep-Alive task started");
@@ -302,21 +266,70 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pclient) {
 
 void EcoflowESP32::onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     _notificationReceived = true;
+
+    // During auth, packets are not encrypted with session key
+    bool is_auth_step = _state < ConnectionState::AUTHENTICATED;
+    const uint8_t* key = is_auth_step ? nullptr : _sessionKey;
+    const uint8_t* iv = is_auth_step ? nullptr : _sessionIV;
+
+    EncPacket* encPkt = EncPacket::fromBytes(pData, length, key, iv);
+    if (!encPkt) {
+        if (is_auth_step) {
+            // for auth, we can receive simple packets, let's try to parse them
+            auto payload = EncPacket::parseSimple(pData, length);
+            if(payload.empty()){
+                Serial.println(">>> [ERROR] Received invalid simple packet");
+                return;
+            }
+            Packet* pkt = Packet::fromBytes(payload.data(), payload.size());
+            if(!pkt){
+                Serial.println(">>> [ERROR] Failed to parse inner packet from simple packet");
+                return;
+            }
+            _handlePacket(pkt);
+            delete pkt;
+        } else {
+            Serial.println(">>> [ERROR] Received invalid encrypted packet");
+        }
+        return;
+    }
+
+    Packet* pkt = Packet::fromBytes(encPkt->getPayload().data(), encPkt->getPayload().size());
+    if(!pkt){
+        Serial.println(">>> [ERROR] Failed to parse inner packet");
+        delete encPkt;
+        return;
+    }
+    _handlePacket(pkt);
+    delete encPkt;
+    delete pkt;
+}
+
+
+void EcoflowESP32::_handlePacket(Packet* pkt) {
     switch (_state) {
         case ConnectionState::PUBLIC_KEY_SENT:
-            _handlePublicKeyExchange(pData, length);
+            if (pkt->getCmdSet() == 2 && pkt->getCmdId() == 1) {
+                _handlePublicKeyExchange(pkt->getPayload());
+            }
             break;
         case ConnectionState::SESSION_KEY_REQUESTED:
-            _handleSessionKeyResponse(pData, length);
+            if (pkt->getCmdSet() == 2 && pkt->getCmdId() == 2) {
+                _handleSessionKeyResponse(pkt->getPayload());
+            }
             break;
         case ConnectionState::AUTH_STATUS_REQUESTED:
-            _handleAuthStatusResponse(pData, length);
+             if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
+                _handleAuthStatusResponse(pkt->getPayload());
+            }
             break;
         case ConnectionState::AUTHENTICATING:
-            _handleAuthResponse(pData, length);
+            if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86) {
+                _handleAuthResponse(pkt->getPayload());
+            }
             break;
         case ConnectionState::AUTHENTICATED:
-            _handleDataNotification(pData, length);
+            _handleDataNotification(pkt);
             break;
         default:
             Serial.println(">>> [WARN] Notification received in unexpected state");
@@ -335,7 +348,7 @@ bool EcoflowESP32::_startAuthentication() {
 }
 
 void EcoflowESP32::_sendPublicKey() {
-    uint8_t pubKey[41];
+    uint8_t pubKey[65]; // Increased size for larger keys
     size_t key_len;
     EcoflowECDH::generate_public_key(pubKey, &key_len, _private_key);
 
@@ -344,12 +357,10 @@ void EcoflowESP32::_sendPublicKey() {
     _setState(ConnectionState::PUBLIC_KEY_SENT);
 }
 
-void EcoflowESP32::_handlePublicKeyExchange(const uint8_t* pData, size_t length) {
-    auto payload = EncPacket::parseSimple(pData, length);
+void EcoflowESP32::_handlePublicKeyExchange(const std::vector<uint8_t>& payload) {
     if (!payload.empty()) {
-        uint8_t key_size = getEcdhTypeSize(payload[2]);
-        EcoflowECDH::compute_shared_secret(payload.data() + 3, key_size, _shared_key, _private_key);
-        mbedtls_md5(_shared_key, 20, _iv);
+        EcoflowECDH::compute_shared_secret(payload.data(), payload.size(), _shared_key, _private_key);
+        mbedtls_md5(_shared_key, 32, _iv);
         memcpy(_sessionIV, _iv, 16); // Use the same IV for the session
         _requestSessionKey();
     }
@@ -361,17 +372,11 @@ void EcoflowESP32::_requestSessionKey() {
     _setState(ConnectionState::SESSION_KEY_REQUESTED);
 }
 
-void EcoflowESP32::_handleSessionKeyResponse(const uint8_t* pData, size_t length) {
-    auto encrypted_data = EncPacket::parseSimple(pData, length);
-    if (!encrypted_data.empty()) {
-        std::vector<uint8_t> inner_payload(encrypted_data.begin() + 1, encrypted_data.end());
-        auto decrypted_payload = decryptShared(inner_payload, _shared_key, _iv);
-
-        if(!decrypted_payload.empty()) {
-             EcoflowECDH::generateSessionKey(decrypted_payload.data(), decrypted_payload.data() + 16, _sessionKey);
-            _sessionKeyEstablished = true;
-            _requestAuthStatus();
-        }
+void EcoflowESP32::_handleSessionKeyResponse(const std::vector<uint8_t>& payload) {
+    if (payload.size() >= 17+56) {
+        EcoflowECDH::generateSessionKey(payload.data() + 1, payload.data() + 17, _sessionKey);
+        _sessionKeyEstablished = true;
+        _requestAuthStatus();
     }
 }
 
@@ -381,11 +386,8 @@ void EcoflowESP32::_requestAuthStatus() {
     _setState(ConnectionState::AUTH_STATUS_REQUESTED);
 }
 
-void EcoflowESP32::_handleAuthStatusResponse(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, _sessionKey, _sessionIV);
-    if (encPkt) {
-        delete encPkt;
-    }
+void EcoflowESP32::_handleAuthStatusResponse(const std::vector<uint8_t>& payload) {
+    // Nothing to do with the response, just proceed to send credentials
     _sendAuthCredentials();
 }
 
@@ -395,31 +397,19 @@ void EcoflowESP32::_sendAuthCredentials() {
     _setState(ConnectionState::AUTHENTICATING);
 }
 
-void EcoflowESP32::_handleAuthResponse(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, _sessionKey, _sessionIV);
-    if (encPkt) {
-        Packet* pkt = Packet::fromBytes(encPkt->getPayload().data(), encPkt->getPayload().size());
-        if (pkt && pkt->getCmdId() == 0x86 && pkt->getPayload().size() > 0 && pkt->getPayload()[0] == 0) {
-            _setState(ConnectionState::AUTHENTICATED);
-            _startKeepAliveTask();
-        } else {
-            disconnect();
-        }
-        if (pkt) delete pkt;
-        delete encPkt;
+void EcoflowESP32::_handleAuthResponse(const std::vector<uint8_t>& payload) {
+    if (payload.size() > 0 && payload[0] == 0) {
+        _setState(ConnectionState::AUTHENTICATED);
+        _startKeepAliveTask();
+        Serial.println(">>> Authentication successful!");
+    } else {
+        Serial.println(">>> Authentication failed!");
+        disconnect();
     }
 }
 
-void EcoflowESP32::_handleDataNotification(const uint8_t* pData, size_t length) {
-    EncPacket* encPkt = EncPacket::fromBytes(pData, length, _sessionKey, _sessionIV);
-    if (encPkt) {
-        Packet* pkt = Packet::fromBytes(encPkt->getPayload().data(), encPkt->getPayload().size());
-        if (pkt) {
-            EcoflowDataParser::parsePacket(*pkt, _data);
-            delete pkt;
-        }
-        delete encPkt;
-    }
+void EcoflowESP32::_handleDataNotification(Packet* pkt) {
+    EcoflowDataParser::parsePacket(*pkt, _data);
 }
 
 // ============================================================================

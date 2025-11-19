@@ -6,6 +6,9 @@
 #include <vector>
 #include <string>
 
+// Forward declaration
+class Packet;
+
 enum class ConnectionState {
     NOT_CONNECTED,
     CONNECTING,
@@ -73,17 +76,21 @@ private:
     void _startKeepAliveTask();
     void _stopKeepAliveTask();
     bool _sendCommand(const std::vector<uint8_t>& packet);
+    
+    // Authentication flow
     bool _startAuthentication();
-
     void _sendPublicKey();
-    void _handlePublicKeyExchange(const uint8_t* pData, size_t length);
     void _requestSessionKey();
-    void _handleSessionKeyResponse(const uint8_t* pData, size_t length);
     void _requestAuthStatus();
-    void _handleAuthStatusResponse(const uint8_t* pData, size_t length);
     void _sendAuthCredentials();
-    void _handleAuthResponse(const uint8_t* pData, size_t length);
-    void _handleDataNotification(const uint8_t* pData, size_t length);
+
+    // Packet handlers
+    void _handlePacket(Packet* pkt);
+    void _handlePublicKeyExchange(const std::vector<uint8_t>& payload);
+    void _handleSessionKeyResponse(const std::vector<uint8_t>& payload);
+    void _handleAuthStatusResponse(const std::vector<uint8_t>& payload);
+    void _handleAuthResponse(const std::vector<uint8_t>& payload);
+    void _handleDataNotification(Packet* pkt);
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
@@ -100,7 +107,7 @@ private:
     bool _notificationReceived = false;
 
     uint8_t _private_key[21];
-    uint8_t _shared_key[20];
+    uint8_t _shared_key[32]; // Increased to 32 for SHA256, although MD5 uses less
     uint8_t _sessionKey[16];
     uint8_t _sessionIV[16];
     uint8_t _iv[16];

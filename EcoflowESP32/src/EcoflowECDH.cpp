@@ -1,4 +1,5 @@
 #include "EcoflowECDH.h"
+#include <Arduino.h>
 #include "Ecoflow_mbedtls.h"
 #include "mbedtls/ecdh.h"
 #include "mbedtls/ecp.h"
@@ -29,34 +30,42 @@ void generate_public_key(uint8_t* buf, size_t* len, uint8_t* private_key_out) {
     mbedtls_entropy_context entropy;
     int ret = 0;
 
-    mbedtls_ecp_group_init(&grp);
     mbedtls_mpi_init(&d);
     mbedtls_ecp_point_init(&q);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
 
     if (init_rng(&ctr_drbg, &entropy) != 0) {
+        Serial.printf("Failed to init rng\n");
         goto cleanup;
     }
 
     ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
     if(ret != 0) {
+        Serial.printf("Failed to load group: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_ecdh_gen_public(&grp, &d, &q, mbedtls_ctr_drbg_random, &ctr_drbg);
     if(ret != 0) {
+        Serial.printf("Failed to gen public key: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_mpi_write_binary(&d, private_key_out, 21);
     if(ret != 0) {
+        Serial.printf("Failed to write private key: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_ecp_point_write_binary(&grp, &q,
                                          MBEDTLS_ECP_PF_UNCOMPRESSED, len,
-                                         buf, 41);
+                                         buf, 65);
+    if(ret != 0) {
+        Serial.printf("Failed to write public key: %d\n", ret);
+        *len = 0;
+    }
+
 
 cleanup:
     mbedtls_ecp_group_free(&grp);
@@ -74,7 +83,6 @@ void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t
     mbedtls_entropy_context entropy;
     int ret = 0;
 
-    mbedtls_ecp_group_init(&grp);
     mbedtls_mpi_init(&d);
     mbedtls_mpi_init(&z);
     mbedtls_ecp_point_init(&qp);
@@ -82,31 +90,39 @@ void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t
     mbedtls_entropy_init(&entropy);
 
     if (init_rng(&ctr_drbg, &entropy) != 0) {
+        Serial.printf("Failed to init rng\n");
         goto cleanup;
     }
 
     ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
     if(ret != 0) {
+        Serial.printf("Failed to load group: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_mpi_read_binary(&d, private_key, 21);
     if(ret != 0) {
+        Serial.printf("Failed to read private key: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_ecp_point_read_binary(&grp, &qp, peer_pub_key, peer_len);
     if(ret != 0) {
+        Serial.printf("Failed to read peer public key: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_ecdh_compute_shared(&grp, &z, &qp, &d,
                                       mbedtls_ctr_drbg_random, &ctr_drbg);
     if(ret != 0) {
+        Serial.printf("Failed to compute shared secret: %d\n", ret);
         goto cleanup;
     }
 
     ret = mbedtls_mpi_write_binary(&z, shared_secret_out, 20);
+    if(ret != 0) {
+        Serial.printf("Failed to write shared secret: %d\n", ret);
+    }
 
 cleanup:
     mbedtls_ecp_group_free(&grp);
