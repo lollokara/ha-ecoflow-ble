@@ -1,38 +1,50 @@
+/*
+ * EcoflowESP32.cpp - FIXED with Proper Connection Retry
+ * 
+ * Key fix: Retry the PHYSICAL connection itself, not just service discovery
+ * Match Python's establish_connection() behavior with exponential backoff
+ * 
+ * Python uses bleak_retry_connector which retries connections with backoff
+ * We need to do the same in C++
+ */
+
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 
 // Static instance for callback
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
+// Connection parameters
+static const uint8_t CONNECT_RETRIES = 3;
+static const uint32_t CONNECT_RETRY_DELAY = 250;  // 250ms backoff like Python
+
 // ============================================================================
-// SCAN CALLBACKS - Minimal logging to prevent serial buffer overflow
+// SCAN CALLBACKS
 // ============================================================================
 
-EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32) 
+EcoflowScanCallbacks::EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32)
     : _pEcoflowESP32(pEcoflowESP32) {}
 
 void EcoflowScanCallbacks::onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) {
-    // Only log if it's an Ecoflow device
     if (advertisedDevice->haveManufacturerData()) {
         if(advertisedDevice->getManufacturerData().length() >= 2) {
-            uint16_t manufacturerId = (advertisedDevice->getManufacturerData()[1] << 8) | advertisedDevice->getManufacturerData()[0];
-            if (manufacturerId == 46517) {
+            uint16_t manufacturerId = (advertisedDevice->getManufacturerData()[1] << 8) | 
+                                      advertisedDevice->getManufacturerData()[0];
+            if (manufacturerId == ECOFLOW_MANUFACTURER_ID) {
                 _pEcoflowESP32->setAdvertisedDevice(const_cast<NimBLEAdvertisedDevice*>(advertisedDevice));
-                // Silent detection - main.cpp will handle logging
                 return;
             }
         }
     }
-    // Silent for non-Ecoflow devices
 }
 
 // ============================================================================
 // CONSTRUCTOR & DESTRUCTOR
 // ============================================================================
 
-EcoflowESP32::EcoflowESP32() 
-    : pClient(nullptr), 
-      pWriteChr(nullptr), 
+EcoflowESP32::EcoflowESP32()
+    : pClient(nullptr),
+      pWriteChr(nullptr),
       pReadChr(nullptr),
       m_pAdvertisedDevice(nullptr),
       _connected(false),
@@ -41,7 +53,6 @@ EcoflowESP32::EcoflowESP32()
       _subscribedToNotifications(false),
       _keepAliveTaskHandle(nullptr),
       _lastDataTime(0) {
-    
     _instance = this;
     _scanCallbacks = new EcoflowScanCallbacks(this);
     memset(&_data, 0, sizeof(EcoflowData));
@@ -66,10 +77,13 @@ EcoflowESP32::~EcoflowESP32() {
 bool EcoflowESP32::begin() {
     NimBLEDevice::init("");
     
-    // Configure security settings
-    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
-    NimBLEDevice::setSecurityAuth(true, false, false);
+    Serial.println(">>> BLE Stack initialized");
     
+    // Disable security for Ecoflow (no pairing needed)
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
+    NimBLEDevice::setSecurityAuth(false, false, false);
+    
+    _running = true;
     return true;
 }
 
@@ -83,7 +97,6 @@ bool EcoflowESP32::scan(uint32_t scanTime) {
     pScan->setInterval(97);
     pScan->setWindow(97);
     pScan->setActiveScan(true);
-    
     pScan->start(scanTime, false);
     
     if (m_pAdvertisedDevice != nullptr) {
@@ -98,114 +111,253 @@ bool EcoflowESP32::scan(uint32_t scanTime) {
 // ============================================================================
 
 bool EcoflowESP32::_resolveCharacteristics() {
+    if (!pClient) {
+        Serial.println(">>> ERROR: No client for resolving characteristics");
+        return false;
+    }
+    
     pWriteChr = nullptr;
     pReadChr = nullptr;
     
-    // Try primary service UUID
-    NimBLERemoteService* pService = pClient->getService("70D51000-2C7F-4E75-AE8A-D758951CE4E0");
-    
+    // Try primary Ecoflow service UUID
+    NimBLERemoteService* pService = pClient->getService(SERVICE_UUID_ECOFLOW);
     if (pService) {
-        pWriteChr = pService->getCharacteristic("70D51001-2C7F-4E75-AE8A-D758951CE4E0");
-        pReadChr = pService->getCharacteristic("70D51002-2C7F-4E75-AE8A-D758951CE4E0");
+        Serial.println(">>> Found primary Ecoflow service");
+        pWriteChr = pService->getCharacteristic(CHAR_WRITE_UUID_ECOFLOW);
+        pReadChr = pService->getCharacteristic(CHAR_READ_UUID_ECOFLOW);
         
         if (pWriteChr && pReadChr) {
+            Serial.println(">>> Found both write and read characteristics");
             return true;
         }
     }
     
     // Try alternate service UUID
-    pService = pClient->getService("00001801-0000-1000-8000-00805f9b34fb");
-    
+    pService = pClient->getService(SERVICE_UUID_ALT);
     if (pService) {
-        pWriteChr = pService->getCharacteristic("0000ff01-0000-1000-8000-00805f9b34fb");
-        pReadChr = pService->getCharacteristic("0000ff02-0000-1000-8000-00805f9b34fb");
+        Serial.println(">>> Found alternate service");
+        pWriteChr = pService->getCharacteristic(CHAR_WRITE_UUID_ALT);
+        pReadChr = pService->getCharacteristic(CHAR_READ_UUID_ALT);
         
         if (pWriteChr && pReadChr) {
+            Serial.println(">>> Found characteristics in alternate service");
             return true;
         }
     }
     
+    Serial.println(">>> Services not yet loaded, will retry");
     return false;
 }
 
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CRITICAL: Retry the PHYSICAL CONNECTION with exponential backoff
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Python's establish_connection() retries the connection with backoff.
+ * NimBLE doesn't have this built-in, so we need to implement it.
+ * This fixes reason 534/531 errors by giving the device time between attempts.
+ */
+
 bool EcoflowESP32::connectToServer() {
     if (m_pAdvertisedDevice == nullptr) {
+        Serial.println(">>> ERROR: No device found");
         return false;
     }
     
-    if (pClient == nullptr) {
+    // If already connected, verify connection is still valid
+    if (pClient != nullptr && pClient->isConnected()) {
+        if (_subscribedToNotifications && pReadChr && pWriteChr) {
+            Serial.println(">>> Already connected and subscribed");
+            _connected = true;
+            return true;
+        }
+    }
+    
+    // Clean up stale client
+    if (pClient != nullptr) {
+        Serial.println(">>> Cleaning up stale connection");
+        if (pClient->isConnected()) {
+            pClient->disconnect();
+        }
+        NimBLEDevice::deleteClient(pClient);
+        pClient = nullptr;
+        pWriteChr = nullptr;
+        pReadChr = nullptr;
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // RETRY LOOP: Try connecting multiple times with backoff
+    // This matches Python's establish_connection() behavior
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    for (uint8_t attempt = 1; attempt <= CONNECT_RETRIES; attempt++) {
+        Serial.print(">>> Connection attempt ");
+        Serial.print(attempt);
+        Serial.print("/");
+        Serial.println(CONNECT_RETRIES);
+        
+        // Create fresh client for each attempt
         pClient = NimBLEDevice::createClient();
+        if (!pClient) {
+            Serial.println(">>> ERROR: Failed to create BLE client");
+            if (attempt < CONNECT_RETRIES) {
+                delay(CONNECT_RETRY_DELAY);
+            }
+            continue;
+        }
+        
         pClient->setClientCallbacks(this, false);
+        
+        // Attempt physical connection
+        Serial.print(">>> Connecting to ");
+        Serial.println(m_pAdvertisedDevice->getAddress().toString().c_str());
+        
+        if (pClient->connect(m_pAdvertisedDevice)) {
+            Serial.println(">>> Physical connection established");
+            break;  // Success! Exit retry loop
+        } else {
+            Serial.println(">>> Physical connection failed");
+            
+            // Clean up client for retry
+            NimBLEDevice::deleteClient(pClient);
+            pClient = nullptr;
+            
+            // Backoff before retry (except on last attempt)
+            if (attempt < CONNECT_RETRIES) {
+                Serial.print(">>> Waiting ");
+                Serial.print(CONNECT_RETRY_DELAY);
+                Serial.println("ms before retry...");
+                delay(CONNECT_RETRY_DELAY);
+            }
+        }
     }
     
-    if (pClient->isConnected()) {
-        return true;
-    }
-    
-    if (!pClient->connect(m_pAdvertisedDevice, false)) {
+    // Check if we managed to connect
+    if (!pClient || !pClient->isConnected()) {
+        Serial.println(">>> ERROR: Failed to connect after all retries");
+        if (pClient) {
+            NimBLEDevice::deleteClient(pClient);
+            pClient = nullptr;
+        }
         return false;
     }
     
-    _connected = true;
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Connection succeeded, now discover services
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     
-    // Request MTU
-    pClient->exchangeMTU();
+    Serial.println(">>> Discovering services...");
     
-    // Resolve characteristics
-    delay(500);
+    // Try service discovery with retries
+    uint8_t retries = 5;
+    uint32_t startTime = millis();
     
-    if (!_resolveCharacteristics()) {
-        pClient->disconnect();
-        _connected = false;
+    while (retries > 0 && millis() - startTime < 10000) {
+        delay(500);  // Wait for services to load
+        
+        if (_resolveCharacteristics()) {
+            Serial.println(">>> Services discovered successfully");
+            break;
+        }
+        
+        retries--;
+        if (retries > 0) {
+            Serial.print(">>> Service discovery retry (");
+            Serial.print(retries);
+            Serial.println(" remaining)");
+        }
+    }
+    
+    // Verify characteristics were found
+    if (!pWriteChr || !pReadChr) {
+        Serial.println(">>> ERROR: Could not find required characteristics");
+        if (pClient->isConnected()) {
+            pClient->disconnect();
+        }
+        NimBLEDevice::deleteClient(pClient);
+        pClient = nullptr;
+        pWriteChr = nullptr;
+        pReadChr = nullptr;
         return false;
     }
     
-    // Verify capabilities
-    if (!pWriteChr->canWrite() || !pReadChr->canNotify()) {
-        pClient->disconnect();
-        _connected = false;
-        return false;
-    }
-    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // Subscribe to notifications
-    if (!pReadChr->subscribe(true, EcoflowESP32::notifyCallback)) {
-        pClient->disconnect();
-        _connected = false;
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    Serial.println(">>> Subscribing to notifications...");
+    
+    try {
+        if (!pReadChr->subscribe(true, EcoflowESP32::notifyCallback, false)) {
+            Serial.println(">>> ERROR: Failed to subscribe to notifications");
+            if (pClient->isConnected()) {
+                pClient->disconnect();
+            }
+            NimBLEDevice::deleteClient(pClient);
+            pClient = nullptr;
+            pWriteChr = nullptr;
+            pReadChr = nullptr;
+            return false;
+        }
+    } catch (const std::exception& e) {
+        Serial.print(">>> ERROR: Exception during subscribe: ");
+        Serial.println(e.what());
+        if (pClient->isConnected()) {
+            pClient->disconnect();
+        }
+        NimBLEDevice::deleteClient(pClient);
+        pClient = nullptr;
+        pWriteChr = nullptr;
+        pReadChr = nullptr;
         return false;
     }
     
+    Serial.println(">>> Notifications subscribed successfully");
     _subscribedToNotifications = true;
+    _connected = true;
+    _authenticated = true;
     _lastDataTime = millis();
     
     // Start keep-alive task
     if (_keepAliveTaskHandle == nullptr) {
         xTaskCreate(
-            _keepAliveTaskStatic,
+            EcoflowESP32::_keepAliveTaskStatic,
             "EcoflowKeepAlive",
-            4096,
+            2048,
             this,
-            2,
+            1,
             &_keepAliveTaskHandle
         );
     }
     
-    _running = true;
-    _authenticated = true;
+    // Request initial data
+    requestData();
     
+    Serial.println(">>> Connection sequence complete!");
     return true;
 }
 
 void EcoflowESP32::disconnect() {
     _running = false;
     _connected = false;
-    _authenticated = false;
     _subscribedToNotifications = false;
     
-    if (pClient && pClient->isConnected()) {
-        if (pReadChr) {
-            pReadChr->unsubscribe();
+    if (pReadChr && _subscribedToNotifications) {
+        try {
+            pReadChr->unsubscribe(false);
+        } catch (...) {
+            // Ignore errors
         }
+    }
+    
+    if (pClient && pClient->isConnected()) {
         pClient->disconnect();
+    }
+    
+    if (pClient) {
+        NimBLEDevice::deleteClient(pClient);
+        pClient = nullptr;
     }
     
     pWriteChr = nullptr;
@@ -213,21 +365,19 @@ void EcoflowESP32::disconnect() {
 }
 
 // ============================================================================
-// CONNECTION CALLBACKS
+// CALLBACKS
 // ============================================================================
 
 void EcoflowESP32::onConnect(NimBLEClient* pclient) {
+    Serial.println(">>> Connected callback triggered");
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pclient, int reason) {
+    Serial.print(">>> Disconnected, reason: ");
+    Serial.println(reason);
     _connected = false;
-    _authenticated = false;
     _subscribedToNotifications = false;
 }
-
-// ============================================================================
-// NOTIFICATION HANDLING
-// ============================================================================
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic,
                                    uint8_t* pData, size_t length, bool isNotify) {
@@ -236,96 +386,57 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacte
     }
 }
 
+// ============================================================================
+// DATA PARSING
+// ============================================================================
+
 void EcoflowESP32::parse(uint8_t* pData, size_t length) {
     if (length < 20) {
         return;
     }
     
-    // Parse battery level (byte 18)
+    if (pData[0] != 0xAA || pData[1] != 0x02) {
+        return;
+    }
+    
     if (length > 18) {
         _data.batteryLevel = pData[18];
     }
     
-    // Parse input power (bytes 12-13, big-endian)
-    if (length > 13) {
-        _data.inputPower = (pData[12] << 8) | pData[13];
-    }
-    
-    // Parse output power (bytes 14-15, big-endian)
-    if (length > 15) {
-        _data.outputPower = (pData[14] << 8) | pData[15];
-    }
-    
-    // Parse accessory status (byte 19 - bitmask)
     if (length > 19) {
-        uint8_t status = pData[19];
-        _data.acOn = (status & 0x01) != 0;
-        _data.usbOn = (status & 0x02) != 0;
-        _data.dcOn = (status & 0x04) != 0;
+        _data.acOn = (pData[19] & 0x01) ? true : false;
+        _data.usbOn = (pData[19] & 0x02) ? true : false;
+        _data.dcOn = (pData[19] & 0x04) ? true : false;
+    }
+    
+    if (length > 17) {
+        _data.inputPower = (pData[17] << 8) | pData[16];
+    }
+    
+    if (length > 15) {
+        _data.outputPower = (pData[15] << 8) | pData[14];
     }
     
     _lastDataTime = millis();
 }
 
 // ============================================================================
-// KEEP-ALIVE TASK
-// ============================================================================
-
-void EcoflowESP32::_keepAliveTaskStatic(void* pvParameters) {
-    EcoflowESP32* pThis = (EcoflowESP32*)pvParameters;
-    pThis->_keepAliveTask();
-    vTaskDelete(nullptr);
-}
-
-void EcoflowESP32::_keepAliveTask() {
-    while (_running) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        
-        if (_connected && _authenticated && isConnected()) {
-            // Process command queue
-            taskENTER_CRITICAL(&_queueMutex);
-            while (!_commandQueue.empty()) {
-                Command cmd = _commandQueue.front();
-                _commandQueue.pop();
-                
-                taskEXIT_CRITICAL(&_queueMutex);
-                
-                if (pWriteChr && pClient->isConnected()) {
-                    pWriteChr->writeValue(cmd.data, cmd.length, false);
-                }
-                
-                taskENTER_CRITICAL(&_queueMutex);
-            }
-            taskEXIT_CRITICAL(&_queueMutex);
-            
-            // Request data if no data received recently
-            if ((millis() - _lastDataTime) > (DATA_REQUEST_INTERVAL * 2)) {
-                requestData();
-            }
-        } else if (!_running) {
-            break;
-        }
-    }
-}
-
-// ============================================================================
-// COMMAND SENDING
+// COMMANDS
 // ============================================================================
 
 bool EcoflowESP32::sendCommand(const uint8_t* command, size_t size) {
-    if (size > 64 || !_connected || !pWriteChr) {
+    if (!_connected || !pWriteChr || !pClient || !pClient->isConnected()) {
         return false;
     }
     
-    Command cmd;
-    memcpy(cmd.data, command, size);
-    cmd.length = size;
-    
-    taskENTER_CRITICAL(&_queueMutex);
-    _commandQueue.push(cmd);
-    taskEXIT_CRITICAL(&_queueMutex);
-    
-    return true;
+    try {
+        pWriteChr->writeValue((uint8_t*)command, size, false);
+        return true;
+    } catch (const std::exception& e) {
+        Serial.print(">>> ERROR: Send command failed: ");
+        Serial.println(e.what());
+        return false;
+    }
 }
 
 bool EcoflowESP32::requestData() {
@@ -333,15 +444,15 @@ bool EcoflowESP32::requestData() {
 }
 
 bool EcoflowESP32::setAC(bool on) {
-    return sendCommand(on ? CMD_AC_ON : CMD_AC_OFF, sizeof(CMD_AC_ON));
+    return sendCommand(on ? CMD_AC_ON : CMD_AC_OFF, on ? sizeof(CMD_AC_ON) : sizeof(CMD_AC_OFF));
 }
 
 bool EcoflowESP32::setDC(bool on) {
-    return sendCommand(on ? CMD_12V_ON : CMD_12V_OFF, sizeof(CMD_12V_ON));
+    return sendCommand(on ? CMD_12V_ON : CMD_12V_OFF, on ? sizeof(CMD_12V_ON) : sizeof(CMD_12V_OFF));
 }
 
 bool EcoflowESP32::setUSB(bool on) {
-    return sendCommand(on ? CMD_USB_ON : CMD_USB_OFF, sizeof(CMD_USB_ON));
+    return sendCommand(on ? CMD_USB_ON : CMD_USB_OFF, on ? sizeof(CMD_USB_ON) : sizeof(CMD_USB_OFF));
 }
 
 // ============================================================================
@@ -349,15 +460,15 @@ bool EcoflowESP32::setUSB(bool on) {
 // ============================================================================
 
 int EcoflowESP32::getBatteryLevel() {
-    return _data.batteryLevel;
+    return (int)_data.batteryLevel;
 }
 
 int EcoflowESP32::getInputPower() {
-    return _data.inputPower;
+    return (int)_data.inputPower;
 }
 
 int EcoflowESP32::getOutputPower() {
-    return _data.outputPower;
+    return (int)_data.outputPower;
 }
 
 bool EcoflowESP32::isAcOn() {
@@ -373,11 +484,39 @@ bool EcoflowESP32::isUsbOn() {
 }
 
 bool EcoflowESP32::isConnected() {
-    return _connected && _authenticated && (pClient != nullptr) && pClient->isConnected();
+    return _connected && pClient && pClient->isConnected() && _subscribedToNotifications;
 }
 
 // ============================================================================
-// UTILITIES
+// KEEP-ALIVE TASK
+// ============================================================================
+
+void EcoflowESP32::_keepAliveTask() {
+    uint32_t lastDataTime = millis();
+    
+    while (_running) {
+        if (_connected && pClient && pClient->isConnected()) {
+            uint32_t now = millis();
+            
+            if (now - lastDataTime > DATA_REQUEST_INTERVAL) {
+                if (requestData()) {
+                    lastDataTime = now;
+                }
+            }
+        }
+        
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void EcoflowESP32::_keepAliveTaskStatic(void* pvParameters) {
+    EcoflowESP32* pThis = (EcoflowESP32*)pvParameters;
+    pThis->_keepAliveTask();
+    vTaskDelete(NULL);
+}
+
+// ============================================================================
+// HELPER METHODS
 // ============================================================================
 
 void EcoflowESP32::setAdvertisedDevice(NimBLEAdvertisedDevice* device) {

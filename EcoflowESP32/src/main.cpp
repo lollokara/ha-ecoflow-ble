@@ -4,19 +4,19 @@ EcoflowESP32 ecoflow;
 
 void setup() {
     Serial.begin(115200);
-    delay(2000);  // Extra time for serial to stabilize
-    
+    delay(2000); // Extra time for serial to stabilize
+
     Serial.println("\n\n");
     Serial.println("╔════════════════════════════════════════╗");
-    Serial.println("║  Ecoflow Delta 3 Remote Control Panel  ║");
-    Serial.println("║         ESP32 BLE Interface            ║");
+    Serial.println("║ Ecoflow Delta 3 Remote Control Panel ║");
+    Serial.println("║ ESP32 BLE Interface ║");
     Serial.println("╚════════════════════════════════════════╝\n");
-    
+
     if (!ecoflow.begin()) {
         Serial.println("✗ FATAL: Failed to initialize BLE!");
         return;
     }
-    
+
     Serial.println("✓ BLE initialization complete\n");
 }
 
@@ -24,92 +24,85 @@ void loop() {
     static bool deviceFound = false;
     static bool connected = false;
     static unsigned long lastScanTime = 0;
+    static unsigned long lastConnectionAttempt = 0;
     static unsigned long lastStatusTime = 0;
-    
-    // Phase 1: Scan for device (only if no device found yet)
+    static uint8_t connectionFailureCount = 0;
+    static const uint8_t MAX_FAILURES_BEFORE_RESCAN = 5;
+    static const unsigned long RETRY_DELAY = 2000;  // 2 seconds between retries
+
+    // Phase 1: Scan for device (only if not found or after many failures)
     if (!deviceFound) {
-        if (millis() - lastScanTime > 3000) {  // Increased to 3 seconds
+        if (millis() - lastScanTime > 3000) {  // Scan every 3 seconds if not found
             Serial.println("\n>>> Scanning for Ecoflow...");
             if (ecoflow.scan(5)) {
                 Serial.println(">>> ✓ Device found! Proceeding to connect...");
                 deviceFound = true;
-                lastScanTime = millis();
-                delay(500);  // Give time for everything to settle
-                return;
+                connectionFailureCount = 0;
+                lastConnectionAttempt = millis();
+            }
+            lastScanTime = millis();
+        }
+    }
+
+    // Phase 2: Connect to device (with backoff, not rescan)
+    if (deviceFound && !connected) {
+        // Only attempt connection after delay to avoid spam
+        if (millis() - lastConnectionAttempt > RETRY_DELAY) {
+            Serial.println(">>> Attempting connection…");
+            if (ecoflow.connectToServer()) {
+                Serial.println("✓ Successfully connected!");
+                connected = true;
+                connectionFailureCount = 0;
             } else {
-                Serial.println(">>> ✗ No device found, will retry...");
-                lastScanTime = millis();
+                connectionFailureCount++;
+                Serial.print(">>> Connection attempt ");
+                Serial.print(connectionFailureCount);
+                Serial.print("/");
+                Serial.println(MAX_FAILURES_BEFORE_RESCAN);
+                
+                // After many failures, rescan
+                if (connectionFailureCount >= MAX_FAILURES_BEFORE_RESCAN) {
+                    Serial.println(">>> Max retries reached, rescanning...");
+                    deviceFound = false;
+                    connectionFailureCount = 0;
+                }
             }
+            lastConnectionAttempt = millis();
         }
     }
-    // Phase 2: Device found, now try to connect
-    else if (deviceFound && !connected) {
-        Serial.println("\n>>> Attempting connection...");
-        if (ecoflow.connectToServer()) {
-            Serial.println(">>> ✓ Successfully connected!\n");
-            connected = true;
-            lastScanTime = millis();
+
+    // Phase 3: Display status if connected
+    if (connected) {
+        if (millis() - lastStatusTime > 15000) {  // Every 15 seconds
+            Serial.println("\n╔════════════════════════════════════════╗");
+            Serial.println("║ Ecoflow Delta 3 Status ║");
+            Serial.print("║ Battery: ");
+            Serial.print(ecoflow.getBatteryLevel());
+            Serial.println("% ║");
+            Serial.print("║ Input: ");
+            Serial.print(ecoflow.getInputPower());
+            Serial.println("W ║");
+            Serial.print("║ Output: ");
+            Serial.print(ecoflow.getOutputPower());
+            Serial.println("W ║");
+            Serial.print("║ AC: ");
+            Serial.print(ecoflow.isAcOn() ? "ON" : "OFF");
+            Serial.println(" ║");
+            Serial.print("║ USB: ");
+            Serial.print(ecoflow.isUsbOn() ? "ON" : "OFF");
+            Serial.println(" ║");
+            Serial.print("║ DC: ");
+            Serial.print(ecoflow.isDcOn() ? "ON" : "OFF");
+            Serial.println(" ║");
+            Serial.println("╚════════════════════════════════════════╝");
             lastStatusTime = millis();
-            delay(1000);  // Let connection stabilize
-        } else {
-            Serial.println(">>> ✗ Connection failed, will retry...");
-            deviceFound = false;  // Reset and rescan
-            lastScanTime = millis();
-            delay(2000);
         }
     }
-    // Phase 3: Connected - display status
-    else if (connected) {
-        if (ecoflow.isConnected()) {
-            // Print status every 15 seconds
-            if (millis() - lastStatusTime > 15000) {
-                Serial.println("\n╔════════════════════════════════════════╗");
-                Serial.println("║        Ecoflow Delta 3 Status          ║");
-                Serial.print("║ Battery:      ");
-                Serial.print(ecoflow.getBatteryLevel());
-                Serial.println("%                              ║");
-                Serial.print("║ Input Power:  ");
-                Serial.print(ecoflow.getInputPower());
-                Serial.println("W                            ║");
-                Serial.print("║ Output Power: ");
-                Serial.print(ecoflow.getOutputPower());
-                Serial.println("W                            ║");
-                Serial.print("║ AC Output:    ");
-                Serial.print(ecoflow.isAcOn() ? "✓ ON " : "✗ OFF");
-                Serial.println("                            ║");
-                Serial.print("║ USB Output:   ");
-                Serial.print(ecoflow.isUsbOn() ? "✓ ON " : "✗ OFF");
-                Serial.println("                            ║");
-                Serial.print("║ DC Output:    ");
-                Serial.print(ecoflow.isDcOn() ? "✓ ON " : "✗ OFF");
-                Serial.println("                            ║");
-                Serial.println("╚════════════════════════════════════════╝\n");
-                lastStatusTime = millis();
-            }
-            delay(500);  // Prevent loop from running too fast
-        } else {
-            Serial.println("\n>>> Connection lost, will attempt reconnection...");
-            connected = false;
-            deviceFound = false;
-            lastScanTime = millis();
-            delay(2000);
-        }
+    
+    // Handle unexpected disconnects
+    if (connected && !ecoflow.isConnected()) {
+        Serial.println(">>> Device disconnected unexpectedly!");
+        connected = false;
+        deviceFound = false;
     }
 }
-
-/*
- * COMMAND EXAMPLES:
- * 
- * Once connected and status is displaying, uncomment to test:
- * 
- * In Phase 3 section, add this to toggle AC every 30 seconds:
- * 
- * static unsigned long lastToggle = 0;
- * if (millis() - lastToggle > 30000) {
- *     static bool acState = false;
- *     Serial.println(acState ? ">>> Turning AC OFF" : ">>> Turning AC ON");
- *     ecoflow.setAC(!acState);
- *     acState = !acState;
- *     lastToggle = millis();
- * }
- */
