@@ -1,73 +1,54 @@
 #include <Arduino.h>
 #include "EcoflowProtocol.h"
+#include "uECC.h"
 #include <mbedtls/md5.h>
 #include <cstring>
+#include <esp_system.h>
 
 // ============================================================================
-// ECDH/KEYDATA IMPLEMENTATION - COMPLETE & DEBUGGED
+// ECDH IMPLEMENTATION with micro-ecc
 // ============================================================================
 
-static std::vector<uint8_t> _keydata;
+static uint8_t _private_key[uECC_BYTES];
+static uint8_t _public_key[uECC_BYTES * 2];
 static std::vector<uint8_t> _shared_key;
-static bool _ecdh_initialized = false;
+static bool _keys_generated = false;
 
-// Compute proper ECDH shared key from keydata
-static void _computeEcdhSharedKey() {
-  Serial.println("\n>>> [ECDH] Computing shared key from keydata...");
-
-  if (_keydata.empty()) {
-    Serial.println(">>> [ECDH] ERROR: Keydata is empty!");
-    return;
-  }
-
-  Serial.print(">>> [ECDH] Keydata size: ");
-  Serial.print(_keydata.size());
-  Serial.println(" bytes");
-
-  // Initialize shared key: 32 bytes
-  _shared_key.clear();
-  _shared_key.resize(32, 0);
-
-  // Method: Take bytes 0-31 of keydata
-  for (int i = 0; i < 32 && i < (int)_keydata.size(); i++) {
-    _shared_key[i] = _keydata[i];
-  }
-
-  Serial.print(">>> [ECDH] Shared key (first 32 bytes of keydata): ");
-  for (int i = 0; i < 32; i++) {
-    if (_shared_key[i] < 0x10) Serial.print("0");
-    Serial.print(_shared_key[i], HEX);
-    if ((i + 1) % 16 == 0) Serial.print(" ");
-  }
-  Serial.println("\n");
+// Custom RNG for micro-ecc using ESP32's hardware RNG
+static int esp32_rng(uint8_t *dest, unsigned size) {
+    esp_fill_random(dest, size);
+    return 1;
 }
 
 void EcoflowECDH::init() {
-  if (_ecdh_initialized) {
-    Serial.println(">>> [ECDH] Already initialized, skipping");
-    return;
-  }
+    uECC_set_rng(&esp32_rng);
+}
 
-  Serial.println("\n>>> [ECDH] init() called");
+bool EcoflowECDH::generateKeys() {
+    if (uECC_make_key(_public_key, _private_key)) {
+        _keys_generated = true;
+        return true;
+    }
+    return false;
+}
 
-  if (_keydata.empty()) {
-    Serial.println(">>> [ECDH] ERROR: Keydata not set! Call initKeyData() first!");
-    _shared_key.resize(32, 0);
-    _ecdh_initialized = true;
-    return;
-  }
+const uint8_t* EcoflowECDH::getPublicKey() {
+    return _public_key;
+}
 
-  _computeEcdhSharedKey();
-  _ecdh_initialized = true;
-
-  Serial.println(">>> [ECDH] ✓ Initialization complete\n");
+bool EcoflowECDH::computeSharedSecret(const uint8_t* device_public_key) {
+    if (!_keys_generated) {
+        return false;
+    }
+    uint8_t secret[uECC_BYTES];
+    if (uECC_shared_secret(device_public_key, _private_key, secret)) {
+        _shared_key.assign(secret, secret + uECC_BYTES);
+        return true;
+    }
+    return false;
 }
 
 const std::vector<uint8_t>& EcoflowECDH::getSharedKey() {
-  if (!_ecdh_initialized) {
-    Serial.println(">>> [ECDH] getSharedKey() called, initializing...");
-    init();
-  }
   return _shared_key;
 }
 
@@ -143,55 +124,4 @@ void EcoflowECDH::generateSessionKey(const uint8_t* sRand, const uint8_t* seed,
   Serial.println();
 
   Serial.println(">>> [SESSION] ✓ Session key & IV generated successfully\n");
-}
-
-// ============================================================================
-// KEYDATA MANAGEMENT
-// ============================================================================
-
-void EcoflowKeyData::initKeyData(const uint8_t* keydata_4096_bytes) {
-  Serial.println("\n>>> [KEYDATA] initKeyData() called");
-
-  _keydata.clear();
-
-  if (keydata_4096_bytes == nullptr) {
-    Serial.println(">>> [KEYDATA] ERROR: Null pointer passed!");
-    return;
-  }
-
-  // Copy exactly 4096 bytes
-  for (int i = 0; i < 4096; i++) {
-    _keydata.push_back(keydata_4096_bytes[i]);
-  }
-
-  Serial.print(">>> [KEYDATA] ✓ Loaded ");
-  Serial.print(_keydata.size());
-  Serial.println(" bytes");
-
-  Serial.print(">>> [KEYDATA] First 16 bytes: ");
-  for (int i = 0; i < 16 && i < (int)_keydata.size(); i++) {
-    if (_keydata[i] < 0x10) Serial.print("0");
-    Serial.print(_keydata[i], HEX);
-  }
-  Serial.println();
-
-  Serial.print(">>> [KEYDATA] Bytes 16-31: ");
-  for (int i = 16; i < 32 && i < (int)_keydata.size(); i++) {
-    if (_keydata[i] < 0x10) Serial.print("0");
-    Serial.print(_keydata[i], HEX);
-  }
-  Serial.println();
-
-  // Force re-initialization
-  _ecdh_initialized = false;
-
-  Serial.println(">>> [KEYDATA] ✓ Keydata ready, ECDH will init on first use\n");
-}
-
-std::vector<uint8_t> EcoflowKeyData::get8bytes(size_t pos) {
-  std::vector<uint8_t> result;
-  if (pos + 8 <= _keydata.size()) {
-    result.insert(result.end(), _keydata.begin() + pos, _keydata.begin() + pos + 8);
-  }
-  return result;
 }
