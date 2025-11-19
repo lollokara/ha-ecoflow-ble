@@ -15,6 +15,11 @@ private:
     EcoflowESP32* _pEcoflowESP32;
 };
 
+/**
+ * @file EcoflowESP32.h
+ * @brief This file contains the declaration of the EcoflowESP32 class, which provides an interface
+ * to communicate with Ecoflow devices over BLE.
+ */
 class EcoflowESP32 : public NimBLEClientCallbacks
 {
     friend class EcoflowScanCallbacks;
@@ -38,19 +43,12 @@ public:
     /**
      * @brief Scan for Ecoflow devices.
      * @param scanTime The duration of the scan in seconds.
-     * @return A pointer to the advertised device if found, nullptr otherwise.
+     * @return true if a device was found, false otherwise.
      */
     bool scan(uint32_t scanTime = 5);
 
     /**
-     * @brief Connect to an Ecoflow device.
-     * @param device A pointer to the advertised device to connect to.
-     * @return true if the connection was successful, false otherwise.
-     */
-    bool connectToDevice(NimBLEAdvertisedDevice* device);
-
-    /**
-     * @brief Connect to an Ecoflow device.
+     * @brief Connect to the first found Ecoflow device.
      * @return true if the connection was successful, false otherwise.
      */
     bool connectToServer();
@@ -75,19 +73,19 @@ public:
 
     /**
      * @brief Get the current battery level.
-     * @return The battery level in percent.
+     * @return The battery level in percent, or -1 if not available.
      */
     int getBatteryLevel();
 
     /**
      * @brief Get the current input power.
-     * @return The input power in watts.
+     * @return The input power in watts, or -1 if not available.
      */
     int getInputPower();
 
     /**
      * @brief Get the current output power.
-     * @return The output power in watts.
+     * @return The output power in watts, or -1 if not available.
      */
     int getOutputPower();
 
@@ -109,7 +107,29 @@ public:
      */
     bool isUsbOn();
 
+    /**
+     * @brief Check if the client is connected to a device.
+     * @return true if connected, false otherwise.
+     */
+    bool isConnected();
+
+    /**
+     * @brief Manually set the advertised device to connect to.
+     * @param device A pointer to the advertised device.
+     */
     void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
+
+    /**
+     * @brief Request the latest data from the device.
+     */
+    void requestData();
+
+    /**
+     * @brief Send a raw command to the device.
+     * @param command A pointer to the command byte array.
+     * @param size The size of the command array.
+     * @return true if the command was sent successfully, false otherwise.
+     */
     bool sendCommand(const uint8_t* command, size_t size);
 
 private:

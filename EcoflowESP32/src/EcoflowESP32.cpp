@@ -118,9 +118,8 @@ bool EcoflowESP32::connectToServer() {
         return false;
     }
 
-    if (!pClient->secureConnection()) {
-        Serial.println("Failed to secure connection");
-        return false;
+    if (!pClient->exchangeMTU()) {
+        Serial.println("Failed to set MTU - continuing");
     }
     pWriteChr = nullptr;
     pReadChr = nullptr;
@@ -181,16 +180,19 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacte
 }
 
 void EcoflowESP32::parse(uint8_t* pData, size_t length) {
-    // TODO: This parsing is likely incorrect and needs to be updated based on the protocol
-    if (length < 20) { // Reduced length check for now
-        return;
-    }
+    // Very basic and likely incorrect parsing based on reverse engineering info
+    // This needs to be properly implemented based on the discovered protocol
+    if (length > 20) {
+        _data.batteryLevel = pData[18];
+        _data.inputPower = (pData[12] << 8) | pData[13];
+        _data.outputPower = (pData[14] << 8) | pData[15];
 
-    Serial.print("Received data: ");
-    for(int i=0; i<length; i++) {
-        Serial.printf("%02X ", pData[i]);
+        // Example of how accessory status might be encoded in a bitmask
+        uint8_t accessory_status = pData[19];
+        _data.acOn = (accessory_status & 0x01) != 0;
+        _data.usbOn = (accessory_status & 0x02) != 0;
+        _data.dcOn = (accessory_status & 0x04) != 0;
     }
-    Serial.println();
 }
 
 void EcoflowESP32::setAC(bool on) {
@@ -239,4 +241,12 @@ bool EcoflowESP32::isDcOn() {
 
 bool EcoflowESP32::isUsbOn() {
     return _data.usbOn;
+}
+
+bool EcoflowESP32::isConnected() {
+    return pClient->isConnected();
+}
+
+void EcoflowESP32::requestData() {
+    sendCommand(CMD_REQUEST_DATA, sizeof(CMD_REQUEST_DATA));
 }
