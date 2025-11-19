@@ -67,31 +67,37 @@ void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context entropy;
     mbedtls_mpi z;
+    mbedtls_mpi d;
     int ret = 0;
+    mbedtls_ecp_group grp;
+    mbedtls_ecp_point pt;
 
+    mbedtls_ecp_group_init(&grp);
+    mbedtls_ecp_point_init(&pt);
     mbedtls_ecdh_init(&ecdh_ctx);
     mbedtls_mpi_init(&z);
+    mbedtls_mpi_init(&d);
 
     if (init_rng(&ctr_drbg, &entropy) != 0) {
         goto cleanup;
     }
 
-    ret = Ecoflow_mbedtls::load_secp160r1_group(&ecdh_ctx.grp);
+    ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
     if(ret != 0) {
         goto cleanup;
     }
 
-    ret = mbedtls_mpi_read_binary(&ecdh_ctx.d, private_key, 21);
+    ret = mbedtls_mpi_read_binary(&d, private_key, 21);
     if(ret != 0) {
         goto cleanup;
     }
 
-    ret = mbedtls_ecp_point_read_binary(&ecdh_ctx.grp, &ecdh_ctx.Qp, peer_pub_key, peer_len);
+    ret = mbedtls_ecp_point_read_binary(&grp, &pt, peer_pub_key, peer_len);
     if(ret != 0) {
         goto cleanup;
     }
 
-    ret = mbedtls_ecdh_compute_shared(&ecdh_ctx.grp, &z, &ecdh_ctx.Qp, &ecdh_ctx.d,
+    ret = mbedtls_ecdh_compute_shared(&grp, &z, &pt, &d,
                                       mbedtls_ctr_drbg_random, &ctr_drbg);
     if(ret != 0) {
         goto cleanup;
@@ -102,8 +108,11 @@ void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t
 cleanup:
     mbedtls_ecdh_free(&ecdh_ctx);
     mbedtls_mpi_free(&z);
+    mbedtls_mpi_free(&d);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
+    mbedtls_ecp_point_free(&pt);
+    mbedtls_ecp_group_free(&grp);
 }
 
 void generateSessionKey(const uint8_t* sRand, const uint8_t* seed, uint8_t* sessionKey, uint8_t* iv) {

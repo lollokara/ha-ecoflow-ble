@@ -3,6 +3,10 @@
 
 #include "mbedtls/ecp.h"
 
+#ifndef MBEDTLS_MPI_CHK
+#define MBEDTLS_MPI_CHK(f) do { if( ( ret = (f) ) != 0 ) goto cleanup; } while( 0 )
+#endif
+
 namespace Ecoflow_mbedtls {
 
 /**

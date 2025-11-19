@@ -143,7 +143,7 @@ bool EcoflowESP32::scan(uint32_t scanTime) {
         NimBLEAdvertisedDevice device = results.getDevice(i);
         if (device.haveManufacturerData() && device.getManufacturerData().length() > 2) {
             uint16_t manufacturerId = (device.getManufacturerData()[1] << 8) | device.getManufacturerData()[0];
-            if (manufacturerId == 0xB5D5) {
+            if (manufacturerId == 0xB5B5) {
                 m_pAdvertisedDevice = new NimBLEAdvertisedDevice(device);
                 return true;
             }
@@ -252,6 +252,7 @@ void EcoflowESP32::_setState(ConnectionState newState) {
 
 void EcoflowESP32::onConnect(NimBLEClient* pclient) {
     _setState(ConnectionState::CONNECTED);
+    vTaskDelay(SERVICE_DISCOVERY_DELAY / portTICK_PERIOD_MS);
     if(_resolveCharacteristics()) {
         _startAuthentication();
     }
