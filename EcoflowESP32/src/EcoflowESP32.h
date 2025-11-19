@@ -4,9 +4,10 @@
 #include <NimBLEDevice.h>
 #include <string>
 #include "EcoflowData.h"
+#include "EcoflowProtocol.h"
 
 class EcoflowESP32 {
-public:
+ public:
   EcoflowESP32();
   ~EcoflowESP32();
 
@@ -34,6 +35,7 @@ public:
   bool setDC(bool on);
   bool setUSB(bool on);
   bool sendCommand(const uint8_t* command, size_t size);
+  bool sendEncryptedCommand(const std::vector<uint8_t>& packet);
 
   // Callbacks
   void onConnect(NimBLEClient* pclient);
@@ -43,6 +45,9 @@ public:
 
   // Credentials
   void setCredentials(const std::string& userId, const std::string& deviceSn);
+
+  // KEYDATA injection (4096 bytes from ha-ef-ble keydata.py)
+  void setKeyData(const uint8_t* keydata_4096_bytes);
 
   // Singleton accessor used by global callbacks
   static EcoflowESP32* getInstance() { return _instance; }
@@ -55,17 +60,23 @@ public:
   uint32_t _lastNotificationTime = 0;
   bool _authResponseReceived = false;
   bool _authenticated = false;
+  bool _sessionKeyEstablished = false;
 
-  // Public parser (so you can test it if needed)
+  // Session crypto state
+  uint8_t _sessionKey[16];
+  uint8_t _sessionIV[16];
+
+  // Public parser
   void parse(uint8_t* pData, size_t length);
 
-private:
+ private:
   // Internal helpers
   bool _resolveCharacteristics();
   void _startKeepAliveTask();
   void _stopKeepAliveTask();
   bool _authenticate();
   void _buildAuthFrame(uint8_t* buffer, size_t* length);
+  bool _decryptAndParseNotification(const uint8_t* pData, size_t length);
 
   // BLE members
   NimBLEClient* pClient = nullptr;
@@ -91,4 +102,4 @@ private:
   friend void keepAliveTask(void* param);
 };
 
-#endif // EcoflowESP32_h
+#endif  // EcoflowESP32_h
