@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+// Ecoflow P2 BLE Protocol, work in progress...
+
+// Message from App to Device
+message ToDevice {
+  uint32 seq = 1;
+  oneof pdata {
+    GetDeviceSn       get_sn = 2;
+    GetDeviceAllData  get_all_data = 3;
+    SetDeviceData     set_data = 4;
+    Heartbeat         heartbeat = 5;
+  }
+}
+
+// Message from Device to App
+message FromDevice {
+  uint32 seq = 1;
+  oneof pdata {
+    DeviceSnInfo      sn_info = 2;
+    DeviceAllData     all_data = 3;
+    SetDeviceDataResp set_data_resp = 4;
+  }
+}
+
+message GetDeviceSn {
+}
+
+message GetDeviceAllData {
+  repeated uint32 params = 1;
+}
+
+message SetDeviceData {
+  map<string, int32> params = 1;
+}
+
+message Heartbeat {
+}
+
+message DeviceSnInfo {
+  string sn = 1;
+}
+
+message DeviceAllData {
+  map<string, int32> params = 1;
+}
+
+message SetDeviceDataResp {
+  bool success = 1;
+}

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include "EcoflowData.h"
+#include "EcoflowProtocol.h" // For ToDevice/FromDevice
 
 class EcoflowESP32 {
 public:
@@ -16,7 +17,7 @@ public:
     void disconnect();
     void update();
 
-    // Data access
+    // --- Data Access ---
     int  getBatteryLevel();
     int  getInputPower();
     int  getOutputPower();
@@ -27,21 +28,22 @@ public:
     bool isDcOn();
     bool isUsbOn();
     bool isConnected();
+    uint32_t getLastDataTime();
 
-    // Commands
+    // --- Commands ---
     bool requestData();
+    bool sendHeartbeat();
     bool setAC(bool on);
     bool setDC(bool on);
     bool setUSB(bool on);
-    bool sendCommand(const uint8_t* command, size_t size);
 
-    // Callbacks
+    // --- Callbacks ---
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
     void onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic,
                   uint8_t* pData, size_t length, bool isNotify);
 
-    // Credentials
+    // --- Configuration ---
     void setCredentials(const std::string& userId, const std::string& deviceSn);
 
     // Singleton accessor used by global callbacks
@@ -51,35 +53,35 @@ public:
     uint32_t _lastDataTime          = 0;
     uint32_t _lastCommandTime       = 0;
     bool     _running               = false;
-    bool     _notificationReceived  = false;
-    uint32_t _lastNotificationTime  = 0;
 
-    // Public parser (so you can test it if needed)
     void parse(uint8_t* pData, size_t length);
+    void updateData(const char* key, int32_t value);
 
 private:
-    // Internal helpers
+    // --- Internal Helpers ---
     bool _resolveCharacteristics();
     void _startKeepAliveTask();
     void _stopKeepAliveTask();
     bool _authenticate();
+    bool _sendCommand(const ToDevice& message); // New send command helper
 
-    // BLE members
+    // --- BLE Members ---
     NimBLEClient*              pClient     = nullptr;
     NimBLERemoteCharacteristic* pWriteChr  = nullptr;
     NimBLERemoteCharacteristic* pReadChr   = nullptr;
     NimBLEAdvertisedDevice*    m_pAdvertisedDevice = nullptr;
 
-    // State
+    // --- State ---
     bool _connected               = false;
     bool _authenticated           = false;
     bool _subscribedToNotifications = false;
+    uint32_t _sequence              = 1;
     TaskHandle_t _keepAliveTaskHandle = nullptr;
 
-    // Data
+    // --- Data ---
     EcoflowData _data;
 
-    // Credentials
+    // --- Credentials ---
     std::string _userId;
     std::string _deviceSn;
 
