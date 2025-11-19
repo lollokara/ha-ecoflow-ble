@@ -69,6 +69,12 @@ class EcoflowESP32 {
   // Public parser
   void parse(uint8_t* pData, size_t length);
 
+  // Commands
+  bool requestData();
+  bool setAC(bool on);
+  bool setDC(bool on);
+  bool setUSB(bool on);
+
  private:
   // Internal helpers
   bool _resolveCharacteristics();
@@ -95,6 +101,23 @@ class EcoflowESP32 {
   // Credentials
   std::string _userId;
   std::string _deviceSn;
+
+  // Auth state
+  enum AuthState {
+    IDLE,
+    WAITING_FOR_DEVICE_PUBLIC_KEY,
+    WAITING_FOR_SRAND_SEED,
+    WAITING_FOR_AUTH_RESPONSE
+  };
+  volatile AuthState _authState;
+
+  // Auth flow handlers
+  void initBleSessionKeyHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                                uint8_t* pData, size_t length, bool isNotify);
+  void getKeyInfoReqHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                            uint8_t* pData, size_t length, bool isNotify);
+  void authHandler(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                   uint8_t* pData, size_t length, bool isNotify);
 
   // Singleton
   static EcoflowESP32* _instance;
