@@ -17,6 +17,7 @@ int load_secp160r1_group(mbedtls_ecp_group *grp) {
     int ret;
 
     mbedtls_ecp_group_init(grp);
+    grp->id = MBEDTLS_ECP_DP_NONE;
 
     // Load prime and coefficients from hex strings
     MBEDTLS_MPI_CHK(mbedtls_mpi_read_string(&grp->P, 16, secp160r1_p_hex));
@@ -33,10 +34,6 @@ int load_secp160r1_group(mbedtls_ecp_group *grp) {
     grp->nbits = 161;
 
 cleanup:
-    if (ret != 0) {
-        // If something failed, free the group to avoid memory leaks
-        mbedtls_ecp_group_free(grp);
-    }
     return ret;
 }
 
