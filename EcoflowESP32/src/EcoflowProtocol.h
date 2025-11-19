@@ -1,46 +1,39 @@
+#ifndef EcoflowProtocol_h
+#define EcoflowProtocol_h
+
 /*
- * EcoflowProtocol.h - Ecoflow BLE Protocol Constants (FINAL CORRECTED)
- * 
+ * EcoflowProtocol.h - Ecoflow BLE Protocol Constants
+ *
  * YOUR DELTA 3 USES:
- * Service:  0x0001 (16-bit UUID)
- * Write:    0x0002 (16-bit UUID) 
+ * Service: 0x0001 (16-bit UUID)
+ * Write:   0x0002 (16-bit UUID)
  * Read/Notify: 0x0003 (16-bit UUID)
- * 
+ *
  * These are converted to full 128-bit UUIDs using the Bluetooth SIG standard:
  * xxxx-0000-1000-8000-00805f9b34fb
  */
 
-#ifndef EcoflowProtocol_h
-#define EcoflowProtocol_h
-
 // Manufacturer ID for Ecoflow devices
-#define ECOFLOW_MANUFACTURER_ID 46517  // 0xB5D5
+#define ECOFLOW_MANUFACTURER_ID 46517 // 0xB5D5
 
 // ============================================================================
-// SERVICE & CHARACTERISTICS - YOUR DELTA 3 (CORRECTED FORMAT)
+// SERVICE & CHARACTERISTICS - DELTA 3
 // ============================================================================
 
-// Convert 16-bit UUIDs to full 128-bit format for NimBLE
 // Service 0x0001 → 00000001-0000-1000-8000-00805f9b34fb
-#define SERVICE_UUID_ECOFLOW "00000001-0000-1000-8000-00805f9b34fb"
+#define SERVICE_UUID_ECOFLOW      "00000001-0000-1000-8000-00805f9b34fb"
+// Characteristic 0x0002 (Write)
+#define CHAR_WRITE_UUID_ECOFLOW   "00000002-0000-1000-8000-00805f9b34fb"
+// Characteristic 0x0003 (Notify/Read)
+#define CHAR_READ_UUID_ECOFLOW    "00000003-0000-1000-8000-00805f9b34fb"
 
-// Characteristic 0x0002 (Write) → 00000002-0000-1000-8000-00805f9b34fb
-#define CHAR_WRITE_UUID_ECOFLOW "00000002-0000-1000-8000-00805f9b34fb"
-
-// Characteristic 0x0003 (Notify) → 00000003-0000-1000-8000-00805f9b34fb
-#define CHAR_READ_UUID_ECOFLOW "00000003-0000-1000-8000-00805f9b34fb"
-
-// ============================================================================
-// ALTERNATE UUIDS (FOR REFERENCE - NOT USED BY YOUR DEVICE)
-// ============================================================================
-
-// Standard Ecoflow UUIDs from other implementations
-#define SERVICE_UUID_ALT "00001801-0000-1000-8000-00805f9b34fb"
-#define CHAR_WRITE_UUID_ALT "0000ff01-0000-1000-8000-00805f9b34fb"
-#define CHAR_READ_UUID_ALT "0000ff02-0000-1000-8000-00805f9b34fb"
+// Alternate UUIDs (from other implementations, not used by your device)
+#define SERVICE_UUID_ALT          "00001801-0000-1000-8000-00805f9b34fb"
+#define CHAR_WRITE_UUID_ALT       "0000ff01-0000-1000-8000-00805f9b34fb"
+#define CHAR_READ_UUID_ALT        "0000ff02-0000-1000-8000-00805f9b34fb"
 
 // ============================================================================
-// PROTOCOL FRAME DEFINITIONS
+// PROTOCOL FRAME DEFINITIONS (LEGACY V1 STYLE)
 // ============================================================================
 
 // Data request command - requests device status

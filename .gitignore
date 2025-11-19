@@ -60,3 +60,5 @@ Temporary Items
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,homeassistant
 
+/Ext_Libs
+EcoflowESP32/src/Credentials.h

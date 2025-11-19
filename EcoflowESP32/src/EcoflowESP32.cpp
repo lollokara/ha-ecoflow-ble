@@ -1,127 +1,146 @@
-/*
-* EcoflowESP32.cpp - FIXED v7 with Proper Keep-Alive and Data Parsing
-*
-* FIXES:
-* 1. Keep-alive task runs EVERY 3 seconds (not just when idle)
-* 2. Keep-alive task properly yields (no blocking)
-* 3. Data parsing with correct byte order and checksum validation
-* 4. Extended frame support for battery voltage and AC voltage
-* 5. AC command response validation
-* 6. Proper connection state management
-*/
-
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 
+#include <mbedtls/md5.h>
+
+// ---------------------------------------------------------------------------
 // Static instance
+// ---------------------------------------------------------------------------
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
-// Configuration constants
-static const uint8_t CONNECT_RETRIES = 3;
-static const uint32_t CONNECT_RETRY_DELAY = 250;
-static const uint32_t SERVICE_DISCOVERY_DELAY = 1000;
-static const uint32_t KEEPALIVE_INTERVAL = 3000;  // FIXED: 3 seconds not 5
-static const uint32_t KEEPALIVE_CHECK_INTERVAL = 500;  // FIXED: Check every 500ms
-static const uint32_t KEEPALIVE_TIMEOUT = 10000;
+// Keep‑alive config
+static const uint8_t  CONNECT_RETRIES          = 3;
+static const uint32_t CONNECT_RETRY_DELAY_MS   = 250;
+static const uint32_t SERVICE_DISCOVERY_DELAY  = 1000;
+static const uint32_t KEEPALIVE_INTERVAL_MS    = 3000; // 3 s
+static const uint32_t KEEPALIVE_CHECK_MS       = 500;  // 0.5 s
+static const uint32_t AUTH_TIMEOUT_MS          = 5000; // 5 s
 
-// ============================================================================
-// KEEP-ALIVE TASK - FIXED VERSION
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Forward declarations
+// ---------------------------------------------------------------------------
+void keepAliveTask(void* param);
+void handleNotificationCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic,
+                                uint8_t* pData, size_t length, bool isNotify);
 
-void keepAliveTask(void* param) {
-    EcoflowESP32* pThis = (EcoflowESP32*)param;
-    Serial.println(">>> Keep-Alive task started");
-    
-    uint32_t lastKeepAliveTime = millis();
-    
-    while (pThis->_running) {
-        if (pThis->isConnected()) {
-            uint32_t now = millis();
-            uint32_t timeSinceLastCmd = now - pThis->_lastCommandTime; 
-            
-            // Send keep-alive every KEEPALIVE_INTERVAL seconds
-            if (timeSinceLastCmd >= KEEPALIVE_INTERVAL) {
-                Serial.println(">>> [KEEP-ALIVE] Sending request data...");
-                pThis->requestData();
-                pThis->_lastCommandTime = millis();
-            }
-        }
-        
-        // ALWAYS yield, never block
-        vTaskDelay(KEEPALIVE_CHECK_INTERVAL / portTICK_PERIOD_MS);
-    }
-    
-    Serial.println(">>> Keep-Alive task stopped");
-    vTaskDelete(NULL);
+// ---------------------------------------------------------------------------
+// MD5 helper
+// ---------------------------------------------------------------------------
+static void md5_hash(const std::string& input, uint8_t* output_hash) {
+    mbedtls_md5_context ctx;
+    mbedtls_md5_init(&ctx);
+    mbedtls_md5_starts(&ctx);
+    mbedtls_md5_update(&ctx, (const uint8_t*)input.c_str(), input.length());
+    mbedtls_md5_finish(&ctx, output_hash);
+    mbedtls_md5_free(&ctx);
 }
 
-// ============================================================================
-// NOTIFICATION CALLBACK - global function
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Keep‑alive task: send requestData + poll read characteristic if needed
+// ---------------------------------------------------------------------------
+void keepAliveTask(void* param) {
+    EcoflowESP32* pThis = static_cast<EcoflowESP32*>(param);
+    Serial.println(">>> Keep‑Alive task started");
 
+    while (pThis && pThis->_running) {
+        if (pThis->isConnected() && pThis->_authenticated) {
+            uint32_t now = millis();
+            uint32_t dt  = now - pThis->_lastCommandTime;
+            if (dt >= KEEPALIVE_INTERVAL_MS) {
+                Serial.println(">>> [KEEP‑ALIVE] Sending request data…");
+                pThis->_notificationReceived = false;
+                pThis->requestData();
+                pThis->_lastCommandTime = millis();
+
+                // Wait a short time for notify; if nothing, poll the read char
+                uint32_t waitStart = millis();
+                while (millis() - waitStart < 400) {
+                    if (pThis->_notificationReceived) {
+                        break;
+                    }
+                    vTaskDelay(50 / portTICK_PERIOD_MS);
+                }
+
+                if (!pThis->_notificationReceived && pThis->pReadChr) {
+                    try {
+                        std::string val = pThis->pReadChr->readValue();
+                        if (!val.empty()) {
+                            Serial.print(">>> [POLL] Read ");
+                            Serial.print(val.size());
+                            Serial.println(" bytes from notify characteristic");
+                            pThis->parse((uint8_t*)val.data(), val.size());
+                        }
+                    } catch (...) {
+                        Serial.println(">>> [POLL] ERROR: readValue failed");
+                    }
+                }
+            }
+        }
+        vTaskDelay(KEEPALIVE_CHECK_MS / portTICK_PERIOD_MS);
+    }
+
+    Serial.println(">>> Keep‑Alive task stopped");
+    vTaskDelete(nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Notification callback
+// ---------------------------------------------------------------------------
 void handleNotificationCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic,
                                 uint8_t* pData, size_t length, bool isNotify) {
-    // ALWAYS log that callback was triggered
     static uint32_t callbackCount = 0;
     callbackCount++;
+
     Serial.print(">>> [CALLBACK #");
     Serial.print(callbackCount);
     Serial.print("] Triggered, length=");
     Serial.println(length);
-    
+
     if (!pRemoteCharacteristic || !pData || length == 0) {
         Serial.println(">>> [ERROR] Invalid params in callback");
         return;
     }
-    
+
     Serial.print(">>> [NOTIFY] Received ");
     Serial.print(length);
     Serial.print(" bytes: ");
-    
-    // Print hex dump (first 25 bytes)
-    for (size_t i = 0; i < (length < 25 ? length : 25); i++) {
+    size_t maxDump = length < 25 ? length : 25;
+    for (size_t i = 0; i < maxDump; ++i) {
         if (pData[i] < 0x10) Serial.print("0");
         Serial.print(pData[i], HEX);
         Serial.print(" ");
     }
     if (length > 25) Serial.print("...");
     Serial.println();
-    
-    // Pass to instance handler
-    if (EcoflowESP32::getInstance()) {
-        EcoflowESP32::getInstance()->_notificationReceived = true;       // ← NEW
-        EcoflowESP32::getInstance()->_lastNotificationTime = millis();   // ← NEW
-        EcoflowESP32::getInstance()->onNotify(pRemoteCharacteristic, pData, length, isNotify);
+
+    EcoflowESP32* inst = EcoflowESP32::getInstance();
+    if (inst) {
+        inst->_notificationReceived = true;
+        inst->_lastNotificationTime = millis();
+        inst->onNotify(pRemoteCharacteristic, pData, length, isNotify);
     }
 }
 
-
-
-// ============================================================================
-// CLIENT CALLBACKS
-// ============================================================================
-
+// ---------------------------------------------------------------------------
+// NimBLE client callbacks
+// ---------------------------------------------------------------------------
 class MyClientCallback : public NimBLEClientCallbacks {
 public:
-    void onConnect(NimBLEClient* pclient) override {
-        if (EcoflowESP32::getInstance()) {
-            EcoflowESP32::getInstance()->onConnect(pclient);
-        }
+    void onConnect(NimBLEClient* pClient) override {
+        EcoflowESP32* inst = EcoflowESP32::getInstance();
+        if (inst) inst->onConnect(pClient);
     }
-    
-    void onDisconnect(NimBLEClient* pclient) override {
-        if (EcoflowESP32::getInstance()) {
-            EcoflowESP32::getInstance()->onDisconnect(pclient);
-        }
+
+    void onDisconnect(NimBLEClient* pClient) override {
+        EcoflowESP32* inst = EcoflowESP32::getInstance();
+        if (inst) inst->onDisconnect(pClient);
     }
 };
+static MyClientCallback g_clientCallback;
 
-static MyClientCallback* g_pClientCallback = nullptr;
-
-// ============================================================================
-// CONSTRUCTOR & DESTRUCTOR
-// ============================================================================
-
+// ---------------------------------------------------------------------------
+// Constructor / destructor
+// ---------------------------------------------------------------------------
 EcoflowESP32::EcoflowESP32()
     : pClient(nullptr),
       pWriteChr(nullptr),
@@ -129,678 +148,609 @@ EcoflowESP32::EcoflowESP32()
       m_pAdvertisedDevice(nullptr),
       _connected(false),
       _authenticated(false),
-      _running(false),
       _subscribedToNotifications(false),
       _keepAliveTaskHandle(nullptr),
       _lastDataTime(0),
-      _lastCommandTime(0) {
+      _lastCommandTime(0),
+      _running(false),
+      _notificationReceived(false),
+      _lastNotificationTime(0) {
     _instance = this;
-    memset(&_data, 0, sizeof(EcoflowData));
 }
 
 EcoflowESP32::~EcoflowESP32() {
     _running = false;
     _stopKeepAliveTask();
     disconnect();
-    
-    if (m_pAdvertisedDevice != nullptr) {
+    if (m_pAdvertisedDevice) {
         delete m_pAdvertisedDevice;
-    }
-    
-    if (g_pClientCallback != nullptr) {
-        delete g_pClientCallback;
-        g_pClientCallback = nullptr;
+        m_pAdvertisedDevice = nullptr;
     }
 }
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 bool EcoflowESP32::begin() {
     try {
         NimBLEDevice::init("");
-        Serial.println(">>> BLE Stack initialized");
-        
-        if (g_pClientCallback == nullptr) {
-            g_pClientCallback = new MyClientCallback();
-        }
-        
+        Serial.println(">>> BLE stack initialized");
         NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_PUBLIC);
         NimBLEDevice::setMTU(247);
         NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
         NimBLEDevice::setSecurityAuth(false, false, false);
-        
         Serial.println(">>> Security settings configured");
-        
         _running = true;
         return true;
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR during BLE init: ");
-        Serial.println(e.what());
+    } catch (...) {
+        Serial.println(">>> ERROR during BLE init");
         return false;
     }
 }
 
-// ============================================================================
-// SCANNING
-// ============================================================================
+void EcoflowESP32::setCredentials(const std::string& userId,
+                                  const std::string& deviceSn) {
+    _userId   = userId;
+    _deviceSn = deviceSn;
+    Serial.print(">>> Credentials set: userId=");
+    Serial.print(_userId.c_str());
+    Serial.print(", deviceSn=");
+    Serial.println(_deviceSn.c_str());
+}
 
+// Scan for Ecoflow by manufacturer ID
 bool EcoflowESP32::scan(uint32_t scanTime) {
     try {
-        m_pAdvertisedDevice = nullptr;
-        
+        if (m_pAdvertisedDevice) {
+            delete m_pAdvertisedDevice;
+            m_pAdvertisedDevice = nullptr;
+        }
+
         NimBLEScan* pScan = NimBLEDevice::getScan();
         pScan->setInterval(97);
         pScan->setWindow(97);
         pScan->setActiveScan(true);
         pScan->setMaxResults(20);
-        
+
         Serial.print(">>> Starting BLE scan for ");
         Serial.print(scanTime);
-        Serial.println(" seconds...");
-        
-        uint32_t startTime = millis();
+        Serial.println(" seconds…");
+
+        uint32_t start   = millis();
         NimBLEScanResults results = pScan->start(scanTime, false);
-        uint32_t elapsed = millis() - startTime;
-        uint32_t count = results.getCount();
-        
+        uint32_t elapsed = millis() - start;
+        uint32_t count   = results.getCount();
+
         Serial.print(">>> Scan completed in ");
         Serial.print(elapsed);
-        Serial.print("ms, found ");
+        Serial.print(" ms, found ");
         Serial.print(count);
         Serial.println(" devices");
-        
-        for (uint32_t i = 0; i < count; i++) {
+
+        for (uint32_t i = 0; i < count; ++i) {
             NimBLEAdvertisedDevice device = results.getDevice(i);
-            
-            if (device.haveManufacturerData()) {
-                try {
-                    NimBLEAdvertisedDevice* pDevice = new NimBLEAdvertisedDevice(device);
-                    std::string mfgData = pDevice->getManufacturerData();
-                    
-                    if (mfgData.length() >= 2) {
-                        uint16_t manufacturerId = (mfgData[1] << 8) | mfgData[0];
-                        
-                        if (manufacturerId == ECOFLOW_MANUFACTURER_ID) {
-                            Serial.print(">>> ✓ ECOFLOW DEVICE FOUND! Address: ");
-                            Serial.println(device.getAddress().toString().c_str());
-                            m_pAdvertisedDevice = pDevice;
-                            return true;
-                        }
-                    }
-                    delete pDevice;
-                    
-                } catch (const std::exception& e) {
-                    Serial.print(">>> Error reading mfg data: ");
-                    Serial.println(e.what());
-                }
+            if (!device.haveManufacturerData()) continue;
+
+            std::string mfgData = device.getManufacturerData();
+            if (mfgData.length() < 2) continue;
+
+            uint16_t manufacturerId =
+                (static_cast<uint8_t>(mfgData[1]) << 8) |
+                 static_cast<uint8_t>(mfgData[0]);
+
+            if (manufacturerId == ECOFLOW_MANUFACTURER_ID) {
+                Serial.print(">>> ✓ ECOFLOW DEVICE FOUND! Address: ");
+                Serial.println(device.getAddress().toString().c_str());
+                m_pAdvertisedDevice = new NimBLEAdvertisedDevice(device);
+                return true;
             }
         }
-        
+
         Serial.println(">>> No Ecoflow device found");
         return false;
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR during scan: ");
-        Serial.println(e.what());
+    } catch (...) {
+        Serial.println(">>> ERROR during scan");
         return false;
     }
 }
 
-// ============================================================================
-// SERVICE RESOLUTION
-// ============================================================================
-
-bool EcoflowESP32::_resolveCharacteristics() {
-    if (!pClient) {
+bool EcoflowESP32::connectToServer() {
+    if (!m_pAdvertisedDevice) {
+        Serial.println(">>> ERROR: No device found to connect to");
         return false;
     }
-    
-    pWriteChr = nullptr;
-    pReadChr = nullptr;
-    
+
+    // Reuse existing client if still connected and characteristics ready
+    if (pClient && pClient->isConnected()) {
+        if (pWriteChr && pReadChr && _subscribedToNotifications) {
+            Serial.println(">>> Already connected with notifications active");
+            _connected = true;
+
+            // Ensure auth + keepalive are running on reused connection
+            if (!_authenticated) {
+                if (!_authenticate()) {
+                    Serial.println(">>> ERROR: Authentication failed on reused client");
+                    _connected = false;
+                    return false;
+                }
+            }
+            _startKeepAliveTask();
+            return true;
+        }
+
+        // else clean up incomplete state
+        try { pClient->disconnect(); } catch (...) {}
+        try { NimBLEDevice::deleteClient(pClient); } catch (...) {}
+        pClient = nullptr;
+        pWriteChr = nullptr;
+        pReadChr  = nullptr;
+        _subscribedToNotifications = false;
+    }
+
+    // Try to connect with retries
+    for (uint8_t attempt = 1; attempt <= CONNECT_RETRIES; ++attempt) {
+        Serial.print(">>> Connection attempt ");
+        Serial.print(attempt);
+        Serial.print("/");
+        Serial.println(CONNECT_RETRIES);
+
+        try {
+            pClient = NimBLEDevice::createClient();
+            if (!pClient) {
+                Serial.println(">>> ERROR: Failed to create BLE client");
+                if (attempt < CONNECT_RETRIES) delay(CONNECT_RETRY_DELAY_MS);
+                continue;
+            }
+
+            pClient->setClientCallbacks(&g_clientCallback, false);
+
+            Serial.print(">>> Connecting to ");
+            Serial.println(m_pAdvertisedDevice->getAddress().toString().c_str());
+            uint32_t t0 = millis();
+            bool ok = pClient->connect(m_pAdvertisedDevice);
+            uint32_t tConnect = millis() - t0;
+            if (!ok) {
+                Serial.print(">>> Physical connection failed after ");
+                Serial.print(tConnect);
+                Serial.println(" ms");
+                try { NimBLEDevice::deleteClient(pClient); } catch (...) {}
+                pClient = nullptr;
+                if (attempt < CONNECT_RETRIES) delay(CONNECT_RETRY_DELAY_MS);
+                continue;
+            }
+
+            Serial.print(">>> Physical connection established in ");
+            Serial.print(tConnect);
+            Serial.println(" ms");
+            break;
+        } catch (...) {
+            Serial.println(">>> Exception during connection");
+            if (attempt < CONNECT_RETRIES) delay(CONNECT_RETRY_DELAY_MS);
+        }
+    }
+
+    if (!pClient || !pClient->isConnected()) {
+        Serial.println(">>> ERROR: Failed to connect after all retries");
+        if (pClient) {
+            try { NimBLEDevice::deleteClient(pClient); } catch (...) {}
+            pClient = nullptr;
+        }
+        return false;
+    }
+
+    uint16_t mtu = pClient->getMTU();
+    Serial.print(">>> MTU from client: ");
+    Serial.println(mtu);
+
+    Serial.println(">>> Waiting for service discovery…");
+    delay(SERVICE_DISCOVERY_DELAY);
+
+    Serial.println(">>> Discovering services and characteristics…");
+    if (!_resolveCharacteristics()) {
+        Serial.println(">>> ERROR: Could not resolve Ecoflow characteristics");
+        return false;
+    }
+
+    // Enable notifications
+    Serial.println(">>> Enabling notifications…");
     try {
-        std::vector<NimBLERemoteService*>* pServices = pClient->getServices(true);
-        
-        if (!pServices || pServices->empty()) {
-            Serial.println(">>> WARNING: No services found yet");
+        pReadChr->subscribe(true, handleNotificationCallback, false);
+        Serial.println(">>> Callback registered");
+        delay(100);
+
+        NimBLERemoteDescriptor* pDesc =
+            pReadChr->getDescriptor(BLEUUID((uint16_t)0x2902));
+        if (pDesc) {
+            uint8_t val[2] = {0x01, 0x00};
+            pDesc->writeValue(val, 2, true);
+            Serial.println(">>> ✓ CCCD descriptor written");
+        } else {
+            Serial.println(">>> WARNING: CCCD descriptor not found");
+        }
+
+        _subscribedToNotifications = true;
+        delay(500);
+    } catch (...) {
+        Serial.println(">>> ERROR: Failed to enable notifications");
+        return false;
+    }
+
+    // Mark as connected BEFORE authentication so sendCommand works
+    _connected        = true;
+    _lastDataTime     = millis();
+    _lastCommandTime  = millis();
+
+    // Protocol-level authentication
+    if (!_authenticate()) {
+        Serial.println(">>> ERROR: Authentication failed");
+        _connected = false;
+        return false;
+    }
+
+    Serial.println(">>> ✓ Connected to Delta 3");
+    Serial.print(">>> MTU: ");
+    Serial.println(pClient->getMTU());
+    Serial.println(">>> Waiting for device data…");
+
+    _startKeepAliveTask();
+    return true;
+}
+
+void EcoflowESP32::disconnect() {
+    _connected    = false;
+    _authenticated = false;
+    _subscribedToNotifications = false;
+
+    if (pClient) {
+        try {
+            if (pClient->isConnected()) pClient->disconnect();
+        } catch (...) {}
+        try {
+            NimBLEDevice::deleteClient(pClient);
+        } catch (...) {}
+        pClient   = nullptr;
+        pWriteChr = nullptr;
+        pReadChr  = nullptr;
+    }
+}
+
+void EcoflowESP32::update() {
+    // Placeholder for any periodic non-BLE tasks
+}
+
+// ---------------------------------------------------------------------------
+// Characteristics resolution
+// ---------------------------------------------------------------------------
+bool EcoflowESP32::_resolveCharacteristics() {
+    if (!pClient) return false;
+
+    pWriteChr = nullptr;
+    pReadChr  = nullptr;
+
+    try {
+        std::vector<NimBLERemoteService*>* services =
+            pClient->getServices(true);
+        if (!services || services->empty()) {
+            Serial.println(">>> WARNING: No services found");
             return false;
         }
-        
+
         Serial.print(">>> Found ");
-        Serial.print(pServices->size());
+        Serial.print(services->size());
         Serial.println(" services");
-        
-        // Try primary Ecoflow service
-        NimBLERemoteService* pService = pClient->getService(SERVICE_UUID_ECOFLOW);
+
+        NimBLERemoteService* pService =
+            pClient->getService(SERVICE_UUID_ECOFLOW);
         if (pService) {
             Serial.println(">>> Found Ecoflow service");
+
             pWriteChr = pService->getCharacteristic(CHAR_WRITE_UUID_ECOFLOW);
-            pReadChr = pService->getCharacteristic(CHAR_READ_UUID_ECOFLOW);
-            
+            pReadChr  = pService->getCharacteristic(CHAR_READ_UUID_ECOFLOW);
+
             if (pWriteChr && pReadChr) {
                 Serial.println(">>> ✓ Found both characteristics");
                 return true;
             }
         }
-        
-        // Try alternate service
+
+        // Try alternate service if needed
         pService = pClient->getService(SERVICE_UUID_ALT);
         if (pService) {
             Serial.println(">>> Found alternate service");
             pWriteChr = pService->getCharacteristic(CHAR_WRITE_UUID_ALT);
-            pReadChr = pService->getCharacteristic(CHAR_READ_UUID_ALT);
-            
+            pReadChr  = pService->getCharacteristic(CHAR_READ_UUID_ALT);
             if (pWriteChr && pReadChr) {
                 Serial.println(">>> ✓ Found alternate characteristics");
                 return true;
             }
         }
-        
+
         return false;
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR resolving characteristics: ");
-        Serial.println(e.what());
+    } catch (...) {
+        Serial.println(">>> ERROR resolving characteristics");
         return false;
     }
 }
 
-// ============================================================================
-// CONNECTION
-// ============================================================================
-
-bool EcoflowESP32::connectToServer() {
-    if (m_pAdvertisedDevice == nullptr) {
-        Serial.println(">>> ERROR: No device found");
-        return false;
-    }
-    
-    // If already connected with valid characteristics, stay connected
-    if (pClient != nullptr && pClient->isConnected()) {
-        if (pReadChr && pWriteChr && _subscribedToNotifications) {
-            Serial.println(">>> Already connected with notifications active");
-            _connected = true;
-            return true;
-        }
-    }
-    
-    // Clean up stale connection
-    if (pClient != nullptr) {
-        try {
-            if (pClient->isConnected()) {
-                pClient->disconnect();
-            }
-            NimBLEDevice::deleteClient(pClient);
-        } catch (...) {}
-        pClient = nullptr;
-        pWriteChr = nullptr;
-        pReadChr = nullptr;
-        _subscribedToNotifications = false;
-    }
-    
-    // Try to connect with retries
-    for (uint8_t attempt = 1; attempt <= CONNECT_RETRIES; attempt++) {
-        Serial.print(">>> Connection attempt ");
-        Serial.print(attempt);
-        Serial.print("/");
-        Serial.println(CONNECT_RETRIES);
-        
-        try {
-            pClient = NimBLEDevice::createClient();
-            if (!pClient) {
-                Serial.println(">>> ERROR: Failed to create BLE client");
-                if (attempt < CONNECT_RETRIES) {
-                    delay(CONNECT_RETRY_DELAY);
-                }
-                continue;
-            }
-            
-            pClient->setClientCallbacks(g_pClientCallback, false);
-            
-            Serial.print(">>> Connecting to ");
-            Serial.println(m_pAdvertisedDevice->getAddress().toString().c_str());
-            
-            uint32_t connectStartTime = millis();
-            if (pClient->connect(m_pAdvertisedDevice)) {
-                uint32_t connectTime = millis() - connectStartTime;
-                Serial.print(">>> Physical connection established in ");
-                Serial.print(connectTime);
-                Serial.println("ms");
-                break;
-            } else {
-                uint32_t connectTime = millis() - connectStartTime;
-                Serial.print(">>> Physical connection failed after ");
-                Serial.print(connectTime);
-                Serial.println("ms");
-                
-                try {
-                    NimBLEDevice::deleteClient(pClient);
-                } catch (...) {}
-                pClient = nullptr;
-                
-                if (attempt < CONNECT_RETRIES) {
-                    delay(CONNECT_RETRY_DELAY);
-                }
-            }
-            
-        } catch (const std::exception& e) {
-            Serial.print(">>> Exception during connection: ");
-            Serial.println(e.what());
-            if (attempt < CONNECT_RETRIES) {
-                delay(CONNECT_RETRY_DELAY);
-            }
-        }
-    }
-    
-    // Check if successfully connected
-    if (!pClient || !pClient->isConnected()) {
-        Serial.println(">>> ERROR: Failed to connect after all retries");
-        if (pClient) {
-            try {
-                NimBLEDevice::deleteClient(pClient);
-            } catch (...) {}
-            pClient = nullptr;
-        }
-        return false;
-    }
-    
-    // Validate MTU before proceeding
-    uint16_t mtu = pClient->getMTU();
-    Serial.print(">>> MTU from client: ");
-    Serial.println(mtu);
-    
-    if (mtu == 0) {
-        Serial.println(">>> ERROR: MTU is 0, connection invalid");
-        try {
-            pClient->disconnect();
-            NimBLEDevice::deleteClient(pClient);
-        } catch (...) {}
-        pClient = nullptr;
-        return false;
-    }
-    
-    // Service discovery - give it more time
-    Serial.println(">>> Waiting for service discovery...");
-    delay(SERVICE_DISCOVERY_DELAY);
-    
-    Serial.println(">>> Discovering services and characteristics...");
-    uint8_t discoveryRetries = 5;
-    uint32_t startTime = millis();
-    
-    while (discoveryRetries > 0 && millis() - startTime < 10000) {
-        delay(300);
-        
-        if (_resolveCharacteristics()) {
-            uint32_t discoveryTime = millis() - startTime;
-            Serial.print(">>> Services discovered in ");
-            Serial.print(discoveryTime);
-            Serial.println("ms");
-            break;
-        }
-        discoveryRetries--;
-    }
-    
-    // Check if we found characteristics
-    if (!pWriteChr || !pReadChr) {
-        Serial.println(">>> ERROR: Could not find characteristics");
-        return false;
-    }
-    
-    // Enable notifications on read characteristic
-    Serial.println(">>> Enabling notifications...");
-    try {
-        // Step 1: Register callback function
-        pReadChr->subscribe(true, handleNotificationCallback, false);
-        Serial.println(">>> Callback registered");
-        
-        // Step 2: Give system time to process subscribe
-        delay(100);
-        
-        // Step 3: MANUALLY write CCCD descriptor
-        NimBLERemoteDescriptor* pDescriptor = pReadChr->getDescriptor(BLEUUID((uint16_t)0x2902));
-        if (pDescriptor) {
-            uint8_t notifyValue[2] = {0x01, 0x00};
-            pDescriptor->writeValue(notifyValue, 2, true);
-            Serial.println(">>> ✓ CCCD descriptor written");
-            _subscribedToNotifications = true;
-        } else {
-            Serial.println(">>> WARNING: CCCD descriptor not found");
-            _subscribedToNotifications = true;
-        }
-        
-        // Give device time to process CCCD write
-        delay(500);
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR: Failed to enable notifications: ");
-        Serial.println(e.what());
-        return false;
-    }
-    
-    // Success
-    Serial.println(">>> ✓ Connected to Delta 3");
-    Serial.print(">>> MTU: ");
-    Serial.println(pClient->getMTU());
-    Serial.println(">>> Waiting for device data...");
-    
-    _connected = true;
-    _authenticated = true;
-    _lastDataTime = millis();
-    _lastCommandTime = millis();
-    
-    // Start keep-alive task
-    _startKeepAliveTask();
-    
-    return true;
+// ---------------------------------------------------------------------------
+// Callbacks from NimBLE
+// ---------------------------------------------------------------------------
+void EcoflowESP32::onConnect(NimBLEClient* /*pclient*/) {
+    Serial.println(">>> [CALLBACK] Connected");
 }
 
-// ============================================================================
-// KEEP-ALIVE TASK MANAGEMENT
-// ============================================================================
+void EcoflowESP32::onDisconnect(NimBLEClient* /*pclient*/) {
+    Serial.println(">>> [CALLBACK] Disconnected");
+    _connected     = false;
+    _authenticated = false;
+}
 
+// Called from notification callback
+void EcoflowESP32::onNotify(NimBLERemoteCharacteristic* /*pRemoteCharacteristic*/,
+                            uint8_t* pData, size_t length, bool /*isNotify*/) {
+    parse(pData, length);
+}
+
+// ---------------------------------------------------------------------------
+// Keep‑alive task management
+// ---------------------------------------------------------------------------
 void EcoflowESP32::_startKeepAliveTask() {
-    if (_keepAliveTaskHandle != nullptr) {
-        return;
-    }
-    
-    xTaskCreate(keepAliveTask, "KeepAlive", 4096, this, 1, &_keepAliveTaskHandle);
+    if (_keepAliveTaskHandle) return;
+    xTaskCreate(keepAliveTask, "EcoflowKeepAlive", 4096,
+                this, 1, &_keepAliveTaskHandle);
 }
 
 void EcoflowESP32::_stopKeepAliveTask() {
-    if (_keepAliveTaskHandle != nullptr) {
+    if (_keepAliveTaskHandle) {
         vTaskDelete(_keepAliveTaskHandle);
         _keepAliveTaskHandle = nullptr;
     }
 }
 
-// ============================================================================
-// NOTIFICATION HANDLER
-// ============================================================================
-
-void EcoflowESP32::onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic,
-                            uint8_t* pData, size_t length, bool isNotify) {
-    if (!pRemoteCharacteristic || !pData || length == 0) {
-        return;
-    }
-    
-    parse(pData, length);
-}
-
-// ============================================================================
-// CALLBACKS
-// ============================================================================
-
-void EcoflowESP32::onConnect(NimBLEClient* pclient) {
-    Serial.print(">>> [");
-    Serial.print(millis());
-    Serial.println("] Connected callback triggered");
-    
-    if (pclient) {
-        Serial.print(">>> - MTU: ");
-        Serial.println(pclient->getMTU());
-    }
-}
-
-void EcoflowESP32::onDisconnect(NimBLEClient* pclient) {
-    Serial.print(">>> [");
-    Serial.print(millis());
-    Serial.println("] Disconnected callback triggered");
-    
-    _connected = false;
-    _subscribedToNotifications = false;
-    _stopKeepAliveTask();
-}
-
-// ============================================================================
-// DISCONNECTION
-// ============================================================================
-
-void EcoflowESP32::disconnect() {
-    _running = false;
-    _connected = false;
-    _subscribedToNotifications = false;
-    _stopKeepAliveTask();
-    
-    try {
-        if (pClient && pClient->isConnected()) {
-            pClient->disconnect();
-        }
-        
-        if (pClient) {
-            NimBLEDevice::deleteClient(pClient);
-            pClient = nullptr;
-        }
-        
-    } catch (...) {}
-    
-    pWriteChr = nullptr;
-    pReadChr = nullptr;
-}
-
-// ============================================================================
-// DATA PARSING - FIXED VERSION
-// ============================================================================
-
-void EcoflowESP32::parse(uint8_t* pData, size_t length) {
-    if (length < 21) {
-        Serial.println(">>> [PARSE] Frame too short");
-        return;
-    }
-    
-    // Validate frame header
-    if (pData[0] != 0xAA || pData[1] != 0x02) {
-        Serial.println(">>> [PARSE] Invalid header");
-        return;
-    }
-    
-    // Validate checksum - XOR of bytes 0-19
-    uint8_t checksum = 0;
-    for (size_t i = 0; i < 20; i++) {
-        checksum ^= pData[i];
-    }
-    
-    if (checksum != pData[20]) {
-        Serial.print(">>> [WARN] Checksum mismatch: calculated=");
-        Serial.print(checksum, HEX);
-        Serial.print(" received=");
-        Serial.println(pData[20], HEX);
-        return;
-    }
-    
-    // Extract standard data fields (BIG-ENDIAN for 16-bit values)
-    _data.batteryLevel = pData[18];                                    // Byte 18: Battery %
-    _data.inputPower = ((uint16_t)pData[17] << 8) | pData[16];        // Bytes 16-17: Input Power
-    _data.outputPower = ((uint16_t)pData[15] << 8) | pData[14];       // Bytes 14-15: Output Power
-    
-    // Parse status flags from byte 19
-    uint8_t flags = pData[19];
-    _data.acOn = (flags & 0x01) != 0;
-    _data.usbOn = (flags & 0x02) != 0;
-    _data.dcOn = (flags & 0x04) != 0;
-    
-    // If frame is longer, extract extended data
-    if (length > 21) {
-        // Battery voltage typically in bytes 21-22 (if available)
-        if (length > 22) {
-            _data.batteryVoltage = ((uint16_t)pData[22] << 8) | pData[21];
-        }
-        // AC voltage typically in bytes 23-24 (if available)
-        if (length > 24) {
-            _data.acVoltage = ((uint16_t)pData[24] << 8) | pData[23];
-        }
-    }
-    
-    _lastDataTime = millis();
-    
-    // Log parsed data
-    Serial.print(">>> [PARSED] Battery: ");
-    Serial.print(_data.batteryLevel);
-    Serial.print("% Input: ");
-    Serial.print(_data.inputPower);
-    Serial.print("W Output: ");
-    Serial.print(_data.outputPower);
-    Serial.print("W AC:");
-    Serial.print(_data.acOn ? "ON" : "OFF");
-    Serial.print(" USB:");
-    Serial.print(_data.usbOn ? "ON" : "OFF");
-    Serial.print(" DC:");
-    Serial.println(_data.dcOn ? "ON" : "OFF");
-    
-    if (_data.batteryVoltage > 0) {
-        Serial.print(">>> [EXTENDED] Battery Voltage: ");
-        Serial.print(_data.batteryVoltage);
-        Serial.println("V");
-    }
-}
-
-// ============================================================================
-// COMMANDS
-// ============================================================================
-
-bool EcoflowESP32::sendCommand(const uint8_t* command, size_t size) {
-    if (!_connected || !pWriteChr || !pClient || !pClient->isConnected()) {
-        Serial.println(">>> ERROR: Not connected");
+// ---------------------------------------------------------------------------
+// Authentication with MD5-based secretKey
+// ---------------------------------------------------------------------------
+bool EcoflowESP32::_authenticate() {
+    if (_userId.empty() || _deviceSn.empty()) {
+        Serial.println(">>> ERROR: Credentials not set (call setCredentials first)");
         return false;
     }
-    
+
+    Serial.println(">>> [AUTH] Starting autoAuthentication...");
+    Serial.print(">>> [AUTH] userId=");
+    Serial.print(_userId.c_str());
+    Serial.print(", deviceSn=");
+    Serial.println(_deviceSn.c_str());
+
+    // Build the secret key: MD5(userId + deviceSn)
+    std::string secretInput = _userId + _deviceSn;
+    uint8_t secretKey[16];
+    md5_hash(secretInput, secretKey);
+
+    Serial.print(">>> [AUTH] Secret key (MD5): ");
+    for (int i = 0; i < 16; i++) {
+        if (secretKey[i] < 0x10) Serial.print("0");
+        Serial.print(secretKey[i], HEX);
+    }
+    Serial.println();
+
+    // Build auth frame:
+    // AA 02 01 01 [16 bytes of secretKey] [XOR checksum]
+    uint8_t authFrame[21];
+    authFrame[0] = 0xAA;
+    authFrame[1] = 0x02;
+    authFrame[2] = 0x01;
+    authFrame[3] = 0x01;
+    for (int i = 0; i < 16; i++) {
+        authFrame[4 + i] = secretKey[i];
+    }
+
+    uint8_t checksum = 0;
+    for (int i = 0; i < 20; i++) {
+        checksum ^= authFrame[i];
+    }
+    authFrame[20] = checksum;
+
+    Serial.print(">>> [AUTH] Sending auth frame (21 bytes): ");
+    for (int i = 0; i < 21; i++) {
+        if (authFrame[i] < 0x10) Serial.print("0");
+        Serial.print(authFrame[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+
+    if (!sendCommand(authFrame, sizeof(authFrame))) {
+        Serial.println(">>> ERROR: Failed to send auth frame");
+        return false;
+    }
+
+    Serial.println(">>> [AUTH] Waiting for auth response...");
+    uint32_t authStart = millis();
+    _notificationReceived = false;
+
+    while (millis() - authStart < AUTH_TIMEOUT_MS) {
+        if (_notificationReceived) {
+            Serial.println(">>> [AUTH] ✓ Auth response received!");
+            _authenticated = true;
+            _notificationReceived = false;
+            return true;
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    Serial.println(">>> [AUTH] WARNING: No auth response within timeout");
+    // Some devices may not send explicit ACK; allow continuing
+    _authenticated = true;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+bool EcoflowESP32::sendCommand(const uint8_t* command, size_t size) {
+    if (!_connected) {
+        Serial.println(">>> ERROR: Not connected flag is false (sendCommand)");
+        return false;
+    }
+    if (!pClient) {
+        Serial.println(">>> ERROR: pClient is null (sendCommand)");
+        return false;
+    }
+    if (!pClient->isConnected()) {
+        Serial.println(">>> ERROR: pClient->isConnected() == false (sendCommand)");
+        return false;
+    }
+    if (!pWriteChr) {
+        Serial.println(">>> ERROR: pWriteChr is null (sendCommand)");
+        return false;
+    }
+    if (!command || size == 0) {
+        Serial.println(">>> ERROR: Invalid command buffer");
+        return false;
+    }
+
     try {
         pWriteChr->writeValue((uint8_t*)command, size, true);
-        Serial.print(">>> [COMMAND] Sent (");
+        Serial.print(">>> [COMMAND] Sent ");
         Serial.print(size);
-        Serial.println(" bytes)");
+        Serial.println(" bytes");
         _lastCommandTime = millis();
         return true;
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR: Send failed: ");
-        Serial.println(e.what());
+    } catch (...) {
+        Serial.println(">>> ERROR: Send failed");
         return false;
     }
 }
 
 bool EcoflowESP32::requestData() {
-    Serial.println(">>> Requesting device data...");
+    Serial.println(">>> Requesting device data…");
     return sendCommand(CMD_REQUEST_DATA, sizeof(CMD_REQUEST_DATA));
 }
 
 bool EcoflowESP32::setAC(bool on) {
     Serial.print(">>> Setting AC to ");
     Serial.println(on ? "ON" : "OFF");
-    
-    if (!_connected || !pWriteChr || !pClient || !pClient->isConnected()) {
-        Serial.println(">>> ERROR: Not connected");
-        return false;
-    }
-    
-    try {
-        const uint8_t* cmd = on ? CMD_AC_ON : CMD_AC_OFF;
-        size_t size = on ? sizeof(CMD_AC_ON) : sizeof(CMD_AC_OFF);
-        
-        // NEW: RESET the flag BEFORE sending command
-        _notificationReceived = false;
-        _lastNotificationTime = 0;
-        
-        pWriteChr->writeValue((uint8_t*)cmd, size, true);
-        Serial.print(">>> [COMMAND] AC ");
-        Serial.print(on ? "ON" : "OFF");
-        Serial.println(" sent (21 bytes)");
-        
-        _lastCommandTime = millis();
-        
-        // NEW: WAIT for notification to arrive (NOT for state change)
-        uint32_t startTime = millis();
-        bool gotNotification = false;
-        
-        while (millis() - startTime < 2000) {
-            if (_notificationReceived) {  // ← Check for notification, not state
-                gotNotification = true;
-                Serial.println(">>> Notification received");
-                break;
-            }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
-        
-        // Check if state actually changed
-        if (_data.acOn == on) {
-            Serial.println(">>> AC command acknowledged!");
-            return true;
-        } else if (gotNotification) {
-            Serial.println(">>> Notification received but AC state didn't change");
-            return true;  // Command was sent and acknowledged, even if state wrong
-        } else {
-            Serial.println(">>> No notification received for AC command");
-            return true;  // Command was sent
-        }
-        
-    } catch (const std::exception& e) {
-        Serial.print(">>> ERROR: AC command failed: ");
-        Serial.println(e.what());
-        return false;
-    }
-}
+    const uint8_t* cmd = on ? CMD_AC_ON : CMD_AC_OFF;
+    size_t size        = on ? sizeof(CMD_AC_ON) : sizeof(CMD_AC_OFF);
 
+    _notificationReceived = false;
+    _lastNotificationTime = 0;
+    if (!sendCommand(cmd, size)) return false;
+
+    uint32_t start = millis();
+    while (millis() - start < 2000) {
+        if (_notificationReceived) break;
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    return true;
+}
 
 bool EcoflowESP32::setDC(bool on) {
     Serial.print(">>> Setting DC 12V to ");
     Serial.println(on ? "ON" : "OFF");
-    return sendCommand(on ? CMD_12V_ON : CMD_12V_OFF,
-                       on ? sizeof(CMD_12V_ON) : sizeof(CMD_12V_OFF));
+    const uint8_t* cmd = on ? CMD_12V_ON : CMD_12V_OFF;
+    size_t size        = on ? sizeof(CMD_12V_ON) : sizeof(CMD_12V_OFF);
+    return sendCommand(cmd, size);
 }
 
 bool EcoflowESP32::setUSB(bool on) {
     Serial.print(">>> Setting USB to ");
     Serial.println(on ? "ON" : "OFF");
-    return sendCommand(on ? CMD_USB_ON : CMD_USB_OFF,
-                       on ? sizeof(CMD_USB_ON) : sizeof(CMD_USB_OFF));
+    const uint8_t* cmd = on ? CMD_USB_ON : CMD_USB_OFF;
+    size_t size        = on ? sizeof(CMD_USB_ON) : sizeof(CMD_USB_OFF);
+    return sendCommand(cmd, size);
 }
 
-// ============================================================================
-// GETTERS
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Data parsing (frame -> EcoflowData)
+// ---------------------------------------------------------------------------
+void EcoflowESP32::parse(uint8_t* pData, size_t length) {
+    if (!pData || length < 21) {
+        Serial.println(">>> [PARSE] Frame too short");
+        return;
+    }
 
-int EcoflowESP32::getBatteryLevel() {
-    return (int)_data.batteryLevel;
+    // Header check
+    if (pData[0] != 0xAA || pData[1] != 0x02) {
+        Serial.println(">>> [PARSE] Invalid header");
+        return;
+    }
+
+    // Checksum: XOR of bytes 0..19 must equal byte 20
+    uint8_t cs = 0;
+    for (size_t i = 0; i < 20; ++i) cs ^= pData[i];
+    if (cs != pData[20]) {
+        Serial.print(">>> [PARSE] Checksum mismatch, calc=");
+        if (cs < 0x10) Serial.print("0");
+        Serial.print(cs, HEX);
+        Serial.print(" recv=");
+        if (pData[20] < 0x10) Serial.print("0");
+        Serial.println(pData[20], HEX);
+        return;
+    }
+
+    // CURRENT GUESS of layout – adjust once you diff with Python:
+    // pData[14-15]: output power (BE)
+    // pData[16-17]: input power (BE)
+    // pData[18]:    battery level %
+    // pData[19]:    flags bit0=AC, bit1=USB, bit2=DC
+    _data.outputPower = (static_cast<uint16_t>(pData[14]) << 8) |
+                         static_cast<uint16_t>(pData[15]);
+    _data.inputPower  = (static_cast<uint16_t>(pData[16]) << 8) |
+                         static_cast<uint16_t>(pData[17]);
+    _data.batteryLevel = pData[18];
+
+    uint8_t flags = pData[19];
+    _data.acOn  = (flags & 0x01) != 0;
+    _data.usbOn = (flags & 0x02) != 0;
+    _data.dcOn  = (flags & 0x04) != 0;
+
+    if (length >= 25) {
+        _data.batteryVoltage = (static_cast<uint16_t>(pData[21]) << 8) |
+                                static_cast<uint16_t>(pData[22]);
+        _data.acVoltage      = (static_cast<uint16_t>(pData[23]) << 8) |
+                                static_cast<uint16_t>(pData[24]);
+        // AC frequency can be added once we know the correct offset
+    }
+
+    _lastDataTime = millis();
+
+    Serial.print(">>> [PARSED] Battery=");
+    Serial.print(_data.batteryLevel);
+    Serial.print("%, In=");
+    Serial.print(_data.inputPower);
+    Serial.print("W, Out=");
+    Serial.print(_data.outputPower);
+    Serial.print("W, AC=");
+    Serial.print(_data.acOn ? "ON" : "OFF");
+    Serial.print(", USB=");
+    Serial.print(_data.usbOn ? "ON" : "OFF");
+    Serial.print(", DC=");
+    Serial.println(_data.dcOn ? "ON" : "OFF");
+
+    if (_data.batteryVoltage > 0) {
+        Serial.print(">>> [PARSED] Battery V=");
+        Serial.println(_data.batteryVoltage);
+    }
+    if (_data.acVoltage > 0) {
+        Serial.print(">>> [PARSED] AC V=");
+        Serial.println(_data.acVoltage);
+    }
 }
 
-int EcoflowESP32::getInputPower() {
-    return (int)_data.inputPower;
-}
-
-int EcoflowESP32::getOutputPower() {
-    return (int)_data.outputPower;
-}
-
-int EcoflowESP32::getBatteryVoltage() {
-    return (int)_data.batteryVoltage;
-}
-
-int EcoflowESP32::getACVoltage() {
-    return (int)_data.acVoltage;
-}
-
-int EcoflowESP32::getACFrequency() {
-    return (int)_data.acFrequency;
-}
-
-bool EcoflowESP32::isAcOn() {
-    return _data.acOn;
-}
-
-bool EcoflowESP32::isDcOn() {
-    return _data.dcOn;
-}
-
-bool EcoflowESP32::isUsbOn() {
-    return _data.usbOn;
-}
+// ---------------------------------------------------------------------------
+// Getters / state
+// ---------------------------------------------------------------------------
+int  EcoflowESP32::getBatteryLevel()   { return static_cast<int>(_data.batteryLevel); }
+int  EcoflowESP32::getInputPower()     { return static_cast<int>(_data.inputPower); }
+int  EcoflowESP32::getOutputPower()    { return static_cast<int>(_data.outputPower); }
+int  EcoflowESP32::getBatteryVoltage() { return static_cast<int>(_data.batteryVoltage); }
+int  EcoflowESP32::getACVoltage()      { return static_cast<int>(_data.acVoltage); }
+int  EcoflowESP32::getACFrequency()    { return static_cast<int>(_data.acFrequency); }
+bool EcoflowESP32::isAcOn()            { return _data.acOn; }
+bool EcoflowESP32::isDcOn()            { return _data.dcOn; }
+bool EcoflowESP32::isUsbOn()           { return _data.usbOn; }
 
 bool EcoflowESP32::isConnected() {
     return _connected && pClient && pClient->isConnected();
-}
-
-void EcoflowESP32::update() {
-    // Called periodically for any needed updates
 }
