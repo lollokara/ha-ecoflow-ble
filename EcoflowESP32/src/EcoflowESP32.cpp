@@ -337,11 +337,14 @@ bool EcoflowESP32::_startAuthentication() {
 void EcoflowESP32::_sendPublicKey() {
     uint8_t pubKey[41];
     size_t key_len;
-    EcoflowECDH::generate_public_key(pubKey, &key_len, _private_key);
-
-    auto cmd = EcoflowCommands::buildPublicKey(pubKey, key_len);
-    _sendCommand(cmd);
-    _setState(ConnectionState::PUBLIC_KEY_SENT);
+    if (EcoflowECDH::generate_public_key(pubKey, &key_len, _private_key)) {
+        auto cmd = EcoflowCommands::buildPublicKey(pubKey, key_len);
+        _sendCommand(cmd);
+        _setState(ConnectionState::PUBLIC_KEY_SENT);
+    } else {
+        Serial.println("Failed to generate public key. Aborting authentication.");
+        disconnect();
+    }
 }
 
 void EcoflowESP32::_handlePublicKeyExchange(const uint8_t* pData, size_t length) {

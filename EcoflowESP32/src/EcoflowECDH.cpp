@@ -8,6 +8,7 @@
 extern "C" {
 #include "Credentials.h"
 }
+#include <Arduino.h>
 #include <cstring>
 
 namespace EcoflowECDH {
@@ -21,13 +22,15 @@ static int init_rng(mbedtls_ctr_drbg_context *ctr_drbg, mbedtls_entropy_context 
                                (const unsigned char *)pers, strlen(pers));
 }
 
-void generate_public_key(uint8_t* buf, size_t* len, uint8_t* private_key_out) {
+bool generate_public_key(uint8_t* buf, size_t* len, uint8_t* private_key_out) {
+    *len = 0;
     mbedtls_ecp_group grp;
     mbedtls_mpi d;
     mbedtls_ecp_point q;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context entropy;
     int ret = 0;
+    bool success = false;
 
     mbedtls_ecp_group_init(&grp);
     mbedtls_mpi_init(&d);
@@ -35,28 +38,35 @@ void generate_public_key(uint8_t* buf, size_t* len, uint8_t* private_key_out) {
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
 
-    if (init_rng(&ctr_drbg, &entropy) != 0) {
+    if ((ret = init_rng(&ctr_drbg, &entropy)) != 0) {
+        Serial.printf("Failed in init_rng: %d\n", ret);
         goto cleanup;
     }
 
-    ret = Ecoflow_mbedtls::load_secp160r1_group(&grp);
-    if(ret != 0) {
+    if((ret = Ecoflow_mbedtls::load_secp160r1_group(&grp)) != 0) {
+        Serial.printf("Failed to load curve: %d\n", ret);
         goto cleanup;
     }
 
-    ret = mbedtls_ecdh_gen_public(&grp, &d, &q, mbedtls_ctr_drbg_random, &ctr_drbg);
-    if(ret != 0) {
+    if((ret = mbedtls_ecdh_gen_public(&grp, &d, &q, mbedtls_ctr_drbg_random, &ctr_drbg)) != 0) {
+        Serial.printf("Failed in mbedtls_ecdh_gen_public: %d\n", ret);
         goto cleanup;
     }
 
-    ret = mbedtls_mpi_write_binary(&d, private_key_out, 21);
-    if(ret != 0) {
+    if((ret = mbedtls_mpi_write_binary(&d, private_key_out, 21)) != 0) {
+        Serial.printf("Failed in mbedtls_mpi_write_binary (private): %d\n", ret);
         goto cleanup;
     }
 
-    ret = mbedtls_ecp_point_write_binary(&grp, &q,
+    if((ret = mbedtls_ecp_point_write_binary(&grp, &q,
                                          MBEDTLS_ECP_PF_UNCOMPRESSED, len,
-                                         buf, 41);
+                                         buf, 41)) != 0) {
+        Serial.printf("Failed in mbedtls_ecp_point_write_binary (public): %d\n", ret);
+        *len = 0;
+        goto cleanup;
+    }
+
+    success = true;
 
 cleanup:
     mbedtls_ecp_group_free(&grp);
@@ -64,6 +74,7 @@ cleanup:
     mbedtls_ecp_point_free(&q);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
+    return success;
 }
 
 void compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_len, uint8_t* shared_secret_out, const uint8_t* private_key) {
