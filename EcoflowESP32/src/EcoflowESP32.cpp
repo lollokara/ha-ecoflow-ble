@@ -252,7 +252,6 @@ void EcoflowESP32::_setState(ConnectionState newState) {
 
 void EcoflowESP32::onConnect(NimBLEClient* pclient) {
     _setState(ConnectionState::CONNECTED);
-    vTaskDelay(SERVICE_DISCOVERY_DELAY / portTICK_PERIOD_MS);
     if(_resolveCharacteristics()) {
         _startAuthentication();
     }
@@ -401,7 +400,7 @@ bool EcoflowESP32::_resolveCharacteristics() {
     pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
 
     if(pReadChr) {
-        pReadChr->subscribe(true, handleNotificationCallback);
+        pReadChr->subscribe(true, handleNotificationCallback, true);
     }
 
     return pWriteChr && pReadChr;
