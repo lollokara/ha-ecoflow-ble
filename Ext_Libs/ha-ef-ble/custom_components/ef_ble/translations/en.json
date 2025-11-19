@@ -1,0 +1,519 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Device is already configured",
+      "not_supported": "Device is not supported",
+      "no_devices_found": "No supported EcoFlow devices found. Make sure your device is not connected to the EcoFlow app via Bluetooth.",
+      "reconfigure_successful": "Reconfiguration was successful"
+    },
+    "error": {
+      "cannot_connect": "Cannot connect",
+      "invalid_auth": "Authentication is invalid",
+      "unknown": "An unexpected error occured, check the logs for details",
+      "email_empty": "Email cannot be empty",
+      "password_empty": "Password cannot be empty",
+      "device_auth_failed": "Device authentication failed - user ID may be incorrect",
+      "bt_timeout": "Could not connect to the device - connection timed out",
+      "bt_not_found": "Device was not found - try refreshing the bluetooth integration if this error occurs repeatedly",
+      "bt_general_error": "Could not connect to the device - see the logs for more details",
+      "error_try_refresh": "Connection disconnected before it could authenticate - try refreshing before adding the device"
+    },
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Discovered Device Configuration",
+        "data": {
+          "user_id": "EcoFlow User ID",
+          "address": "BLE Device",
+          "update_period": "Update Period",
+          "connection_timeout": "Connection Timeout"
+        },
+        "data_description": {
+          "update_period": "Number of seconds to wait before processing the next device update. Value of 0 means all updates are processed immediately (will result in a high number of database writes).",
+          "connection_timeout": "Number of seconds to wait for the device to connect and authenticate."
+        },
+        "sections": {
+          "login": {
+            "name": "EcoFlow Login (skip if you already know your user ID)",
+            "data": {
+              "email": "Email",
+              "password": "Password"
+            }
+          },
+          "log_options": {
+            "name": "Logging Options",
+            "description": "Detailed logging options. Most of these will flood your logs, so avoid leaving them enabled for long periods.",
+            "data": {
+                "log_masked": "Mask sensitive information (useful when sharing logs publicly)",
+                "log_connection": "Log device connection requests and responses",
+                "log_messages": "Log deserialized device update messages",
+                "log_packets": "Log packet objects",
+                "log_encrypted_payloads": "Log encrypted payloads",
+                "log_payloads": "Log decrypted payloads",
+                "log_bleak": "Enable bleak debug log level (not masked and not filtered to this device)"
+            }
+          }
+        }
+      },
+      "user": {
+        "title": "Add EcoFlow Device",
+        "data": {
+          "user_id": "EcoFlow User ID",
+          "address": "BLE Device",
+          "update_period": "Update Period",
+          "connection_timeout": "Connection Timeout"
+        },
+        "data_description": {
+          "update_period": "Number of seconds to wait before processing the next device update. Value of 0 means all updates are processed immediately (will result in a high number of DB writes).",
+          "connection_timeout": "Number of seconds to wait for the device to connect and authenticate."
+        },
+        "sections": {
+          "login": {
+            "name": "EcoFlow Login (skip if you already know your user ID)",
+            "data": {
+              "email": "Email",
+              "password": "Password"
+            }
+          },
+          "log_options": {
+            "name": "Logging Options",
+            "description": "Detailed logging options. Most of these will flood your logs, so avoid leaving them enabled for long periods.",
+            "data": {
+                "log_masked": "Mask sensitive information (useful when sharing logs publicly)",
+                "log_connection": "Log device connection requests and responses",
+                "log_messages": "Log deserialized device update messages",
+                "log_packets": "Log packet objects",
+                "log_encrypted_payloads": "Log encrypted payloads",
+                "log_payloads": "Log decrypted payloads",
+                "log_bleak": "Enable bleak debug log level (not masked and not filtered to this device)"
+            }
+          }
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "user_id": "EcoFlow User ID"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options for {device_name}",
+        "data": {
+          "update_period": "Update Period"
+        },
+        "data_description": {
+          "update_period": "Number of seconds to wait before processing the next device update. Value of 0 means all updates are processed immediately (will result in a high number of DB writes)."
+        },
+        "sections": {
+          "log_options": {
+            "name": "Logging Options",
+            "description": "Detailed logging options. Most of these will flood your logs, so avoid leaving them enabled for long periods.",
+            "data": {
+                "log_masked": "Mask sensitive information (useful when sharing logs publicly)",
+                "log_connection": "Log device connection requests and responses",
+                "log_messages": "Log deserialized device update messages",
+                "log_packets": "Log packet objects",
+                "log_encrypted_payloads": "Log encrypted payloads",
+                "log_payloads": "Log decrypted payloads",
+                "log_bleak": "Enable bleak debug log level (not masked and not filtered to this device)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_error": {
+      "message": "Unknown error: {error}"
+    },
+    "unable_to_create_device": {
+      "message": "EcoFlow BLE Device unable to create"
+    },
+    "device_not_present": {
+      "message": "EcoFlow BLE device not present"
+    },
+    "could_not_connect": {
+      "message": "Could not connect to the device after {time} seconds, check the logs"
+    },
+    "error_after_connected": {
+      "message": "Error occured before device could authenticate"
+    },
+    "authentication_failed": {
+      "message": "Authentication failed"
+    },
+    "could_not_reconnect_after_max_attempts": {
+      "message": "Could not reconnect after losing connection {attempts} times."
+    },
+    "could_not_connect_no_retry": {
+      "message": "Could not connect to device after {attempts} unsuccessful attempts"
+    },
+    "failed_after_successful_connection": {
+      "message": "Device connected but did not get to auth procedure, last state: {last_state}"
+    }
+  },
+  "issues": {
+    "max_connection_attempts_reached": {
+      "title": "Could not connect to {device_name} after {attempts} unsuccessful attempts",
+      "description": "Failed to connect to {device_name} after {attempts} unsuccessful attempts. Check the logs for more info.\n\nAutomatic retry was disabled to not spam logs, integration has to be reloaded manually. This error clears after successful connection."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "channel_backup_is_ready": {
+        "name": "Channel {channel} Backup Ready"
+      },
+      "channel_is_enabled": {
+        "name": "Channel {channel} Enabled"
+      },
+      "channel_is_connected": {
+        "name": "Channel {channel} Connected"
+      },
+      "channel_is_ac_open": {
+        "name": "Channel {channel} AC Output"
+      },
+      "channel_is_power_output": {
+        "name": "Channel {channel} Power Output"
+      },
+      "channel_is_grid_charge": {
+        "name": "Channel {channel} Grid Charging"
+      },
+      "channel_is_mppt_charge": {
+        "name": "Channel {channel} Solar Charging"
+      },
+      "channel_ems_charging": {
+        "name": "Channel {channel} EMS Charging"
+      },
+      "channel_hw_connected": {
+        "name": "Channel {channel} Hardware Connected"
+      },
+      "error_happened": {
+        "name": "Error"
+      },
+      "plugged_in_ac": {
+        "name": "AC Plugged In"
+      }
+    },
+    "sensor": {
+      "battery_level": {
+        "name": "Battery Level"
+      },
+      "additional_battery_level": {
+        "name": "Battery {index} Level"
+      },
+      "battery_level_main": {
+        "name": "Main Battery Level"
+      },
+      "input_power": {
+        "name": "Input Power"
+      },
+      "output_power": {
+        "name": "Output Power"
+      },
+      "grid_power": {
+        "name": "Grid Power"
+      },
+      "in_use_power": {
+        "name": "In Use Power"
+      },
+      "port_voltage": {
+        "name": "{name} Voltage"
+      },
+      "port_current": {
+        "name": "{name} Current"
+      },
+      "port_power": {
+        "name": "{name} Power"
+      },
+      "circuit_power": {
+        "name": "Circuit Power {index}"
+      },
+      "circuit_current": {
+        "name": "Circuit Current {index}"
+      },
+      "channel_power": {
+        "name": "Channel Power {index}"
+      },
+      "input_energy": {
+        "name": "Input Energy Total"
+      },
+      "output_energy": {
+        "name": "Output Energy Total"
+      },
+      "ac_input_power": {
+        "name": "AC Input Power"
+      },
+      "ac_output_power": {
+        "name": "AC Output Power"
+      },
+      "ac_input_energy": {
+        "name": "AC Input Energy"
+      },
+      "ac_output_energy": {
+        "name": "AC Output Energy"
+      },
+      "dc_input_power": {
+        "name": "DC Input Power"
+      },
+      "dc_input_energy": {
+        "name": "DC Input Energy"
+      },
+      "dc12v_output_power": {
+        "name": "DC 12V Output Power"
+      },
+      "dc12v_output_energy": {
+        "name": "DC 12V Output Energy"
+      },
+      "usbc_output_power": {
+        "name": "USB C Output Power"
+      },
+      "usbc_output_energy": {
+        "name": "USB C Output Energy"
+      },
+      "usba_output_power": {
+        "name": "USB A Output Power"
+      },
+      "usba_output_energy": {
+        "name": "USB A Output Energy"
+      },
+      "usbc2_output_power": {
+        "name": "USB C (2) Output Power"
+      },
+      "usbc2_output_energy": {
+        "name": "USB C (2) Output Energy"
+      },
+      "usba2_output_power": {
+        "name": "USB A (2) Output Power"
+      },
+      "usba2_output_energy": {
+        "name": "USB A (2) Output Energy"
+      },
+      "battery_input_power": {
+        "name": "Battery Input Power"
+      },
+      "battery_output_power": {
+        "name": "Battery Output Power"
+      },
+      "cell_temperature": {
+        "name": "Cell Temperature"
+      },
+      "dc_port_input_power": {
+        "name": "DC Port Input Power"
+      },
+      "dc_port_input_power_2": {
+        "name": "DC Port (2) Input Power"
+      },
+      "dc_port_state": {
+        "name": "DC Input Port State"
+      },
+      "dc_port_2_state": {
+        "name": "DC Input Port (2) State"
+      },
+      "input_power_solar": {
+        "name": "Solar Power"
+      },
+      "input_power_solar_2": {
+        "name": "Solar Power (2)"
+      },
+      "ac_lv_output_power": {
+        "name": "AC LV Output Power"
+      },
+      "ac_hv_output_power": {
+        "name": "AC HV Output Power"
+      },
+      "input_power_solar_lv": {
+        "name": "LV Solar Power"
+      },
+      "input_power_solar_hv": {
+        "name": "HV Solar Power"
+      },
+      "dc_lv_input_power": {
+        "name": "LV DC Port Input Power"
+      },
+      "dc_hv_input_power": {
+        "name": "LV DC Port Input Power"
+      },
+      "dc_lv_input_state": {
+        "name": "LV DC Input Port State"
+      },
+      "dc_hv_input_state": {
+        "name": "HV DC Input Port State"
+      },
+      "engine_state": {
+        "name": "Engine State",
+        "state": {
+          "closed": "Off",
+          "opened": "Running",
+          "closing": "Stopping"
+        }
+      },
+      "xt150_battery_level": {
+        "name": "XT150 Battery Level"
+      },
+      "xt150_charge_type": {
+        "name": "XT150 Charge Type"
+      },
+      "liquefied_gas_type": {
+        "name": "Liquefied Gas Type"
+      },
+      "liquefied_gas": {
+        "name": "Liquefied Gas"
+      },
+      "liquefied_gas_consumption": {
+        "name": "Liquefied Gas Consumption per Hour"
+      },
+      "generator_total_output": {
+        "name": "Generator Total Output"
+      },
+      "generator_abnormal_state": {
+        "name": "Abnormal State",
+        "state": {
+          "no": "No",
+          "gasoline_low": "Gasoline Low"
+        }
+      },
+      "sub_battery_soc": {
+        "name": "Internal Battery Level"
+      },
+      "sub_battery_power": {
+        "name": "Internal Battery Power"
+      },
+      "sub_battery_state": {
+        "name": "Internal Battery State",
+        "state": {
+          "idle": "Idle",
+          "no_input": "No Input",
+          "discharging": "Discharging",
+          "charging": "Charging",
+          "normal_full": "Full",
+          "normal_low_pressure": "Normal Low Pressure"
+        }
+      },
+      "fuel_type": {
+        "name": "Fuel Type"
+      },
+      "battery_temperature": {
+        "name": "Battery Temperature"
+      },
+      "car_battery_voltage": {
+        "name": "Battery Voltage"
+      },
+      "dc_power": {
+        "name": "DC Power"
+      },
+      "load_from_battery": {
+        "name": "Load From Battery"
+      },
+      "load_from_grid": {
+        "name": "Load From Grid"
+      },
+      "load_from_pv": {
+        "name": "Load From PV"
+      },
+      "grid_voltage": {
+        "name": "Grid Voltage"
+      },
+      "grid_frequency": {
+        "name": "Grid Frequency"
+      },
+      "backup_is_ready": {
+        "name": "Channel {channel} Backup Ready"
+      },
+      "backup_ctrl_status": {
+        "name": "Channel {channel} Control Status",
+        "state": {
+          "off": "Off",
+          "discharge": "Discharging",
+          "charge": "Charging",
+          "emergency_stop": "Emergency Stop",
+          "standby": "Standby"
+        }
+      },
+      "backup_force_charge": {
+        "name": "Channel {channel} Force Charge",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "backup_relay1_count": {
+        "name": "Channel {channel} Relay 1 Count"
+      },
+      "backup_relay2_count": {
+        "name": "Channel {channel} Relay 2 Count"
+      },
+      "backup_wakeup_charge": {
+        "name": "Channel {channel} Wakeup Charge Level"
+      },
+      "backup_connector_type": {
+        "name": "Channel {channel} Connector Type"
+      },
+      "channel_serial_number": {
+        "name": "Channel {channel} Serial Number"
+      },
+      "channel_device_type": {
+        "name": "Channel {channel} Device Type"
+      },
+      "channel_full_capacity": {
+        "name": "Channel {channel} Full Capacity"
+      },
+      "channel_rated_power": {
+        "name": "Channel {channel} Rated Power"
+      },
+      "channel_battery_level": {
+        "name": "Channel {channel} Battery Level"
+      },
+      "channel_output_power": {
+        "name": "Channel {channel} Output Power"
+      },
+      "channel_battery_temperature": {
+        "name": "Channel {channel} Battery Temperature"
+      },
+      "channel_lcd_input_power": {
+        "name": "Channel {channel} LCD Input Power"
+      },
+      "channel_pv_status": {
+        "name": "Channel {channel} PV Status",
+        "state": {
+          "none": "None",
+          "lv": "LV",
+          "hv": "HV",
+          "lv_and_hv": "LV&HV"
+        }
+      },
+      "channel_pv_lv_input_power": {
+        "name": "Channel {channel} PV LV Input Power"
+      },
+      "channel_pv_hv_input_power": {
+        "name": "Channel {channel} PV HV Input Power"
+      },
+      "channel_error_count": {
+        "name": "Channel {channel} Error Count"
+      }
+    },
+    "select": {
+      "led_mode": {
+        "name": "LED"
+      },
+      "dc_charging_type": {
+        "name": "DC Charging Type"
+      },
+      "performance_mode": {
+        "name": "Performance Mode"
+      },
+      "liquefied_gas_unit": {
+        "name": "Gas Unit"
+      },
+      "charger_mode": {
+        "name": "Charger Mode",
+        "state": {
+          "idle": "Idle",
+          "charge": "Charge",
+          "reverse_charge": "Reverse Charge",
+          "battery_maintenance": "Battery Maintenance"
+        }
+      }
+    }
+  }
+}
