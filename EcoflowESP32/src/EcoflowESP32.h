@@ -4,129 +4,104 @@
 #include "Arduino.h"
 #include "NimBLEDevice.h"
 #include "EcoflowData.h"
+#include <queue>
 
-class EcoflowESP32; // Forward declaration
+class EcoflowESP32;
 
+/**
+ * @brief Callback handler for BLE scan operations
+ */
 class EcoflowScanCallbacks : public NimBLEScanCallbacks {
 public:
     EcoflowScanCallbacks(EcoflowESP32* pEcoflowESP32);
     void onDiscovered(const NimBLEAdvertisedDevice* advertisedDevice) override;
+
 private:
     EcoflowESP32* _pEcoflowESP32;
 };
 
-class EcoflowESP32 : public NimBLEClientCallbacks
-{
+/**
+ * @file EcoflowESP32.h
+ * @brief Ecoflow BLE communication library for ESP32
+ */
+class EcoflowESP32 : public NimBLEClientCallbacks {
     friend class EcoflowScanCallbacks;
-public:
-    /**
-     * @brief Construct a new EcoflowESP32 object.
-     */
-    EcoflowESP32();
 
-    /**
-     * @brief Destroy the EcoflowESP32 object.
-     */
+public:
+    EcoflowESP32();
     ~EcoflowESP32();
 
-    /**
-     * @brief Initialize the BLE stack.
-     * @return true if initialization was successful, false otherwise.
-     */
     bool begin();
-
-    /**
-     * @brief Scan for Ecoflow devices.
-     * @param scanTime The duration of the scan in seconds.
-     * @return A pointer to the advertised device if found, nullptr otherwise.
-     */
     bool scan(uint32_t scanTime = 5);
-
-    /**
-     * @brief Connect to an Ecoflow device.
-     * @param device A pointer to the advertised device to connect to.
-     * @return true if the connection was successful, false otherwise.
-     */
-    bool connectToDevice(NimBLEAdvertisedDevice* device);
-
-    /**
-     * @brief Connect to an Ecoflow device.
-     * @return true if the connection was successful, false otherwise.
-     */
     bool connectToServer();
+    void disconnect();
 
-    /**
-     * @brief Turn the AC output on or off.
-     * @param on true to turn on, false to turn off.
-     */
-    void setAC(bool on);
+    bool setAC(bool on);
+    bool setDC(bool on);
+    bool setUSB(bool on);
 
-    /**
-     * @brief Turn the DC (12V) output on or off.
-     * @param on true to turn on, false to turn off.
-     */
-    void setDC(bool on);
-
-    /**
-     * @brief Turn the USB outputs on or off.
-     * @param on true to turn on, false to turn off.
-     */
-    void setUSB(bool on);
-
-    /**
-     * @brief Get the current battery level.
-     * @return The battery level in percent.
-     */
     int getBatteryLevel();
-
-    /**
-     * @brief Get the current input power.
-     * @return The input power in watts.
-     */
     int getInputPower();
-
-    /**
-     * @brief Get the current output power.
-     * @return The output power in watts.
-     */
     int getOutputPower();
 
-    /**
-     * @brief Check if the AC output is on.
-     * @return true if the AC output is on, false otherwise.
-     */
     bool isAcOn();
-
-    /**
-     * @brief Check if the DC (12V) output is on.
-     * @return true if the DC output is on, false otherwise.
-     */
     bool isDcOn();
-
-    /**
-     * @brief Check if the USB outputs are on.
-     * @return true if the USB outputs are on, false otherwise.
-     */
     bool isUsbOn();
+    bool isConnected();
+
+    bool sendCommand(const uint8_t* command, size_t size);
+    bool requestData();
 
     void setAdvertisedDevice(NimBLEAdvertisedDevice* device);
-    bool sendCommand(const uint8_t* command, size_t size);
+    void update();
 
 private:
-    void onConnect(NimBLEClient* pclient);
-    void onDisconnect(NimBLEClient* pclient, int reason);
-    void onAuthenticationComplete(ble_gap_conn_desc* desc);
-    static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
+    // NimBLEClientCallbacks overrides
+    void onConnect(NimBLEClient* pclient) override;
+    void onDisconnect(NimBLEClient* pclient, int reason) override;
+
+    // Notification callback
+    static void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, 
+                               uint8_t* pData, size_t length, bool isNotify);
+
+    // Data parsing
     void parse(uint8_t* pData, size_t length);
 
+    // Internal helpers
+    bool _resolveCharacteristics();
+    void _keepAliveTask();
+    static void _keepAliveTaskStatic(void* pvParameters);
+
+    // Member variables
     NimBLEClient* pClient;
     NimBLERemoteCharacteristic* pWriteChr;
     NimBLERemoteCharacteristic* pReadChr;
+    NimBLEAdvertisedDevice* m_pAdvertisedDevice;
+    
     EcoflowData _data;
+    
+    bool _connected;
+    bool _authenticated;
+    bool _running;
+    bool _subscribedToNotifications;
+    
     static EcoflowESP32* _instance;
-
     EcoflowScanCallbacks* _scanCallbacks;
-    NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
+    
+    TaskHandle_t _keepAliveTaskHandle;
+    
+    // Command queuing
+    struct Command {
+        uint8_t data[64];
+        size_t length;
+    };
+    std::queue<Command> _commandQueue;
+    portMUX_TYPE _queueMutex = portMUX_INITIALIZER_UNLOCKED;
+    
+    // Connection timing
+    unsigned long _lastDataTime;
+    static const unsigned long DATA_REQUEST_INTERVAL = 5000;
+    static const unsigned long CONNECTION_TIMEOUT = 30000;
 };
 
 #endif
