@@ -1,6 +1,6 @@
 #include "EcoflowProtocol.h"
-
-#include <cstring>
+#include <mbedtls/aes.h>
+#include "mbedtls/md5.h"
 
 // ============================================================================
 // CRC IMPLEMENTATION
@@ -54,6 +54,9 @@ uint16_t EcoflowCRC::crc16(const uint8_t* data, size_t len) {
 // ============================================================================
 // PACKET CLASS IMPLEMENTATION
 // ============================================================================
+
+constexpr uint8_t Packet::PREFIX;
+constexpr size_t Packet::HEADER_SIZE;
 
 Packet::Packet(uint8_t src, uint8_t dst, uint8_t cmd_set, uint8_t cmd_id,
                const uint8_t* payload, size_t payload_len,
@@ -145,6 +148,10 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
 // ENCPACKET CLASS IMPLEMENTATION
 // ============================================================================
 
+constexpr uint8_t EncPacket::PREFIX_0;
+constexpr uint8_t EncPacket::PREFIX_1;
+constexpr size_t EncPacket::HEADER_SIZE;
+
 EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type,
                      const uint8_t* payload, size_t payload_len,
                      uint8_t cmd_id, uint8_t version,
@@ -197,8 +204,8 @@ EncPacket* EncPacket::fromBytes(const uint8_t* data, size_t len,
   if (len < HEADER_SIZE + payload_len + 2) return nullptr;
 
   const uint8_t* payload_data = data + HEADER_SIZE;
-  uint16_t crc_received = ((uint16_t)payload_data[payload_len] << 8) |
-                          payload_data[payload_len + 1];
+  uint16_t crc_received = ((uint16_t)data[HEADER_SIZE + payload_len] << 8) |
+                          data[HEADER_SIZE + payload_len + 1];
   uint16_t crc_calc = EcoflowCRC::crc16(data, HEADER_SIZE + payload_len);
 
   if (crc_calc != crc_received) return nullptr;
@@ -225,17 +232,16 @@ std::vector<uint8_t> EncPacket::decryptPayload(const uint8_t* ciphertext, size_t
 
 std::vector<uint8_t> EcoflowEncryption::aesEncrypt(const uint8_t* plaintext, size_t len,
                                                    const uint8_t* key, const uint8_t* iv) {
-  // PKCS7 padding
-  size_t padded_len = ((len / 16) + 1) * 16;
+  size_t pad_len = 16 - (len % 16);
+  size_t padded_len = len + pad_len;
   std::vector<uint8_t> padded(padded_len);
   memcpy(padded.data(), plaintext, len);
 
-  uint8_t pad_byte = padded_len - len;
+  uint8_t pad_byte = pad_len;
   for (size_t i = len; i < padded_len; i++) {
     padded[i] = pad_byte;
   }
 
-  // AES-128-CBC (truncate key to 128 bits for now)
   mbedtls_aes_context aes_ctx;
   mbedtls_aes_init(&aes_ctx);
 
@@ -269,7 +275,6 @@ std::vector<uint8_t> EcoflowEncryption::aesDecrypt(const uint8_t* ciphertext, si
 
   mbedtls_aes_free(&aes_ctx);
 
-  // Remove PKCS7 padding
   if (len > 0) {
     uint8_t pad_len = plaintext[len - 1];
     if (pad_len <= 16 && pad_len <= len) {
@@ -285,13 +290,11 @@ std::vector<uint8_t> EcoflowEncryption::aesDecrypt(const uint8_t* ciphertext, si
 // ============================================================================
 
 std::vector<uint8_t> EcoflowCommands::buildGetKeyInfoReq() {
-  // Request device key info (cmd_id 0x00)
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, PACKET_CMD_SET_DEFAULT, 0x00);
   return pkt.toBytes();
 }
 
 std::vector<uint8_t> EcoflowCommands::buildGetAuthStatus() {
-  // Get authentication status (cmd_id 0x89)
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, PACKET_CMD_SET_DEFAULT,
              PACKET_CMD_ID_GET_AUTH_STATUS);
   return pkt.toBytes();
@@ -299,32 +302,28 @@ std::vector<uint8_t> EcoflowCommands::buildGetAuthStatus() {
 
 std::vector<uint8_t> EcoflowCommands::buildAutoAuthentication(
     const std::string& user_id, const std::string& device_sn) {
-  // MD5 hash of userID + deviceSN
   std::string combined = user_id + device_sn;
   uint8_t digest[16];
 
   mbedtls_md5_context md5;
   mbedtls_md5_init(&md5);
-  mbedtls_md5_starts(&md5);
+  mbedtls_md5_starts_ret(&md5);
   mbedtls_md5_update(&md5, (const uint8_t*)combined.c_str(), combined.length());
   mbedtls_md5_finish(&md5, digest);
   mbedtls_md5_free(&md5);
 
-  // Build packet: cmd_id 0x86, payload = digest
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, PACKET_CMD_SET_DEFAULT,
              PACKET_CMD_ID_AUTO_AUTH, digest, 16);
   return pkt.toBytes();
 }
 
 std::vector<uint8_t> EcoflowCommands::buildStatusRequest() {
-  // Request device status (cmd_id 0x81)
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, PACKET_CMD_SET_DEFAULT,
              PACKET_CMD_ID_REQUEST_STATUS);
   return pkt.toBytes();
 }
 
 std::vector<uint8_t> EcoflowCommands::buildAcCommand(bool on) {
-  // AC control: cmd_id 0x34, payload[0] = on ? 1 : 0
   uint8_t payload[1] = {on ? 1 : 0};
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, PACKET_CMD_SET_DEFAULT,
              PACKET_CMD_ID_AC_CONTROL, payload, 1);
@@ -332,14 +331,12 @@ std::vector<uint8_t> EcoflowCommands::buildAcCommand(bool on) {
 }
 
 std::vector<uint8_t> EcoflowCommands::buildDcCommand(bool on) {
-  // DC control: cmd_id 0x35, payload[0] = on ? 1 : 0
   uint8_t payload[1] = {on ? 1 : 0};
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, 0x36, 0x35, payload, 1);
   return pkt.toBytes();
 }
 
 std::vector<uint8_t> EcoflowCommands::buildUsbCommand(bool on) {
-  // USB control: cmd_id 0x36, payload[0] = on ? 1 : 0
   uint8_t payload[1] = {on ? 1 : 0};
   Packet pkt(0x21, DEVICE_ADDRESS_MAIN, 0x37, 0x36, payload, 1);
   return pkt.toBytes();
@@ -354,15 +351,13 @@ bool EcoflowDelta3::parseStatusResponse(const Packet* pkt, Status& out_status) {
 
   const auto& payload = pkt->getPayload();
   
-  // Byte offsets for Delta 3 status response (adjust based on actual device)
-  out_status.batteryLevel = payload[0];  // %
-  out_status.inputPower = (payload[1] << 8) | payload[2];  // W
-  out_status.outputPower = (payload[3] << 8) | payload[4];  // W
-  out_status.batteryVoltage = (payload[5] << 8) | payload[6];  // mV
-  out_status.acVoltage = (payload[7] << 8) | payload[8];  // mV
-  out_status.acFrequency = (payload[9] << 8) | payload[10];  // Hz
+  out_status.batteryLevel = payload[0];
+  out_status.inputPower = (payload[1] << 8) | payload[2];
+  out_status.outputPower = (payload[3] << 8) | payload[4];
+  out_status.batteryVoltage = (payload[5] << 8) | payload[6];
+  out_status.acVoltage = (payload[7] << 8) | payload[8];
+  out_status.acFrequency = (payload[9] << 8) | payload[10];
 
-  // Bit flags (typically in byte 11-12)
   uint16_t flags = (payload[11] << 8) | payload[12];
   out_status.acOn = (flags & 0x01) != 0;
   out_status.dcOn = (flags & 0x02) != 0;
