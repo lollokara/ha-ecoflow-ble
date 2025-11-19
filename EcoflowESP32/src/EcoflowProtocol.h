@@ -160,6 +160,9 @@ std::vector<uint8_t> aesDecrypt(const uint8_t* ciphertext, size_t len,
 
 namespace EcoflowECDH {
 void init();
+bool generateKeys();
+const uint8_t* getPublicKey();
+bool computeSharedSecret(const uint8_t* device_public_key);
 const std::vector<uint8_t>& getSharedKey();
 void generateSessionKey(const uint8_t* sRand, const uint8_t* seed,
                         uint8_t* out_key, uint8_t* out_iv);
