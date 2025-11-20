@@ -18,15 +18,26 @@ void setup() {
 }
 
 void loop() {
-    static unsigned long last_battery_print_time = 0;
-    unsigned long current_time = millis();
+    static uint32_t last_battery_check = 0;
+    static uint32_t last_ac_toggle = 0;
+    static bool ac_on = false;
 
     ecoflow.update();
 
-    if (ecoflow.isAuthenticated() && (current_time - last_battery_print_time > 5000)) {
-        last_battery_print_time = current_time;
-        int battery_level = ecoflow.getBatteryLevel();
-        Serial.printf("Battery Level: %d%%\n", battery_level);
+    if (millis() - last_battery_check > 5000) {
+        last_battery_check = millis();
+        if (ecoflow.isAuthenticated()) {
+            ecoflow.getBatteryLevel();
+        }
+    }
+
+    if (millis() - last_ac_toggle > 15000) {
+        last_ac_toggle = millis();
+        if (ecoflow.isAuthenticated()) {
+            ac_on = !ac_on;
+            ESP_LOGI("main", "Toggling AC to %s", ac_on ? "ON" : "OFF");
+            ecoflow.setAC(ac_on);
+        }
     }
 
     delay(100);

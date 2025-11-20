@@ -26,6 +26,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &proto_msg)) {
             ESP_LOGI(TAG, "Successfully decoded protobuf message");
+            data.batteryLevel = proto_msg.cms_batt_soc;
             if (proto_msg.cms_batt_soc > 0) {
                 data.batteryLevel = proto_msg.cms_batt_soc;
             }
