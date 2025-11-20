@@ -66,6 +66,7 @@ int tempAcLimit = 400;
 void drawMainMenu();
 void drawSelectionMenu();
 void drawDetailMenu();
+void drawNcScreen();
 void drawText(int x, int y, String text, uint32_t color);
 void renderFrame();
 void clearFrame();
@@ -159,6 +160,15 @@ int getTextWidth(String text) {
 
 void updateDisplay(const EcoflowData& data) {
     currentData = data;
+    clearFrame();
+
+    // Priority 1: Disconnected
+    if (!currentData.isConnected) {
+        strip.setBrightness(25);
+        drawNcScreen();
+        renderFrame();
+        return;
+    }
 
     // Check Timeouts
     unsigned long now = millis();
@@ -180,8 +190,6 @@ void updateDisplay(const EcoflowData& data) {
         }
     }
 
-    clearFrame();
-
     if (currentState == MenuState::MAIN_MENU) {
         drawMainMenu();
     } else if (currentState == MenuState::SELECTION) {
@@ -197,6 +205,13 @@ void updateDisplay(const EcoflowData& data) {
 }
 
 // --- Drawing Screens ---
+
+void drawNcScreen() {
+    String text = "NC";
+    int width = getTextWidth(text) - 1;
+    int x = (NUM_COLS - width) / 2;
+    drawText(x, 1, text, cRed);
+}
 
 void drawMainMenu() {
     int battery = currentData.batteryLevel;
@@ -333,10 +348,7 @@ void drawDetailMenu() {
                 break;
             case SelectionPage::IN:
                 text = String(currentData.inputPower) + "W";
-                color = cYellow; // Input is typically yellow in this scheme? Or Green?
-                // Solar was Yellow. Let's keep Input as Yellow or Green?
-                // User asked for Battery Green when charging.
-                // Let's use Yellow for consistency with Solar Input.
+                color = cYellow;
                 break;
             default: break;
         }
@@ -385,10 +397,17 @@ void renderFrame() {
 DisplayAction handleDisplayInput(ButtonInput input) {
     lastInteractionTime = millis();
 
+    // If not connected, input shouldn't do anything or just wake screen?
+    // Requirement doesn't specify. We'll assume normal handling,
+    // but Main loop prevents actions if not authenticated anyway.
+    // But display transitions might still happen.
+    // If "NC" is shown, we probably shouldn't allow menu navigation?
+    // Let's leave it as is; `updateDisplay` will override drawing with NC anyway.
+
     if (currentState == MenuState::MAIN_MENU) {
         currentState = MenuState::SELECTION;
         currentSelection = SelectionPage::AC;
-        strip.setBrightness(25); // Reset brightness immediately on exit
+        strip.setBrightness(25);
         return DisplayAction::NONE;
     }
 

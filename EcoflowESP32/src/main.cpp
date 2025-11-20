@@ -170,6 +170,7 @@ void loop() {
         data.acOn = ecoflow.isAcOn();
         data.dcOn = ecoflow.isDcOn();
         data.usbOn = ecoflow.isUsbOn();
+        data.isConnected = ecoflow.isConnected();
 
         updateDisplay(data);
     }

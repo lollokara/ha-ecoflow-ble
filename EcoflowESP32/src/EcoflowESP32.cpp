@@ -151,7 +151,21 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         } else if (self->_state != ConnectionState::SCANNING) {
-            self->_startScan();
+            // If state is not SCANNING but we have no device or not connected, ensure we scan.
+            // But wait, onDisconnect sets state to SCANNING (via _startScan).
+            // If onDisconnect was called, state IS scanning.
+            // If onDisconnect was NOT called (e.g. silent failure?), we need to detect.
+            // NimBLEClient::isConnected() check is good.
+            // But here we check `self->_pClient->isConnected()` only if `_pAdvertisedDevice` exists.
+
+            // Check if client claims disconnected but our state thinks otherwise
+            if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
+                if (!self->_pClient->isConnected()) {
+                     ESP_LOGW(TAG, "Client disconnected unexpectedly");
+                     // Force disconnect logic
+                     self->onDisconnect(self->_pClient);
+                }
+            }
         }
 
         if (self->_pClient->isConnected()) {
@@ -368,7 +382,13 @@ bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
 bool EcoflowESP32::isUsbOn() { return _data.usbOn; }
 
-bool EcoflowESP32::isConnected() { return _state >= ConnectionState::CONNECTED; }
+bool EcoflowESP32::isConnected() {
+    // Check if we are in a state that implies an active connection.
+    // CONNECTED is the start of active connection states.
+    // AUTHENTICATED is the highest state.
+    // States after AUTHENTICATED in the enum are error or disconnect states.
+    return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
+}
 bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENTICATED; }
 
 bool EcoflowESP32::requestData() {
