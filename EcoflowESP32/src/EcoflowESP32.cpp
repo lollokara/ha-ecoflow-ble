@@ -126,6 +126,7 @@ void EcoflowESP32::update() {
     }
 
     if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
+        _lastAuthActivity = millis();
         _setState(ConnectionState::SERVICE_DISCOVERY);
     } else if (_state == ConnectionState::SERVICE_DISCOVERY) {
         NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
