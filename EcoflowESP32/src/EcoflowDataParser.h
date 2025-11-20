@@ -11,9 +11,8 @@ namespace EcoflowDataParser {
  *
  * @param pkt The packet to parse.
  * @param data The EcoflowData struct to populate.
- * @return true if the packet was successfully parsed, false otherwise.
  */
-bool parsePacket(const Packet& pkt, EcoflowData& data);
+void parsePacket(const Packet& pkt, EcoflowData& data);
 
 } // namespace EcoflowDataParser
 

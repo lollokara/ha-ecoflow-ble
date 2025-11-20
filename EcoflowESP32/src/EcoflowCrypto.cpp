@@ -6,12 +6,17 @@
 #include "esp_system.h"
 #include "mbedtls/md.h"
 
-void print_hex(const uint8_t* data, size_t size, const char* label) {
-    Serial.printf("%s: ", label);
+static const char* TAG = "EcoflowCrypto";
+
+// Helper to print byte arrays for debugging
+static void print_hex_crypto(const uint8_t* data, size_t size, const char* label) {
+    if (size == 0) return;
+    char hex_str[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        Serial.printf("%02x", data[i]);
+        sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
-    Serial.println();
+    hex_str[size * 3] = '\0';
+    ESP_LOGD(TAG, "%s: %s", label, hex_str);
 }
 
 
@@ -29,15 +34,20 @@ EcoflowCrypto::EcoflowCrypto() {
     mbedtls_ecp_point_init(&Q);
     mbedtls_aes_init(&aes_ctx);
 
-    // Load custom curve
-    mbedtls_mpi_read_string(&grp.P, 16, SECP160R1_P);
-    mbedtls_mpi_read_string(&grp.A, 16, SECP160R1_A);
-    mbedtls_mpi_read_string(&grp.B, 16, SECP160R1_B);
-    mbedtls_ecp_point_read_string(&grp.G, 16, SECP160R1_GX, SECP160R1_GY);
-    mbedtls_mpi_read_string(&grp.N, 16, SECP160R1_N);
+    // Load custom secp160r1 curve.
+    // In this version of mbedtls, direct struct access is the intended way to load custom curves.
+    if (mbedtls_mpi_read_string(&grp.P, 16, SECP160R1_P) != 0 ||
+        mbedtls_mpi_read_string(&grp.A, 16, SECP160R1_A) != 0 ||
+        mbedtls_mpi_read_string(&grp.B, 16, SECP160R1_B) != 0 ||
+        mbedtls_ecp_point_read_string(&grp.G, 16, SECP160R1_GX, SECP160R1_GY) != 0 ||
+        mbedtls_mpi_read_string(&grp.N, 16, SECP160R1_N) != 0) {
+        ESP_LOGE("EcoflowCrypto", "Failed to load custom curve parameters");
+        return;
+    }
+
     grp.pbits = 160;
     grp.nbits = 160;
-    grp.id = MBEDTLS_ECP_DP_SECP192R1;
+    grp.id = MBEDTLS_ECP_DP_NONE; // Use DP_NONE for custom curves
 }
 
 EcoflowCrypto::~EcoflowCrypto() {
@@ -56,25 +66,30 @@ bool EcoflowCrypto::generate_keys() {
     if (mbedtls_ecp_gen_keypair(&grp, &d, &Q, f_rng, nullptr) != 0) {
         return false;
     }
+
+    // mbedtls writes a 41-byte key (0x04 prefix + X + Y), but the device expects a 40-byte raw key (X + Y).
+    uint8_t temp_pub_key[41];
     size_t pub_len;
-    bool success = mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, public_key, sizeof(public_key)) == 0;
-    if (success) {
-        print_hex(public_key, pub_len, "Public Key");
+    if (mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, temp_pub_key, sizeof(temp_pub_key)) != 0) {
+        return false;
     }
-    return success;
+
+    if (pub_len == 41) {
+        memcpy(public_key, temp_pub_key + 1, 40);
+        print_hex_crypto(public_key, sizeof(public_key), "Public Key");
+        return true;
+    }
+
+    return false;
 }
 
-bool EcoflowCrypto::compute_shared_secret(const std::vector<uint8_t>& peer_pub_key) {
+bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_pub_key_len) {
     mbedtls_ecp_point peer_Q;
     mbedtls_ecp_point_init(&peer_Q);
     mbedtls_ecp_point shared_P;
     mbedtls_ecp_point_init(&shared_P);
 
-    std::vector<uint8_t> formatted_key;
-    formatted_key.push_back(0x04);
-    formatted_key.insert(formatted_key.end(), peer_pub_key.begin(), peer_pub_key.end());
-
-    if (mbedtls_ecp_point_read_binary(&grp, &peer_Q, formatted_key.data(), formatted_key.size()) != 0) {
+    if (mbedtls_ecp_point_read_binary(&grp, &peer_Q, peer_pub_key, peer_pub_key_len) != 0) {
         mbedtls_ecp_point_free(&peer_Q);
         mbedtls_ecp_point_free(&shared_P);
         return false;
@@ -90,15 +105,19 @@ bool EcoflowCrypto::compute_shared_secret(const std::vector<uint8_t>& peer_pub_k
     size_t len;
     mbedtls_ecp_point_write_binary(&grp, &shared_P, MBEDTLS_ECP_PF_UNCOMPRESSED, &len, buf, sizeof(buf));
 
-    uint8_t temp_shared_secret[20];
-    memcpy(temp_shared_secret, buf + 1, 20);
+    // The shared secret is the 20-byte x-coordinate of the resulting point.
+    uint8_t full_shared_secret[20];
+    memcpy(full_shared_secret, buf + 1, sizeof(full_shared_secret));
 
-    mbedtls_md5(temp_shared_secret, 20, iv);
+    // The IV is the MD5 hash of the full 20-byte shared secret.
+    mbedtls_md5(full_shared_secret, sizeof(full_shared_secret), iv);
 
-    memcpy(shared_secret, temp_shared_secret, 16);
+    // The final AES key is the first 16 bytes of the shared secret.
+    memcpy(shared_secret, full_shared_secret, 16);
 
-    print_hex(shared_secret, 16, "Shared Secret");
-    print_hex(iv, 16, "IV");
+    print_hex_crypto(full_shared_secret, 20, "Full Shared Secret");
+    print_hex_crypto(shared_secret, 16, "Shared Secret (AES Key)");
+    print_hex_crypto(iv, 16, "IV");
 
     mbedtls_ecp_point_free(&peer_Q);
     mbedtls_ecp_point_free(&shared_P);
@@ -122,7 +141,7 @@ void EcoflowCrypto::generate_session_key(const uint8_t* seed, const uint8_t* sra
     memcpy(data + 24, &data_num[3], 8);
 
     mbedtls_md5(data, sizeof(data), session_key);
-    print_hex(session_key, 16, "Session Key");
+    print_hex_crypto(session_key, 16, "Session Key");
 }
 
 void EcoflowCrypto::encrypt_session(const uint8_t* input, size_t input_len, uint8_t* output) {
@@ -139,18 +158,9 @@ void EcoflowCrypto::decrypt_session(const uint8_t* input, size_t input_len, uint
     mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output);
 }
 
-void EcoflowCrypto::decrypt_shared(const uint8_t* input, size_t input_len, std::vector<uint8_t>& output) {
-    mbedtls_aes_context aes_ctx;
-    mbedtls_aes_init(&aes_ctx);
+void EcoflowCrypto::decrypt_shared(const uint8_t* input, size_t input_len, uint8_t* output) {
     mbedtls_aes_setkey_dec(&aes_ctx, shared_secret, 128);
     uint8_t temp_iv[16];
     memcpy(temp_iv, iv, 16);
-    output.resize(input_len);
-    mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output.data());
-    mbedtls_aes_free(&aes_ctx);
-
-    uint8_t padding = output.back();
-    if (padding > 0 && padding <= 16) {
-        output.resize(output.size() - padding);
-    }
+    mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output);
 }

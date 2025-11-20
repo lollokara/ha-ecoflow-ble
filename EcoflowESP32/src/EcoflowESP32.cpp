@@ -2,13 +2,31 @@
 #include "EcoflowProtocol.h"
 #include "EcoflowDataParser.h"
 #include <NimBLEDevice.h>
+#include "esp_log.h"
+
+static const char* TAG = "EcoflowESP32";
+
+// Helper to print byte arrays for debugging
+static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
+    if (size == 0) return;
+    char hex_str[size * 3 + 1];
+    for (size_t i = 0; i < size; i++) {
+        sprintf(hex_str + i * 3, "%02x ", data[i]);
+    }
+    hex_str[size * 3] = '\0';
+    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+}
+
 
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+    ESP_LOGD(TAG, "Notify callback received %d bytes", length);
+    print_hex_esp(pData, length, "Notify Data");
     if (_instance) {
         if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-            _instance->_handleAuthSimplePacket(pData, length);
+            std::vector<uint8_t> data(pData, pData + length);
+            _instance->_handleSimpleAuthResponse(data);
         } else {
             std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
             for (auto &packet : packets) {
@@ -21,14 +39,14 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteris
 EcoflowClientCallback::EcoflowClientCallback(EcoflowESP32* instance) : _instance(instance) {}
 
 void EcoflowClientCallback::onConnect(NimBLEClient* pClient) {
-    Serial.println("Connected to device");
+    ESP_LOGI(TAG, "Connected to device");
     if (_instance) {
         _instance->onConnect(pClient);
     }
 }
 
 void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
-    Serial.println("Disconnected from device");
+    ESP_LOGI(TAG, "Disconnected from device");
     if (_instance) {
         _instance->onDisconnect(pClient);
     }
@@ -50,23 +68,16 @@ EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32*
 
 void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
     if (advertisedDevice->getAddress().toString() == _instance->_ble_address) {
-        Serial.println("Found device");
+        ESP_LOGI(TAG, "Found device");
         _instance->_pScan->stop();
         _instance->_pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice);
-    }
-}
-
-void EcoflowESP32::_setState(ConnectionState newState) {
-    if (_state != newState) {
-        _state = newState;
-        Serial.printf("State changed: %d\n", (int)_state);
     }
 }
 
 void EcoflowESP32::_startScan() {
     if (millis() - _lastScanTime > 10000) {
         _lastScanTime = millis();
-        _setState(ConnectionState::SCANNING);
+        _state = ConnectionState::SCANNING;
         if (!_pScan) {
             _pScan = NimBLEDevice::getScan();
             _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
@@ -91,32 +102,47 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
-    _setState(ConnectionState::CONNECTED);
+    _state = ConnectionState::CONNECTED;
+    ESP_LOGI("EcoflowESP32", "onConnect: State changed to CONNECTED, performing service discovery");
     NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
     if (pSvc) {
         _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
         _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
         if (_pReadChr && _pReadChr->canNotify()) {
-            _pReadChr->subscribe(true, notifyCallback);
+            if(_pReadChr->subscribe(true, notifyCallback)) {
+                ESP_LOGI(TAG, "Subscribed to notifications");
+                delay(100); // Wait for the subscription to be processed
+            } else {
+                ESP_LOGE(TAG, "Failed to subscribe to notifications");
+                pClient->disconnect();
+            }
         }
+    } else {
+        ESP_LOGE("EcoflowESP32", "onConnect: Service not found, disconnecting");
+        pClient->disconnect();
     }
-    delay(100);
-    _startAuthentication();
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
-    _setState(ConnectionState::DISCONNECTED);
+    _state = ConnectionState::DISCONNECTED;
     delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
 }
 
 void EcoflowESP32::update() {
+    if (_state != _lastState) {
+        ESP_LOGI(TAG, "State changed: %d", (int)_state);
+        _lastState = _state;
+    }
+
     if (_pAdvertisedDevice) {
         if (!_pClient->isConnected()) {
             if (millis() - _lastConnectionAttempt > 5000) {
                 _lastConnectionAttempt = millis();
                 if (_connectionRetries < 5) {
-                    Serial.println("Connecting...");
+                    ESP_LOGI(TAG, "Connecting...");
+                    _state = ConnectionState::ESTABLISHING_CONNECTION;
+                    _connectionRetries++;
                     _pClient->connect(_pAdvertisedDevice);
                 } else {
                     delete _pAdvertisedDevice;
@@ -129,8 +155,11 @@ void EcoflowESP32::update() {
         _startScan();
     }
 
-    if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastAuthActivity > 10000) {
+    if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
+        _startAuthentication();
+    }
+    else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+        if (millis() - _lastConnectionAttempt > 10000) {
             _pClient->disconnect();
         }
     } else if (_state == ConnectionState::AUTHENTICATED) {
@@ -142,45 +171,90 @@ void EcoflowESP32::update() {
 }
 
 void EcoflowESP32::_startAuthentication() {
-    _lastAuthActivity = millis();
-    _setState(ConnectionState::PUBLIC_KEY_EXCHANGE);
-    _crypto.generate_keys();
+    ESP_LOGI(TAG, "Starting authentication");
+    _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
+    if (!_crypto.generate_keys()) {
+        ESP_LOGE(TAG, "Failed to generate keys");
+        return;
+    }
 
     std::vector<uint8_t> payload;
     payload.push_back(0x01);
     payload.push_back(0x00);
     uint8_t* pub_key = _crypto.get_public_key();
-    // The mbedtls library generates a 41-byte key (with 0x04 prefix).
-    // The device expects a 40-byte key (raw X and Y coordinates).
-    // We skip the first byte of the key to send the correct payload.
-    payload.insert(payload.end(), pub_key + 1, pub_key + 41);
+    payload.insert(payload.end(), pub_key, pub_key + _crypto.get_public_key_len());
+
+    print_hex_esp(payload.data(), payload.size(), "Public Key Payload");
 
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
 }
 
-void EcoflowESP32::_handleAuthSimplePacket(uint8_t* pData, size_t length) {
-    print_hex(pData, length, "Simple Packet");
-    if (length < 8) {
+void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
+    ESP_LOGD(TAG, "_handleSimpleAuthResponse: Handling simple auth response");
+    print_hex_esp(data.data(), data.size(), "Raw Simple Auth Response");
+    auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
+    if (parsed_payload.empty()) {
+        ESP_LOGE(TAG, "Failed to parse simple auth response");
         return;
     }
-    uint16_t payload_len = pData[4] | (pData[5] << 8);
-    if (length < 6 + payload_len) {
-        return;
+    print_hex_esp(parsed_payload.data(), parsed_payload.size(), "Parsed Simple Auth Response");
+
+    if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+        ESP_LOGD(TAG, "Handling public key response");
+        if (parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) { // 1 (status) + 1 (type) + 1 (size) + 40 (key)
+            uint8_t peer_pub_key[41];
+            peer_pub_key[0] = 0x04;
+            memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
+            print_hex_esp(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
+
+            if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+                _state = ConnectionState::REQUESTING_SESSION_KEY;
+                ESP_LOGD(TAG, "Shared secret computed, requesting session key");
+                std::vector<uint8_t> req_payload = {0x02};
+                EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+                _sendCommand(enc_packet.toBytes());
+            } else {
+                ESP_LOGE(TAG, "Failed to compute shared secret");
+            }
+        } else {
+            ESP_LOGE(TAG, "Invalid public key response");
+        }
+    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
+        ESP_LOGD(TAG, "Handling session key response");
+        if (parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
+            std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
+            _crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
+
+            // Remove PKCS7 padding
+            if (!decrypted_payload.empty()) {
+                uint8_t padding = decrypted_payload.back();
+                if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                    decrypted_payload.resize(decrypted_payload.size() - padding);
+                }
+            }
+            print_hex_esp(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Session Key Info");
+
+            if (decrypted_payload.size() >= 18) {
+                _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
+                _state = ConnectionState::REQUESTING_AUTH_STATUS;
+                ESP_LOGD(TAG, "Session key generated, requesting auth status");
+                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03);
+                EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+                _sendCommand(enc_auth_status.toBytes(&_crypto));
+            } else {
+                ESP_LOGE(TAG, "Decrypted session key info too short");
+            }
+        }
     }
-
-    std::vector<uint8_t> payload;
-    payload.assign(pData + 6, pData + 6 + payload_len - 2);
-
-    // ToDo: Add CRC16 check here
-
-    _handleAuthPacket(new Packet(0,0,0, pData[6], payload));
 }
 
 void EcoflowESP32::_handlePacket(Packet* pkt) {
+    ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());
     if (_state == ConnectionState::AUTHENTICATED) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         if (pkt->getDest() == 0x21 && pkt->getCmdSet() != 0x01 && pkt->getCmdId() != 0x01) {
+            ESP_LOGD(TAG, "Replying to packet");
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq());
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
@@ -191,43 +265,14 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 }
 
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
-    _lastAuthActivity = millis();
+    ESP_LOGD(TAG, "_handleAuthPacket: Handling auth packet with cmdId=0x%02x", pkt->getCmdId());
     const auto& payload = pkt->getPayload();
-    if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-        if (payload.size() >= 43 && payload[0] == 0x01) {
-            Serial.println("Handling public key response...");
-            std::vector<uint8_t> peer_key(payload.begin() + 3, payload.begin() + 43);
-            print_hex(peer_key.data(), peer_key.size(), "Peer Public Key");
-            if (_crypto.compute_shared_secret(peer_key)) {
-                _setState(ConnectionState::REQUESTING_SESSION_KEY);
-                std::vector<uint8_t> req_payload = {0x02};
-                EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-                _sendCommand(enc_packet.toBytes());
-            }
-        }
-        return;
-    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
-        if (payload.size() >= 18 && payload[0] == 0x02) {
-            Serial.println("Handling session key response...");
-            std::vector<uint8_t> decrypted_payload;
-            _crypto.decrypt_shared(payload.data() + 1, payload.size() - 1, decrypted_payload);
 
-            print_hex(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Payload");
-
-            _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
-
-            _setState(ConnectionState::REQUESTING_AUTH_STATUS);
-            Serial.println("Requesting auth status...");
-            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
-            EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
-            _sendCommand(enc_auth_status.toBytes(&_crypto));
-        }
-        return;
-    } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
+    if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
+        ESP_LOGD(TAG, "Handling auth status response");
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
-            Serial.println("Auth status received, sending final authentication packet.");
-
-            _setState(ConnectionState::AUTHENTICATING);
+            _state = ConnectionState::AUTHENTICATING;
+            ESP_LOGD(TAG, "Auth status OK, authenticating");
 
             uint8_t md5_data[16];
             mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
@@ -238,23 +283,25 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
-        return;
     } else if (_state == ConnectionState::AUTHENTICATING) {
-        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload[0] == 0x00) {
-            Serial.println("Authentication successful!");
-            _setState(ConnectionState::AUTHENTICATED);
+        ESP_LOGD(TAG, "Handling authentication response");
+        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload.size() > 0 && payload[0] == 0x00) {
+            _state = ConnectionState::AUTHENTICATED;
+            ESP_LOGI(TAG, "Authentication successful!");
+        } else {
+            ESP_LOGE(TAG, "Authentication failed!");
         }
-        return;
     }
 }
 
 bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     if (_pWriteChr && isConnected()) {
-        _pWriteChr->writeValue(command.data(), command.size(), true);
+        print_hex_esp(command.data(), command.size(), "Sending command");
+        _pWriteChr->writeValue(command.data(), command.size(), false); // Write without response
         return true;
     }
     return false;
@@ -275,7 +322,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x21, 0x35, 0x35, 0x01, {});
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }
