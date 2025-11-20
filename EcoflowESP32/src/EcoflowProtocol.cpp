@@ -66,8 +66,9 @@ std::vector<uint8_t> Packet::toBytes() const {
 }
 
 // EncPacket implementation
-EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload) :
-    _frame_type(frame_type), _payload_type(payload_type), _payload(payload) {}
+EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload,
+                     uint8_t needs_ack, uint8_t is_ack)
+    : _frame_type(frame_type), _payload_type(payload_type), _payload(payload), _needs_ack(needs_ack), _is_ack(is_ack) {}
 
 std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     std::vector<uint8_t> encrypted_payload = _payload;
@@ -82,18 +83,23 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
         crypto->encrypt_session(padded_payload.data(), padded_payload.size(), encrypted_payload.data());
     }
 
-    std::vector<uint8_t> bytes;
-    bytes.push_back(PREFIX & 0xFF);
-    bytes.push_back((PREFIX >> 8) & 0xFF);
-    bytes.push_back(_frame_type);
-    bytes.push_back(_payload_type);
-    bytes.push_back(encrypted_payload.size() & 0xFF);
-    bytes.push_back((encrypted_payload.size() >> 8) & 0xFF);
-    bytes.insert(bytes.end(), encrypted_payload.begin(), encrypted_payload.end());
-    uint16_t crc = crc16(bytes.data(), bytes.size());
-    bytes.push_back(crc & 0xFF);
-    bytes.push_back((crc >> 8) & 0xFF);
-    return bytes;
+    std::vector<uint8_t> header;
+    header.push_back(PREFIX & 0xFF);
+    header.push_back((PREFIX >> 8) & 0xFF);
+    header.push_back((_payload_type << 4) | _frame_type);
+    header.push_back((_is_ack << 7) | (_needs_ack << 6));
+    uint16_t len = encrypted_payload.size() + 2; // payload + 2 bytes for CRC
+    header.push_back(len & 0xFF);
+    header.push_back((len >> 8) & 0xFF);
+
+    std::vector<uint8_t> packet_data = header;
+    packet_data.insert(packet_data.end(), encrypted_payload.begin(), encrypted_payload.end());
+
+    uint16_t crc = crc16(packet_data.data(), packet_data.size());
+    packet_data.push_back(crc & 0xFF);
+    packet_data.push_back((crc >> 8) & 0xFF);
+
+    return packet_data;
 }
 
 std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto) {

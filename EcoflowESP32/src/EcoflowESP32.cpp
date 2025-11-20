@@ -139,7 +139,10 @@ void EcoflowESP32::update() {
 
 void EcoflowESP32::_startAuthentication() {
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
-    _crypto.generate_keys();
+    if (!_crypto.generate_keys()) {
+        ESP_LOGE("EcoflowESP32", "Failed to generate keys");
+        return;
+    }
 
     std::vector<uint8_t> payload;
     payload.push_back(0x01);
