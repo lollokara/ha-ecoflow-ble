@@ -2,6 +2,7 @@
 #include <cstring>
 #include "EcoflowCrypto.h"
 #include "Credentials.h"
+#include "keydata.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "mbedtls/md.h"

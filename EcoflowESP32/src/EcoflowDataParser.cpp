@@ -28,9 +28,14 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             ESP_LOGD(TAG, "Successfully decoded protobuf message");
 
             // Reliable Battery Percentage
-            if (proto_msg.has_cms_batt_soc) {
+            // Try BMS SOC first, then CMS SOC.
+            // Sometimes cms_batt_soc reports 0 incorrectly.
+            if (proto_msg.has_bms_batt_soc && proto_msg.bms_batt_soc > 0) {
+                 data.batteryLevel = (int)proto_msg.bms_batt_soc;
+                 ESP_LOGD(TAG, "Battery level (BMS): %d%%", data.batteryLevel);
+            } else if (proto_msg.has_cms_batt_soc) {
                 data.batteryLevel = (int)proto_msg.cms_batt_soc;
-                ESP_LOGD(TAG, "Battery level: %d%%", data.batteryLevel);
+                ESP_LOGD(TAG, "Battery level (CMS): %d%%", data.batteryLevel);
             } else {
                 ESP_LOGD(TAG, "Battery level field missing in packet");
             }

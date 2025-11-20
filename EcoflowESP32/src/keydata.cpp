@@ -1,3 +1,4 @@
+#include "keydata.h"
 #include <cstdint>
 
 // This is the base64-decoded keydata from keydata.py, converted to a C++ byte array.
