@@ -13,6 +13,12 @@ struct EcoflowData {
     bool acOn = false;
     bool dcOn = false;
     bool usbOn = false;
+
+    // New fields
+    int solarInputPower = 0;
+    int acOutputPower = 0;
+    int dcOutputPower = 0;
+    int cellTemperature = 0;
 };
 
 #endif // ECOFLOW_DATA_H

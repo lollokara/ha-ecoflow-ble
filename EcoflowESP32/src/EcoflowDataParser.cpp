@@ -26,15 +26,54 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &proto_msg)) {
             ESP_LOGI(TAG, "Successfully decoded protobuf message");
-            data.batteryLevel = proto_msg.cms_batt_soc;
-            if (proto_msg.cms_batt_soc > 0) {
-                data.batteryLevel = proto_msg.cms_batt_soc;
+
+            // Reliable Battery Percentage
+            if (proto_msg.has_cms_batt_soc) {
+                data.batteryLevel = (int)proto_msg.cms_batt_soc;
+                ESP_LOGI(TAG, "Battery level: %d%%", data.batteryLevel);
+            } else {
+                ESP_LOGW(TAG, "Battery level field missing in packet");
             }
-            ESP_LOGI(TAG, "Battery level: %d%%", data.batteryLevel);
-            data.inputPower = proto_msg.pow_in_sum_w;
-            data.outputPower = proto_msg.pow_out_sum_w;
-            data.acOn = (proto_msg.flow_info_ac_out & 0b11) >= 0b10;
-            data.dcOn = (proto_msg.flow_info_12v & 0b11) >= 0b10;
+
+            // Power readings
+            if (proto_msg.has_pow_in_sum_w) {
+                data.inputPower = (int)proto_msg.pow_in_sum_w;
+            }
+            if (proto_msg.has_pow_out_sum_w) {
+                data.outputPower = (int)proto_msg.pow_out_sum_w;
+            }
+
+            // Solar Input Power (W)
+            if (proto_msg.has_pow_get_pv) {
+                data.solarInputPower = (int)proto_msg.pow_get_pv;
+            }
+
+            // AC Output Power (W)
+            if (proto_msg.has_pow_get_ac_out) {
+                data.acOutputPower = (int)proto_msg.pow_get_ac_out;
+            }
+
+            // DC Output Power (W)
+            if (proto_msg.has_pow_get_12v) {
+                data.dcOutputPower = (int)proto_msg.pow_get_12v;
+            }
+
+            // Cell Temperature (C)
+            if (proto_msg.has_bms_max_cell_temp) {
+                data.cellTemperature = (int)proto_msg.bms_max_cell_temp;
+            }
+
+            // Status flags
+            if (proto_msg.has_flow_info_ac_out) {
+                data.acOn = (proto_msg.flow_info_ac_out & 0b11) >= 0b10;
+            }
+            if (proto_msg.has_flow_info_12v) {
+                data.dcOn = (proto_msg.flow_info_12v & 0b11) >= 0b10;
+            }
+            if (proto_msg.has_flow_info_qcusb1) {
+                 data.usbOn = (proto_msg.flow_info_qcusb1 & 0b11) >= 0b10;
+            }
+
         } else {
             ESP_LOGE(TAG, "Failed to decode protobuf message");
         }
