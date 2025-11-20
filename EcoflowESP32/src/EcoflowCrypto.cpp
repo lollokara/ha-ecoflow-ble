@@ -6,6 +6,14 @@
 #include "esp_system.h"
 #include "mbedtls/md.h"
 
+void print_hex(const uint8_t* data, size_t size, const char* label) {
+    Serial.printf("%s: ", label);
+    for (size_t i = 0; i < size; i++) {
+        Serial.printf("%02x", data[i]);
+    }
+    Serial.println();
+}
+
 
 // secp160r1 curve parameters
 #define SECP160R1_P "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFF"
@@ -49,7 +57,11 @@ bool EcoflowCrypto::generate_keys() {
         return false;
     }
     size_t pub_len;
-    return mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, public_key, sizeof(public_key)) == 0;
+    bool success = mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, public_key, sizeof(public_key)) == 0;
+    if (success) {
+        print_hex(public_key, pub_len, "Public Key");
+    }
+    return success;
 }
 
 bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_pub_key_len) {
@@ -80,6 +92,9 @@ bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t pe
 
     memcpy(shared_secret, shared_secret, 16);
 
+    print_hex(shared_secret, 16, "Shared Secret");
+    print_hex(iv, 16, "IV");
+
     mbedtls_ecp_point_free(&peer_Q);
     mbedtls_ecp_point_free(&shared_P);
     return true;
@@ -102,6 +117,7 @@ void EcoflowCrypto::generate_session_key(const uint8_t* seed, const uint8_t* sra
     memcpy(data + 24, &data_num[3], 8);
 
     mbedtls_md5(data, sizeof(data), session_key);
+    print_hex(session_key, 16, "Session Key");
 }
 
 void EcoflowCrypto::encrypt_session(const uint8_t* input, size_t input_len, uint8_t* output) {

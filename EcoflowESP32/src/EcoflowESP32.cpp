@@ -40,40 +40,88 @@ EcoflowESP32::~EcoflowESP32() {
     delete _clientCallback;
 }
 
+EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32* instance) : _instance(instance) {}
+
+void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+    if (advertisedDevice->getAddress().toString() == _instance->_ble_address) {
+        _instance->_pScan->stop();
+        _instance->_pAdvertisedDevice = advertisedDevice;
+    }
+}
+
+void EcoflowESP32::_startScan() {
+    _state = ConnectionState::SCANNING;
+    if (!_pScan) {
+        _pScan = NimBLEDevice::getScan();
+        _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this));
+        _pScan->setActiveScan(true);
+        _pScan->setInterval(100);
+        _pScan->setWindow(99);
+    }
+    _pScan->start(30, false);
+}
+
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
     NimBLEDevice::init("");
-
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
-
-    if (_pClient->connect(_ble_address.c_str())) {
-        NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-        if (pSvc) {
-            _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-            _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-            if (_pReadChr && _pReadChr->canNotify()) {
-                _pReadChr->subscribe(true, notifyCallback);
-            }
-            _startAuthentication();
-            return true;
-        }
-    }
-    return false;
+    _startScan();
+    return true;
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _state = ConnectionState::CONNECTED;
+    NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+    if (pSvc) {
+        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+        if (_pReadChr && _pReadChr->canNotify()) {
+            _pReadChr->subscribe(true, notifyCallback);
+        }
+    }
+    _startAuthentication();
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
+    _pAdvertisedDevice = nullptr;
 }
 
 void EcoflowESP32::update() {
-    // Reconnection logic can be added here if needed
+    if (_state == ConnectionState::DISCONNECTED) {
+        if (_pAdvertisedDevice && millis() - _lastConnectionAttempt > 5000) {
+            _lastConnectionAttempt = millis();
+            if (_connectionRetries < 5) {
+                if (_pClient->connect(_pAdvertisedDevice)) {
+                    _state = ConnectionState::ESTABLISHING_CONNECTION;
+                    _connectionRetries++;
+                }
+            } else {
+                _pAdvertisedDevice = nullptr;
+                _connectionRetries = 0;
+            }
+        } else if (!_pAdvertisedDevice) {
+            _startScan();
+        }
+    } else if (_state == ConnectionState::SCANNING) {
+        if (_pScan->isScanning() == false) {
+            if (!_pAdvertisedDevice) {
+                _startScan();
+            }
+        }
+    } else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+        if (millis() - _lastConnectionAttempt > 10000) {
+            _pClient->disconnect();
+        }
+    } else if (_state == ConnectionState::AUTHENTICATED) {
+        if (millis() - _lastKeepAliveTime > 5000) {
+            _lastKeepAliveTime = millis();
+            requestData();
+        }
+    }
 }
 
 void EcoflowESP32::_startAuthentication() {
@@ -107,14 +155,15 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     const auto& payload = pkt->getPayload();
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
         if (pkt->getCmdId() == 0x01 && payload.size() >= 43) {
+            print_hex(payload.data() + 2, 41, "Peer Public Key");
             if (_crypto.compute_shared_secret(payload.data() + 2, 41)) {
-                _state = ConnectionState::SESSION_KEY_REQUESTED;
+                _state = ConnectionState::REQUESTING_SESSION_KEY;
                 std::vector<uint8_t> req_payload = {0x02};
                 EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
                 _sendCommand(enc_packet.toBytes());
             }
         }
-    } else if (_state == ConnectionState::SESSION_KEY_REQUESTED) {
+    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
         if (pkt->getCmdId() == 0x02 && payload.size() >= 18) {
             std::vector<uint8_t> decrypted_payload(payload.size() - 1);
             mbedtls_aes_context aes_ctx;
@@ -127,6 +176,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             if (padding > 0 && padding <= 16) {
                 decrypted_payload.resize(decrypted_payload.size() - padding);
             }
+            print_hex(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Payload");
 
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
@@ -148,28 +198,9 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload[0] == 0x00) {
             _state = ConnectionState::AUTHENTICATED;
-            xTaskCreate(keepAliveTask, "keepAlive", 4096, this, 5, &_keepAliveTaskHandle);
         }
     }
 }
-
-void EcoflowESP32::keepAliveTask(void* param) {
-    EcoflowESP32* pThis = static_cast<EcoflowESP32*>(param);
-    pThis->_running = true;
-    while (pThis && pThis->_running) {
-        if (pThis->isAuthenticated()) {
-            uint32_t now = millis();
-            uint32_t dt = now - pThis->_lastCommandTime;
-
-            if (dt >= 3000) {
-                pThis->requestData();
-            }
-        }
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-    }
-    vTaskDelete(nullptr);
-}
-
 
 bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     if (_pWriteChr && isConnected()) {

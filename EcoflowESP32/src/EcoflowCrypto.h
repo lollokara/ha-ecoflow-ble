@@ -7,6 +7,9 @@
 #include "mbedtls/aes.h"
 #include "mbedtls/ecp.h"
 #include "mbedtls/bignum.h"
+#include <Arduino.h>
+
+void print_hex(const uint8_t* data, size_t size, const char* label);
 
 class EcoflowCrypto {
 public:
