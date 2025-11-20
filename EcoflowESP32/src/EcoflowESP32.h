@@ -82,6 +82,7 @@ public:
     uint32_t _lastKeepAliveTime = 0;
     uint8_t _connectionRetries = 0;
     uint32_t _lastConnectionAttempt = 0;
+    uint32_t _lastScanTime = 0;
 
 private:
     static void notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
@@ -95,6 +96,7 @@ private:
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
+    ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
 
     std::string _userId;
     std::string _deviceSn;

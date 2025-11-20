@@ -17,12 +17,14 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteris
 EcoflowClientCallback::EcoflowClientCallback(EcoflowESP32* instance) : _instance(instance) {}
 
 void EcoflowClientCallback::onConnect(NimBLEClient* pClient) {
+    Serial.println("Connected to device");
     if (_instance) {
         _instance->onConnect(pClient);
     }
 }
 
 void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
+    Serial.println("Disconnected from device");
     if (_instance) {
         _instance->onDisconnect(pClient);
     }
@@ -44,21 +46,25 @@ EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32*
 
 void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
     if (advertisedDevice->getAddress().toString() == _instance->_ble_address) {
+        Serial.println("Found device");
         _instance->_pScan->stop();
-        _instance->_pAdvertisedDevice = advertisedDevice;
+        _instance->_pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice);
     }
 }
 
 void EcoflowESP32::_startScan() {
-    _state = ConnectionState::SCANNING;
-    if (!_pScan) {
-        _pScan = NimBLEDevice::getScan();
-        _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this));
-        _pScan->setActiveScan(true);
-        _pScan->setInterval(100);
-        _pScan->setWindow(99);
+    if (millis() - _lastScanTime > 10000) {
+        _lastScanTime = millis();
+        _state = ConnectionState::SCANNING;
+        if (!_pScan) {
+            _pScan = NimBLEDevice::getScan();
+            _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
+            _pScan->setActiveScan(true);
+            _pScan->setInterval(100);
+            _pScan->setWindow(99);
+        }
+        _pScan->start(5, false);
     }
-    _pScan->start(30, false);
 }
 
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
@@ -73,6 +79,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
+    _connectionRetries = 0;
     _state = ConnectionState::CONNECTED;
     NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
     if (pSvc) {
@@ -87,32 +94,38 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
+    delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
 }
 
 void EcoflowESP32::update() {
-    if (_state == ConnectionState::DISCONNECTED) {
-        if (_pAdvertisedDevice && millis() - _lastConnectionAttempt > 5000) {
-            _lastConnectionAttempt = millis();
-            if (_connectionRetries < 5) {
-                if (_pClient->connect(_pAdvertisedDevice)) {
-                    _state = ConnectionState::ESTABLISHING_CONNECTION;
-                    _connectionRetries++;
+    if (_state != _lastState) {
+        Serial.printf("State changed: %d\n", (int)_state);
+        _lastState = _state;
+    }
+
+    if (_pAdvertisedDevice) {
+        if (!_pClient->isConnected()) {
+            if (millis() - _lastConnectionAttempt > 5000) {
+                _lastConnectionAttempt = millis();
+                if (_connectionRetries < 5) {
+                    Serial.println("Connecting...");
+                    if (_pClient->connect(_pAdvertisedDevice)) {
+                        _state = ConnectionState::ESTABLISHING_CONNECTION;
+                        _connectionRetries++;
+                    }
+                } else {
+                    delete _pAdvertisedDevice;
+                    _pAdvertisedDevice = nullptr;
+                    _connectionRetries = 0;
                 }
-            } else {
-                _pAdvertisedDevice = nullptr;
-                _connectionRetries = 0;
-            }
-        } else if (!_pAdvertisedDevice) {
-            _startScan();
-        }
-    } else if (_state == ConnectionState::SCANNING) {
-        if (_pScan->isScanning() == false) {
-            if (!_pAdvertisedDevice) {
-                _startScan();
             }
         }
-    } else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+    } else {
+        _startScan();
+    }
+
+    if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
         if (millis() - _lastConnectionAttempt > 10000) {
             _pClient->disconnect();
         }
