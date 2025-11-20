@@ -23,6 +23,7 @@ public:
     void decrypt_session(const uint8_t* input, size_t input_len, uint8_t* output);
 
     uint8_t* get_public_key() { return public_key; }
+    size_t get_public_key_len() { return sizeof(public_key); }
     uint8_t* get_shared_secret() { return shared_secret; }
     uint8_t* get_session_key() { return session_key; }
     uint8_t* get_iv() { return iv; }

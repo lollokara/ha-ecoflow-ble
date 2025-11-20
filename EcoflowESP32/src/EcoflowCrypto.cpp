@@ -29,15 +29,20 @@ EcoflowCrypto::EcoflowCrypto() {
     mbedtls_ecp_point_init(&Q);
     mbedtls_aes_init(&aes_ctx);
 
-    // Load custom curve
-    mbedtls_mpi_read_string(&grp.P, 16, SECP160R1_P);
-    mbedtls_mpi_read_string(&grp.A, 16, SECP160R1_A);
-    mbedtls_mpi_read_string(&grp.B, 16, SECP160R1_B);
-    mbedtls_ecp_point_read_string(&grp.G, 16, SECP160R1_GX, SECP160R1_GY);
-    mbedtls_mpi_read_string(&grp.N, 16, SECP160R1_N);
+    // Load custom secp160r1 curve.
+    // In this version of mbedtls, direct struct access is the intended way to load custom curves.
+    if (mbedtls_mpi_read_string(&grp.P, 16, SECP160R1_P) != 0 ||
+        mbedtls_mpi_read_string(&grp.A, 16, SECP160R1_A) != 0 ||
+        mbedtls_mpi_read_string(&grp.B, 16, SECP160R1_B) != 0 ||
+        mbedtls_ecp_point_read_string(&grp.G, 16, SECP160R1_GX, SECP160R1_GY) != 0 ||
+        mbedtls_mpi_read_string(&grp.N, 16, SECP160R1_N) != 0) {
+        ESP_LOGE("EcoflowCrypto", "Failed to load custom curve parameters");
+        return;
+    }
+
     grp.pbits = 160;
     grp.nbits = 160;
-    grp.id = MBEDTLS_ECP_DP_SECP192R1;
+    grp.id = MBEDTLS_ECP_DP_NONE; // Use DP_NONE for custom curves
 }
 
 EcoflowCrypto::~EcoflowCrypto() {
@@ -86,13 +91,17 @@ bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t pe
     size_t len;
     mbedtls_ecp_point_write_binary(&grp, &shared_P, MBEDTLS_ECP_PF_UNCOMPRESSED, &len, buf, sizeof(buf));
 
-    memcpy(shared_secret, buf + 1, 20);
+    // The shared secret is the 20-byte x-coordinate of the resulting point.
+    uint8_t full_shared_secret[20];
+    memcpy(full_shared_secret, buf + 1, sizeof(full_shared_secret));
 
-    mbedtls_md5(shared_secret, 20, iv);
+    // The IV is the MD5 hash of the full 20-byte shared secret.
+    mbedtls_md5(full_shared_secret, sizeof(full_shared_secret), iv);
 
-    memcpy(shared_secret, shared_secret, 16);
+    // The final AES key is the first 16 bytes of the shared secret.
+    memcpy(shared_secret, full_shared_secret, 16);
 
-    print_hex(shared_secret, 16, "Shared Secret");
+    print_hex(shared_secret, 16, "Shared Secret (AES Key)");
     print_hex(iv, 16, "IV");
 
     mbedtls_ecp_point_free(&peer_Q);

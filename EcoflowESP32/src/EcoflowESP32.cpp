@@ -145,7 +145,7 @@ void EcoflowESP32::_startAuthentication() {
     payload.push_back(0x01);
     payload.push_back(0x00);
     uint8_t* pub_key = _crypto.get_public_key();
-    payload.insert(payload.end(), pub_key, pub_key + 41);
+    payload.insert(payload.end(), pub_key, pub_key + _crypto.get_public_key_len());
 
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
@@ -193,6 +193,15 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
+            _state = ConnectionState::REQUESTING_AUTH_STATUS;
+
+            // Send getAuthStatus packet
+            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
+            EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+            _sendCommand(enc_auth_status.toBytes(&_crypto));
+        }
+    } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
+        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
             _state = ConnectionState::AUTHENTICATING;
 
             uint8_t md5_data[16];
