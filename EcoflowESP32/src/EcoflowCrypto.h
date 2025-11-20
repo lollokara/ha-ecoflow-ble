@@ -34,7 +34,7 @@ private:
     mbedtls_ecp_point Q;
     mbedtls_aes_context aes_ctx;
 
-    uint8_t public_key[41];
+    uint8_t public_key[40];
     uint8_t shared_secret[20];
     uint8_t session_key[16];
     uint8_t iv[16];

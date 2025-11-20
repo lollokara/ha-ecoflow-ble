@@ -167,9 +167,14 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     const auto& payload = pkt->getPayload();
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-        if (pkt->getCmdId() == 0x01 && payload.size() >= 43) {
-            print_hex(payload.data() + 2, 41, "Peer Public Key");
-            if (_crypto.compute_shared_secret(payload.data() + 2, 41)) {
+        if (pkt->getCmdId() == 0x01 && payload.size() >= 42) {
+            // The device sends a 40-byte raw key, but mbedtls needs a 41-byte key with a 0x04 prefix.
+            uint8_t peer_pub_key[41];
+            peer_pub_key[0] = 0x04;
+            memcpy(peer_pub_key + 1, payload.data() + 2, 40);
+            print_hex(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
+
+            if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
                 _state = ConnectionState::REQUESTING_SESSION_KEY;
                 std::vector<uint8_t> req_payload = {0x02};
                 EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);

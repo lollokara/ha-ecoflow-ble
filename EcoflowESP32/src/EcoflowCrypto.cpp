@@ -61,12 +61,21 @@ bool EcoflowCrypto::generate_keys() {
     if (mbedtls_ecp_gen_keypair(&grp, &d, &Q, f_rng, nullptr) != 0) {
         return false;
     }
+
+    // mbedtls writes a 41-byte key (0x04 prefix + X + Y), but the device expects a 40-byte raw key (X + Y).
+    uint8_t temp_pub_key[41];
     size_t pub_len;
-    bool success = mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, public_key, sizeof(public_key)) == 0;
-    if (success) {
-        print_hex(public_key, pub_len, "Public Key");
+    if (mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &pub_len, temp_pub_key, sizeof(temp_pub_key)) != 0) {
+        return false;
     }
-    return success;
+
+    if (pub_len == 41) {
+        memcpy(public_key, temp_pub_key + 1, 40);
+        print_hex(public_key, sizeof(public_key), "Public Key");
+        return true;
+    }
+
+    return false;
 }
 
 bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_pub_key_len) {
