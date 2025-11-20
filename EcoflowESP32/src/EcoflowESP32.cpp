@@ -243,7 +243,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
 bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     if (_pWriteChr && isConnected()) {
-        _pWriteChr->writeValue(command.data(), command.size(), true);
+        _pWriteChr->writeValue(command.data(), command.size(), false);
         return true;
     }
     return false;
