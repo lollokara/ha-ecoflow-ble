@@ -97,14 +97,6 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
     _setState(ConnectionState::CONNECTED);
-    NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-    if (pSvc) {
-        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-        if (_pReadChr && _pReadChr->canNotify()) {
-            _pReadChr->subscribe(true, notifyCallback);
-        }
-    }
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
@@ -134,6 +126,29 @@ void EcoflowESP32::update() {
     }
 
     if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
+        _setState(ConnectionState::SERVICE_DISCOVERY);
+    }
+
+    if (_state == ConnectionState::SERVICE_DISCOVERY) {
+        NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+        if (pSvc) {
+            _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+            _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+            if (_pWriteChr && _pReadChr) {
+                _setState(ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS);
+            }
+        }
+    }
+
+    if (_state == ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS) {
+        if (_pReadChr->canNotify()) {
+            if (_pReadChr->subscribe(true, notifyCallback)) {
+                _setState(ConnectionState::AUTHENTICATION_START);
+            }
+        }
+    }
+
+    if (_state == ConnectionState::AUTHENTICATION_START) {
         _startAuthentication();
     }
 
