@@ -30,21 +30,23 @@ Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const s
 }
 
 Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
-    if (len < 11 || data[0] != PREFIX) {
+    if (len < 13 || data[0] != PREFIX) { // 13 bytes is the minimum length for a packet with an empty payload
         return nullptr;
     }
     uint16_t payload_len = data[4] | (data[5] << 8);
-    if (len < 11 + payload_len) {
-        return nullptr;
-    }
-    uint16_t crc_from_packet = data[9 + payload_len] | (data[10 + payload_len] << 8);
-    if (crc_from_packet != crc16(data, 9 + payload_len)) {
+    if (len < 13 + payload_len) {
         return nullptr;
     }
 
-    std::vector<uint8_t> payload(data + 9, data + 9 + payload_len);
-    // The sequence number is not present in the inner packet, it's part of the encrypted packet wrapper
-    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, 0);
+    size_t crc_offset = 11 + payload_len;
+    uint16_t crc_from_packet = data[crc_offset] | (data[crc_offset + 1] << 8);
+    if (crc_from_packet != crc16(data, crc_offset)) {
+        return nullptr;
+    }
+
+    std::vector<uint8_t> payload(data + 11, data + 11 + payload_len);
+    uint16_t seq = data[9] | (data[10] << 8);
+    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, seq);
 }
 
 std::vector<uint8_t> Packet::toBytes() const {
@@ -58,6 +60,8 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(_encrypted);
     bytes.push_back(_cmdSet);
     bytes.push_back(_cmdId);
+    bytes.push_back(_seq & 0xFF);
+    bytes.push_back((_seq >> 8) & 0xFF);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
