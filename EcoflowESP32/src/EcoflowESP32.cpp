@@ -141,10 +141,9 @@ void EcoflowESP32::update() {
                 _lastConnectionAttempt = millis();
                 if (_connectionRetries < 5) {
                     ESP_LOGI(TAG, "Connecting...");
-                    if (_pClient->connect(_pAdvertisedDevice)) {
-                        _state = ConnectionState::ESTABLISHING_CONNECTION;
-                        _connectionRetries++;
-                    }
+                    _state = ConnectionState::ESTABLISHING_CONNECTION;
+                    _connectionRetries++;
+                    _pClient->connect(_pAdvertisedDevice);
                 } else {
                     delete _pAdvertisedDevice;
                     _pAdvertisedDevice = nullptr;
