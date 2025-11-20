@@ -173,6 +173,7 @@ void EcoflowESP32::update() {
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
+    Packet::reset_sequence();
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
         return;
