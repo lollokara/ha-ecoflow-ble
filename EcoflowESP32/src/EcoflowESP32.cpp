@@ -357,6 +357,13 @@ int EcoflowESP32::getOutputPower() { return _data.outputPower; }
 int EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
 int EcoflowESP32::getACVoltage() { return _data.acVoltage; }
 int EcoflowESP32::getACFrequency() { return _data.acFrequency; }
+
+// New getters
+int EcoflowESP32::getSolarInputPower() { return _data.solarInputPower; }
+int EcoflowESP32::getAcOutputPower() { return _data.acOutputPower; }
+int EcoflowESP32::getDcOutputPower() { return _data.dcOutputPower; }
+int EcoflowESP32::getCellTemperature() { return _data.cellTemperature; }
+
 bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
 bool EcoflowESP32::isUsbOn() { return _data.usbOn; }

@@ -71,6 +71,13 @@ public:
     int getBatteryVoltage();
     int getACVoltage();
     int getACFrequency();
+
+    // New getters
+    int getSolarInputPower();
+    int getAcOutputPower();
+    int getDcOutputPower();
+    int getCellTemperature();
+
     bool isAcOn();
     bool isDcOn();
     bool isUsbOn();
