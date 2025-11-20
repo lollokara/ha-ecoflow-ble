@@ -122,17 +122,26 @@ void EcoflowESP32::update() {
     }
 
     if(_state == ConnectionState::CONNECTED) {
+        _setState(ConnectionState::DISCOVERING_SERVICE);
+    } else if (_state == ConnectionState::DISCOVERING_SERVICE) {
         NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
         if (pSvc) {
-            _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-            _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-            if (_pReadChr && _pReadChr->canNotify()) {
-                _pReadChr->subscribe(true, notifyCallback);
-            }
+            _setState(ConnectionState::DISCOVERING_CHARACTERISTICS);
+        }
+    } else if (_state == ConnectionState::DISCOVERING_CHARACTERISTICS) {
+        NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+        if (_pWriteChr && _pReadChr) {
+            _setState(ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS);
+        }
+    } else if (_state == ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS) {
+        if (_pReadChr->canNotify()) {
+            _pReadChr->subscribe(true, notifyCallback);
         }
         delay(100);
         _startAuthentication();
-    } else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+    } else if (_state > ConnectionState::PUBLIC_KEY_EXCHANGE && _state < ConnectionState::AUTHENTICATED) {
         if (millis() - _lastAuthActivity > 10000) {
             _pClient->disconnect();
         }
