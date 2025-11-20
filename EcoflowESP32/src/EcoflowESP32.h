@@ -59,7 +59,7 @@ public:
 
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
-
+    
     TaskHandle_t _keepAliveTaskHandle = nullptr;
     uint32_t _lastCommandTime = 0;
     bool _running = false;
