@@ -64,13 +64,17 @@ bool EcoflowCrypto::generate_keys() {
     return success;
 }
 
-bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_pub_key_len) {
+bool EcoflowCrypto::compute_shared_secret(const std::vector<uint8_t>& peer_pub_key) {
     mbedtls_ecp_point peer_Q;
     mbedtls_ecp_point_init(&peer_Q);
     mbedtls_ecp_point shared_P;
     mbedtls_ecp_point_init(&shared_P);
 
-    if (mbedtls_ecp_point_read_binary(&grp, &peer_Q, peer_pub_key, peer_pub_key_len) != 0) {
+    std::vector<uint8_t> formatted_key;
+    formatted_key.push_back(0x04);
+    formatted_key.insert(formatted_key.end(), peer_pub_key.begin(), peer_pub_key.end());
+
+    if (mbedtls_ecp_point_read_binary(&grp, &peer_Q, formatted_key.data(), formatted_key.size()) != 0) {
         mbedtls_ecp_point_free(&peer_Q);
         mbedtls_ecp_point_free(&shared_P);
         return false;
@@ -132,4 +136,20 @@ void EcoflowCrypto::decrypt_session(const uint8_t* input, size_t input_len, uint
     uint8_t temp_iv[16];
     memcpy(temp_iv, iv, 16);
     mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output);
+}
+
+void EcoflowCrypto::decrypt_shared(const uint8_t* input, size_t input_len, std::vector<uint8_t>& output) {
+    mbedtls_aes_context aes_ctx;
+    mbedtls_aes_init(&aes_ctx);
+    mbedtls_aes_setkey_dec(&aes_ctx, shared_secret, 128);
+    uint8_t temp_iv[16];
+    memcpy(temp_iv, iv, 16);
+    output.resize(input_len);
+    mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output.data());
+    mbedtls_aes_free(&aes_ctx);
+
+    uint8_t padding = output.back();
+    if (padding > 0 && padding <= 16) {
+        output.resize(output.size() - padding);
+    }
 }
