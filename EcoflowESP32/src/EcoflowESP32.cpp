@@ -52,10 +52,17 @@ void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* a
     }
 }
 
+void EcoflowESP32::_setState(ConnectionState newState) {
+    if (_state != newState) {
+        _state = newState;
+        Serial.printf("State changed: %d\n", (int)_state);
+    }
+}
+
 void EcoflowESP32::_startScan() {
     if (millis() - _lastScanTime > 10000) {
         _lastScanTime = millis();
-        _state = ConnectionState::SCANNING;
+        _setState(ConnectionState::SCANNING);
         if (!_pScan) {
             _pScan = NimBLEDevice::getScan();
             _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
@@ -80,7 +87,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
-    _state = ConnectionState::CONNECTED;
+    _setState(ConnectionState::CONNECTED);
     NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
     if (pSvc) {
         _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
@@ -93,17 +100,12 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
-    _state = ConnectionState::DISCONNECTED;
+    _setState(ConnectionState::DISCONNECTED);
     delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
 }
 
 void EcoflowESP32::update() {
-    if (_state != _lastState) {
-        Serial.printf("State changed: %d\n", (int)_state);
-        _lastState = _state;
-    }
-
     if (_pAdvertisedDevice) {
         if (!_pClient->isConnected()) {
             if (millis() - _lastConnectionAttempt > 5000) {
@@ -111,7 +113,7 @@ void EcoflowESP32::update() {
                 if (_connectionRetries < 5) {
                     Serial.println("Connecting...");
                     if (_pClient->connect(_pAdvertisedDevice)) {
-                        _state = ConnectionState::ESTABLISHING_CONNECTION;
+                        _setState(ConnectionState::ESTABLISHING_CONNECTION);
                         _connectionRetries++;
                     }
                 } else {
@@ -138,14 +140,17 @@ void EcoflowESP32::update() {
 }
 
 void EcoflowESP32::_startAuthentication() {
-    _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
+    _setState(ConnectionState::PUBLIC_KEY_EXCHANGE);
     _crypto.generate_keys();
 
     std::vector<uint8_t> payload;
     payload.push_back(0x01);
     payload.push_back(0x00);
     uint8_t* pub_key = _crypto.get_public_key();
-    payload.insert(payload.end(), pub_key, pub_key + 41);
+    // The mbedtls library generates a 41-byte key (with 0x04 prefix).
+    // The device expects a 40-byte key (raw X and Y coordinates).
+    // We skip the first byte of the key to send the correct payload.
+    payload.insert(payload.end(), pub_key + 1, pub_key + 41);
 
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
@@ -170,7 +175,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
         if (pkt->getCmdId() == 0x01 && payload.size() >= 43) {
             print_hex(payload.data() + 2, 41, "Peer Public Key");
             if (_crypto.compute_shared_secret(payload.data() + 2, 41)) {
-                _state = ConnectionState::REQUESTING_SESSION_KEY;
+                _setState(ConnectionState::REQUESTING_SESSION_KEY);
                 std::vector<uint8_t> req_payload = {0x02};
                 EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
                 _sendCommand(enc_packet.toBytes());
@@ -193,7 +198,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
-            _state = ConnectionState::AUTHENTICATING;
+            _setState(ConnectionState::AUTHENTICATING);
 
             uint8_t md5_data[16];
             mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
@@ -210,7 +215,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload[0] == 0x00) {
-            _state = ConnectionState::AUTHENTICATED;
+            _setState(ConnectionState::AUTHENTICATED);
         }
     }
 }

@@ -93,10 +93,10 @@ private:
     // Authentication flow
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
+    void _setState(ConnectionState newState);
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
-    ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
 
     std::string _userId;
     std::string _deviceSn;
