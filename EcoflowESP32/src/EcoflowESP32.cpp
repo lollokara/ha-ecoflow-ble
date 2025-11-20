@@ -45,7 +45,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _deviceSn = deviceSn;
     _ble_address = ble_address;
     NimBLEDevice::init("");
-    
+
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
 
@@ -79,13 +79,13 @@ void EcoflowESP32::update() {
 void EcoflowESP32::_startAuthentication() {
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
     _crypto.generate_keys();
-    
+
     std::vector<uint8_t> payload;
     payload.push_back(0x01);
     payload.push_back(0x00);
     uint8_t* pub_key = _crypto.get_public_key();
     payload.insert(payload.end(), pub_key, pub_key + 41);
-    
+
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
 }
@@ -127,11 +127,11 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             if (padding > 0 && padding <= 16) {
                 decrypted_payload.resize(decrypted_payload.size() - padding);
             }
-            
+
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
             _state = ConnectionState::AUTHENTICATING;
-            
+
             uint8_t md5_data[16];
             mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
             char hex_data[33];

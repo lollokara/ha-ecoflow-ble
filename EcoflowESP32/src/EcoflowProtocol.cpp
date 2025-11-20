@@ -110,7 +110,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
 
         uint16_t payload_len = buffer[4] | (buffer[5] << 8);
         if (buffer.size() < 8 + payload_len) {
-            break; 
+            break;
         }
 
         uint16_t crc_from_packet = buffer[6 + payload_len] | (buffer[7 + payload_len] << 8);
@@ -120,7 +120,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
         }
 
         std::vector<uint8_t> encrypted_payload(buffer.begin() + 6, buffer.begin() + 6 + payload_len);
-        
+
         std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
         crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
 

@@ -5,7 +5,7 @@
 EcoflowESP32 ecoflow;
 
 // Replace with your device's BLE address
-const std::string ble_address = "F8:3C:73:XX:XX:XX"; 
+const std::string ble_address = "F8:3C:73:XX:XX:XX";
 
 void setup() {
     Serial.begin(115200);
