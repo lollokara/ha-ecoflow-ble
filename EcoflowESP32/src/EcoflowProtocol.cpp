@@ -112,32 +112,41 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
 
     buffer.insert(buffer.end(), data, data + len);
 
-    while (buffer.size() >= 8) {
+    while (buffer.size() >= 8) { // Minimum size of an EncPacket
         if (buffer[0] != (PREFIX & 0xFF) || buffer[1] != ((PREFIX >> 8) & 0xFF)) {
             buffer.erase(buffer.begin());
             continue;
         }
 
-        uint16_t payload_len = buffer[4] | (buffer[5] << 8);
-        if (buffer.size() < 8 + payload_len) {
+        uint16_t frame_len = buffer[4] | (buffer[5] << 8);
+        size_t total_len = 6 + frame_len;
+        if (buffer.size() < total_len) {
             break;
         }
 
-        uint16_t crc_from_packet = buffer[6 + payload_len] | (buffer[7 + payload_len] << 8);
-        if (crc_from_packet != crc16(buffer.data(), 6 + payload_len)) {
+        if (frame_len < 2) { // Must include 2 bytes for CRC
             buffer.erase(buffer.begin());
             continue;
         }
 
+        uint16_t crc_from_packet = buffer[total_len - 2] | (buffer[total_len - 1] << 8);
+        if (crc_from_packet != crc16(buffer.data(), total_len - 2)) {
+            buffer.erase(buffer.begin());
+            continue;
+        }
+
+        size_t payload_len = frame_len - 2;
         std::vector<uint8_t> encrypted_payload(buffer.begin() + 6, buffer.begin() + 6 + payload_len);
 
         std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
         crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
 
         // Remove PKCS7 padding
-        uint8_t padding = decrypted_payload.back();
-        if (padding > 0 && padding <= 16) {
-            decrypted_payload.resize(decrypted_payload.size() - padding);
+        if (!decrypted_payload.empty()) {
+            uint8_t padding = decrypted_payload.back();
+            if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                decrypted_payload.resize(decrypted_payload.size() - padding);
+            }
         }
 
         Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size());
@@ -146,7 +155,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             delete packet;
         }
 
-        buffer.erase(buffer.begin(), buffer.begin() + 8 + payload_len);
+        buffer.erase(buffer.begin(), buffer.begin() + total_len);
     }
     return packets;
 }

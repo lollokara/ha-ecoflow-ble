@@ -21,6 +21,7 @@ public:
     void generate_session_key(const uint8_t* seed, const uint8_t* srand);
     void encrypt_session(const uint8_t* input, size_t input_len, uint8_t* output);
     void decrypt_session(const uint8_t* input, size_t input_len, uint8_t* output);
+    void decrypt_shared(const uint8_t* input, size_t input_len, uint8_t* output);
 
     uint8_t* get_public_key() { return public_key; }
     size_t get_public_key_len() { return sizeof(public_key); }

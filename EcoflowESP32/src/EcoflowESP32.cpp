@@ -7,9 +7,14 @@ EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     if (_instance) {
-        std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
-        for (auto &packet : packets) {
-            _instance->_handlePacket(&packet);
+        if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+            std::vector<uint8_t> data(pData, pData + length);
+            _instance->_handleSimpleAuthResponse(data);
+        } else {
+            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
+            for (auto &packet : packets) {
+                _instance->_handlePacket(&packet);
+            }
         }
     }
 }
@@ -157,6 +162,49 @@ void EcoflowESP32::_startAuthentication() {
 
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
+}
+
+void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
+    auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
+    if (parsed_payload.empty()) {
+        ESP_LOGE("EcoflowESP32", "Failed to parse simple auth response");
+        return;
+    }
+
+    if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+        if (parsed_payload.size() >= 42 && parsed_payload[0] == 0x01) {
+            uint8_t peer_pub_key[41];
+            peer_pub_key[0] = 0x04;
+            memcpy(peer_pub_key + 1, parsed_payload.data() + 2, 40);
+            print_hex(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
+
+            if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+                _state = ConnectionState::REQUESTING_SESSION_KEY;
+                std::vector<uint8_t> req_payload = {0x02};
+                EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+                _sendCommand(enc_packet.toBytes());
+            }
+        }
+    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
+        if (parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
+            std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
+            _crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
+
+            uint8_t padding = decrypted_payload.back();
+            if (padding > 0 && padding <= 16) {
+                decrypted_payload.resize(decrypted_payload.size() - padding);
+            }
+            print_hex(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Session Key Info");
+
+            if (decrypted_payload.size() >= 18) {
+                _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
+                _state = ConnectionState::REQUESTING_AUTH_STATUS;
+                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
+                EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+                _sendCommand(enc_auth_status.toBytes(&_crypto));
+            }
+        }
+    }
 }
 
 void EcoflowESP32::_handlePacket(Packet* pkt) {

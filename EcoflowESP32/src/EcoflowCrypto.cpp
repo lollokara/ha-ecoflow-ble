@@ -151,3 +151,10 @@ void EcoflowCrypto::decrypt_session(const uint8_t* input, size_t input_len, uint
     memcpy(temp_iv, iv, 16);
     mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output);
 }
+
+void EcoflowCrypto::decrypt_shared(const uint8_t* input, size_t input_len, uint8_t* output) {
+    mbedtls_aes_setkey_dec(&aes_ctx, shared_secret, 128);
+    uint8_t temp_iv[16];
+    memcpy(temp_iv, iv, 16);
+    mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, input_len, temp_iv, input, output);
+}
