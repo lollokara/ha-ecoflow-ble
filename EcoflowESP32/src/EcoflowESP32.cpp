@@ -161,6 +161,7 @@ void EcoflowESP32::_startAuthentication() {
 }
 
 void EcoflowESP32::_handleAuthSimplePacket(uint8_t* pData, size_t length) {
+    print_hex(pData, length, "Simple Packet");
     if (length < 8) {
         return;
     }
@@ -193,8 +194,8 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     const auto& payload = pkt->getPayload();
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-        if (payload.size() >= 42 && payload[0] == 0x01) {
-            std::vector<uint8_t> peer_key(payload.begin() + 2, payload.end());
+        if (payload.size() >= 43 && payload[0] == 0x01) {
+            std::vector<uint8_t> peer_key(payload.begin() + 3, payload.begin() + 43);
             print_hex(peer_key.data(), peer_key.size(), "Peer Public Key");
             if (_crypto.compute_shared_secret(peer_key)) {
                 _setState(ConnectionState::REQUESTING_SESSION_KEY);
