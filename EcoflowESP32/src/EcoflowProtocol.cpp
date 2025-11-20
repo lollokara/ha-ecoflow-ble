@@ -149,8 +149,8 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     std::vector<uint8_t> packet_data;
     packet_data.push_back(PREFIX & 0xFF);
     packet_data.push_back((PREFIX >> 8) & 0xFF);
-    packet_data.push_back((_payload_type << 4) | _frame_type);
-    packet_data.push_back((_is_ack << 7) | (_needs_ack << 6));
+    packet_data.push_back((_frame_type << 4));
+    packet_data.push_back(0x01); // Hardcoded based on Python implementation
     uint16_t len = encrypted_payload.size() + 2; // payload + 2 bytes for CRC
     packet_data.push_back(len & 0xFF);
     packet_data.push_back((len >> 8) & 0xFF);
