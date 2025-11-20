@@ -4,14 +4,12 @@
 #include "Credentials.h"
 #include "esp_log.h"
 #include "esp_system.h"
+static const char *LOG_TAG = "EcoflowCrypto";
 #include "mbedtls/md.h"
 
 void print_hex(const uint8_t* data, size_t size, const char* label) {
-    Serial.printf("%s: ", label);
-    for (size_t i = 0; i < size; i++) {
-        Serial.printf("%02x", data[i]);
-    }
-    Serial.println();
+    ESP_LOGD(LOG_TAG, "%s:", label);
+    ESP_LOG_BUFFER_HEX_LEVEL(LOG_TAG, data, size, ESP_LOG_DEBUG);
 }
 
 
