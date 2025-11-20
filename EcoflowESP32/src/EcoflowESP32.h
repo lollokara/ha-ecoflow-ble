@@ -10,6 +10,9 @@
 // Forward declaration
 class Packet;
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+
 enum class ConnectionState {
     NOT_CONNECTED,
     SCANNING,
@@ -121,6 +124,10 @@ private:
     EcoflowCrypto _crypto;
 
     EcoflowData _data;
+
+    static void packetProcessorTask(void* pvParameters);
+    QueueHandle_t _packetQueue;
+    TaskHandle_t _packetProcessorHandle;
 };
 
 #endif // ECOFLOW_ESP32_H

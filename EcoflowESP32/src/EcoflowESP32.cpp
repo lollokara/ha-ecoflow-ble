@@ -23,16 +23,9 @@ EcoflowESP32* EcoflowESP32::_instance = nullptr;
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     ESP_LOGD(TAG, "Notify callback received %d bytes", length);
     print_hex_esp(pData, length, "Notify Data");
-    if (_instance) {
-        if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-            std::vector<uint8_t> data(pData, pData + length);
-            _instance->_handleSimpleAuthResponse(data);
-        } else {
-            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
-            for (auto &packet : packets) {
-                _instance->_handlePacket(&packet);
-            }
-        }
+    if (_instance && _instance->_packetQueue != NULL) {
+        std::vector<uint8_t> data(pData, pData + length);
+        xQueueSend(_instance->_packetQueue, &data, portMAX_DELAY);
     }
 }
 
@@ -62,6 +55,12 @@ EcoflowESP32::~EcoflowESP32() {
         NimBLEDevice::deleteClient(_pClient);
     }
     delete _clientCallback;
+    if (_packetProcessorHandle != NULL) {
+        vTaskDelete(_packetProcessorHandle);
+    }
+    if (_packetQueue != NULL) {
+        vQueueDelete(_packetQueue);
+    }
 }
 
 EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32* instance) : _instance(instance) {}
@@ -93,6 +92,8 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
+    _packetQueue = xQueueCreate(10, sizeof(std::vector<uint8_t>));
+    xTaskCreate(packetProcessorTask, "PacketProcessor", 4096, this, 5, &_packetProcessorHandle);
     NimBLEDevice::init("");
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
@@ -350,4 +351,21 @@ bool EcoflowESP32::setAC(bool on) {
     Packet packet(0x21, 0x35, 0x35, 0x91, payload);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
+}
+
+void EcoflowESP32::packetProcessorTask(void* pvParameters) {
+    EcoflowESP32* self = (EcoflowESP32*)pvParameters;
+    std::vector<uint8_t> data;
+    for (;;) {
+        if (xQueueReceive(self->_packetQueue, &data, portMAX_DELAY) == pdPASS) {
+            if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+                self->_handleSimpleAuthResponse(data);
+            } else {
+                std::vector<Packet> packets = EncPacket::parsePackets(data.data(), data.size(), self->_crypto);
+                for (auto &packet : packets) {
+                    self->_handlePacket(&packet);
+                }
+            }
+        }
+    }
 }
