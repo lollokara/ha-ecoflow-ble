@@ -23,16 +23,12 @@ EcoflowESP32* EcoflowESP32::_instance = nullptr;
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     ESP_LOGD(TAG, "Notify callback received %d bytes", length);
     print_hex_esp(pData, length, "Notify Data");
-    if (_instance) {
-        if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-            std::vector<uint8_t> data(pData, pData + length);
-            _instance->_handleSimpleAuthResponse(data);
-        } else {
-            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
-            for (auto &packet : packets) {
-                _instance->_handlePacket(&packet);
-            }
-        }
+    if (_instance && _instance->_ble_queue) {
+        BleNotification* notification = new BleNotification;
+        notification->data = new uint8_t[length];
+        memcpy(notification->data, pData, length);
+        notification->length = length;
+        xQueueSend(_instance->_ble_queue, &notification, portMAX_DELAY);
     }
 }
 
@@ -96,6 +92,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     NimBLEDevice::init("");
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
+    _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
     xTaskCreate(ble_task_entry, "ble_task", 4096, this, 5, &_ble_task_handle);
     return true;
 }
@@ -192,6 +189,63 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         }
+
+        BleNotification* notification;
+        if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
+            if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+                std::vector<uint8_t> data(notification->data, notification->data + notification->length);
+                auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
+                if (!parsed_payload.empty() && parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) {
+                    uint8_t peer_pub_key[41];
+                    peer_pub_key[0] = 0x04;
+                    memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
+                    if (self->_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+                        self->_state = ConnectionState::REQUESTING_SESSION_KEY;
+                        ESP_LOGD(TAG, "Shared secret computed, requesting session key");
+                        std::vector<uint8_t> req_payload = {0x02};
+                        EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+                        self->_sendCommand(enc_packet.toBytes());
+                    } else {
+                        ESP_LOGE(TAG, "Failed to compute shared secret");
+                    }
+                } else {
+                    ESP_LOGE(TAG, "Invalid public key response");
+                }
+            } else if (self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+                std::vector<uint8_t> data(notification->data, notification->data + notification->length);
+                auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
+                if (!parsed_payload.empty() && parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
+                    std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
+                    self->_crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
+
+                    if (!decrypted_payload.empty()) {
+                        uint8_t padding = decrypted_payload.back();
+                        if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                            decrypted_payload.resize(decrypted_payload.size() - padding);
+                        }
+                    }
+
+                    if (decrypted_payload.size() >= 18) {
+                        self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
+                        self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
+                        ESP_LOGD(TAG, "Session key generated, requesting auth status");
+                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03, 0, 0x0d);
+                        EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+                        self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
+                    } else {
+                        ESP_LOGE(TAG, "Decrypted session key info too short");
+                    }
+                }
+            } else {
+                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto);
+                for (auto &packet : packets) {
+                    self->_handlePacket(&packet);
+                }
+            }
+            delete[] notification->data;
+            delete notification;
+        }
+
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
@@ -217,64 +271,6 @@ void EcoflowESP32::_startAuthentication() {
     _sendCommand(enc_packet.toBytes());
 }
 
-void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
-    ESP_LOGD(TAG, "_handleSimpleAuthResponse: Handling simple auth response");
-    print_hex_esp(data.data(), data.size(), "Raw Simple Auth Response");
-    auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
-    if (parsed_payload.empty()) {
-        ESP_LOGE(TAG, "Failed to parse simple auth response");
-        return;
-    }
-    print_hex_esp(parsed_payload.data(), parsed_payload.size(), "Parsed Simple Auth Response");
-
-    if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-        ESP_LOGD(TAG, "Handling public key response");
-        if (parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) { // 1 (status) + 1 (type) + 1 (size) + 40 (key)
-            uint8_t peer_pub_key[41];
-            peer_pub_key[0] = 0x04;
-            memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
-            print_hex_esp(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
-
-            if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
-                _state = ConnectionState::REQUESTING_SESSION_KEY;
-                ESP_LOGD(TAG, "Shared secret computed, requesting session key");
-                std::vector<uint8_t> req_payload = {0x02};
-                EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-                _sendCommand(enc_packet.toBytes());
-            } else {
-                ESP_LOGE(TAG, "Failed to compute shared secret");
-            }
-        } else {
-            ESP_LOGE(TAG, "Invalid public key response");
-        }
-    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
-        ESP_LOGD(TAG, "Handling session key response");
-        if (parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
-            std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
-            _crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
-
-            // Remove PKCS7 padding
-            if (!decrypted_payload.empty()) {
-                uint8_t padding = decrypted_payload.back();
-                if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
-                    decrypted_payload.resize(decrypted_payload.size() - padding);
-                }
-            }
-            print_hex_esp(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Session Key Info");
-
-            if (decrypted_payload.size() >= 18) {
-                _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
-                _state = ConnectionState::REQUESTING_AUTH_STATUS;
-                ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03, 0, 0x0d);
-                EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
-                _sendCommand(enc_auth_status.toBytes(&_crypto));
-            } else {
-                ESP_LOGE(TAG, "Decrypted session key info too short");
-            }
-        }
-    }
-}
 
 void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());

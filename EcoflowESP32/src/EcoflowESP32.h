@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include "freertos/task.h"
+#include "freertos/queue.h"
 
 #define MAX_CONNECT_ATTEMPTS 5
 
@@ -130,6 +131,12 @@ private:
 
     static void ble_task_entry(void* pvParameters);
     TaskHandle_t _ble_task_handle = nullptr;
+    QueueHandle_t _ble_queue = nullptr;
+
+    struct BleNotification {
+        uint8_t* data;
+        size_t length;
+    };
 };
 
 #endif // ECOFLOW_ESP32_H
