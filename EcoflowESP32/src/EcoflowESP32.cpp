@@ -3,6 +3,8 @@
 #include "EcoflowDataParser.h"
 #include <NimBLEDevice.h>
 #include "esp_log.h"
+#include "pd335_sys.pb.h"
+#include <pb_encode.h>
 
 static const char* TAG = "EcoflowESP32";
 
@@ -271,7 +273,6 @@ void EcoflowESP32::_startAuthentication() {
     _sendCommand(enc_packet.toBytes());
 }
 
-
 void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());
     if (_state == ConnectionState::AUTHENTICATED) {
@@ -321,6 +322,23 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     }
 }
 
+void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
+    if (!isAuthenticated()) return;
+
+    uint8_t buffer[128];
+    pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+    if (!pb_encode(&stream, pd335_sys_ConfigWrite_fields, &config)) {
+        ESP_LOGE(TAG, "Failed to encode config protobuf message");
+        return;
+    }
+
+    std::vector<uint8_t> payload(buffer, buffer + stream.bytes_written);
+    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13);
+    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
+    _sendCommand(enc_packet.toBytes(&_crypto));
+}
+
+
 bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     if (_pWriteChr && isConnected()) {
         print_hex_esp(command.data(), command.size(), "Sending command");
@@ -354,25 +372,25 @@ bool EcoflowESP32::requestData() {
 }
 
 bool EcoflowESP32::setDC(bool on) {
-    if (!isAuthenticated()) return false;
-    std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-    Packet packet(0x21, 0x35, 0x35, 0x92, payload);
-    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    return _sendCommand(enc_packet.toBytes(&_crypto));
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    config.has_cfg_dc_12v_out_open = true;
+    config.cfg_dc_12v_out_open = on;
+    _sendConfigPacket(config);
+    return true;
 }
 
 bool EcoflowESP32::setUSB(bool on) {
-    if (!isAuthenticated()) return false;
-    std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-    Packet packet(0x21, 0x35, 0x35, 0x93, payload);
-    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    return _sendCommand(enc_packet.toBytes(&_crypto));
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    config.has_cfg_usb_open = true;
+    config.cfg_usb_open = on;
+    _sendConfigPacket(config);
+    return true;
 }
 
 bool EcoflowESP32::setAC(bool on) {
-    if (!isAuthenticated()) return false;
-    std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-    Packet packet(0x21, 0x35, 0x35, 0x91, payload);
-    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    return _sendCommand(enc_packet.toBytes(&_crypto));
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    config.has_cfg_ac_out_open = true;
+    config.cfg_ac_out_open = on;
+    _sendConfigPacket(config);
+    return true;
 }

@@ -8,6 +8,7 @@
 #include <string>
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "pd335_sys.pb.h"
 
 #define MAX_CONNECT_ATTEMPTS 5
 
@@ -100,7 +101,7 @@ private:
     // Authentication flow
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
-    void _handleSimpleAuthResponse(const std::vector<uint8_t>& data);
+    void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;

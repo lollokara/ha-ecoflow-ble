@@ -18,6 +18,27 @@ void setup() {
 }
 
 void loop() {
+    static uint32_t last_battery_check = 0;
+    static uint32_t last_ac_toggle = 0;
+    static bool ac_on = false;
+
     ecoflow.update();
+
+    if (millis() - last_battery_check > 5000) {
+        last_battery_check = millis();
+        if (ecoflow.isAuthenticated()) {
+            ecoflow.getBatteryLevel();
+        }
+    }
+
+    if (millis() - last_ac_toggle > 15000) {
+        last_ac_toggle = millis();
+        if (ecoflow.isAuthenticated()) {
+            ac_on = !ac_on;
+            ESP_LOGI("main", "Toggling AC to %s", ac_on ? "ON" : "OFF");
+            ecoflow.setAC(ac_on);
+        }
+    }
+
     delay(100);
 }
