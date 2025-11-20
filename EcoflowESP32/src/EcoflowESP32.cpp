@@ -24,7 +24,7 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteris
     ESP_LOGD(TAG, "Notify callback received %d bytes", length);
     print_hex_esp(pData, length, "Notify Data");
     if (_instance && _instance->_packetQueue != NULL) {
-        std::vector<uint8_t> data(pData, pData + length);
+        auto* data = new std::vector<uint8_t>(pData, pData + length);
         xQueueSend(_instance->_packetQueue, &data, portMAX_DELAY);
     }
 }
@@ -92,7 +92,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
-    _packetQueue = xQueueCreate(10, sizeof(std::vector<uint8_t>));
+    _packetQueue = xQueueCreate(10, sizeof(std::vector<uint8_t>*));
     xTaskCreate(packetProcessorTask, "PacketProcessor", 4096, this, 5, &_packetProcessorHandle);
     NimBLEDevice::init("");
     _pClient = NimBLEDevice::createClient();
@@ -355,17 +355,18 @@ bool EcoflowESP32::setAC(bool on) {
 
 void EcoflowESP32::packetProcessorTask(void* pvParameters) {
     EcoflowESP32* self = (EcoflowESP32*)pvParameters;
-    std::vector<uint8_t> data;
+    std::vector<uint8_t>* data;
     for (;;) {
         if (xQueueReceive(self->_packetQueue, &data, portMAX_DELAY) == pdPASS) {
             if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-                self->_handleSimpleAuthResponse(data);
+                self->_handleSimpleAuthResponse(*data);
             } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(data.data(), data.size(), self->_crypto);
+                std::vector<Packet> packets = EncPacket::parsePackets(data->data(), data->size(), self->_crypto);
                 for (auto &packet : packets) {
                     self->_handlePacket(&packet);
                 }
             }
+            delete data;
         }
     }
 }

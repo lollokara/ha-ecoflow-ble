@@ -126,8 +126,8 @@ private:
     EcoflowData _data;
 
     static void packetProcessorTask(void* pvParameters);
-    QueueHandle_t _packetQueue;
-    TaskHandle_t _packetProcessorHandle;
+    QueueHandle_t _packetQueue = nullptr;
+    TaskHandle_t _packetProcessorHandle = nullptr;
 };
 
 #endif // ECOFLOW_ESP32_H
