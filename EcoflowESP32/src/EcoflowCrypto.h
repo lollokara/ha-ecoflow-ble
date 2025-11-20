@@ -2,6 +2,7 @@
 #define ECOFLOW_CRYPTO_H
 
 #include <stdint.h>
+#include <vector>
 #include "mbedtls/ecdh.h"
 #include "mbedtls/md5.h"
 #include "mbedtls/aes.h"
@@ -17,10 +18,11 @@ public:
     ~EcoflowCrypto();
 
     bool generate_keys();
-    bool compute_shared_secret(const uint8_t* peer_pub_key, size_t peer_pub_key_len);
+    bool compute_shared_secret(const std::vector<uint8_t>& peer_pub_key);
     void generate_session_key(const uint8_t* seed, const uint8_t* srand);
     void encrypt_session(const uint8_t* input, size_t input_len, uint8_t* output);
     void decrypt_session(const uint8_t* input, size_t input_len, uint8_t* output);
+    void decrypt_shared(const uint8_t* input, size_t input_len, std::vector<uint8_t>& output);
 
     uint8_t* get_public_key() { return public_key; }
     uint8_t* get_shared_secret() { return shared_secret; }

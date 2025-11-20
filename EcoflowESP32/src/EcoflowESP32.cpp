@@ -7,9 +7,13 @@ EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     if (_instance) {
-        std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
-        for (auto &packet : packets) {
-            _instance->_handlePacket(&packet);
+        if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+            _instance->_handleAuthSimplePacket(pData, length);
+        } else {
+            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
+            for (auto &packet : packets) {
+                _instance->_handlePacket(&packet);
+            }
         }
     }
 }
@@ -156,6 +160,23 @@ void EcoflowESP32::_startAuthentication() {
     _sendCommand(enc_packet.toBytes());
 }
 
+void EcoflowESP32::_handleAuthSimplePacket(uint8_t* pData, size_t length) {
+    if (length < 8) {
+        return;
+    }
+    uint16_t payload_len = pData[4] | (pData[5] << 8);
+    if (length < 6 + payload_len) {
+        return;
+    }
+
+    std::vector<uint8_t> payload;
+    payload.assign(pData + 6, pData + 6 + payload_len - 2);
+
+    // ToDo: Add CRC16 check here
+
+    _handleAuthPacket(new Packet(0,0,0, pData[6], payload));
+}
+
 void EcoflowESP32::_handlePacket(Packet* pkt) {
     if (_state == ConnectionState::AUTHENTICATED) {
         EcoflowDataParser::parsePacket(*pkt, _data);
@@ -172,9 +193,10 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
     const auto& payload = pkt->getPayload();
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-        if (pkt->getCmdId() == 0x01 && payload.size() >= 43) {
-            print_hex(payload.data() + 2, 41, "Peer Public Key");
-            if (_crypto.compute_shared_secret(payload.data() + 2, 41)) {
+        if (payload.size() >= 42 && payload[0] == 0x01) {
+            std::vector<uint8_t> peer_key(payload.begin() + 2, payload.end());
+            print_hex(peer_key.data(), peer_key.size(), "Peer Public Key");
+            if (_crypto.compute_shared_secret(peer_key)) {
                 _setState(ConnectionState::REQUESTING_SESSION_KEY);
                 std::vector<uint8_t> req_payload = {0x02};
                 EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
@@ -182,18 +204,10 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             }
         }
     } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
-        if (pkt->getCmdId() == 0x02 && payload.size() >= 18) {
-            std::vector<uint8_t> decrypted_payload(payload.size() - 1);
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
-            mbedtls_aes_setkey_dec(&aes_ctx, _crypto.get_shared_secret(), 128);
-            mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, payload.size() - 1, _crypto.get_iv(), payload.data() + 1, decrypted_payload.data());
-            mbedtls_aes_free(&aes_ctx);
+        if (payload.size() >= 18 && payload[0] == 0x02) {
+            std::vector<uint8_t> decrypted_payload;
+            _crypto.decrypt_shared(payload.data() + 1, payload.size() - 1, decrypted_payload);
 
-            uint8_t padding = decrypted_payload.back();
-            if (padding > 0 && padding <= 16) {
-                decrypted_payload.resize(decrypted_payload.size() - padding);
-            }
             print_hex(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Payload");
 
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
