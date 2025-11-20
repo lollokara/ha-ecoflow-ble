@@ -127,9 +127,7 @@ void EcoflowESP32::update() {
 
     if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
         _setState(ConnectionState::SERVICE_DISCOVERY);
-    }
-
-    if (_state == ConnectionState::SERVICE_DISCOVERY) {
+    } else if (_state == ConnectionState::SERVICE_DISCOVERY) {
         NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
         if (pSvc) {
             _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
@@ -138,17 +136,13 @@ void EcoflowESP32::update() {
                 _setState(ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS);
             }
         }
-    }
-
-    if (_state == ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS) {
+    } else if (_state == ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS) {
         if (_pReadChr->canNotify()) {
             if (_pReadChr->subscribe(true, notifyCallback)) {
                 _setState(ConnectionState::AUTHENTICATION_START);
             }
         }
-    }
-
-    if (_state == ConnectionState::AUTHENTICATION_START) {
+    } else if (_state == ConnectionState::AUTHENTICATION_START) {
         _startAuthentication();
     }
 
