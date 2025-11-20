@@ -37,8 +37,8 @@ static uint16_t crc16(const uint8_t* data, size_t len) {
 // Packet implementation
 uint32_t Packet::g_seq = 0;
 
-Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version, uint32_t seq) :
-    _src(src), _dest(dest), _cmdSet(cmdSet), _cmdId(cmdId), _payload(payload), _check_type(check_type), _encrypted(encrypted), _version(version), _seq(seq) {
+Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version, uint32_t seq, uint8_t product_id) :
+    _src(src), _dest(dest), _cmdSet(cmdSet), _cmdId(cmdId), _payload(payload), _check_type(check_type), _encrypted(encrypted), _version(version), _seq(seq), _product_id(product_id) {
     if (_seq == 0) {
         _seq = g_seq++;
     }
@@ -80,6 +80,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
         return nullptr;
     }
 
+    uint8_t product_id = data[5];
     uint32_t seq = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
     uint8_t src = data[12];
     uint8_t dest = data[13];
@@ -93,7 +94,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
         payload.assign(data + 18, data + 18 + payload_len);
     }
 
-    return new Packet(src, dest, cmd_set, cmd_id, payload, dsrc, ddest, version, seq);
+    return new Packet(src, dest, cmd_set, cmd_id, payload, dsrc, ddest, version, seq, product_id);
 }
 
 std::vector<uint8_t> Packet::toBytes() const {
@@ -104,8 +105,7 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back((_payload.size() >> 8) & 0xFF);
     bytes.push_back(crc8(bytes.data(), bytes.size()));
 
-    // product_id, assuming 0x0d as per python
-    bytes.push_back(0x0d);
+    bytes.push_back(_product_id);
     bytes.push_back(_seq & 0xFF);
     bytes.push_back((_seq >> 8) & 0xFF);
     bytes.push_back((_seq >> 16) & 0xFF);

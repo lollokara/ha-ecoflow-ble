@@ -10,7 +10,7 @@ class Packet {
 public:
     static const uint8_t PREFIX = 0xAA;
 
-    Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type = 0x01, uint8_t encrypted = 0x01, uint8_t version = 0x03, uint32_t seq = 0);
+    Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type = 0x01, uint8_t encrypted = 0x01, uint8_t version = 0x03, uint32_t seq = 0, uint8_t product_id = 0x0d);
 
     static Packet* fromBytes(const uint8_t* data, size_t len);
     std::vector<uint8_t> toBytes() const;
@@ -36,6 +36,7 @@ private:
     uint8_t _encrypted;
     uint8_t _version;
     uint32_t _seq;
+    uint8_t _product_id;
     static uint32_t g_seq;
 };
 

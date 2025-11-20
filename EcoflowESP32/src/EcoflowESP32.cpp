@@ -75,18 +75,18 @@ void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* a
 }
 
 void EcoflowESP32::_startScan() {
-    if (millis() - _lastScanTime > 10000) {
-        _lastScanTime = millis();
-        _state = ConnectionState::SCANNING;
-        if (!_pScan) {
-            _pScan = NimBLEDevice::getScan();
-            _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
-            _pScan->setActiveScan(true);
-            _pScan->setInterval(100);
-            _pScan->setWindow(99);
-        }
-        _pScan->start(5, false);
+    ESP_LOGI(TAG, "Starting scan...");
+    _lastScanTime = millis();
+    _state = ConnectionState::SCANNING;
+    _connectionRetries = 0;
+    if (!_pScan) {
+        _pScan = NimBLEDevice::getScan();
+        _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
+        _pScan->setActiveScan(true);
+        _pScan->setInterval(100);
+        _pScan->setWindow(99);
     }
+    _pScan->start(5, false);
 }
 
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
@@ -96,77 +96,103 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     NimBLEDevice::init("");
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
-    _startScan();
+    xTaskCreate(ble_task_entry, "ble_task", 4096, this, 5, &_ble_task_handle);
     return true;
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
-    _state = ConnectionState::CONNECTED;
-    ESP_LOGI("EcoflowESP32", "onConnect: State changed to CONNECTED, performing service discovery");
-    NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-    if (pSvc) {
-        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-        if (_pReadChr && _pReadChr->canNotify()) {
-            if(_pReadChr->subscribe(true, notifyCallback)) {
-                ESP_LOGI(TAG, "Subscribed to notifications");
-                delay(100); // Wait for the subscription to be processed
-            } else {
-                ESP_LOGE(TAG, "Failed to subscribe to notifications");
-                pClient->disconnect();
-            }
-        }
-    } else {
-        ESP_LOGE("EcoflowESP32", "onConnect: Service not found, disconnecting");
-        pClient->disconnect();
-    }
+    _state = ConnectionState::SERVICE_DISCOVERY;
+    _lastAuthActivity = millis();
+    ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
     delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
+    // Restart scan to reconnect
+    _startScan();
 }
 
 void EcoflowESP32::update() {
-    if (_state != _lastState) {
-        ESP_LOGI(TAG, "State changed: %d", (int)_state);
-        _lastState = _state;
-    }
+    // This function can be used for other non-BLE related tasks if needed.
+    // The main BLE logic is now in ble_task_entry.
+}
 
-    if (_pAdvertisedDevice) {
-        if (!_pClient->isConnected()) {
-            if (millis() - _lastConnectionAttempt > 5000) {
-                _lastConnectionAttempt = millis();
-                if (_connectionRetries < 5) {
-                    ESP_LOGI(TAG, "Connecting...");
-                    _state = ConnectionState::ESTABLISHING_CONNECTION;
-                    _connectionRetries++;
-                    _pClient->connect(_pAdvertisedDevice);
+void EcoflowESP32::ble_task_entry(void* pvParameters) {
+    EcoflowESP32* self = (EcoflowESP32*)pvParameters;
+    for (;;) {
+        if (self->_state != self->_lastState) {
+            ESP_LOGI(TAG, "State changed: %d", (int)self->_state);
+            self->_lastState = self->_state;
+        }
+
+        if (self->_state == ConnectionState::SCANNING && millis() - self->_lastScanTime > 10000) {
+            ESP_LOGW(TAG, "Scan timed out, restarting scan");
+            self->_startScan();
+        }
+
+        if (self->_pAdvertisedDevice) {
+            if (!self->_pClient->isConnected()) {
+                if (millis() - self->_lastConnectionAttempt > 10000) { // Increased timeout
+                    self->_lastConnectionAttempt = millis();
+                    if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
+                        ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
+                        self->_state = ConnectionState::ESTABLISHING_CONNECTION;
+                        self->_connectionRetries++;
+                        self->_pClient->connect(self->_pAdvertisedDevice);
+                    } else {
+                        ESP_LOGE(TAG, "Max connection attempts reached, restarting scan");
+                        delete self->_pAdvertisedDevice;
+                        self->_pAdvertisedDevice = nullptr;
+                        self->_connectionRetries = 0;
+                        self->_startScan();
+                    }
+                }
+            }
+        } else if (self->_state != ConnectionState::SCANNING) {
+            self->_startScan();
+        }
+
+        if (self->_pClient->isConnected()) {
+            if (self->_state == ConnectionState::SERVICE_DISCOVERY) {
+                NimBLERemoteService* pSvc = self->_pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+                if (pSvc) {
+                    self->_pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+                    self->_pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+                    if (self->_pReadChr && self->_pWriteChr) {
+                        self->_state = ConnectionState::SUBSCRIBING_NOTIFICATIONS;
+                    }
                 } else {
-                    delete _pAdvertisedDevice;
-                    _pAdvertisedDevice = nullptr;
-                    _connectionRetries = 0;
+                    ESP_LOGE(TAG, "Service not found, disconnecting");
+                    self->_pClient->disconnect();
+                }
+            } else if (self->_state == ConnectionState::SUBSCRIBING_NOTIFICATIONS) {
+                if (self->_pReadChr->canNotify()) {
+                    if(self->_pReadChr->subscribe(true, notifyCallback)) {
+                        ESP_LOGI(TAG, "Subscribed to notifications");
+                        self->_state = ConnectionState::CONNECTED;
+                    } else {
+                        ESP_LOGE(TAG, "Failed to subscribe to notifications");
+                        self->_pClient->disconnect();
+                    }
+                }
+            } else if (self->_state == ConnectionState::CONNECTED) {
+                self->_startAuthentication();
+            } else if (self->_state > ConnectionState::CONNECTED && self->_state < ConnectionState::AUTHENTICATED) {
+                if (millis() - self->_lastAuthActivity > 10000) { // New timeout for auth steps
+                    ESP_LOGW(TAG, "Authentication timed out");
+                    self->_pClient->disconnect();
+                }
+            } else if (self->_state == ConnectionState::AUTHENTICATED) {
+                if (millis() - self->_lastKeepAliveTime > 5000) {
+                    self->_lastKeepAliveTime = millis();
+                    self->requestData();
                 }
             }
         }
-    } else {
-        _startScan();
-    }
-
-    if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
-        _startAuthentication();
-    }
-    else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastConnectionAttempt > 10000) {
-            _pClient->disconnect();
-        }
-    } else if (_state == ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastKeepAliveTime > 5000) {
-            _lastKeepAliveTime = millis();
-            requestData();
-        }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
@@ -240,7 +266,7 @@ void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
                 _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
                 _state = ConnectionState::REQUESTING_AUTH_STATUS;
                 ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03);
+                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03, 0, 0x0d);
                 EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
                 _sendCommand(enc_auth_status.toBytes(&_crypto));
             } else {
@@ -256,7 +282,7 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         if (pkt->getDest() == 0x21 && pkt->getCmdSet() != 0x01 && pkt->getCmdId() != 0x01) {
             ESP_LOGD(TAG, "Replying to packet");
-            Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq());
+            Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
         }
@@ -284,7 +310,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03, 0, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -308,7 +334,10 @@ bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     return false;
 }
 
-int EcoflowESP32::getBatteryLevel() { return _data.batteryLevel; }
+int EcoflowESP32::getBatteryLevel() {
+    ESP_LOGI(TAG, "Battery level is: %d%%", _data.batteryLevel);
+    return _data.batteryLevel;
+}
 int EcoflowESP32::getInputPower() { return _data.inputPower; }
 int EcoflowESP32::getOutputPower() { return _data.outputPower; }
 int EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
@@ -323,7 +352,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03);
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03, 0, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }

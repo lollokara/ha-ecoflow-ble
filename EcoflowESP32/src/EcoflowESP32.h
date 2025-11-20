@@ -6,6 +6,9 @@
 #include "EcoflowCrypto.h"
 #include <vector>
 #include <string>
+#include "freertos/task.h"
+
+#define MAX_CONNECT_ATTEMPTS 5
 
 // Forward declaration
 class Packet;
@@ -16,6 +19,8 @@ enum class ConnectionState {
     CREATED,
     ESTABLISHING_CONNECTION,
     CONNECTED,
+    SERVICE_DISCOVERY,
+    SUBSCRIBING_NOTIFICATIONS,
     PUBLIC_KEY_EXCHANGE,
     PUBLIC_KEY_RECEIVED,
     REQUESTING_SESSION_KEY,
@@ -83,6 +88,7 @@ public:
     uint8_t _connectionRetries = 0;
     uint32_t _lastConnectionAttempt = 0;
     uint32_t _lastScanTime = 0;
+    uint32_t _lastAuthActivity = 0;
 
 private:
     static void notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
@@ -121,6 +127,9 @@ private:
     EcoflowCrypto _crypto;
 
     EcoflowData _data;
+
+    static void ble_task_entry(void* pvParameters);
+    TaskHandle_t _ble_task_handle = nullptr;
 };
 
 #endif // ECOFLOW_ESP32_H
