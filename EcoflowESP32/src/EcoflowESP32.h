@@ -82,6 +82,7 @@ public:
     uint32_t _lastKeepAliveTime = 0;
     uint8_t _connectionRetries = 0;
     uint32_t _lastConnectionAttempt = 0;
+    uint32_t _lastAuthActivity = 0;
     uint32_t _lastScanTime = 0;
 
 private:
@@ -93,11 +94,11 @@ private:
     // Authentication flow
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
-    void _handleSimpleAuthResponse(const std::vector<uint8_t>& data);
+    void _handleAuthSimplePacket(uint8_t* pData, size_t length);
+    void _setState(ConnectionState newState);
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
-    ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
 
     std::string _userId;
     std::string _deviceSn;

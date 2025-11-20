@@ -6,6 +6,8 @@
 #include <string>
 #include "EcoflowCrypto.h"
 
+uint16_t crc16(const uint8_t* data, size_t len);
+
 class Packet {
 public:
     static const uint8_t PREFIX = 0xAA;
@@ -43,8 +45,7 @@ public:
     static const uint8_t FRAME_TYPE_PROTOCOL = 0x01;
     static const uint8_t PAYLOAD_TYPE_VX_PROTOCOL = 0x00;
 
-    EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload,
-              uint8_t needs_ack = 0, uint8_t is_ack = 0);
+    EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload);
 
     const std::vector<uint8_t>& getPayload() const { return _payload; }
     std::vector<uint8_t> toBytes(EcoflowCrypto* crypto = nullptr) const;
@@ -56,8 +57,6 @@ private:
     uint8_t _frame_type;
     uint8_t _payload_type;
     std::vector<uint8_t> _payload;
-    uint8_t _needs_ack;
-    uint8_t _is_ack;
 };
 
 #endif // ECOFLOW_PROTOCOL_H
