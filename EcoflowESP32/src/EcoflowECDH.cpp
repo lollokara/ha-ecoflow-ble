@@ -40,11 +40,11 @@ bool compute_shared_secret(const uint8_t* peer_pub_key, uint8_t* shared_secret, 
     return true;
 }
 
-void generateSessionKey(const uint8_t* seed, const uint8_t* shared_secret, uint8_t* sessionKey) {
-    uint8_t data[16 + 20]; // 16 from keydata, 20 from shared secret
+void generateSessionKey(const uint8_t* seed, const uint8_t* srand, uint8_t* sessionKey) {
+    uint8_t data[32]; // 16 from keydata, 16 from srand
     int pos = seed[0] * 16 + (seed[1] - 1) * 256;
     memcpy(data, &ECOFLOW_KEYDATA[pos], 16);
-    memcpy(data + 16, shared_secret, 20);
+    memcpy(data + 16, srand, 16);
     mbedtls_md5(data, sizeof(data), sessionKey);
 }
 

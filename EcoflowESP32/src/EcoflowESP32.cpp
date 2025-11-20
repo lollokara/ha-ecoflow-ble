@@ -380,7 +380,7 @@ void EcoflowESP32::_requestSessionKey() {
 
 void EcoflowESP32::_handleSessionKeyResponse(const std::vector<uint8_t>& payload) {
     if (payload.size() >= 17) { // 1 byte something + 16 bytes seed
-        EcoflowECDH::generateSessionKey(payload.data() + 1, _shared_key, _sessionKey);
+        EcoflowECDH::generateSessionKey(payload.data() + 16, payload.data(), _sessionKey);
         _sessionKeyEstablished = true;
         _requestAuthStatus();
     } else {
