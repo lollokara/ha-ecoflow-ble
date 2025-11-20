@@ -100,6 +100,7 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
             _pReadChr->subscribe(true, notifyCallback);
         }
     }
+    delay(100);
     _startAuthentication();
 }
 
@@ -116,10 +117,7 @@ void EcoflowESP32::update() {
                 _lastConnectionAttempt = millis();
                 if (_connectionRetries < 5) {
                     Serial.println("Connecting...");
-                    if (_pClient->connect(_pAdvertisedDevice)) {
-                        _setState(ConnectionState::ESTABLISHING_CONNECTION);
-                        _connectionRetries++;
-                    }
+                    _pClient->connect(_pAdvertisedDevice);
                 } else {
                     delete _pAdvertisedDevice;
                     _pAdvertisedDevice = nullptr;
