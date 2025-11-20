@@ -10,7 +10,7 @@ class Packet {
 public:
     static const uint8_t PREFIX = 0xAA;
 
-    Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type = 0x01, uint8_t encrypted = 0x01, uint8_t version = 0x03, uint16_t seq = 0);
+    Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type = 0x01, uint8_t encrypted = 0x01, uint8_t version = 0x03, uint32_t seq = 0);
 
     static Packet* fromBytes(const uint8_t* data, size_t len);
     std::vector<uint8_t> toBytes() const;
@@ -20,8 +20,10 @@ public:
     uint8_t getSrc() const { return _src; }
     uint8_t getDest() const { return _dest; }
     uint8_t getCmdSet() const { return _cmdSet; }
-    uint16_t getSeq() const { return _seq; }
+    uint32_t getSeq() const { return _seq; }
     uint8_t getVersion() const { return _version; }
+
+    static void reset_sequence() { g_seq = 0; }
 
 
 private:
@@ -33,7 +35,8 @@ private:
     uint8_t _check_type;
     uint8_t _encrypted;
     uint8_t _version;
-    uint16_t _seq;
+    uint32_t _seq;
+    static uint32_t g_seq;
 };
 
 class EncPacket {
