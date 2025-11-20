@@ -92,15 +92,6 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
     _setState(ConnectionState::CONNECTED);
-    NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-    if (pSvc) {
-        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-        if (_pReadChr && _pReadChr->canNotify()) {
-            _pReadChr->subscribe(true, notifyCallback);
-        }
-    }
-    _startAuthentication();
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
@@ -116,10 +107,8 @@ void EcoflowESP32::update() {
                 _lastConnectionAttempt = millis();
                 if (_connectionRetries < 5) {
                     Serial.println("Connecting...");
-                    if (_pClient->connect(_pAdvertisedDevice)) {
-                        _setState(ConnectionState::ESTABLISHING_CONNECTION);
-                        _connectionRetries++;
-                    }
+                    _pClient->connect(_pAdvertisedDevice);
+                    _connectionRetries++;
                 } else {
                     delete _pAdvertisedDevice;
                     _pAdvertisedDevice = nullptr;
@@ -131,6 +120,19 @@ void EcoflowESP32::update() {
         _startScan();
     }
 
+    if (_state == ConnectionState::CONNECTED) {
+        NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+        if (pSvc) {
+            _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+            _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+            if (_pReadChr && _pReadChr->canNotify()) {
+                _pReadChr->subscribe(true, notifyCallback);
+            }
+            _startAuthentication();
+        } else {
+            _pClient->disconnect();
+        }
+    }
     if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
         if (millis() - _lastConnectionAttempt > 10000) {
             _pClient->disconnect();
