@@ -3,15 +3,24 @@ Read the BLE protocol handling files.
 
 i'm porting the development to ESP32 to bring a cloud indipendent local control solution that allow to toggle outputs (ac, dc) and monitor battery status locally without any cloud connection. 
 
-My current implementation is now able to connect but the connection gets killed right after connecting. We need to fix this, probably due to a wrong authentication. 
 Study deeply the implementation in python and find what are the differences and fix the bug.  
 
-Investigate closely on how the Python code handles the connection, use notifications  and complete the implementation.
+Investigate closely on how the Python code handles the connection, use notifications  and complete the implementation.(that is 100% working) 
 
-Read closely the python implementation (that is 100% working) 
+At this point in time code compiles but is not able to keep the connection, we need to start debugging it (refer to the pyhton implementation) to connect and keep a connection active, and read out battery percentage. we can focus on this at the beginning. 
 
-D NimBLEScan: discovery complete; reason=0
-Device found! Connecting…
+Since i did also implement a custom curve SECP160 under the mbedtls lib (because uECC lib creates linker errors) i'm not even sure about the crypto implementation of it. can you please double check read the logging along the way so that we can together debug this.
+
+As for folder structure, in the folder you'll find the Python Implementation (working) for the Ecoflow BLE (it's just a clone of the original repo), code is instead in the EcoflowESP32 folder. To compile use platformio (install via pip).
+
+Here the logs:
+
+ NimBLEScan: Updated advertiser: 7c:2c:67:44:a4:3e
+Found device
+D NimBLEScan: >> stop()
+D NimBLEScan: << stop()
+State changed: 1
+Connecting…
 D NimBLEClient: >> connect(7c:2c:67:44:a4:3e)
 D NimBLEClient: Got Client event 
 I NimBLEClient: Connected event
@@ -21,12 +30,19 @@ D NimBLEClient: MinInterval: 16, MaxInterval: 32, Latency: 0, Timeout: 400
 D NimBLEClientCallbacks: onConnParamsUpdateRequest: default
 D NimBLEClient: Accepted peer params
 D NimBLEClient: Got Client event 
-I NimBLEClient: mtu update event; conn_handle=1 mtu=247
+I NimBLEClient: mtu update event; conn_handle=1 mtu=255
 I NimBLEClient: Connection established
 D NimBLEClient: Got Client event 
-I NimBLEClient: mtu update event; conn_handle=1 mtu=247
+I NimBLEClient: mtu update event; conn_handle=1 mtu=255
 D NimBLEClient: >> deleteServices
+D NimBLERemoteService: >> deleteCharacteristics
+D NimBLERemoteCharacteristic: >> deleteDescriptors
+D NimBLERemoteCharacteristic: << deleteDescriptors
+D NimBLERemoteCharacteristic: >> deleteDescriptors
+D NimBLERemoteCharacteristic: << deleteDescriptors
+D NimBLERemoteService: << deleteCharacteristics
 D NimBLEClient: << deleteServices
+Connected to device
 D NimBLEClient: >> getService: uuid: 00000001-0000-1000-8000-00805f9b34fb
 D NimBLEClient: >> retrieveServices
 D NimBLEClient: Service Discovered >> status: 14 handle: -1
@@ -76,19 +92,15 @@ D NimBLERemoteCharacteristic: << Descriptor Discovered. status: 0
 D NimBLERemoteCharacteristic: << retrieveDescriptors(): Found 1 descriptors.
 D NimBLERemoteCharacteristic: << setNotify()
 D NimBLERemoteDescriptor: >> Descriptor writeValue: Descriptor: uuid: 0x2902, handle: 19
-I NimBLERemoteDescriptor: Write complete; status=0 conn_handle=1
-D NimBLERemoteDescriptor: << Descriptor writeValue, rc: 0
-D NimBLERemoteCharacteristic: >> writeValue(), length: 10
+Public Key: 04172730134ec3f4c85d9a38a3f69969358f303b2fe09124ad15150b88b2a790e4855aa7cadd2bab12
+D NimBLERemoteCharacteristic: >> writeValue(), length: 51
 I NimBLERemoteCharacteristic: Write complete; status=0 conn_handle=1
 D NimBLERemoteCharacteristic: << writeValue, rc: 0
 D NimBLEClient: << connect()
+State changed: 3
 D NimBLEClient: Got Client event 
 I NimBLEClient: disconnect; reason=531, 
-Scanning for Ecoflow device…
-D NimBLEScan: >> start: duration=5
-D NimBLEScan: << start()
-
-As for folder structure, in the folder you'll find the Python Implementation (working) for the Ecoflow BLE (it's just a clone of the original repo), code is instead in the EcoflowESP32 folder. To compile use platformio (install via pip).
+State changed: 24
 
 
 As for folder structure, in the folder you'll find the Python Implementation (working) for the Ecoflow BLE, code is instead in the EcoflowESP32 folder. To compile use python3.10 and call platformio from it. do not use the system wide python since the version is uncompatible.
