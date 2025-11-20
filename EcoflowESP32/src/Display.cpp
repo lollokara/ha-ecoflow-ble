@@ -1,5 +1,6 @@
 #include "Display.h"
 #include "Font.h"
+#include <math.h>
 
 #define DATAPIN    8
 #define CLOCKPIN   18
@@ -23,7 +24,9 @@ enum class SelectionPage {
     AC,
     DC,
     USB,
-    SOL
+    SOL,
+    IN,
+    SET
 };
 
 MenuState currentState = MenuState::MAIN_MENU;
@@ -41,21 +44,23 @@ int animationStep = 0;
 SelectionPage prevSelection = SelectionPage::AC;
 int slideDirection = 0; // 1 = Up, -1 = Down
 
+// Pending Action for Timeout
+DisplayAction pendingAction = DisplayAction::NONE;
+
 // --- Colors ---
-const uint32_t COLOR_RED    = 0xFF0000; // G R B order? DotStar is usually BGR or GBR.
-// Adafruit DotStar constructor is DOTSTAR_BGR.
-// Color() takes (R, G, B).
-// Let's use strip.Color(R, G, B)
 uint32_t cRed;
 uint32_t cYellow;
 uint32_t cGreen;
 uint32_t cWhite;
 uint32_t cOff;
+uint32_t cBlue;
 
 // --- Frame Buffer ---
-// We draw to this buffer, then push to strip.
 // 9 rows, 20 cols.
 uint32_t frameBuffer[9][20];
+
+// --- Settings State ---
+int tempAcLimit = 400;
 
 // Forward Declarations
 void drawMainMenu();
@@ -64,6 +69,7 @@ void drawDetailMenu();
 void drawText(int x, int y, String text, uint32_t color);
 void renderFrame();
 void clearFrame();
+int getTextWidth(String text);
 
 // --- Helper: Map (x,y) to strip index ---
 uint16_t getPixelIndex(int x, int y) {
@@ -96,6 +102,7 @@ void setupDisplay() {
     cGreen = strip.Color(0, 255, 0);
     cWhite = strip.Color(255, 255, 255);
     cOff = strip.Color(0, 0, 0);
+    cBlue = strip.Color(0, 0, 255);
 
     lastInteractionTime = millis();
 }
@@ -135,7 +142,11 @@ int drawChar(int x, int y, char c, uint32_t color) {
 void drawText(int x, int y, String text, uint32_t color) {
     int curX = x;
     for (int i = 0; i < text.length(); i++) {
-        curX += drawChar(curX, y, text[i], color);
+        if (curX >= NUM_COLS) break;
+        if (curX + 6 >= 0) {
+            drawChar(curX, y, text[i], color);
+        }
+        curX += 6;
     }
 }
 
@@ -152,8 +163,16 @@ void updateDisplay(const EcoflowData& data) {
     // Check Timeouts
     unsigned long now = millis();
     if (currentState == MenuState::DETAIL) {
-        if (now - lastInteractionTime > 60000) { // 60s
-            currentState = MenuState::MAIN_MENU;
+        if (currentSelection == SelectionPage::SET) {
+             if (now - lastInteractionTime > 60000) { // 60s
+                // Timeout confirms SET
+                pendingAction = DisplayAction::SET_AC_LIMIT;
+                currentState = MenuState::MAIN_MENU;
+            }
+        } else {
+            if (now - lastInteractionTime > 60000) { // 60s
+                currentState = MenuState::MAIN_MENU;
+            }
         }
     } else if (currentState == MenuState::SELECTION) {
         if (now - lastInteractionTime > 10000) { // 10s
@@ -166,8 +185,11 @@ void updateDisplay(const EcoflowData& data) {
     if (currentState == MenuState::MAIN_MENU) {
         drawMainMenu();
     } else if (currentState == MenuState::SELECTION) {
+        // Reset brightness in case we came from breathing
+        strip.setBrightness(25);
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
+        strip.setBrightness(25);
         drawDetailMenu();
     }
 
@@ -179,48 +201,59 @@ void updateDisplay(const EcoflowData& data) {
 void drawMainMenu() {
     int battery = currentData.batteryLevel;
     uint32_t color = cGreen;
-    if (battery < 20) color = cRed;
-    else if (battery < 60) color = cYellow;
 
-    // Cap at 99 if needed to avoid scroll, per user request
-    // If it's 100, let's just show 99 to keep it static as requested:
-    // "no scrolling is better you can even cap it to 99 if needed"
+    // Check Charging
+    bool isCharging = (currentData.inputPower > 0);
+
+    if (isCharging) {
+        color = cGreen;
+
+        // Breathing Animation: 3% (7) to 20% (51)
+        // Period approx 4s?
+        // sin^2 gives smooth 0..1
+        float t = (float)millis() / 2000.0f; // Slow down
+        float val = (sin(t) + 1.0f) / 2.0f; // 0.0 to 1.0
+
+        int minB = 7;
+        int maxB = 51;
+        int brightness = minB + (int)(val * (maxB - minB));
+        strip.setBrightness(brightness);
+
+    } else {
+        strip.setBrightness(25); // Default static
+        if (battery < 20) color = cRed;
+        else if (battery < 60) color = cYellow;
+        else color = cGreen;
+    }
+
     int displayVal = battery;
     if (displayVal > 99) displayVal = 99;
 
     String text = String(displayVal) + "%";
-    // 5x7 font. Height 7.
-    // Display height 9. Center vertically: 1px margin top/bottom. Y=1.
-
-    // Calculate X to center it
-    int width = getTextWidth(text) - 1; // Remove last spacing
+    int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
 
     drawText(x, 1, text, color);
 }
 
+String getSelectionText(SelectionPage page) {
+    switch(page) {
+        case SelectionPage::AC: return "AC";
+        case SelectionPage::DC: return "DC";
+        case SelectionPage::USB: return "USB";
+        case SelectionPage::SOL: return "SOL";
+        case SelectionPage::IN: return "IN";
+        case SelectionPage::SET: return "SET";
+        default: return "?";
+    }
+}
+
 void drawSelectionMenu() {
-    // Selection: AC, DC, USB, SOL
-    // We need animation.
-
     if (isAnimating) {
-        // Animation logic
-        // We are sliding between prevSelection and currentSelection
-        // Direction: 1 = Up (Next Page comes from bottom), -1 = Down (Next Page comes from top)
-        // Wait, logic:
-        // Press Down (Next): Current text goes Up, New text comes from Bottom.
-        // Press Up (Prev): Current text goes Down, New text comes from Top.
-
-        int step = animationStep; // 0 to 9 (Height)
+        int step = animationStep;
 
         // Draw OLD selection
-        String oldText = "";
-        switch(prevSelection) {
-            case SelectionPage::AC: oldText = "AC"; break;
-            case SelectionPage::DC: oldText = "DC"; break;
-            case SelectionPage::USB: oldText = "USB"; break;
-            case SelectionPage::SOL: oldText = "SOL"; break;
-        }
+        String oldText = getSelectionText(prevSelection);
         int oldWidth = getTextWidth(oldText) - 1;
         int oldX = (NUM_COLS - oldWidth) / 2;
 
@@ -233,16 +266,10 @@ void drawSelectionMenu() {
         drawText(oldX, oldY, oldText, cWhite);
 
         // Draw NEW selection
-        String newText = "";
-        switch(currentSelection) {
-            case SelectionPage::AC: newText = "AC"; break;
-            case SelectionPage::DC: newText = "DC"; break;
-            case SelectionPage::USB: newText = "USB"; break;
-            case SelectionPage::SOL: newText = "SOL"; break;
-        }
+        String newText = getSelectionText(currentSelection);
         int newWidth = getTextWidth(newText) - 1;
         int newX = (NUM_COLS - newWidth) / 2;
-        
+
         int newY = 1;
         if (slideDirection == 1) { // Next (New comes from Bottom)
             newY = 1 + (9 - step);
@@ -251,19 +278,12 @@ void drawSelectionMenu() {
         }
         drawText(newX, newY, newText, cWhite);
 
-        animationStep+=2; // Speed
+        animationStep+=2;
         if (animationStep > 9) {
             isAnimating = false;
         }
     } else {
-        // Static draw
-        String text = "";
-        switch(currentSelection) {
-            case SelectionPage::AC: text = "AC"; break;
-            case SelectionPage::DC: text = "DC"; break;
-            case SelectionPage::USB: text = "USB"; break;
-            case SelectionPage::SOL: text = "SOL"; break;
-        }
+        String text = getSelectionText(currentSelection);
         int width = getTextWidth(text) - 1;
         int x = (NUM_COLS - width) / 2;
         drawText(x, 1, text, cWhite);
@@ -271,71 +291,65 @@ void drawSelectionMenu() {
 }
 
 void drawDetailMenu() {
-    // Shows Value or OFF
     String text = "";
     uint32_t color = cWhite;
 
-    switch(currentSelection) {
-        case SelectionPage::AC:
-            if (currentData.acOn) {
-                text = String(currentData.acOutputPower) + "W";
-                color = cGreen;
-            } else {
-                text = "OFF";
-                color = cRed;
-            }
-            break;
-        case SelectionPage::DC:
-            if (currentData.dcOn) {
-                text = String(currentData.dcOutputPower) + "W";
-                color = cGreen;
-            } else {
-                text = "OFF";
-                color = cRed;
-            }
-            break;
-        case SelectionPage::USB:
-            if (currentData.usbOn) {
-                // USB doesn't usually report power accurately or at all in some models,
-                // but let's assume it does or just show status
-                // "ON" or "OFF"? User said "current power output should be shown".
-                // EcoflowData has outputPower, but that's total.
-                // Usually USB power isn't broken out separately in PD335, but let's see.
-                // The user request says "if on the current power output should be shown".
-                // If we don't have specific USB power, we might just show "ON".
-                // But let's assume 0W if on. Or "ON".
-                // "OFF" is 17px. "ON" is 11px.
-                // Let's stick to "OFF" if off.
+    if (currentSelection == SelectionPage::SET) {
+        int displayNum = tempAcLimit / 10;
+        text = String(displayNum);
+        color = cBlue;
+    } else {
+        switch(currentSelection) {
+            case SelectionPage::AC:
+                if (currentData.acOn) {
+                    text = String(currentData.acOutputPower) + "W";
+                    color = cGreen;
+                } else {
+                    text = "OFF";
+                    color = cRed;
+                }
+                break;
+            case SelectionPage::DC:
+                if (currentData.dcOn) {
+                    text = String(currentData.dcOutputPower) + "W";
+                    color = cGreen;
+                } else {
+                    text = "OFF";
+                    color = cRed;
+                }
+                break;
+            case SelectionPage::USB:
                 if (currentData.usbOn) {
-                   // For now, just show "ON" if we don't have specific USB power,
-                   // or maybe 0W? The protocol usually provides DC output which combines 12V and USB often.
-                   // Let's try to show "ON" for USB to be safe, or maybe DC output if it's the only thing.
-                   // Actually, `dcOutputPower` is `pow_get_12v`. USB is separate?
-                   // Usually they are grouped. Let's just show "ON" for USB for now unless we have data.
                    text = "ON";
                    color = cGreen;
                 } else {
                     text = "OFF";
                     color = cRed;
                 }
-            }
-            break;
-        case SelectionPage::SOL:
-            // Solar Input Power
-            text = String(currentData.solarInputPower) + "W";
-            color = cYellow; // Solar is input
-            break;
+                break;
+            case SelectionPage::SOL:
+                text = String(currentData.solarInputPower) + "W";
+                color = cYellow;
+                break;
+            case SelectionPage::IN:
+                text = String(currentData.inputPower) + "W";
+                color = cYellow; // Input is typically yellow in this scheme? Or Green?
+                // Solar was Yellow. Let's keep Input as Yellow or Green?
+                // User asked for Battery Green when charging.
+                // Let's use Yellow for consistency with Solar Input.
+                break;
+            default: break;
+        }
     }
 
     int width = getTextWidth(text) - 1;
 
     // Scrolling Logic
     if (width > NUM_COLS) {
-        // Need Scroll
-        if (millis() - lastScrollTime > 150) { // Scroll speed
+        if (millis() - lastScrollTime > 150) {
             scrollOffset++;
-            if (scrollOffset > (width - NUM_COLS + 5)) { // +5 for pause at end
-                scrollOffset = -5; // Pause at start
+            if (scrollOffset > (width - NUM_COLS + 5)) {
+                scrollOffset = -5;
             }
             lastScrollTime = millis();
         }
@@ -347,14 +361,12 @@ void drawDetailMenu() {
         drawText(-effectiveOffset, 1, text, color);
 
     } else {
-        // Center
         int x = (NUM_COLS - width) / 2;
         drawText(x, 1, text, color);
         scrollOffset = 0;
     }
 }
 
-// --- Render to Strip ---
 void renderFrame() {
     strip.clear();
     for(int y=0; y<NUM_ROWS; y++) {
@@ -373,24 +385,22 @@ void renderFrame() {
 DisplayAction handleDisplayInput(ButtonInput input) {
     lastInteractionTime = millis();
 
-    // Main Menu -> Any Button -> Selection Menu
     if (currentState == MenuState::MAIN_MENU) {
         currentState = MenuState::SELECTION;
-        currentSelection = SelectionPage::AC; // Default to AC? Or remember last?
-        // Let's Default to AC to be consistent.
+        currentSelection = SelectionPage::AC;
+        strip.setBrightness(25); // Reset brightness immediately on exit
         return DisplayAction::NONE;
     }
 
     if (currentState == MenuState::SELECTION) {
-        if (isAnimating) return DisplayAction::NONE; // Ignore while animating
+        if (isAnimating) return DisplayAction::NONE;
 
         switch(input) {
             case ButtonInput::BTN_UP: // Previous Page
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::SOL;
+                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::SET;
                 else currentSelection = (SelectionPage)((int)currentSelection - 1);
 
-                // Animation: Slide Down (Text moves Down, New comes from Top)
                 slideDirection = -1;
                 isAnimating = true;
                 animationStep = 0;
@@ -398,10 +408,9 @@ DisplayAction handleDisplayInput(ButtonInput input) {
 
             case ButtonInput::BTN_DOWN: // Next Page
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::SOL) currentSelection = SelectionPage::AC;
+                if (currentSelection == SelectionPage::SET) currentSelection = SelectionPage::AC;
                 else currentSelection = (SelectionPage)((int)currentSelection + 1);
 
-                // Animation: Slide Up (Text moves Up, New comes from Bottom)
                 slideDirection = 1;
                 isAnimating = true;
                 animationStep = 0;
@@ -409,35 +418,65 @@ DisplayAction handleDisplayInput(ButtonInput input) {
 
             case ButtonInput::BTN_ENTER_SHORT:
                 currentState = MenuState::DETAIL;
-                scrollOffset = -5; // Reset scroll
+                scrollOffset = -5;
                 break;
 
-            default:
-                break;
+            default: break;
         }
         return DisplayAction::NONE;
     }
 
     if (currentState == MenuState::DETAIL) {
-        switch(input) {
-            case ButtonInput::BTN_ENTER_LONG:
-                // Toggle Action!
-                switch(currentSelection) {
-                    case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
-                    case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
-                    case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
-                    default: return DisplayAction::NONE;
-                }
-                break;
+        if (currentSelection == SelectionPage::SET) {
+             // SET Menu Logic
+             switch(input) {
+                case ButtonInput::BTN_UP:
+                    tempAcLimit += 100;
+                    if (tempAcLimit > 1500) tempAcLimit = 1500;
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    tempAcLimit -= 100;
+                    if (tempAcLimit < 400) tempAcLimit = 400;
+                    break;
+                case ButtonInput::BTN_ENTER_LONG:
+                    currentState = MenuState::MAIN_MENU;
+                    return DisplayAction::SET_AC_LIMIT;
 
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-            case ButtonInput::BTN_ENTER_SHORT:
-                // Reset timeout is handled by lastInteractionTime update
-                break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    break;
+             }
+             return DisplayAction::NONE;
+
+        } else {
+            // Normal Toggle Logic
+            switch(input) {
+                case ButtonInput::BTN_ENTER_LONG:
+                    switch(currentSelection) {
+                        case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
+                        case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
+                        case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
+                        default: return DisplayAction::NONE;
+                    }
+                    break;
+
+                case ButtonInput::BTN_UP:
+                case ButtonInput::BTN_DOWN:
+                case ButtonInput::BTN_ENTER_SHORT:
+                    break;
+            }
         }
         return DisplayAction::NONE;
     }
 
     return DisplayAction::NONE;
+}
+
+DisplayAction getPendingAction() {
+    DisplayAction act = pendingAction;
+    pendingAction = DisplayAction::NONE;
+    return act;
+}
+
+int getSetAcLimit() {
+    return tempAcLimit;
 }

@@ -77,7 +77,7 @@ Button btnEnter(BTN_ENTER_PIN);
 
 void setup() {
     Serial.begin(115200);
-    // while (!Serial) { ; } // Don't block if no serial connected
+    // while (!Serial) { ; }
     Serial.println("Starting Ecoflow Controller...");
 
     // Initialize Display
@@ -89,6 +89,37 @@ void setup() {
     pinMode(BTN_ENTER_PIN, INPUT_PULLUP);
 
     ecoflow.begin(ECOFLOW_USER_ID, ECOFLOW_DEVICE_SN, ble_address);
+}
+
+void handleAction(DisplayAction action) {
+    if (action != DisplayAction::NONE) {
+        if (ecoflow.isAuthenticated()) {
+            switch(action) {
+                case DisplayAction::TOGGLE_AC:
+                    ESP_LOGI("main", "Toggling AC");
+                    ecoflow.setAC(!ecoflow.isAcOn());
+                    break;
+                case DisplayAction::TOGGLE_DC:
+                    ESP_LOGI("main", "Toggling DC");
+                    ecoflow.setDC(!ecoflow.isDcOn());
+                    break;
+                case DisplayAction::TOGGLE_USB:
+                    ESP_LOGI("main", "Toggling USB");
+                    ecoflow.setUSB(!ecoflow.isUsbOn());
+                    break;
+                case DisplayAction::SET_AC_LIMIT:
+                    {
+                        int limit = getSetAcLimit();
+                        ESP_LOGI("main", "Setting AC Charging Limit to %dW", limit);
+                        ecoflow.setAcChargingLimit(limit);
+                    }
+                    break;
+                default: break;
+            }
+        } else {
+            ESP_LOGI("main", "Action Ignored: Not Authenticated");
+        }
+    }
 }
 
 void loop() {
@@ -110,34 +141,14 @@ void loop() {
     if (enterEvent == 1) action = handleDisplayInput(ButtonInput::BTN_ENTER_SHORT);
     if (enterEvent == 2) action = handleDisplayInput(ButtonInput::BTN_ENTER_LONG);
 
-    // 3. Process Action
-    if (action != DisplayAction::NONE) {
-        if (ecoflow.isAuthenticated()) {
-            switch(action) {
-                case DisplayAction::TOGGLE_AC:
-                    ESP_LOGI("main", "Toggling AC");
-                    ecoflow.setAC(!ecoflow.isAcOn());
-                    break;
-                case DisplayAction::TOGGLE_DC:
-                    ESP_LOGI("main", "Toggling DC");
-                    ecoflow.setDC(!ecoflow.isDcOn());
-                    break;
-                case DisplayAction::TOGGLE_USB:
-                    ESP_LOGI("main", "Toggling USB");
-                    ecoflow.setUSB(!ecoflow.isUsbOn());
-                    break;
-                default: break;
-            }
-            // Force a quicker refresh or wait for notify?
-            // Usually wait for notify, but maybe we update display optimistically?
-            // For now, let the data update naturally.
-        } else {
-            ESP_LOGI("main", "Action Ignored: Not Authenticated");
-        }
-    }
+    // 3. Process User Action
+    handleAction(action);
 
-    // 4. Refresh Data (Periodic)
-    // User requested every 2s
+    // 4. Process Pending Action (from Timeout)
+    DisplayAction pending = getPendingAction();
+    handleAction(pending);
+
+    // 5. Refresh Data (Periodic)
     if (millis() - last_data_refresh > 2000) {
         last_data_refresh = millis();
         if (ecoflow.isAuthenticated()) {
@@ -145,7 +156,7 @@ void loop() {
         }
     }
 
-    // 5. Update Display (Animation Framerate ~30-50fps => 20-33ms)
+    // 6. Update Display (Animation Framerate ~30-50fps => 20-33ms)
     if (millis() - last_display_update > 20) {
         last_display_update = millis();
 
@@ -156,7 +167,6 @@ void loop() {
         data.solarInputPower = ecoflow.getSolarInputPower();
         data.acOutputPower = ecoflow.getAcOutputPower();
         data.dcOutputPower = ecoflow.getDcOutputPower();
-        // Update Toggle States
         data.acOn = ecoflow.isAcOn();
         data.dcOn = ecoflow.isDcOn();
         data.usbOn = ecoflow.isUsbOn();

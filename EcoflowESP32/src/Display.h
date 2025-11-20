@@ -9,7 +9,8 @@ enum class DisplayAction {
     NONE,
     TOGGLE_AC,
     TOGGLE_DC,
-    TOGGLE_USB
+    TOGGLE_USB,
+    SET_AC_LIMIT
 };
 
 enum class ButtonInput {
@@ -22,5 +23,9 @@ enum class ButtonInput {
 void setupDisplay();
 void updateDisplay(const EcoflowData& data);
 DisplayAction handleDisplayInput(ButtonInput input);
+DisplayAction getPendingAction();
+
+// Accessor for the new set value
+int getSetAcLimit();
 
 #endif
