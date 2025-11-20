@@ -43,43 +43,87 @@ Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const s
     }
 }
 
+// CRC8 implementation for packet header validation
+static uint8_t crc8(const uint8_t* data, size_t len) {
+    uint8_t crc = 0;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int j = 0; j < 8; j++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x07;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
 Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
-    if (len < 13 || data[0] != PREFIX) { // 13 bytes is the minimum length for a packet with an empty payload
-        return nullptr;
-    }
-    uint16_t payload_len = data[4] | (data[5] << 8);
-    if (len < 13 + payload_len) {
+    if (len < 20 || data[0] != PREFIX) {
         return nullptr;
     }
 
-    size_t crc_offset = 11 + payload_len;
-    uint16_t crc_from_packet = data[crc_offset] | (data[crc_offset + 1] << 8);
-    if (crc_from_packet != crc16(data, crc_offset)) {
+    uint8_t version = data[1];
+    uint16_t payload_len = data[2] | (data[3] << 8);
+
+    if (version == 3) {
+        if (crc16(data, len - 2) != (data[len - 2] | (data[len - 1] << 8))) {
+            ESP_LOGE(TAG, "Packet CRC16 mismatch");
+            return nullptr;
+        }
+    }
+
+    if (crc8(data, 4) != data[4]) {
+        ESP_LOGE(TAG, "Packet header CRC8 mismatch");
         return nullptr;
     }
 
-    std::vector<uint8_t> payload(data + 11, data + 11 + payload_len);
-    uint16_t seq = data[9] | (data[10] << 8);
-    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, seq);
+    uint16_t seq = data[6] | (data[7] << 8);
+    uint8_t src = data[12];
+    uint8_t dest = data[13];
+    uint8_t dsrc = data[14];
+    uint8_t ddest = data[15];
+    uint8_t cmd_set = data[16];
+    uint8_t cmd_id = data[17];
+
+    std::vector<uint8_t> payload;
+    if (payload_len > 0) {
+        payload.assign(data + 18, data + 18 + payload_len);
+    }
+
+    return new Packet(src, dest, cmd_set, cmd_id, payload, dsrc, ddest, version, seq);
 }
 
 std::vector<uint8_t> Packet::toBytes() const {
     std::vector<uint8_t> bytes;
     bytes.push_back(PREFIX);
-    bytes.push_back(_src);
-    bytes.push_back(_dest);
-    bytes.push_back((_version << 4) | _check_type);
+    bytes.push_back(_version);
     bytes.push_back(_payload.size() & 0xFF);
     bytes.push_back((_payload.size() >> 8) & 0xFF);
-    bytes.push_back(_encrypted);
-    bytes.push_back(_cmdSet);
-    bytes.push_back(_cmdId);
+    bytes.push_back(crc8(bytes.data(), bytes.size()));
+
+    // product_id, assuming 0x0d as per python
+    bytes.push_back(0x0d);
     bytes.push_back(_seq & 0xFF);
     bytes.push_back((_seq >> 8) & 0xFF);
+    bytes.push_back(0); // seq upper bytes, assuming 0
+    bytes.push_back(0);
+
+    bytes.push_back(0); // static zeroes
+    bytes.push_back(0);
+    bytes.push_back(_src);
+    bytes.push_back(_dest);
+    bytes.push_back(_check_type); // dsrc
+    bytes.push_back(_encrypted); // ddest
+    bytes.push_back(_cmdSet);
+    bytes.push_back(_cmdId);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);
+
+    print_hex_protocol(bytes.data(), bytes.size(), "Serialized Packet");
     return bytes;
 }
 
@@ -99,24 +143,27 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
         }
         encrypted_payload.resize(padded_payload.size());
         crypto->encrypt_session(padded_payload.data(), padded_payload.size(), encrypted_payload.data());
+        print_hex_protocol(encrypted_payload.data(), encrypted_payload.size(), "Encrypted Payload");
     }
 
-    std::vector<uint8_t> header;
-    header.push_back(PREFIX & 0xFF);
-    header.push_back((PREFIX >> 8) & 0xFF);
-    header.push_back((_payload_type << 4) | _frame_type);
-    header.push_back((_is_ack << 7) | (_needs_ack << 6));
+    std::vector<uint8_t> packet_data;
+    packet_data.push_back(PREFIX & 0xFF);
+    packet_data.push_back((PREFIX >> 8) & 0xFF);
+    packet_data.push_back((_payload_type << 4) | _frame_type);
+    packet_data.push_back((_is_ack << 7) | (_needs_ack << 6));
     uint16_t len = encrypted_payload.size() + 2; // payload + 2 bytes for CRC
-    header.push_back(len & 0xFF);
-    header.push_back((len >> 8) & 0xFF);
+    packet_data.push_back(len & 0xFF);
+    packet_data.push_back((len >> 8) & 0xFF);
 
-    std::vector<uint8_t> packet_data = header;
+    print_hex_protocol(packet_data.data(), packet_data.size(), "Packet Header");
+
     packet_data.insert(packet_data.end(), encrypted_payload.begin(), encrypted_payload.end());
 
     uint16_t crc = crc16(packet_data.data(), packet_data.size());
     packet_data.push_back(crc & 0xFF);
     packet_data.push_back((crc >> 8) & 0xFF);
 
+    print_hex_protocol(packet_data.data(), packet_data.size(), "Full EncPacket");
     return packet_data;
 }
 

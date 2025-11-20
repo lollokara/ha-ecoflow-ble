@@ -8,7 +8,8 @@
 
 static const char* TAG = "EcoflowCrypto";
 
-void print_hex(const uint8_t* data, size_t size, const char* label) {
+// Helper to print byte arrays for debugging
+static void print_hex_crypto(const uint8_t* data, size_t size, const char* label) {
     if (size == 0) return;
     char hex_str[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
@@ -75,7 +76,7 @@ bool EcoflowCrypto::generate_keys() {
 
     if (pub_len == 41) {
         memcpy(public_key, temp_pub_key + 1, 40);
-        print_hex(public_key, sizeof(public_key), "Public Key");
+        print_hex_crypto(public_key, sizeof(public_key), "Public Key");
         return true;
     }
 
@@ -114,8 +115,9 @@ bool EcoflowCrypto::compute_shared_secret(const uint8_t* peer_pub_key, size_t pe
     // The final AES key is the first 16 bytes of the shared secret.
     memcpy(shared_secret, full_shared_secret, 16);
 
-    print_hex(shared_secret, 16, "Shared Secret (AES Key)");
-    print_hex(iv, 16, "IV");
+    print_hex_crypto(full_shared_secret, 20, "Full Shared Secret");
+    print_hex_crypto(shared_secret, 16, "Shared Secret (AES Key)");
+    print_hex_crypto(iv, 16, "IV");
 
     mbedtls_ecp_point_free(&peer_Q);
     mbedtls_ecp_point_free(&shared_P);
@@ -139,7 +141,7 @@ void EcoflowCrypto::generate_session_key(const uint8_t* seed, const uint8_t* sra
     memcpy(data + 24, &data_num[3], 8);
 
     mbedtls_md5(data, sizeof(data), session_key);
-    print_hex(session_key, 16, "Session Key");
+    print_hex_crypto(session_key, 16, "Session Key");
 }
 
 void EcoflowCrypto::encrypt_session(const uint8_t* input, size_t input_len, uint8_t* output) {

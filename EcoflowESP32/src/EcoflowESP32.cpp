@@ -6,9 +6,23 @@
 
 static const char* TAG = "EcoflowESP32";
 
+// Helper to print byte arrays for debugging
+static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
+    if (size == 0) return;
+    char hex_str[size * 3 + 1];
+    for (size_t i = 0; i < size; i++) {
+        sprintf(hex_str + i * 3, "%02x ", data[i]);
+    }
+    hex_str[size * 3] = '\0';
+    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+}
+
+
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+    ESP_LOGD(TAG, "Notify callback received %d bytes", length);
+    print_hex_esp(pData, length, "Notify Data");
     if (_instance) {
         if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
             std::vector<uint8_t> data(pData, pData + length);
@@ -95,9 +109,13 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
         _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
         _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
         if (_pReadChr && _pReadChr->canNotify()) {
-            _pReadChr->subscribe(true, notifyCallback);
-            delay(100); // Wait for the subscription to be processed
-            _startAuthentication();
+            if(_pReadChr->subscribe(true, notifyCallback)) {
+                ESP_LOGI(TAG, "Subscribed to notifications");
+                delay(100); // Wait for the subscription to be processed
+            } else {
+                ESP_LOGE(TAG, "Failed to subscribe to notifications");
+                pClient->disconnect();
+            }
         }
     } else {
         ESP_LOGE("EcoflowESP32", "onConnect: Service not found, disconnecting");
@@ -138,7 +156,10 @@ void EcoflowESP32::update() {
         _startScan();
     }
 
-    if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+    if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
+        _startAuthentication();
+    }
+    else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
         if (millis() - _lastConnectionAttempt > 10000) {
             _pClient->disconnect();
         }
@@ -151,9 +172,10 @@ void EcoflowESP32::update() {
 }
 
 void EcoflowESP32::_startAuthentication() {
+    ESP_LOGI(TAG, "Starting authentication");
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
     if (!_crypto.generate_keys()) {
-        ESP_LOGE("EcoflowESP32", "Failed to generate keys");
+        ESP_LOGE(TAG, "Failed to generate keys");
         return;
     }
 
@@ -163,25 +185,29 @@ void EcoflowESP32::_startAuthentication() {
     uint8_t* pub_key = _crypto.get_public_key();
     payload.insert(payload.end(), pub_key, pub_key + _crypto.get_public_key_len());
 
+    print_hex_esp(payload.data(), payload.size(), "Public Key Payload");
+
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
 }
 
 void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
     ESP_LOGD(TAG, "_handleSimpleAuthResponse: Handling simple auth response");
+    print_hex_esp(data.data(), data.size(), "Raw Simple Auth Response");
     auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
     if (parsed_payload.empty()) {
         ESP_LOGE(TAG, "Failed to parse simple auth response");
         return;
     }
+    print_hex_esp(parsed_payload.data(), parsed_payload.size(), "Parsed Simple Auth Response");
 
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
         ESP_LOGD(TAG, "Handling public key response");
-        if (parsed_payload.size() >= 42 && parsed_payload[0] == 0x01) {
+        if (parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) { // 1 (status) + 1 (type) + 1 (size) + 40 (key)
             uint8_t peer_pub_key[41];
             peer_pub_key[0] = 0x04;
-            memcpy(peer_pub_key + 1, parsed_payload.data() + 2, 40);
-            print_hex(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
+            memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
+            print_hex_esp(peer_pub_key, sizeof(peer_pub_key), "Peer Public Key");
 
             if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
                 _state = ConnectionState::REQUESTING_SESSION_KEY;
@@ -192,6 +218,8 @@ void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
             } else {
                 ESP_LOGE(TAG, "Failed to compute shared secret");
             }
+        } else {
+            ESP_LOGE(TAG, "Invalid public key response");
         }
     } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
         ESP_LOGD(TAG, "Handling session key response");
@@ -199,17 +227,20 @@ void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
             std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
             _crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
 
-            uint8_t padding = decrypted_payload.back();
-            if (padding > 0 && padding <= 16) {
-                decrypted_payload.resize(decrypted_payload.size() - padding);
+            // Remove PKCS7 padding
+            if (!decrypted_payload.empty()) {
+                uint8_t padding = decrypted_payload.back();
+                if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                    decrypted_payload.resize(decrypted_payload.size() - padding);
+                }
             }
-            print_hex(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Session Key Info");
+            print_hex_esp(decrypted_payload.data(), decrypted_payload.size(), "Decrypted Session Key Info");
 
             if (decrypted_payload.size() >= 18) {
                 _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
                 _state = ConnectionState::REQUESTING_AUTH_STATUS;
                 ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
+                Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03);
                 EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
                 _sendCommand(enc_auth_status.toBytes(&_crypto));
             } else {
@@ -253,7 +284,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -270,7 +301,8 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
 bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     if (_pWriteChr && isConnected()) {
-        _pWriteChr->writeValue(command.data(), command.size(), true);
+        print_hex_esp(command.data(), command.size(), "Sending command");
+        _pWriteChr->writeValue(command.data(), command.size(), false); // Write without response
         return true;
     }
     return false;
@@ -291,7 +323,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x21, 0x35, 0x35, 0x01, {});
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }
