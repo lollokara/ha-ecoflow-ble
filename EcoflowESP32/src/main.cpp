@@ -4,6 +4,9 @@
 
 EcoflowESP32 ecoflow;
 
+// Replace with your device's BLE address
+const std::string ble_address = "F8:3C:73:XX:XX:XX";
+
 void setup() {
     Serial.begin(115200);
     while (!Serial) {
@@ -11,17 +14,10 @@ void setup() {
     }
     Serial.println("Starting...");
 
-    ecoflow.begin();
-    ecoflow.setCredentials(ECOFLOW_USER_ID, ECOFLOW_DEVICE_SN);
+    ecoflow.begin(ECOFLOW_USER_ID, ECOFLOW_DEVICE_SN, ble_address);
 }
 
 void loop() {
-    if (!ecoflow.isConnected()) {
-        Serial.println("Scanning for Ecoflow device...");
-        if (ecoflow.scan(5)) {
-            Serial.println("Device found! Connecting...");
-            ecoflow.connectToServer();
-        }
-    }
-    delay(1000);
+    ecoflow.update();
+    delay(100);
 }

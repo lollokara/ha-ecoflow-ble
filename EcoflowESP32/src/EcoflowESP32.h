@@ -3,6 +3,7 @@
 
 #include <NimBLEDevice.h>
 #include "EcoflowData.h"
+#include "EcoflowCrypto.h"
 #include <vector>
 #include <string>
 
@@ -14,7 +15,6 @@ enum class ConnectionState {
     CONNECTING,
     CONNECTED,
     PUBLIC_KEY_EXCHANGE,
-    PUBLIC_KEY_SENT,
     SESSION_KEY_REQUESTED,
     AUTH_STATUS_REQUESTED,
     AUTHENTICATING,
@@ -22,23 +22,21 @@ enum class ConnectionState {
     DISCONNECTED
 };
 
-class MyClientCallback : public NimBLEClientCallbacks {
+class EcoflowClientCallback : public NimBLEClientCallbacks {
 public:
+    EcoflowClientCallback(class EcoflowESP32* instance);
     void onConnect(NimBLEClient* pClient) override;
     void onDisconnect(NimBLEClient* pClient) override;
+private:
+    class EcoflowESP32* _instance;
 };
 
 class EcoflowESP32 {
 public:
-    static MyClientCallback g_clientCallback;
     EcoflowESP32();
     ~EcoflowESP32();
 
-    bool begin();
-    void setCredentials(const std::string& userId, const std::string& deviceSn);
-    bool scan(uint32_t scanTime);
-    bool connectToServer();
-    void disconnect();
+    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address);
     void update();
 
     int getBatteryLevel();
@@ -52,7 +50,6 @@ public:
     bool isUsbOn();
 
     bool isConnected();
-    bool isConnecting();
     bool isAuthenticated();
 
     bool requestData();
@@ -62,55 +59,35 @@ public:
 
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
-    void onNotify(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 
-    static EcoflowESP32* getInstance() { return _instance; }
-
-    bool _running = false;
-    bool _sessionKeyEstablished = false;
+    TaskHandle_t _keepAliveTaskHandle = nullptr;
     uint32_t _lastCommandTime = 0;
+    bool _running = false;
 
 private:
-    void _setState(ConnectionState newState);
-    bool _resolveCharacteristics();
-    void _startKeepAliveTask();
-    void _stopKeepAliveTask();
-    bool _sendCommand(const std::vector<uint8_t>& packet);
+    static void keepAliveTask(void* param);
+    static void notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
+    void _handlePacket(Packet* pkt);
+
+    bool _sendCommand(const std::vector<uint8_t>& command);
     
     // Authentication flow
-    bool _startAuthentication();
-    void _sendPublicKey();
-    void _requestSessionKey();
-    void _requestAuthStatus();
-    void _sendAuthCredentials();
-
-    // Packet handlers
-    void _handlePacket(Packet* pkt);
-    void _handlePublicKeyExchange(const std::vector<uint8_t>& payload);
-    void _handleSessionKeyResponse(const std::vector<uint8_t>& payload);
-    void _handleAuthStatusResponse(const std::vector<uint8_t>& payload);
-    void _handleAuthResponse(const std::vector<uint8_t>& payload);
-    void _handleDataNotification(Packet* pkt);
+    void _startAuthentication();
+    void _handleAuthPacket(Packet* pkt);
 
     static EcoflowESP32* _instance;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
 
     std::string _userId;
     std::string _deviceSn;
+    std::string _ble_address;
 
-    NimBLEAdvertisedDevice* m_pAdvertisedDevice = nullptr;
-    NimBLEClient* pClient = nullptr;
-    NimBLERemoteCharacteristic* pWriteChr = nullptr;
-    NimBLERemoteCharacteristic* pReadChr = nullptr;
+    NimBLEClient* _pClient = nullptr;
+    NimBLERemoteCharacteristic* _pWriteChr = nullptr;
+    NimBLERemoteCharacteristic* _pReadChr = nullptr;
+    EcoflowClientCallback* _clientCallback;
 
-    TaskHandle_t _keepAliveTaskHandle = nullptr;
-    bool _notificationReceived = false;
-
-    uint8_t _private_key[21];
-    uint8_t _shared_key[20];
-    uint8_t _sessionKey[16];
-    uint8_t _sessionIV[16];
-    uint8_t _iv[16];
+    EcoflowCrypto _crypto;
 
     EcoflowData _data;
 };

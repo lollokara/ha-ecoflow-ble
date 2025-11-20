@@ -11,6 +11,8 @@ def generate_header(data_bytes, output_path):
         f.write("#ifndef CREDENTIALS_H\n")
         f.write("#define CREDENTIALS_H\n\n")
         f.write("#include <stdint.h>\n\n")
+        f.write("static const char ECOFLOW_USER_ID[] = \"1921517708356313089\";\n")
+        f.write("static const char ECOFLOW_DEVICE_SN[] = \"P231ZEBAPH342310\";\n\n")
         f.write("const uint8_t ECOFLOW_KEYDATA[] = {\n    ")
         
         for i, byte in enumerate(data_bytes):
@@ -18,7 +20,7 @@ def generate_header(data_bytes, output_path):
             if (i + 1) % 16 == 0:
                 f.write("\n    ")
         
-        f.write("\n}\n\n")
+        f.write("\n};\n\n")
         f.write("#endif // CREDENTIALS_H\n")
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 #include "EcoflowProtocol.h"
-#include "mbedtls/aes.h"
-#include "mbedtls/md5.h"
 #include <Arduino.h>
+#include <cstring>
 
 const uint8_t Packet::PREFIX;
 const uint16_t EncPacket::PREFIX;
@@ -21,10 +20,13 @@ static uint16_t crc16(const uint8_t* data, size_t len) {
     return crc;
 }
 
-Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version) :
-    _src(src), _dest(dest), _cmdSet(cmdSet), _cmdId(cmdId), _payload(payload), _check_type(check_type), _encrypted(encrypted), _version(version) {
-    static uint16_t seq = 0;
-    _seq = seq++;
+// Packet implementation
+Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version, uint16_t seq) :
+    _src(src), _dest(dest), _cmdSet(cmdSet), _cmdId(cmdId), _payload(payload), _check_type(check_type), _encrypted(encrypted), _version(version), _seq(seq) {
+    if (_seq == 0) {
+        static uint16_t g_seq = 0;
+        _seq = g_seq++;
+    }
 }
 
 Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
@@ -35,13 +37,14 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
     if (len < 11 + payload_len) {
         return nullptr;
     }
-    uint16_t crc = data[9 + payload_len] | (data[10 + payload_len] << 8);
-    if (crc != crc16(data, 9 + payload_len)) {
+    uint16_t crc_from_packet = data[9 + payload_len] | (data[10 + payload_len] << 8);
+    if (crc_from_packet != crc16(data, 9 + payload_len)) {
         return nullptr;
     }
 
     std::vector<uint8_t> payload(data + 9, data + 9 + payload_len);
-    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F);
+    // The sequence number is not present in the inner packet, it's part of the encrypted packet wrapper
+    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, 0);
 }
 
 std::vector<uint8_t> Packet::toBytes() const {
@@ -62,108 +65,104 @@ std::vector<uint8_t> Packet::toBytes() const {
     return bytes;
 }
 
+// EncPacket implementation
+EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload) :
+    _frame_type(frame_type), _payload_type(payload_type), _payload(payload) {}
 
-EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type, const std::vector<uint8_t>& payload, uint16_t seq, uint8_t device_sn, const uint8_t* key, const uint8_t* iv) :
-    _frame_type(frame_type), _payload_type(payload_type), _payload(payload), _seq(seq), _device_sn(device_sn) {
-    if (key && iv) {
-        mbedtls_aes_context aes;
-        mbedtls_aes_init(&aes);
-        mbedtls_aes_setkey_enc(&aes, key, 128);
-
-        uint8_t p_payload[_payload.size()];
-        memcpy(p_payload, _payload.data(), _payload.size());
-
+std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
+    std::vector<uint8_t> encrypted_payload = _payload;
+    if (crypto) {
         // PKCS7 padding
         int padding = 16 - (_payload.size() % 16);
         std::vector<uint8_t> padded_payload = _payload;
         for (int i = 0; i < padding; ++i) {
             padded_payload.push_back(padding);
         }
-
-        _payload.resize(padded_payload.size());
-        uint8_t temp_iv[16];
-        memcpy(temp_iv, iv, 16);
-        mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_payload.size(), temp_iv, padded_payload.data(), _payload.data());
-        mbedtls_aes_free(&aes);
-    }
-}
-
-EncPacket* EncPacket::fromBytes(const uint8_t* data, size_t len, const uint8_t* key, const uint8_t* iv) {
-    if (len < 8 || (data[0] | (data[1] << 8)) != PREFIX) {
-        return nullptr;
-    }
-    uint16_t payload_len = data[4] | (data[5] << 8);
-    if (len < 8 + payload_len) {
-        return nullptr;
-    }
-    uint16_t crc = data[6 + payload_len] | (data[7 + payload_len] << 8);
-    if (crc != crc16(data, 6 + payload_len)) {
-        return nullptr;
+        encrypted_payload.resize(padded_payload.size());
+        crypto->encrypt_session(padded_payload.data(), padded_payload.size(), encrypted_payload.data());
     }
 
-    std::vector<uint8_t> payload(data + 6, data + 6 + payload_len);
-
-    if(key && iv) {
-        mbedtls_aes_context aes;
-        mbedtls_aes_init(&aes);
-        mbedtls_aes_setkey_dec(&aes, key, 128);
-        std::vector<uint8_t> decrypted_payload(payload.size());
-        uint8_t temp_iv[16];
-        memcpy(temp_iv, iv, 16);
-        mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, payload.size(), temp_iv, payload.data(), decrypted_payload.data());
-        mbedtls_aes_free(&aes);
-
-        // Remove PKCS7 padding
-        uint8_t padding = decrypted_payload.back();
-        decrypted_payload.resize(decrypted_payload.size() - padding);
-        payload = decrypted_payload;
-    }
-
-    return new EncPacket(data[2], data[3], payload, 0, 0, nullptr, nullptr);
-}
-
-std::vector<uint8_t> EncPacket::toBytes() const {
     std::vector<uint8_t> bytes;
     bytes.push_back(PREFIX & 0xFF);
     bytes.push_back((PREFIX >> 8) & 0xFF);
     bytes.push_back(_frame_type);
     bytes.push_back(_payload_type);
-    bytes.push_back(_payload.size() & 0xFF);
-    bytes.push_back((_payload.size() >> 8) & 0xFF);
-    bytes.insert(bytes.end(), _payload.begin(), _payload.end());
+    bytes.push_back(encrypted_payload.size() & 0xFF);
+    bytes.push_back((encrypted_payload.size() >> 8) & 0xFF);
+    bytes.insert(bytes.end(), encrypted_payload.begin(), encrypted_payload.end());
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);
     return bytes;
 }
 
+std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto) {
+    std::vector<Packet> packets;
+    static std::vector<uint8_t> buffer;
+
+    buffer.insert(buffer.end(), data, data + len);
+
+    while (buffer.size() >= 8) {
+        if (buffer[0] != (PREFIX & 0xFF) || buffer[1] != ((PREFIX >> 8) & 0xFF)) {
+            buffer.erase(buffer.begin());
+            continue;
+        }
+
+        uint16_t payload_len = buffer[4] | (buffer[5] << 8);
+        if (buffer.size() < 8 + payload_len) {
+            break;
+        }
+
+        uint16_t crc_from_packet = buffer[6 + payload_len] | (buffer[7 + payload_len] << 8);
+        if (crc_from_packet != crc16(buffer.data(), 6 + payload_len)) {
+            buffer.erase(buffer.begin());
+            continue;
+        }
+
+        std::vector<uint8_t> encrypted_payload(buffer.begin() + 6, buffer.begin() + 6 + payload_len);
+
+        std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
+        crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
+
+        // Remove PKCS7 padding
+        uint8_t padding = decrypted_payload.back();
+        if (padding > 0 && padding <= 16) {
+            decrypted_payload.resize(decrypted_payload.size() - padding);
+        }
+
+        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size());
+        if (packet) {
+            packets.push_back(*packet);
+            delete packet;
+        }
+
+        buffer.erase(buffer.begin(), buffer.begin() + 8 + payload_len);
+    }
+    return packets;
+}
+
+
 std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
-    if (len < 8) { // Minimum length: 6 header + 2 crc
+    if (len < 8) {
         return {};
     }
     if ((data[0] | (data[1] << 8)) != PREFIX) {
         return {};
     }
 
-    // Length field from the packet
     uint16_t len_from_packet = data[4] | (data[5] << 8);
-
     size_t frame_end = 6 + len_from_packet;
+
     if (len < frame_end) {
         return {};
     }
-
-    if (len_from_packet < 2) { // Must contain at least a 2-byte CRC
+    if (len_from_packet < 2) {
         return {};
     }
+
     size_t payload_size = len_from_packet - 2;
-
     std::vector<uint8_t> for_crc;
-    for_crc.insert(for_crc.end(), data, data + 6); // header
-    if (payload_size > 0) {
-        for_crc.insert(for_crc.end(), data + 6, data + 6 + payload_size);
-    }
-
+    for_crc.insert(for_crc.end(), data, data + 6 + payload_size);
     uint16_t calculated_crc = crc16(for_crc.data(), for_crc.size());
     uint16_t received_crc = data[frame_end - 2] | (data[frame_end - 1] << 8);
 
@@ -171,70 +170,5 @@ std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
         return {};
     }
 
-    // Return just the payload
     return std::vector<uint8_t>(data + 6, data + 6 + payload_size);
-}
-
-namespace EcoflowCommands {
-    std::vector<uint8_t> buildPublicKey(const uint8_t* pub_key, size_t len) {
-        std::vector<uint8_t> payload(pub_key, pub_key + len);
-        Packet inner_pkt(0x01, 0x01, 2, 1, payload, 0x01, 0x00, 0x02);
-        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, nullptr, nullptr);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildSessionKeyRequest() {
-        Packet inner_pkt(0x01, 0x01, 2, 2, {}, 0x01, 0x00, 0x02);
-        EncPacket pkt(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, nullptr, nullptr);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildAuthStatusRequest(const uint8_t* key, const uint8_t* iv) {
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildAuthentication(const std::string& userId, const std::string& deviceSn, const uint8_t* key, const uint8_t* iv) {
-        uint8_t md5_data[16];
-        mbedtls_md5((const unsigned char*)(userId + deviceSn).c_str(), userId.length() + deviceSn.length(), md5_data);
-
-        char hex_data[33];
-        for(int i=0; i<16; i++) {
-            sprintf(&hex_data[i*2], "%02X", md5_data[i]);
-        }
-        hex_data[32] = 0;
-
-        std::vector<uint8_t> payload(hex_data, hex_data + 32);
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x86, payload, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildStatusRequest(const uint8_t* key, const uint8_t* iv) {
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x01, {}, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildAcCommand(bool on, const uint8_t* key, const uint8_t* iv) {
-        std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x91, payload, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildDcCommand(bool on, const uint8_t* key, const uint8_t* iv) {
-        std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x92, payload, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
-
-    std::vector<uint8_t> buildUsbCommand(bool on, const uint8_t* key, const uint8_t* iv) {
-        std::vector<uint8_t> payload = { (uint8_t)(on ? 1 : 0) };
-        Packet inner_pkt(0x21, 0x35, 0x35, 0x93, payload, 0x01, 0x01, 0x03);
-        EncPacket pkt(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, inner_pkt.toBytes(), 0, 0, key, iv);
-        return pkt.toBytes();
-    }
 }
