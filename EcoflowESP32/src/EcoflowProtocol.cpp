@@ -35,10 +35,10 @@ static uint16_t crc16(const uint8_t* data, size_t len) {
 }
 
 // Packet implementation
-Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version, uint16_t seq) :
+Packet::Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type, uint8_t encrypted, uint8_t version, uint32_t seq) :
     _src(src), _dest(dest), _cmdSet(cmdSet), _cmdId(cmdId), _payload(payload), _check_type(check_type), _encrypted(encrypted), _version(version), _seq(seq) {
     if (_seq == 0) {
-        static uint16_t g_seq = 0;
+        static uint32_t g_seq = 0;
         _seq = g_seq++;
     }
 }
@@ -79,7 +79,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
         return nullptr;
     }
 
-    uint16_t seq = data[6] | (data[7] << 8);
+    uint32_t seq = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
     uint8_t src = data[12];
     uint8_t dest = data[13];
     uint8_t dsrc = data[14];
@@ -102,20 +102,17 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(_payload.size() & 0xFF);
     bytes.push_back((_payload.size() >> 8) & 0xFF);
     bytes.push_back(crc8(bytes.data(), bytes.size()));
-
-    // product_id, assuming 0x0d as per python
-    bytes.push_back(0x0d);
+    bytes.push_back(0x0d); // product_id
     bytes.push_back(_seq & 0xFF);
     bytes.push_back((_seq >> 8) & 0xFF);
-    bytes.push_back(0); // seq upper bytes, assuming 0
-    bytes.push_back(0);
-
+    bytes.push_back((_seq >> 16) & 0xFF);
+    bytes.push_back((_seq >> 24) & 0xFF);
     bytes.push_back(0); // static zeroes
     bytes.push_back(0);
     bytes.push_back(_src);
     bytes.push_back(_dest);
-    bytes.push_back(_check_type); // dsrc
-    bytes.push_back(_encrypted); // ddest
+    bytes.push_back(_check_type);
+    bytes.push_back(_encrypted);
     bytes.push_back(_cmdSet);
     bytes.push_back(_cmdId);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
@@ -149,8 +146,8 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     std::vector<uint8_t> packet_data;
     packet_data.push_back(PREFIX & 0xFF);
     packet_data.push_back((PREFIX >> 8) & 0xFF);
-    packet_data.push_back((_payload_type << 4) | _frame_type);
-    packet_data.push_back((_is_ack << 7) | (_needs_ack << 6));
+    packet_data.push_back((_frame_type << 4) | _payload_type);
+    packet_data.push_back(1); // Per Python implementation, this is a static value
     uint16_t len = encrypted_payload.size() + 2; // payload + 2 bytes for CRC
     packet_data.push_back(len & 0xFF);
     packet_data.push_back((len >> 8) & 0xFF);

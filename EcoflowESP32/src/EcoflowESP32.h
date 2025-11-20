@@ -16,6 +16,8 @@ enum class ConnectionState {
     CREATED,
     ESTABLISHING_CONNECTION,
     CONNECTED,
+    SERVICE_DISCOVERY,
+    SUBSCRIBING_TO_NOTIFICATIONS,
     PUBLIC_KEY_EXCHANGE,
     PUBLIC_KEY_RECEIVED,
     REQUESTING_SESSION_KEY,
@@ -82,6 +84,7 @@ public:
     uint32_t _lastKeepAliveTime = 0;
     uint8_t _connectionRetries = 0;
     uint32_t _lastConnectionAttempt = 0;
+    uint32_t _lastAuthActivity = 0;
     uint32_t _lastScanTime = 0;
 
 private:

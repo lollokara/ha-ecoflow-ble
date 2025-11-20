@@ -103,24 +103,6 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
     _state = ConnectionState::CONNECTED;
-    ESP_LOGI("EcoflowESP32", "onConnect: State changed to CONNECTED, performing service discovery");
-    NimBLERemoteService* pSvc = pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-    if (pSvc) {
-        _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-        _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-        if (_pReadChr && _pReadChr->canNotify()) {
-            if(_pReadChr->subscribe(true, notifyCallback)) {
-                ESP_LOGI(TAG, "Subscribed to notifications");
-                delay(100); // Wait for the subscription to be processed
-            } else {
-                ESP_LOGE(TAG, "Failed to subscribe to notifications");
-                pClient->disconnect();
-            }
-        }
-    } else {
-        ESP_LOGE("EcoflowESP32", "onConnect: Service not found, disconnecting");
-        pClient->disconnect();
-    }
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
@@ -135,43 +117,69 @@ void EcoflowESP32::update() {
         _lastState = _state;
     }
 
-    if (_pAdvertisedDevice) {
-        if (!_pClient->isConnected()) {
-            if (millis() - _lastConnectionAttempt > 5000) {
-                _lastConnectionAttempt = millis();
-                if (_connectionRetries < 5) {
-                    ESP_LOGI(TAG, "Connecting...");
-                    _state = ConnectionState::ESTABLISHING_CONNECTION;
-                    _connectionRetries++;
-                    _pClient->connect(_pAdvertisedDevice);
+    if (_pAdvertisedDevice && !_pClient->isConnected()) {
+        if (millis() - _lastConnectionAttempt > 5000) {
+            _lastConnectionAttempt = millis();
+            if (_connectionRetries < 5) {
+                ESP_LOGI(TAG, "Connecting...");
+                _state = ConnectionState::ESTABLISHING_CONNECTION;
+                _connectionRetries++;
+                if (_pClient->connect(_pAdvertisedDevice)) {
+                    _state = ConnectionState::SERVICE_DISCOVERY;
+                    _lastAuthActivity = millis();
                 } else {
-                    delete _pAdvertisedDevice;
-                    _pAdvertisedDevice = nullptr;
-                    _connectionRetries = 0;
+                    ESP_LOGW(TAG, "Failed to connect");
                 }
+            } else {
+                delete _pAdvertisedDevice;
+                _pAdvertisedDevice = nullptr;
+                _connectionRetries = 0;
             }
         }
-    } else {
+    } else if (!_pAdvertisedDevice) {
         _startScan();
     }
 
-    if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
-        _startAuthentication();
-    }
-    else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastConnectionAttempt > 10000) {
-            _pClient->disconnect();
-        }
-    } else if (_state == ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastKeepAliveTime > 5000) {
-            _lastKeepAliveTime = millis();
-            requestData();
+    if (_pClient->isConnected()) {
+        if (_state == ConnectionState::SERVICE_DISCOVERY) {
+            ESP_LOGI(TAG, "Performing service discovery");
+            NimBLERemoteService* pSvc = _pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+            if (pSvc) {
+                _pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+                _pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+                if (_pWriteChr && _pReadChr) {
+                    _state = ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS;
+                }
+            } else {
+                ESP_LOGE(TAG, "Service not found, disconnecting");
+                _pClient->disconnect();
+            }
+        } else if (_state == ConnectionState::SUBSCRIBING_TO_NOTIFICATIONS) {
+            if (_pReadChr->canNotify() && _pReadChr->subscribe(true, notifyCallback)) {
+                ESP_LOGI(TAG, "Subscribed to notifications");
+                _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
+                _startAuthentication();
+            } else {
+                ESP_LOGE(TAG, "Failed to subscribe to notifications, disconnecting");
+                _pClient->disconnect();
+            }
+        } else if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
+            if (millis() - _lastAuthActivity > 10000) {
+                ESP_LOGW(TAG, "Authentication timeout, disconnecting");
+                _pClient->disconnect();
+            }
+        } else if (_state == ConnectionState::AUTHENTICATED) {
+            if (millis() - _lastKeepAliveTime > 5000) {
+                _lastKeepAliveTime = millis();
+                requestData();
+            }
         }
     }
 }
 
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
+    _lastAuthActivity = millis();
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
@@ -191,6 +199,7 @@ void EcoflowESP32::_startAuthentication() {
 }
 
 void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
+    _lastAuthActivity = millis();
     ESP_LOGD(TAG, "_handleSimpleAuthResponse: Handling simple auth response");
     print_hex_esp(data.data(), data.size(), "Raw Simple Auth Response");
     auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
@@ -265,6 +274,7 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 }
 
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
+    _lastAuthActivity = millis();
     ESP_LOGD(TAG, "_handleAuthPacket: Handling auth packet with cmdId=0x%02x", pkt->getCmdId());
     const auto& payload = pkt->getPayload();
 
