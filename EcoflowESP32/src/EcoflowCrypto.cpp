@@ -6,12 +6,16 @@
 #include "esp_system.h"
 #include "mbedtls/md.h"
 
+static const char* TAG = "EcoflowCrypto";
+
 void print_hex(const uint8_t* data, size_t size, const char* label) {
-    Serial.printf("%s: ", label);
+    if (size == 0) return;
+    char hex_str[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        Serial.printf("%02x", data[i]);
+        sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
-    Serial.println();
+    hex_str[size * 3] = '\0';
+    ESP_LOGD(TAG, "%s: %s", label, hex_str);
 }
 
 

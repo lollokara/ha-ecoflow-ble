@@ -1,6 +1,20 @@
 #include "EcoflowProtocol.h"
 #include <Arduino.h>
 #include <cstring>
+#include "esp_log.h"
+
+static const char* TAG = "EcoflowProtocol";
+
+// Helper to print byte arrays for debugging
+static void print_hex_protocol(const uint8_t* data, size_t size, const char* label) {
+    if (size == 0) return;
+    char hex_str[size * 3 + 1];
+    for (size_t i = 0; i < size; i++) {
+        sprintf(hex_str + i * 3, "%02x ", data[i]);
+    }
+    hex_str[size * 3] = '\0';
+    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+}
 
 const uint8_t Packet::PREFIX;
 const uint16_t EncPacket::PREFIX;
@@ -110,10 +124,14 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
     std::vector<Packet> packets;
     static std::vector<uint8_t> buffer;
 
+    ESP_LOGD(TAG, "parsePackets: Received %d bytes", len);
+    print_hex_protocol(data, len, "Received Data");
+
     buffer.insert(buffer.end(), data, data + len);
 
     while (buffer.size() >= 8) { // Minimum size of an EncPacket
         if (buffer[0] != (PREFIX & 0xFF) || buffer[1] != ((PREFIX >> 8) & 0xFF)) {
+            ESP_LOGE(TAG, "parsePackets: Invalid prefix, discarding byte");
             buffer.erase(buffer.begin());
             continue;
         }
@@ -162,10 +180,14 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
 
 
 std::vector<uint8_t> EncPacket::parseSimple(const uint8_t* data, size_t len) {
+    ESP_LOGD(TAG, "parseSimple: Received %d bytes", len);
+    print_hex_protocol(data, len, "Simple Data");
     if (len < 8) {
+        ESP_LOGE(TAG, "parseSimple: Data too short");
         return {};
     }
     if ((data[0] | (data[1] << 8)) != PREFIX) {
+        ESP_LOGE(TAG, "parseSimple: Invalid prefix");
         return {};
     }
 
