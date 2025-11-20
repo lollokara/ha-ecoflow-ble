@@ -90,6 +90,9 @@ public:
     bool setDC(bool on);
     bool setUSB(bool on);
 
+    // New method for dynamic AC charging limit
+    bool setAcChargingLimit(int watts);
+
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
 

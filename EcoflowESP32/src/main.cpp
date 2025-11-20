@@ -22,9 +22,12 @@ void loop() {
     static uint32_t last_dc_toggle = 0;
     static uint32_t last_usb_toggle = 0;
     static uint32_t last_ac_toggle = 0;
+    static uint32_t last_chg_limit_update = 0;
+
     static bool dc_on = false;
     static bool usb_on = false;
     static bool ac_on = false;
+    static int chg_limit_watts = 400;
 
     ecoflow.update();
 
@@ -69,6 +72,20 @@ void loop() {
             ac_on = !ac_on;
             ESP_LOGI("main", "Toggling AC to %s", ac_on ? "ON" : "OFF");
             ecoflow.setAC(ac_on);
+        }
+    }
+
+    // Dynamic AC Charging Limit Test
+    if (millis() - last_chg_limit_update > 10000) {
+        last_chg_limit_update = millis();
+        if (ecoflow.isAuthenticated()) {
+            ESP_LOGI("main", "Setting AC Charging Limit to %dW", chg_limit_watts);
+            ecoflow.setAcChargingLimit(chg_limit_watts);
+
+            chg_limit_watts += 50;
+            if (chg_limit_watts > 600) {
+                chg_limit_watts = 400;
+            }
         }
     }
 

@@ -401,3 +401,20 @@ bool EcoflowESP32::setAC(bool on) {
     _sendConfigPacket(config);
     return true;
 }
+
+bool EcoflowESP32::setAcChargingLimit(int watts) {
+    if (watts < 200 || watts > 2900) { // Approximate safety limits, adjust as needed
+        ESP_LOGW(TAG, "AC Charging limit %d W out of range", watts);
+        // Proceed anyway as the device might cap it
+    }
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+
+    config.has_cfg_ac_in_chg_mode = true;
+    config.cfg_ac_in_chg_mode = pd335_sys_AC_IN_CHG_MODE_AC_IN_CHG_MODE_SELF_DEF_POW;
+
+    config.has_cfg_plug_in_info_ac_in_chg_pow_max = true;
+    config.cfg_plug_in_info_ac_in_chg_pow_max = watts;
+
+    _sendConfigPacket(config);
+    return true;
+}
