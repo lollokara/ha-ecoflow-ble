@@ -84,7 +84,9 @@ void EcoflowESP32::_startScan() {
         _pScan->setInterval(100);
         _pScan->setWindow(99);
     }
-    _pScan->start(5, false);
+    // Use non-blocking scan for 0 (forever) until we stop it manually when device is found.
+    // This prevents the BLE task from hanging.
+    _pScan->start(0, nullptr, false);
 }
 
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
@@ -95,7 +97,9 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
     _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
-    xTaskCreate(ble_task_entry, "ble_task", 4096, this, 5, &_ble_task_handle);
+
+    // Increased stack size to prevent potential overflow
+    xTaskCreate(ble_task_entry, "ble_task", 8192, this, 5, &_ble_task_handle);
     return true;
 }
 
@@ -127,8 +131,12 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             self->_lastState = self->_state;
         }
 
+        // If scanning indefinitely, we might want to restart occasionally if it gets stuck,
+        // but NimBLE is usually reliable.
+        // If we haven't found the device after 10s, maybe just log or restart scan to be safe.
         if (self->_state == ConnectionState::SCANNING && millis() - self->_lastScanTime > 10000) {
-            ESP_LOGW(TAG, "Scan timed out, restarting scan");
+            ESP_LOGW(TAG, "Scan running for >10s, restarting scan to be safe");
+            self->_pScan->stop();
             self->_startScan();
         }
 
@@ -151,18 +159,15 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         } else if (self->_state != ConnectionState::SCANNING) {
-            // If state is not SCANNING but we have no device or not connected, ensure we scan.
-            // But wait, onDisconnect sets state to SCANNING (via _startScan).
-            // If onDisconnect was called, state IS scanning.
-            // If onDisconnect was NOT called (e.g. silent failure?), we need to detect.
-            // NimBLEClient::isConnected() check is good.
-            // But here we check `self->_pClient->isConnected()` only if `_pAdvertisedDevice` exists.
+             // Fallback if we are disconnected but not scanning (and not manually handled yet)
+             if (self->_state == ConnectionState::DISCONNECTED || self->_state == ConnectionState::NOT_CONNECTED) {
+                 self->_startScan();
+             }
 
             // Check if client claims disconnected but our state thinks otherwise
             if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
                 if (!self->_pClient->isConnected()) {
                      ESP_LOGW(TAG, "Client disconnected unexpectedly");
-                     // Force disconnect logic
                      self->onDisconnect(self->_pClient);
                 }
             }
