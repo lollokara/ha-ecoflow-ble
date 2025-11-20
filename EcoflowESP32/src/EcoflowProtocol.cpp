@@ -43,8 +43,8 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
     }
 
     std::vector<uint8_t> payload(data + 9, data + 9 + payload_len);
-    // The sequence number is not present in the inner packet, it's part of the encrypted packet wrapper
-    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, 0);
+    uint16_t seq = data[9] | (data[10] << 8);
+    return new Packet(data[1], data[2], data[7], data[8], payload, data[3], data[6], data[3] & 0x0F, seq);
 }
 
 std::vector<uint8_t> Packet::toBytes() const {
@@ -58,6 +58,8 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(_encrypted);
     bytes.push_back(_cmdSet);
     bytes.push_back(_cmdId);
+    bytes.push_back(_seq & 0xFF);
+    bytes.push_back((_seq >> 8) & 0xFF);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
@@ -87,8 +89,9 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     bytes.push_back((PREFIX >> 8) & 0xFF);
     bytes.push_back(_frame_type);
     bytes.push_back(_payload_type);
-    bytes.push_back(encrypted_payload.size() & 0xFF);
-    bytes.push_back((encrypted_payload.size() >> 8) & 0xFF);
+    uint16_t length = encrypted_payload.size() + 2;
+    bytes.push_back(length & 0xFF);
+    bytes.push_back((length >> 8) & 0xFF);
     bytes.insert(bytes.end(), encrypted_payload.begin(), encrypted_payload.end());
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
