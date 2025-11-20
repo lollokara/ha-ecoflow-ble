@@ -16,7 +16,7 @@ static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
         sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
     hex_str[size * 3] = '\0';
-    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+    //ESP_LOGD(TAG, "%s: %s", label, hex_str);
 }
 
 
@@ -239,7 +239,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     }
                 }
             } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto);
+                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->isAuthenticated());
                 for (auto &packet : packets) {
                     self->_handlePacket(&packet);
                 }
@@ -277,8 +277,8 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());
     if (_state == ConnectionState::AUTHENTICATED) {
         EcoflowDataParser::parsePacket(*pkt, _data);
-        if (pkt->getDest() == 0x21 && pkt->getCmdSet() != 0x01 && pkt->getCmdId() != 0x01) {
-            ESP_LOGD(TAG, "Replying to packet");
+        if (pkt->getDest() == 0x21) {
+            ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
