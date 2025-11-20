@@ -172,7 +172,7 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     return packet_data;
 }
 
-std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated) {
+std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool is_xor) {
     std::vector<Packet> packets;
     static std::vector<uint8_t> buffer;
 
@@ -219,7 +219,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             }
         }
 
-        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
+        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), is_xor);
         if (packet) {
             packets.push_back(*packet);
             delete packet;

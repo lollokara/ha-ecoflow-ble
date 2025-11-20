@@ -53,7 +53,7 @@ public:
     const std::vector<uint8_t>& getPayload() const { return _payload; }
     std::vector<uint8_t> toBytes(EcoflowCrypto* crypto = nullptr) const;
 
-    static std::vector<Packet> parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated = false);
+    static std::vector<Packet> parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool is_xor = false);
     static std::vector<uint8_t> parseSimple(const uint8_t* data, size_t len);
 
 private:

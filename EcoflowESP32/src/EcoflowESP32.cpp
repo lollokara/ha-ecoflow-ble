@@ -239,7 +239,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     }
                 }
             } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->isAuthenticated());
+                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, true);
                 for (auto &packet : packets) {
                     self->_handlePacket(&packet);
                 }
@@ -354,9 +354,13 @@ int EcoflowESP32::getBatteryLevel() {
 }
 int EcoflowESP32::getInputPower() { return _data.inputPower; }
 int EcoflowESP32::getOutputPower() { return _data.outputPower; }
-int EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
+float EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
 int EcoflowESP32::getACVoltage() { return _data.acVoltage; }
 int EcoflowESP32::getACFrequency() { return _data.acFrequency; }
+float EcoflowESP32::getSolarInputPower() { return _data.solarInputPower; }
+float EcoflowESP32::getAcOutputPower() { return _data.acOutputPower; }
+float EcoflowESP32::getDcOutputPower() { return _data.dcOutputPower; }
+float EcoflowESP32::getCellTemperature() { return _data.cellTemperature; }
 bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
 bool EcoflowESP32::isUsbOn() { return _data.usbOn; }

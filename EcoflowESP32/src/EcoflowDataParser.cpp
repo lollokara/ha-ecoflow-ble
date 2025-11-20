@@ -19,6 +19,8 @@ bool pb_decode_to_vector(pb_istream_t *stream, const pb_field_t *field, void **a
 
 namespace EcoflowDataParser {
 
+#include "pd335_bms_bp.pb.h"
+
 void parsePacket(const Packet& pkt, EcoflowData& data) {
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
         ESP_LOGI(TAG, "Parsing data packet with cmdId=0x%02x", pkt.getCmdId());
@@ -27,16 +29,23 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &proto_msg)) {
             ESP_LOGI(TAG, "Successfully decoded protobuf message");
             data.batteryLevel = proto_msg.cms_batt_soc;
-            if (proto_msg.cms_batt_soc > 0) {
-                data.batteryLevel = proto_msg.cms_batt_soc;
-            }
             ESP_LOGI(TAG, "Battery level: %d%%", data.batteryLevel);
             data.inputPower = proto_msg.pow_in_sum_w;
             data.outputPower = proto_msg.pow_out_sum_w;
             data.acOn = (proto_msg.flow_info_ac_out & 0b11) >= 0b10;
             data.dcOn = (proto_msg.flow_info_12v & 0b11) >= 0b10;
+            data.solarInputPower = (proto_msg.plug_in_info_pv_type == 2) ? proto_msg.pow_get_pv : 0;
+            data.acOutputPower = proto_msg.pow_get_ac_out;
+            data.dcOutputPower = proto_msg.pow_get_12v;
+            data.cellTemperature = proto_msg.bms_max_cell_temp;
         } else {
             ESP_LOGE(TAG, "Failed to decode protobuf message");
+        }
+    } else if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0x02 && pkt.getCmdId() == 0x01) {
+        pd335_bms_bp_BMSHeartBeatReport proto_msg = pd335_bms_bp_BMSHeartBeatReport_init_zero;
+        pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+        if (pb_decode(&stream, pd335_bms_bp_BMSHeartBeatReport_fields, &proto_msg)) {
+            data.batteryVoltage = proto_msg.vol;
         }
     }
 }
