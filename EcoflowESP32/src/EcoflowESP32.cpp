@@ -101,18 +101,18 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _setState(ConnectionState::DISCONNECTED);
-    delete _pAdvertisedDevice;
-    _pAdvertisedDevice = nullptr;
 }
 
 void EcoflowESP32::update() {
-    if (_pAdvertisedDevice) {
-        if (!_pClient->isConnected()) {
+    if (_state == ConnectionState::DISCONNECTED || _state == ConnectionState::NOT_CONNECTED) {
+        if (_pAdvertisedDevice) {
             if (millis() - _lastConnectionAttempt > 5000) {
                 _lastConnectionAttempt = millis();
                 if (_connectionRetries < 5) {
                     ESP_LOGI(TAG, "Connecting...");
-                    _pClient->connect(_pAdvertisedDevice);
+                    if (_pClient->connect(_pAdvertisedDevice)) {
+                        _setState(ConnectionState::ESTABLISHING_CONNECTION);
+                    }
                 } else {
                     ESP_LOGW(TAG, "Max connection retries reached");
                     delete _pAdvertisedDevice;
@@ -120,9 +120,9 @@ void EcoflowESP32::update() {
                     _connectionRetries = 0;
                 }
             }
+        } else {
+            _startScan();
         }
-    } else {
-        _startScan();
     }
 
     if (_state == ConnectionState::CONNECTED && _pClient->isConnected()) {
