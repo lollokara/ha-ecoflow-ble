@@ -212,21 +212,27 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
-            _setState(ConnectionState::AUTHENTICATING);
+            _setState(ConnectionState::REQUESTING_AUTH_STATUS);
 
-            uint8_t md5_data[16];
-            mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
-            char hex_data[33];
-            for(int i=0; i<16; i++) {
-                sprintf(&hex_data[i*2], "%02X", md5_data[i]);
-            }
-            hex_data[32] = 0;
-            std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
-            EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
-            _sendCommand(enc_auth.toBytes(&_crypto));
+            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
+            EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+            _sendCommand(enc_auth_status.toBytes(&_crypto));
         }
+    } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
+        _setState(ConnectionState::AUTHENTICATING);
+
+        uint8_t md5_data[16];
+        mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
+        char hex_data[33];
+        for(int i=0; i<16; i++) {
+            sprintf(&hex_data[i*2], "%02X", md5_data[i]);
+        }
+        hex_data[32] = 0;
+        std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
+
+        Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
+        EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
+        _sendCommand(enc_auth.toBytes(&_crypto));
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload[0] == 0x00) {
             _setState(ConnectionState::AUTHENTICATED);
