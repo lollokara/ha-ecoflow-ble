@@ -12,7 +12,7 @@ public:
 
     Packet(uint8_t src, uint8_t dest, uint8_t cmdSet, uint8_t cmdId, const std::vector<uint8_t>& payload, uint8_t check_type = 0x01, uint8_t encrypted = 0x01, uint8_t version = 0x03, uint32_t seq = 0);
 
-    static Packet* fromBytes(const uint8_t* data, size_t len);
+    static Packet* fromBytes(const uint8_t* data, size_t len, bool is_xor = false);
     std::vector<uint8_t> toBytes() const;
     
     uint8_t getCmdId() const { return _cmdId; }
@@ -52,7 +52,7 @@ public:
     const std::vector<uint8_t>& getPayload() const { return _payload; }
     std::vector<uint8_t> toBytes(EcoflowCrypto* crypto = nullptr) const;
 
-    static std::vector<Packet> parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto);
+    static std::vector<Packet> parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated = false);
     static std::vector<uint8_t> parseSimple(const uint8_t* data, size_t len);
 
 private:

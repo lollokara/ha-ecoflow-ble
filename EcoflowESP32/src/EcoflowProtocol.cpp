@@ -60,7 +60,7 @@ static uint8_t crc8(const uint8_t* data, size_t len) {
     return crc;
 }
 
-Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
+Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
     if (len < 20 || data[0] != PREFIX) {
         return nullptr;
     }
@@ -91,6 +91,11 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len) {
     std::vector<uint8_t> payload;
     if (payload_len > 0) {
         payload.assign(data + 18, data + 18 + payload_len);
+        if (is_xor && data[6] != 0) {
+            for (size_t i = 0; i < payload.size(); ++i) {
+                payload[i] ^= data[6];
+            }
+        }
     }
 
     return new Packet(src, dest, cmd_set, cmd_id, payload, dsrc, ddest, version, seq);
@@ -167,7 +172,7 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     return packet_data;
 }
 
-std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto) {
+std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated) {
     std::vector<Packet> packets;
     static std::vector<uint8_t> buffer;
 
@@ -214,7 +219,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             }
         }
 
-        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size());
+    Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
         if (packet) {
             packets.push_back(*packet);
             delete packet;

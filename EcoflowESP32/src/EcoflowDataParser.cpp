@@ -20,12 +20,15 @@ bool pb_decode_to_vector(pb_istream_t *stream, const pb_field_t *field, void **a
 namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data) {
-    if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && pkt.getCmdId() == 0x11) {
+    if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
+        ESP_LOGI(TAG, "Parsing data packet with cmdId=0x%02x", pkt.getCmdId());
         pd335_sys_DisplayPropertyUpload proto_msg = pd335_sys_DisplayPropertyUpload_init_zero;
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &proto_msg)) {
             ESP_LOGI(TAG, "Successfully decoded protobuf message");
-            data.batteryLevel = proto_msg.cms_batt_soc;
+            if (proto_msg.cms_batt_soc > 0) {
+                data.batteryLevel = proto_msg.cms_batt_soc;
+            }
             ESP_LOGI(TAG, "Battery level: %d%%", data.batteryLevel);
             data.inputPower = proto_msg.pow_in_sum_w;
             data.outputPower = proto_msg.pow_out_sum_w;

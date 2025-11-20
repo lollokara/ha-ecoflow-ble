@@ -21,14 +21,17 @@ static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
 EcoflowESP32* EcoflowESP32::_instance = nullptr;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
-    ESP_LOGD(TAG, "Notify callback received %d bytes", length);
-    print_hex_esp(pData, length, "Notify Data");
+    ESP_LOGI(TAG, "Notify callback received %d bytes", length);
+    print_hex_esp(pData, length, "Notify Raw Data");
     if (_instance) {
         if (_instance->_state == ConnectionState::PUBLIC_KEY_EXCHANGE || _instance->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+             ESP_LOGD(TAG, "Routing notification to simple auth handler");
             std::vector<uint8_t> data(pData, pData + length);
             _instance->_handleSimpleAuthResponse(data);
         } else {
-            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto);
+            ESP_LOGD(TAG, "Routing notification to packet parser");
+            std::vector<Packet> packets = EncPacket::parsePackets(pData, length, _instance->_crypto, _instance->isAuthenticated());
+            ESP_LOGD(TAG, "Parsed %d packets from notification", packets.size());
             for (auto &packet : packets) {
                 _instance->_handlePacket(&packet);
             }
@@ -165,6 +168,7 @@ void EcoflowESP32::update() {
     } else if (_state == ConnectionState::AUTHENTICATED) {
         if (millis() - _lastKeepAliveTime > 5000) {
             _lastKeepAliveTime = millis();
+            ESP_LOGI(TAG, "Authenticated. Requesting data...");
             requestData();
         }
     }
@@ -251,16 +255,19 @@ void EcoflowESP32::_handleSimpleAuthResponse(const std::vector<uint8_t>& data) {
 }
 
 void EcoflowESP32::_handlePacket(Packet* pkt) {
-    ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());
+    ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
     if (_state == ConnectionState::AUTHENTICATED) {
+        ESP_LOGI(TAG, "Packet received while authenticated. Routing to data parser.");
         EcoflowDataParser::parsePacket(*pkt, _data);
-        if (pkt->getDest() == 0x21 && pkt->getCmdSet() != 0x01 && pkt->getCmdId() != 0x01) {
-            ESP_LOGD(TAG, "Replying to packet");
+        ESP_LOGD(TAG, "Checking if reply is needed for packet: dest=0x%02x", pkt->getDest());
+        if (pkt->getDest() == 0x21) {
+            ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq());
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
         }
     } else {
+        ESP_LOGD(TAG, "Packet received while not authenticated. Routing to auth handler.");
         _handleAuthPacket(pkt);
     }
 }
@@ -323,6 +330,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
+    ESP_LOGD(TAG, "Constructing data request packet (cmd_set=0xFE, cmd_id=0x11)");
     Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));

@@ -18,6 +18,16 @@ void setup() {
 }
 
 void loop() {
+    static unsigned long last_battery_print_time = 0;
+    unsigned long current_time = millis();
+
     ecoflow.update();
+
+    if (ecoflow.isAuthenticated() && (current_time - last_battery_print_time > 5000)) {
+        last_battery_print_time = current_time;
+        int battery_level = ecoflow.getBatteryLevel();
+        Serial.printf("Battery Level: %d%%\n", battery_level);
+    }
+
     delay(100);
 }
