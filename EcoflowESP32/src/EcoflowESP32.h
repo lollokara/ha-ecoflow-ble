@@ -82,6 +82,7 @@ public:
     uint32_t _lastKeepAliveTime = 0;
     uint8_t _connectionRetries = 0;
     uint32_t _lastConnectionAttempt = 0;
+    uint32_t _lastAuthActivity = 0;
     uint32_t _lastScanTime = 0;
 
 private:

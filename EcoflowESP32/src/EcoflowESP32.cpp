@@ -132,7 +132,7 @@ void EcoflowESP32::update() {
     }
 
     if (_state > ConnectionState::CONNECTED && _state < ConnectionState::AUTHENTICATED) {
-        if (millis() - _lastConnectionAttempt > 10000) {
+        if (millis() - _lastAuthActivity > 10000) {
             _pClient->disconnect();
         }
     } else if (_state == ConnectionState::AUTHENTICATED) {
@@ -144,6 +144,7 @@ void EcoflowESP32::update() {
 }
 
 void EcoflowESP32::_startAuthentication() {
+    _lastAuthActivity = millis();
     _setState(ConnectionState::PUBLIC_KEY_EXCHANGE);
     _crypto.generate_keys();
 
@@ -192,9 +193,11 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
 }
 
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
+    _lastAuthActivity = millis();
     const auto& payload = pkt->getPayload();
     if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
         if (payload.size() >= 43 && payload[0] == 0x01) {
+            Serial.println("Handling public key response...");
             std::vector<uint8_t> peer_key(payload.begin() + 3, payload.begin() + 43);
             print_hex(peer_key.data(), peer_key.size(), "Peer Public Key");
             if (_crypto.compute_shared_secret(peer_key)) {
@@ -204,8 +207,10 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
                 _sendCommand(enc_packet.toBytes());
             }
         }
+        return;
     } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
         if (payload.size() >= 18 && payload[0] == 0x02) {
+            Serial.println("Handling session key response...");
             std::vector<uint8_t> decrypted_payload;
             _crypto.decrypt_shared(payload.data() + 1, payload.size() - 1, decrypted_payload);
 
@@ -214,30 +219,38 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
 
             _setState(ConnectionState::REQUESTING_AUTH_STATUS);
-
+            Serial.println("Requesting auth status...");
             Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {});
             EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
             _sendCommand(enc_auth_status.toBytes(&_crypto));
         }
+        return;
     } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
-        _setState(ConnectionState::AUTHENTICATING);
+        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
+            Serial.println("Auth status received, sending final authentication packet.");
 
-        uint8_t md5_data[16];
-        mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
-        char hex_data[33];
-        for(int i=0; i<16; i++) {
-            sprintf(&hex_data[i*2], "%02X", md5_data[i]);
+            _setState(ConnectionState::AUTHENTICATING);
+
+            uint8_t md5_data[16];
+            mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
+            char hex_data[33];
+            for(int i=0; i<16; i++) {
+                sprintf(&hex_data[i*2], "%02X", md5_data[i]);
+            }
+            hex_data[32] = 0;
+            std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
+
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
+            EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
+            _sendCommand(enc_auth.toBytes(&_crypto));
         }
-        hex_data[32] = 0;
-        std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-
-        Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload);
-        EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
-        _sendCommand(enc_auth.toBytes(&_crypto));
+        return;
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload[0] == 0x00) {
+            Serial.println("Authentication successful!");
             _setState(ConnectionState::AUTHENTICATED);
         }
+        return;
     }
 }
 

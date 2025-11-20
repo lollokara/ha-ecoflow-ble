@@ -90,11 +90,12 @@ bool EcoflowCrypto::compute_shared_secret(const std::vector<uint8_t>& peer_pub_k
     size_t len;
     mbedtls_ecp_point_write_binary(&grp, &shared_P, MBEDTLS_ECP_PF_UNCOMPRESSED, &len, buf, sizeof(buf));
 
-    memcpy(shared_secret, buf + 1, 20);
+    uint8_t temp_shared_secret[20];
+    memcpy(temp_shared_secret, buf + 1, 20);
 
-    mbedtls_md5(shared_secret, 20, iv);
+    mbedtls_md5(temp_shared_secret, 20, iv);
 
-    memcpy(shared_secret, shared_secret, 16);
+    memcpy(shared_secret, temp_shared_secret, 16);
 
     print_hex(shared_secret, 16, "Shared Secret");
     print_hex(iv, 16, "IV");
