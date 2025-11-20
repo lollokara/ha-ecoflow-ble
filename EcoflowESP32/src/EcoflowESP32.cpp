@@ -14,7 +14,7 @@ static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
         sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
     hex_str[size * 3] = '\0';
-    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+    //ESP_LOGD(TAG, "%s: %s", label, hex_str);
 }
 
 
