@@ -61,7 +61,7 @@ static uint8_t crc8(const uint8_t* data, size_t len) {
 }
 
 Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
-    if (len < 20 || data[0] != PREFIX) {
+    if (len < 18 || data[0] != PREFIX) { // Minimum length reduced for V2
         return nullptr;
     }
 
@@ -84,14 +84,32 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
     uint32_t seq = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
     uint8_t src = data[12];
     uint8_t dest = data[13];
-    uint8_t dsrc = data[14];
-    uint8_t ddest = data[15];
-    uint8_t cmd_set = data[16];
-    uint8_t cmd_id = data[17];
+
+    uint8_t dsrc = 0;
+    uint8_t ddest = 0;
+    uint8_t cmd_set = 0;
+    uint8_t cmd_id = 0;
+    size_t payload_offset = 0;
+
+    if (version == 3) {
+        dsrc = data[14];
+        ddest = data[15];
+        cmd_set = data[16];
+        cmd_id = data[17];
+        payload_offset = 18;
+    } else if (version == 2) {
+        // V2: No dsrc/ddst fields
+        cmd_set = data[14];
+        cmd_id = data[15];
+        payload_offset = 16;
+    } else {
+        ESP_LOGE(TAG, "Unsupported packet version %d", version);
+        return nullptr;
+    }
 
     std::vector<uint8_t> payload;
     if (payload_len > 0) {
-        payload.assign(data + 18, data + 18 + payload_len);
+        payload.assign(data + payload_offset, data + payload_offset + payload_len);
         if (is_xor && data[6] != 0) {
             for (size_t i = 0; i < payload.size(); ++i) {
                 payload[i] ^= data[6];
@@ -119,11 +137,16 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(0);
     bytes.push_back(_src);
     bytes.push_back(_dest);
-    bytes.push_back(_check_type); // dsrc
-    bytes.push_back(_encrypted); // ddest
+
+    if (_version == 3) {
+        bytes.push_back(_check_type); // dsrc
+        bytes.push_back(_encrypted); // ddest
+    }
+
     bytes.push_back(_cmdSet);
     bytes.push_back(_cmdId);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
+
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);

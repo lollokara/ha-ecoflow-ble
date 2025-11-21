@@ -65,11 +65,11 @@ void DeviceManager::initialize() {
     // If we have saved credentials, start the instances
     if (!slotD3.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring D3: %s", slotD3.serialNumber.c_str());
-        slotD3.instance->begin(ECOFLOW_USER_ID, slotD3.serialNumber, slotD3.macAddress);
+        slotD3.instance->begin(ECOFLOW_USER_ID, slotD3.serialNumber, slotD3.macAddress, 3); // V3 for D3 (Delta)
     }
     if (!slotW2.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring W2: %s", slotW2.serialNumber.c_str());
-        slotW2.instance->begin(ECOFLOW_USER_ID, slotW2.serialNumber, slotW2.macAddress);
+        slotW2.instance->begin(ECOFLOW_USER_ID, slotW2.serialNumber, slotW2.macAddress, 2); // V2 for W2 (Wave 2)
     }
 }
 
@@ -208,7 +208,8 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
             saveDevice(_targetScanType, mac, sn);
 
             EcoflowESP32* dev = getDevice(_targetScanType);
-            dev->begin(ECOFLOW_USER_ID, sn, mac);
+            uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+            dev->begin(ECOFLOW_USER_ID, sn, mac, version);
         }
     }
 }

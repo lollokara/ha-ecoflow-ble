@@ -102,10 +102,11 @@ void EcoflowESP32::_startScan() {
     _pScan->start(0, nullptr, false);
 }
 
-bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
+bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
+    _protocolVersion = protocolVersion;
     NimBLEDevice::init("");
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
@@ -354,7 +355,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03, 0, 0x0d);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, 0, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -380,7 +381,7 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
     }
 
     std::vector<uint8_t> payload(buffer, buffer + stream.bytes_written);
-    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13);
+    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     _sendCommand(enc_packet.toBytes(&_crypto));
 }
@@ -426,7 +427,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03, 0, 0x0d);
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, 0, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }

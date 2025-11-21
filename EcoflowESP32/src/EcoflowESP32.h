@@ -62,7 +62,7 @@ public:
     EcoflowESP32();
     ~EcoflowESP32();
 
-    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address);
+    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion = 3);
     void update();
 
     int getBatteryLevel();
@@ -122,6 +122,7 @@ private:
     std::string _userId;
     std::string _deviceSn;
     std::string _ble_address;
+    uint8_t _protocolVersion = 3;
 
     NimBLEClient* _pClient = nullptr;
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
