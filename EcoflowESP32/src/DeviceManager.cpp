@@ -4,33 +4,29 @@
 
 // Helper to extract serial from Manufacturer Data
 // Similar to Python's parse_manufacturer_data
+// Python: serial = hex_representation[2:34] -> 16 bytes, skipping the first byte (0) of the data payload.
+// The data payload typically comes after the 2-byte Manufacturer ID.
+// NimBLE's getManufacturerData() returns the raw payload associated with the ID if parsed, or the whole string?
+// NimBLEAdvertisedDevice::getManufacturerData() returns std::string containing the payload ONLY (ID is key).
+// Wait, looking at NimBLE source, it seems it just returns the payload bytes.
+// If Python receives `manufacturer_data[ID]`, then index 0 is the first byte of payload.
+// Python logic: hex_representation is hex string of the payload.
+// hex[2:34] means skipping first 2 chars = 1 byte.
+// So we skip index 0 of payload, and take next 16 bytes (index 1 to 16).
+// This matches the previous logic: `manufacturerData.data() + 1`.
+// BUT, we must be absolutely certain what getManufacturerData returns.
+// If using standard NimBLE-Arduino: it returns payload.
+// Let's double check logging.
 static std::string extractSerial(const std::string& manufacturerData) {
-    if (manufacturerData.length() < 18) return "";
-    // Python: hex_representation[2:34] -> 16 bytes -> chars 2 to 18 (0-indexed? No, 1-indexed).
-    // C++: manufacturerData is raw bytes.
-    // Manufacturer ID is first 2 bytes.
-    // Data starts at index 2.
-    // Serial is 16 bytes?
-    // Python:
-    // hex_representation = binascii.hexlify(data).decode("utf-8")
-    // serial = hex_representation[2:34]
-    // 34-2 = 32 hex chars = 16 bytes.
-    // So bytes[1...16]? Or bytes[0...15] of the payload?
-    // manufacturer_data is a dict {ID: bytes}.
-    // In NimBLE, getManufacturerData() returns the whole string including ID? No, usually just payload if obtained via getManufacturerData(ID).
-    // But here we get the raw string.
-
-    // Let's assume standard format: 2 bytes ID + Data.
-    // Ecoflow ID is 0xB3B5 (46517 decimal).
-
-    // Wait, Python code: `advertisement_data.manufacturer_data[MANUFACTURER_ID]` -> returns bytes.
-    // `hex_representation = binascii.hexlify(data)`
-    // `serial = hex_representation[2:34]` -> Bytes 1 to 16 (skipping byte 0?).
-    // Let's look at byte 0.
-    // Byte 0 might be a type or length?
-    // "serial = binascii.unhexlify(serial).decode("utf-8")"
-
-    // So we need 16 bytes starting from offset 1 of the manufacturer data payload.
+    // Debug print
+    if (manufacturerData.length() > 0) {
+        char hex_debug[manufacturerData.length() * 2 + 1];
+        for(size_t i=0; i<manufacturerData.length(); i++) {
+            sprintf(&hex_debug[i*2], "%02X", (uint8_t)manufacturerData[i]);
+        }
+        hex_debug[manufacturerData.length() * 2] = 0;
+        ESP_LOGD("DeviceManager", "Manufacturer Data: %s", hex_debug);
+    }
 
     if (manufacturerData.length() < 18) return "";
 
@@ -59,6 +55,7 @@ DeviceManager::DeviceManager() {
 }
 
 void DeviceManager::initialize() {
+    NimBLEDevice::init(""); // Initialize BLE once here
     prefs.begin("ecoflow", false);
     loadDevices();
 
@@ -74,6 +71,17 @@ void DeviceManager::initialize() {
 }
 
 void DeviceManager::update() {
+    // Handle Pending Connection
+    if (_hasPendingConnection) {
+        stopScan();
+        ESP_LOGI("DeviceManager", "Executing pending connection to %s", _pendingConnectSN.c_str());
+        saveDevice(_targetScanType, _pendingConnectMac, _pendingConnectSN);
+        EcoflowESP32* dev = getDevice(_targetScanType);
+        uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+        dev->begin(ECOFLOW_USER_ID, _pendingConnectSN, _pendingConnectMac, version);
+        _hasPendingConnection = false;
+    }
+
     slotD3.instance->update();
     slotW2.instance->update();
 
@@ -152,14 +160,16 @@ void DeviceManager::startScan(DeviceType type) {
     _targetScanType = type;
     _isScanning = true;
     _scanStartTime = millis();
+    _hasPendingConnection = false;
 
     if (!pScan) {
         pScan = NimBLEDevice::getScan();
-        pScan->setAdvertisedDeviceCallbacks(new ManagerScanCallbacks(this), true); // Use true to delete old callbacks? No, managed manually usually.
+        pScan->setAdvertisedDeviceCallbacks(new ManagerScanCallbacks(this), true);
         pScan->setActiveScan(true);
         pScan->setInterval(100);
         pScan->setWindow(99);
     }
+    // Non-blocking scan (duration 0 = forever until stopped manually or timeout logic in update)
     pScan->start(0, nullptr, false);
 }
 
@@ -182,34 +192,24 @@ void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* adver
 }
 
 void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
+    if (_hasPendingConnection) return; // Already found one, ignore others
     if (!device->haveManufacturerData()) return;
 
     std::string data = device->getManufacturerData();
-    // Check Manufacturer ID (Ecoflow = 0xB3B5 -> little endian in memory? NimBLE returns string.
-    // The data string usually contains the ID at the beginning if parsed from raw packet,
-    // BUT NimBLE's getManufacturerData() returns the data associated with the ID if parsed, OR raw?
-    // Wait, NimBLEAdvertisedDevice::getManufacturerData() returns the *whole* manufacturer data field including the 2-byte company ID?
-    // Let's verify. NimBLEArduino usually stores the body.
-    // Actually, `haveManufacturerData()` checks if the flag is set.
-    // `getManufacturerData()` returns std::string.
-    // If we check standard BLE, it's ID + Data.
-
-    // Ecoflow ID is 46517 (0xB5B3 in Little Endian, or 0xB3B5).
-    // Let's just check if the string is long enough and parse serial.
+    // NimBLEAdvertisedDevice::getManufacturerData() returns the payload string.
+    // Important: Ecoflow ID is 0xB3B5.
+    // If the parser works by skipping byte 0, we rely on that.
 
     std::string sn = extractSerial(data);
     if (sn.length() > 0) {
         ESP_LOGD("DeviceManager", "Found SN: %s", sn.c_str());
         if (isTargetDevice(sn, _targetScanType)) {
-            ESP_LOGI("DeviceManager", "Match found! Connecting to %s", sn.c_str());
-            stopScan();
-
-            std::string mac = device->getAddress().toString();
-            saveDevice(_targetScanType, mac, sn);
-
-            EcoflowESP32* dev = getDevice(_targetScanType);
-            uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
-            dev->begin(ECOFLOW_USER_ID, sn, mac, version);
+            ESP_LOGI("DeviceManager", "Match found! Pending connection to %s", sn.c_str());
+            // Do NOT connect here to avoid deadlock.
+            _pendingConnectMac = device->getAddress().toString();
+            _pendingConnectSN = sn;
+            _hasPendingConnection = true;
+            // Scan will be stopped in update()
         }
     }
 }

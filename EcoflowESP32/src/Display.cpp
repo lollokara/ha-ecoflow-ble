@@ -205,8 +205,8 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     }
 
     // Priority 1: Disconnected (Only if in Main Menu or Detail View of that device)
-    // If in Device Menu, we want to see options even if disconnected.
-    if ((currentState == MenuState::MAIN_MENU || currentState == MenuState::DETAIL || currentState == MenuState::SELECTION) && !currentData.isConnected) {
+    // If in Device Menu or Selection Menu, we want to see options even if disconnected.
+    if ((currentState == MenuState::MAIN_MENU || currentState == MenuState::DETAIL) && !currentData.isConnected) {
         strip.setBrightness(25);
         drawNcScreen();
         // Show device name if possible?

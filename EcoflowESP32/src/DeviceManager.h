@@ -69,6 +69,11 @@ private:
     bool isTargetDevice(const std::string& sn, DeviceType type);
     void saveDevice(DeviceType type, const std::string& mac, const std::string& sn);
     void loadDevices();
+
+    // Connection queue
+    bool _hasPendingConnection = false;
+    std::string _pendingConnectMac;
+    std::string _pendingConnectSN;
 };
 
 #endif
