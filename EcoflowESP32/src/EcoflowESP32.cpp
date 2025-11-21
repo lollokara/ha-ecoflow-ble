@@ -1,3 +1,13 @@
+/**
+ * @file EcoflowESP32.cpp
+ * @author Jules
+ * @brief Implementation file for the EcoflowESP32 library.
+ *
+ * This file contains the core logic for managing the BLE connection, handling
+ * the state machine for authentication, and processing incoming/outgoing data.
+ * It uses a dedicated FreeRTOS task to handle all BLE operations non-blockingly.
+ */
+
 #include "EcoflowESP32.h"
 #include "EcoflowProtocol.h"
 #include "EcoflowDataParser.h"
@@ -8,23 +18,20 @@
 
 static const char* TAG = "EcoflowESP32";
 
-// Helper to print byte arrays for debugging
-static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
-    if (size == 0) return;
-    char hex_str[size * 3 + 1];
-    for (size_t i = 0; i < size; i++) {
-        sprintf(hex_str + i * 3, "%02x ", data[i]);
-    }
-    hex_str[size * 3] = '\0';
-    ESP_LOGV(TAG, "%s: %s", label, hex_str);
-}
-
-
+// Static vector to hold instances for the static notify callback
 std::vector<EcoflowESP32*> EcoflowESP32::_instances;
 
+//--------------------------------------------------------------------------
+//--- Static BLE Callbacks
+//--------------------------------------------------------------------------
+
+/**
+ * @brief Static callback for BLE notifications.
+ * This function receives data from the device and queues it for processing
+ * in the dedicated BLE task.
+ */
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     ESP_LOGV(TAG, "Notify callback received %d bytes", length);
-    print_hex_esp(pData, length, "Notify Data");
 
     NimBLEClient* pClient = pRemoteCharacteristic->getRemoteService()->getClient();
     for (auto* instance : _instances) {
@@ -33,7 +40,11 @@ void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteris
             notification->data = new uint8_t[length];
             memcpy(notification->data, pData, length);
             notification->length = length;
-            xQueueSend(instance->_ble_queue, &notification, portMAX_DELAY);
+            if (xQueueSend(instance->_ble_queue, &notification, 0) != pdTRUE) {
+                ESP_LOGW(TAG, "BLE notification queue full, dropping packet.");
+                delete[] notification->data;
+                delete notification;
+            }
             return;
         }
     }
@@ -56,6 +67,10 @@ void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
     }
 }
 
+//--------------------------------------------------------------------------
+//--- Constructor / Destructor
+//--------------------------------------------------------------------------
+
 EcoflowESP32::EcoflowESP32() {
     _instances.push_back(this);
     _clientCallback = new EcoflowClientCallback(this);
@@ -75,6 +90,10 @@ EcoflowESP32::~EcoflowESP32() {
     }
 }
 
+//--------------------------------------------------------------------------
+//--- Public API
+//--------------------------------------------------------------------------
+
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
     _userId = userId;
     _deviceSn = deviceSn;
@@ -91,24 +110,14 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     }
 
     if (!_ble_task_handle) {
-        // Increased stack size to prevent potential overflow
         xTaskCreate(ble_task_entry, "ble_task", 12288, this, 5, &_ble_task_handle);
     }
     return true;
 }
 
-void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
-    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
-    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
-    _state = ConnectionState::CREATED; // Signal task to connect
-    _connectionRetries = 0; // Reset retries
-}
-
-void EcoflowESP32::onConnect(NimBLEClient* pClient) {
-    _connectionRetries = 0;
-    _state = ConnectionState::SERVICE_DISCOVERY;
-    _lastAuthActivity = millis();
-    ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
+void EcoflowESP32::update() {
+    // This function is intentionally left empty.
+    // All processing is handled by the dedicated FreeRTOS task.
 }
 
 void EcoflowESP32::disconnectAndForget() {
@@ -124,152 +133,132 @@ void EcoflowESP32::disconnectAndForget() {
     }
 }
 
-void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
-    _state = ConnectionState::DISCONNECTED;
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
-        _pAdvertisedDevice = nullptr;
-    }
-}
 
-void EcoflowESP32::update() {
-}
+//--------------------------------------------------------------------------
+//--- BLE Task and State Machine
+//--------------------------------------------------------------------------
 
+/**
+ * @brief Main entry point for the FreeRTOS task that handles all BLE logic.
+ */
 void EcoflowESP32::ble_task_entry(void* pvParameters) {
     EcoflowESP32* self = (EcoflowESP32*)pvParameters;
     for (;;) {
+        // Log state changes for debugging
         if (self->_state != self->_lastState) {
-            ESP_LOGI(TAG, "State changed: %d", (int)self->_state);
+            ESP_LOGI(TAG, "State changed: %d -> %d", (int)self->_lastState, (int)self->_state);
             self->_lastState = self->_state;
         }
 
-        if (self->_pAdvertisedDevice) {
-            if (!self->_pClient->isConnected()) {
-                // Check if we are waiting for a retry delay
-                if (millis() - self->_lastConnectionAttempt > 5000) { // 5s retry delay
-                    self->_lastConnectionAttempt = millis();
-                    if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
-                        ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
-                        self->_state = ConnectionState::ESTABLISHING_CONNECTION;
-                        self->_connectionRetries++;
-                        if(self->_pClient->connect(self->_pAdvertisedDevice)) {
-                             // Connect successful, onConnect will be called
-                        } else {
-                             ESP_LOGE(TAG, "Connect failed");
-                        }
-                    } else {
-                        ESP_LOGE(TAG, "Max connection attempts reached. Waiting for manager.");
-                        delete self->_pAdvertisedDevice;
-                        self->_pAdvertisedDevice = nullptr;
-                        self->_connectionRetries = 0;
-                        self->_state = ConnectionState::DISCONNECTED;
-                    }
-                }
-            }
-        } else {
-            if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
-                if (!self->_pClient->isConnected()) {
-                     ESP_LOGW(TAG, "Client disconnected unexpectedly");
-                     self->onDisconnect(self->_pClient);
-                }
-            }
-        }
-
-        if (self->_pClient->isConnected()) {
-            if (self->_state == ConnectionState::SERVICE_DISCOVERY) {
-                NimBLERemoteService* pSvc = self->_pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
-                if (pSvc) {
-                    self->_pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-                    self->_pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
-                    if (self->_pReadChr && self->_pWriteChr) {
-                        self->_state = ConnectionState::SUBSCRIBING_NOTIFICATIONS;
+        // --- Connection Management ---
+        if (self->_pAdvertisedDevice && !self->_pClient->isConnected()) {
+            // Attempt to connect if a device has been found
+            if (millis() - self->_lastConnectionAttempt > 5000) { // 5s retry delay
+                self->_lastConnectionAttempt = millis();
+                if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
+                    ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
+                    self->_state = ConnectionState::ESTABLISHING_CONNECTION;
+                    self->_connectionRetries++;
+                    if(!self->_pClient->connect(self->_pAdvertisedDevice)) {
+                         ESP_LOGE(TAG, "Connect failed");
                     }
                 } else {
-                    ESP_LOGE(TAG, "Service not found, disconnecting");
-                    self->_pClient->disconnect();
+                    ESP_LOGE(TAG, "Max connection attempts reached.");
+                    delete self->_pAdvertisedDevice;
+                    self->_pAdvertisedDevice = nullptr;
+                    self->_state = ConnectionState::DISCONNECTED;
                 }
-            } else if (self->_state == ConnectionState::SUBSCRIBING_NOTIFICATIONS) {
-                if (self->_pReadChr->canNotify()) {
-                    if(self->_pReadChr->subscribe(true, notifyCallback)) {
+            }
+        } else if (self->_state >= ConnectionState::CONNECTED && !self->_pClient->isConnected()){
+             ESP_LOGW(TAG, "Client disconnected unexpectedly");
+             self->onDisconnect(self->_pClient);
+        }
+
+        // --- State Machine for Connected Client ---
+        if (self->_pClient->isConnected()) {
+            switch(self->_state) {
+                case ConnectionState::SERVICE_DISCOVERY: {
+                    NimBLERemoteService* pSvc = self->_pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
+                    if (pSvc) {
+                        self->_pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+                        self->_pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+                        if (self->_pReadChr && self->_pWriteChr) {
+                            self->_state = ConnectionState::SUBSCRIBING_NOTIFICATIONS;
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "Service not found, disconnecting");
+                        self->_pClient->disconnect();
+                    }
+                    break;
+                }
+                case ConnectionState::SUBSCRIBING_NOTIFICATIONS:
+                    if (self->_pReadChr->canNotify() && self->_pReadChr->subscribe(true, notifyCallback)) {
                         ESP_LOGI(TAG, "Subscribed to notifications");
                         self->_state = ConnectionState::CONNECTED;
                     } else {
                         ESP_LOGE(TAG, "Failed to subscribe to notifications");
                         self->_pClient->disconnect();
                     }
-                }
-            } else if (self->_state == ConnectionState::CONNECTED) {
-                self->_startAuthentication();
-            } else if (self->_state > ConnectionState::CONNECTED && self->_state < ConnectionState::AUTHENTICATED) {
-                if (millis() - self->_lastAuthActivity > 10000) { // New timeout for auth steps
-                    ESP_LOGW(TAG, "Authentication timed out");
-                    self->_pClient->disconnect();
-                }
-            } else if (self->_state == ConnectionState::AUTHENTICATED) {
-                if (millis() - self->_lastKeepAliveTime > 5000) {
-                    self->_lastKeepAliveTime = millis();
-                    self->requestData();
-                }
+                    break;
+                case ConnectionState::CONNECTED:
+                    self->_startAuthentication();
+                    break;
+                case ConnectionState::AUTHENTICATED:
+                    // Send a keep-alive request for data every 5 seconds
+                    if (millis() - self->_lastKeepAliveTime > 5000) {
+                        self->_lastKeepAliveTime = millis();
+                        self->requestData();
+                    }
+                    break;
+                default:
+                    // Handle authentication timeout
+                    if (self->_state > ConnectionState::CONNECTED && self->_state < ConnectionState::AUTHENTICATED) {
+                        if (millis() - self->_lastAuthActivity > 10000) {
+                            ESP_LOGW(TAG, "Authentication timed out");
+                            self->_pClient->disconnect();
+                        }
+                    }
+                    break;
             }
         }
 
+        // --- Process Incoming Notifications ---
         BleNotification* notification;
         if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
-            if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-                std::vector<uint8_t> data(notification->data, notification->data + notification->length);
-                auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
-                if (!parsed_payload.empty() && parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) {
-                    uint8_t peer_pub_key[41];
-                    peer_pub_key[0] = 0x04;
-                    memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
-                    if (self->_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
-                        self->_state = ConnectionState::REQUESTING_SESSION_KEY;
-                        ESP_LOGD(TAG, "Shared secret computed, requesting session key");
-                        std::vector<uint8_t> req_payload = {0x02};
-                        EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-                        self->_sendCommand(enc_packet.toBytes());
-                    } else {
-                        ESP_LOGE(TAG, "Failed to compute shared secret");
-                    }
-                } else {
-                    ESP_LOGE(TAG, "Invalid public key response");
-                }
-            } else if (self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-                std::vector<uint8_t> data(notification->data, notification->data + notification->length);
-                auto parsed_payload = EncPacket::parseSimple(data.data(), data.size());
-                if (!parsed_payload.empty() && parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
-                    std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
-                    self->_crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
-
-                    if (!decrypted_payload.empty()) {
-                        uint8_t padding = decrypted_payload.back();
-                        if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
-                            decrypted_payload.resize(decrypted_payload.size() - padding);
-                        }
-                    }
-
-                    if (decrypted_payload.size() >= 18) {
-                        self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
-                        self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
-                        ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, self->_txSeq++, 0x0d);
-                        EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
-                        self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
-                    } else {
-                        ESP_LOGE(TAG, "Decrypted session key info too short");
-                    }
-                }
-            } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
-                for (auto &packet : packets) {
-                    self->_handlePacket(&packet);
-                }
+            std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
+            for (auto &packet : packets) {
+                self->_handlePacket(&packet);
             }
             delete[] notification->data;
             delete notification;
         }
 
         vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
+
+//--------------------------------------------------------------------------
+//--- Internal Connection and Authentication Logic
+//--------------------------------------------------------------------------
+
+void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
+    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
+    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
+    _state = ConnectionState::CREATED; // Signal task to connect
+    _connectionRetries = 0;
+}
+
+void EcoflowESP32::onConnect(NimBLEClient* pClient) {
+    _connectionRetries = 0;
+    _state = ConnectionState::SERVICE_DISCOVERY;
+    _lastAuthActivity = millis();
+}
+
+void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
+    _state = ConnectionState::DISCONNECTED;
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
     }
 }
 
@@ -288,18 +277,19 @@ void EcoflowESP32::_startAuthentication() {
     uint8_t* pub_key = _crypto.get_public_key();
     payload.insert(payload.end(), pub_key, pub_key + _crypto.get_public_key_len());
 
-    print_hex_esp(payload.data(), payload.size(), "Public Key Payload");
-
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
     _sendCommand(enc_packet.toBytes());
 }
 
+/**
+ * @brief Main packet handler, routes packets to the correct handler based on auth state.
+ */
 void EcoflowESP32::_handlePacket(Packet* pkt) {
-    ESP_LOGD(TAG, "_handlePacket: Handling packet with cmdId=0x%02x", pkt->getCmdId());
-    if (_state == ConnectionState::AUTHENTICATED) {
+    ESP_LOGD(TAG, "_handlePacket: cmdId=0x%02x", pkt->getCmdId());
+    if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data);
+        // Reply to packets that require it to keep the data flowing
         if (pkt->getDest() == 0x21) {
-            ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
@@ -309,31 +299,49 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     }
 }
 
+/**
+ * @brief Handles packets received during the authentication process.
+ */
 void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
-    ESP_LOGD(TAG, "_handleAuthPacket: Handling auth packet with cmdId=0x%02x", pkt->getCmdId());
+    ESP_LOGD(TAG, "_handleAuthPacket: cmdId=0x%02x", pkt->getCmdId());
     const auto& payload = pkt->getPayload();
 
-    if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
-        ESP_LOGD(TAG, "Handling auth status response");
+    if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+        if (!payload.empty() && payload.size() >= 43 && payload[0] == 0x01) {
+            uint8_t peer_pub_key[41];
+            peer_pub_key[0] = 0x04;
+            memcpy(peer_pub_key + 1, payload.data() + 3, 40);
+            if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+                _state = ConnectionState::REQUESTING_SESSION_KEY;
+                std::vector<uint8_t> req_payload = {0x02};
+                EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+                _sendCommand(enc_packet.toBytes());
+            }
+        }
+    } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
+        std::vector<uint8_t> decrypted_payload;
+        _crypto.decrypt_shared(payload.data(), payload.size(), decrypted_payload.data());
+        if (decrypted_payload.size() >= 18) {
+            _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
+            _state = ConnectionState::REQUESTING_AUTH_STATUS;
+            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
+            EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+            _sendCommand(enc_auth_status.toBytes(&_crypto));
+        }
+    } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
             _state = ConnectionState::AUTHENTICATING;
-            ESP_LOGD(TAG, "Auth status OK, authenticating");
-
             uint8_t md5_data[16];
             mbedtls_md5((const unsigned char*)(_userId + _deviceSn).c_str(), _userId.length() + _deviceSn.length(), md5_data);
             char hex_data[33];
-            for(int i=0; i<16; i++) {
-                sprintf(&hex_data[i*2], "%02X", md5_data[i]);
-            }
+            for(int i=0; i<16; i++) sprintf(&hex_data[i*2], "%02X", md5_data[i]);
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-
             Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
-        ESP_LOGD(TAG, "Handling authentication response");
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload.size() > 0 && payload[0] == 0x00) {
             _state = ConnectionState::AUTHENTICATED;
             ESP_LOGI(TAG, "Authentication successful!");
@@ -341,6 +349,19 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             ESP_LOGE(TAG, "Authentication failed!");
         }
     }
+}
+
+//--------------------------------------------------------------------------
+//--- Command Sending
+//--------------------------------------------------------------------------
+
+bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
+    if (_pWriteChr && isConnected()) {
+        ESP_LOGV(TAG, "Sending %d bytes", command.size());
+        _pWriteChr->writeValue(command.data(), command.size(), false); // Write without response
+        return true;
+    }
+    return false;
 }
 
 void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
@@ -359,18 +380,11 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
     _sendCommand(enc_packet.toBytes(&_crypto));
 }
 
+//--------------------------------------------------------------------------
+//--- Getters and Setters
+//--------------------------------------------------------------------------
 
-bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
-    if (_pWriteChr && isConnected()) {
-        print_hex_esp(command.data(), command.size(), "Sending command");
-        _pWriteChr->writeValue(command.data(), command.size(), false); // Write without response
-        return true;
-    }
-    return false;
-}
-
-// --- Updated Getters with Protocol Version Logic ---
-
+// --- Data Getters ---
 int EcoflowESP32::getBatteryLevel() {
     if (_protocolVersion == 2) return _data.wave2.batSoc;
     return (int)_data.delta3.batteryLevel;
@@ -383,17 +397,15 @@ int EcoflowESP32::getOutputPower() {
     if (_protocolVersion == 2) return (_data.wave2.batPwrWatt < 0) ? abs(_data.wave2.batPwrWatt) : 0;
     return (int)_data.delta3.outputPower;
 }
-int EcoflowESP32::getBatteryVoltage() { return 0; } // Not in filtered list
-int EcoflowESP32::getACVoltage() { return 0; } // Not in filtered list
-int EcoflowESP32::getACFrequency() { return 0; } // Not in filtered list
-
-// New getters
+int EcoflowESP32::getBatteryVoltage() { return 0; } // Not available in current data structure
+int EcoflowESP32::getACVoltage() { return 0; } // Not available
+int EcoflowESP32::getACFrequency() { return 0; } // Not available
 int EcoflowESP32::getSolarInputPower() {
     if (_protocolVersion == 2) return _data.wave2.mpptPwrWatt;
     return (int)_data.delta3.solarInputPower;
 }
 int EcoflowESP32::getAcOutputPower() {
-    if (_protocolVersion == 2) return 0; // Wave 2 is DC only usually?
+    if (_protocolVersion == 2) return 0; // Wave 2 is typically DC
     return (int)abs(_data.delta3.acOutputPower);
 }
 int EcoflowESP32::getDcOutputPower() {
@@ -406,21 +418,22 @@ int EcoflowESP32::getCellTemperature() {
 }
 int EcoflowESP32::getAmbientTemperature() {
     if (_protocolVersion == 2) return (int)_data.wave2.envTemp;
-    return 0;
+    return 0; // Not available for Delta 3
 }
 int EcoflowESP32::getMaxChgSoc() {
-    if (_protocolVersion == 2) return 100; // Wave 2 doesn't have this exposed in packet?
+    if (_protocolVersion == 2) return 100; // Not configurable on Wave 2
     return _data.delta3.batteryChargeLimitMax;
 }
 int EcoflowESP32::getMinDsgSoc() {
-    if (_protocolVersion == 2) return 0;
+    if (_protocolVersion == 2) return 0; // Not configurable on Wave 2
     return _data.delta3.batteryChargeLimitMin;
 }
 int EcoflowESP32::getAcChgLimit() {
-    if (_protocolVersion == 2) return 0;
+    if (_protocolVersion == 2) return 0; // Not applicable
     return _data.delta3.acChargingSpeed;
 }
 
+// --- State Getters ---
 bool EcoflowESP32::isAcOn() {
     if (_protocolVersion == 2) return (_data.wave2.mode != 0);
     return _data.delta3.acOn;
@@ -430,20 +443,14 @@ bool EcoflowESP32::isDcOn() {
     return _data.delta3.dcOn;
 }
 bool EcoflowESP32::isUsbOn() {
-    if (_protocolVersion == 2) return false;
+    if (_protocolVersion == 2) return false; // Not applicable to Wave 2
     return _data.delta3.usbOn;
 }
-
-bool EcoflowESP32::isConnected() {
-    return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
-}
-
-bool EcoflowESP32::isConnecting() {
-    return (_state >= ConnectionState::CREATED && _state < ConnectionState::AUTHENTICATED) || _state == ConnectionState::ESTABLISHING_CONNECTION;
-}
-
+bool EcoflowESP32::isConnected() { return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED; }
+bool EcoflowESP32::isConnecting() { return (_state >= ConnectionState::CREATED && _state < ConnectionState::AUTHENTICATED); }
 bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENTICATED; }
 
+// --- Control Setters ---
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
     Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
@@ -451,26 +458,18 @@ bool EcoflowESP32::requestData() {
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }
 
-bool EcoflowESP32::setDC(bool on) {
+bool EcoflowESP32::setAC(bool on) {
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
-    config.has_cfg_dc_12v_out_open = true;
-    config.cfg_dc_12v_out_open = on;
+    config.has_cfg_ac_out_open = true;
+    config.cfg_ac_out_open = on;
     _sendConfigPacket(config);
     return true;
 }
 
-bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
+bool EcoflowESP32::setDC(bool on) {
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
-
-    if (maxChg >= 50 && maxChg <= 100) {
-        config.has_cfg_max_chg_soc = true;
-        config.cfg_max_chg_soc = maxChg;
-    }
-    if (minDsg >= 0 && minDsg <= 30) {
-        config.has_cfg_min_dsg_soc = true;
-        config.cfg_min_dsg_soc = minDsg;
-    }
-
+    config.has_cfg_dc_12v_out_open = true;
+    config.cfg_dc_12v_out_open = on;
     _sendConfigPacket(config);
     return true;
 }
@@ -483,26 +482,29 @@ bool EcoflowESP32::setUSB(bool on) {
     return true;
 }
 
-bool EcoflowESP32::setAC(bool on) {
-    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
-    config.has_cfg_ac_out_open = true;
-    config.cfg_ac_out_open = on;
-    _sendConfigPacket(config);
-    return true;
-}
-
 bool EcoflowESP32::setAcChargingLimit(int watts) {
     if (watts < 200 || watts > 2900) {
         ESP_LOGW(TAG, "AC Charging limit %d W out of range", watts);
     }
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
-
     config.has_cfg_ac_in_chg_mode = true;
     config.cfg_ac_in_chg_mode = pd335_sys_AC_IN_CHG_MODE_AC_IN_CHG_MODE_SELF_DEF_POW;
-
     config.has_cfg_plug_in_info_ac_in_chg_pow_max = true;
     config.cfg_plug_in_info_ac_in_chg_pow_max = watts;
+    _sendConfigPacket(config);
+    return true;
+}
 
+bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    if (maxChg >= 50 && maxChg <= 100) {
+        config.has_cfg_max_chg_soc = true;
+        config.cfg_max_chg_soc = maxChg;
+    }
+    if (minDsg >= 0 && minDsg <= 30) {
+        config.has_cfg_min_dsg_soc = true;
+        config.cfg_min_dsg_soc = minDsg;
+    }
     _sendConfigPacket(config);
     return true;
 }

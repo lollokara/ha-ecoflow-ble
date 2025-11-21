@@ -85,7 +85,7 @@ int slideDirection = 0; // 1 = Up, -1 = Down
 
 // Pending Action for Timeout
 DisplayAction pendingAction = DisplayAction::NONE;
-DeviceType targetDeviceType = DeviceType::DELTA_2;
+DeviceType targetDeviceType = DeviceType::DELTA_3;
 
 // Temp variables for editing
 int tempAcLimit = 400;
@@ -304,7 +304,7 @@ void drawDetailMenu(DeviceType activeType) {
     int totIn = 0;
 
     switch (activeType) {
-        case DeviceType::DELTA_2:
+        case DeviceType::DELTA_3:
             // Default to Delta/River V3 logic
             acOn = currentData.delta3.acOn;
             acOut = abs((int)currentData.delta3.acOutputPower);
@@ -419,7 +419,7 @@ void drawDeviceActionMenu(DeviceSlot* slot) {
 
 void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScanning) {
     currentData = data;
-    DeviceSlot* slotD3 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_2);
+    DeviceSlot* slotD3 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_3);
     DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
 
     clearFrame();
@@ -442,7 +442,7 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
         strip.setBrightness(25);
-        DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_2;
+        DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_3;
         drawDetailMenu(activeType);
     } else if (currentState == MenuState::SETTINGS_SUBMENU) {
         strip.setBrightness(25);
@@ -676,7 +676,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             case ButtonInput::BTN_ENTER_SHORT:
                 currentState = MenuState::DEVICE_ACTION;
                 currentDeviceAction = DeviceActionPage::CON;
-                targetDeviceType = (currentDevicePage == DevicePage::D3) ? DeviceType::DELTA_2 : DeviceType::WAVE_2;
+                targetDeviceType = (currentDevicePage == DevicePage::D3) ? DeviceType::DELTA_3 : DeviceType::WAVE_2;
                 break;
             default: break;
         }
