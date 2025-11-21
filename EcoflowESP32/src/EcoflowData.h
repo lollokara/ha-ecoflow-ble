@@ -19,6 +19,17 @@ struct EcoflowData {
     int acOutputPower = 0;
     int dcOutputPower = 0;
     int cellTemperature = 0;
+
+    // Wave 2 Specifics
+    int currentTemp = 0;
+    int setTemp = 0;
+    int fanSpeed = 0;
+    int mode = 0;
+    int subMode = 0;
+    int remainingTime = 0; // Battery discharge/charge remaining in mins
+
+    // Connection Status
+    bool isConnected = false;
 };
 
 #endif // ECOFLOW_DATA_H

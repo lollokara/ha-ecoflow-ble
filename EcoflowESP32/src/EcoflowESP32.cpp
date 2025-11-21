@@ -16,22 +16,28 @@ static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
         sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
     hex_str[size * 3] = '\0';
-    //ESP_LOGD(TAG, "%s: %s", label, hex_str);
+    ESP_LOGV(TAG, "%s: %s", label, hex_str);
 }
 
 
-EcoflowESP32* EcoflowESP32::_instance = nullptr;
+std::vector<EcoflowESP32*> EcoflowESP32::_instances;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
-    ESP_LOGD(TAG, "Notify callback received %d bytes", length);
+    ESP_LOGV(TAG, "Notify callback received %d bytes", length);
     print_hex_esp(pData, length, "Notify Data");
-    if (_instance && _instance->_ble_queue) {
-        BleNotification* notification = new BleNotification;
-        notification->data = new uint8_t[length];
-        memcpy(notification->data, pData, length);
-        notification->length = length;
-        xQueueSend(_instance->_ble_queue, &notification, portMAX_DELAY);
+
+    NimBLEClient* pClient = pRemoteCharacteristic->getRemoteService()->getClient();
+    for (auto* instance : _instances) {
+        if (instance->_pClient == pClient && instance->_ble_queue) {
+            BleNotification* notification = new BleNotification;
+            notification->data = new uint8_t[length];
+            memcpy(notification->data, pData, length);
+            notification->length = length;
+            xQueueSend(instance->_ble_queue, &notification, portMAX_DELAY);
+            return;
+        }
     }
+    ESP_LOGW(TAG, "Notification received but no matching instance found");
 }
 
 EcoflowClientCallback::EcoflowClientCallback(EcoflowESP32* instance) : _instance(instance) {}
@@ -51,7 +57,7 @@ void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
 }
 
 EcoflowESP32::EcoflowESP32() {
-    _instance = this;
+    _instances.push_back(this);
     _clientCallback = new EcoflowClientCallback(this);
 }
 
@@ -60,43 +66,42 @@ EcoflowESP32::~EcoflowESP32() {
         NimBLEDevice::deleteClient(_pClient);
     }
     delete _clientCallback;
-}
 
-EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32* instance) : _instance(instance) {}
-
-void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-    if (advertisedDevice->getAddress().toString() == _instance->_ble_address) {
-        ESP_LOGI(TAG, "Found device");
-        _instance->_pScan->stop();
-        _instance->_pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice);
+    for (auto it = _instances.begin(); it != _instances.end(); ++it) {
+        if (*it == this) {
+            _instances.erase(it);
+            break;
+        }
     }
 }
 
-void EcoflowESP32::_startScan() {
-    ESP_LOGI(TAG, "Starting scan...");
-    _lastScanTime = millis();
-    _state = ConnectionState::SCANNING;
-    _connectionRetries = 0;
-    if (!_pScan) {
-        _pScan = NimBLEDevice::getScan();
-        _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
-        _pScan->setActiveScan(true);
-        _pScan->setInterval(100);
-        _pScan->setWindow(99);
-    }
-    _pScan->start(5, false);
-}
-
-bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address) {
+bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
-    NimBLEDevice::init("");
-    _pClient = NimBLEDevice::createClient();
-    _pClient->setClientCallbacks(_clientCallback);
-    _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
-    xTaskCreate(ble_task_entry, "ble_task", 4096, this, 5, &_ble_task_handle);
+    _protocolVersion = protocolVersion;
+
+    if (!_pClient) {
+        _pClient = NimBLEDevice::createClient();
+        _pClient->setClientCallbacks(_clientCallback);
+    }
+
+    if (!_ble_queue) {
+        _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
+    }
+
+    if (!_ble_task_handle) {
+        // Increased stack size to prevent potential overflow
+        xTaskCreate(ble_task_entry, "ble_task", 12288, this, 5, &_ble_task_handle);
+    }
     return true;
+}
+
+void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
+    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
+    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
+    _state = ConnectionState::CREATED; // Signal task to connect
+    _connectionRetries = 0; // Reset retries
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
@@ -106,17 +111,37 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
 }
 
+void EcoflowESP32::disconnectAndForget() {
+    if (_pClient && _pClient->isConnected()) {
+        _pClient->disconnect();
+    }
+    _ble_address = "";
+    _deviceSn = "";
+    _state = ConnectionState::NOT_CONNECTED;
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
+    }
+}
+
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
-    delete _pAdvertisedDevice;
-    _pAdvertisedDevice = nullptr;
-    // Restart scan to reconnect
-    _startScan();
+    // Don't delete _pAdvertisedDevice here, we might want to reconnect using it?
+    // Actually DeviceManager handles finding it again.
+    // But if we just lost connection, we might want to keep the AdvertisedDevice to retry immediately?
+    // The logic in ble_task_entry handles retries if _pAdvertisedDevice is present.
+    // But if we reached MAX_CONNECT_ATTEMPTS, we delete it.
+    // For simple disconnect, let's leave it.
+    // But if we want to force rescan, we should delete it.
+    // Let's delete it to force DeviceManager to find it again (fresh RSSI etc).
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
+    }
 }
 
 void EcoflowESP32::update() {
     // This function can be used for other non-BLE related tasks if needed.
-    // The main BLE logic is now in ble_task_entry.
 }
 
 void EcoflowESP32::ble_task_entry(void* pvParameters) {
@@ -127,31 +152,39 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             self->_lastState = self->_state;
         }
 
-        if (self->_state == ConnectionState::SCANNING && millis() - self->_lastScanTime > 10000) {
-            ESP_LOGW(TAG, "Scan timed out, restarting scan");
-            self->_startScan();
-        }
-
         if (self->_pAdvertisedDevice) {
             if (!self->_pClient->isConnected()) {
-                if (millis() - self->_lastConnectionAttempt > 10000) { // Increased timeout
+                // Check if we are waiting for a retry delay
+                if (millis() - self->_lastConnectionAttempt > 5000) { // 5s retry delay
                     self->_lastConnectionAttempt = millis();
                     if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
                         ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
                         self->_state = ConnectionState::ESTABLISHING_CONNECTION;
                         self->_connectionRetries++;
-                        self->_pClient->connect(self->_pAdvertisedDevice);
+                        if(self->_pClient->connect(self->_pAdvertisedDevice)) {
+                             // Connect successful, onConnect will be called
+                        } else {
+                             ESP_LOGE(TAG, "Connect failed");
+                        }
                     } else {
-                        ESP_LOGE(TAG, "Max connection attempts reached, restarting scan");
+                        ESP_LOGE(TAG, "Max connection attempts reached. Waiting for manager.");
                         delete self->_pAdvertisedDevice;
                         self->_pAdvertisedDevice = nullptr;
                         self->_connectionRetries = 0;
-                        self->_startScan();
+                        self->_state = ConnectionState::DISCONNECTED;
                     }
                 }
             }
-        } else if (self->_state != ConnectionState::SCANNING) {
-            self->_startScan();
+        } else {
+            // If disconnected and no advertised device to connect to, we wait for DeviceManager to give us one.
+
+             // Check if client claims disconnected but our state thinks otherwise
+            if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
+                if (!self->_pClient->isConnected()) {
+                     ESP_LOGW(TAG, "Client disconnected unexpectedly");
+                     self->onDisconnect(self->_pClient);
+                }
+            }
         }
 
         if (self->_pClient->isConnected()) {
@@ -231,7 +264,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                         self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
                         self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
                         ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03, 0, 0x0d);
+                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, self->_txSeq++, 0x0d);
                         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
                         self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
                     } else {
@@ -239,7 +272,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     }
                 }
             } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->isAuthenticated());
+                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
                 for (auto &packet : packets) {
                     self->_handlePacket(&packet);
                 }
@@ -255,7 +288,8 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
-    Packet::reset_sequence();
+    // Packet::reset_sequence(); // Removed static reset
+    _txSeq = 0;
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
         return;
@@ -279,6 +313,9 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         if (pkt->getDest() == 0x21) {
             ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
+            // Reply packets usually echo the sequence number or use their own?
+            // The reference code mirrors the sequence from the received packet for replies?
+            // "packet.seq" in python replyPacket.
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
@@ -307,7 +344,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 0x03, 0, 0x0d);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -333,7 +370,7 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
     }
 
     std::vector<uint8_t> payload(buffer, buffer + stream.bytes_written);
-    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13);
+    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     _sendCommand(enc_packet.toBytes(&_crypto));
 }
@@ -349,7 +386,7 @@ bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
 }
 
 int EcoflowESP32::getBatteryLevel() {
-    ESP_LOGI(TAG, "Battery level is: %d%%", _data.batteryLevel);
+    ESP_LOGV(TAG, "Battery level is: %d%%", _data.batteryLevel);
     return _data.batteryLevel;
 }
 int EcoflowESP32::getInputPower() { return _data.inputPower; }
@@ -368,12 +405,26 @@ bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
 bool EcoflowESP32::isUsbOn() { return _data.usbOn; }
 
-bool EcoflowESP32::isConnected() { return _state >= ConnectionState::CONNECTED; }
+bool EcoflowESP32::isConnected() {
+    // Check if we are in a state that implies an active connection.
+    // CONNECTED is the start of active connection states.
+    // AUTHENTICATED is the highest state.
+    // States after AUTHENTICATED in the enum are error or disconnect states.
+    return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
+}
+
+bool EcoflowESP32::isConnecting() {
+    // Connecting includes Created (pending task pickup), Establishing, and all auth steps before Authenticated
+    // Exclude SCANNING as that's now handled by DeviceManager, but EcoflowESP32 state might still reflect it if not updated.
+    // Here we care if we are "busy trying to connect".
+    return (_state >= ConnectionState::CREATED && _state < ConnectionState::AUTHENTICATED) || _state == ConnectionState::ESTABLISHING_CONNECTION;
+}
+
 bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENTICATED; }
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, 0x03, 0, 0x0d);
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }

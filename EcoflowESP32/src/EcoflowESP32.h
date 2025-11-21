@@ -62,7 +62,7 @@ public:
     EcoflowESP32();
     ~EcoflowESP32();
 
-    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address);
+    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion = 3);
     void update();
 
     int getBatteryLevel();
@@ -83,6 +83,7 @@ public:
     bool isUsbOn();
 
     bool isConnected();
+    bool isConnecting();
     bool isAuthenticated();
 
     bool requestData();
@@ -92,6 +93,8 @@ public:
 
     // New method for dynamic AC charging limit
     bool setAcChargingLimit(int watts);
+
+    void disconnectAndForget();
 
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
@@ -113,28 +116,23 @@ private:
     void _handleAuthPacket(Packet* pkt);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
 
-    static EcoflowESP32* _instance;
+    static std::vector<EcoflowESP32*> _instances;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
     ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
 
     std::string _userId;
     std::string _deviceSn;
     std::string _ble_address;
+    uint8_t _protocolVersion = 3;
+    uint32_t _txSeq = 0;
 
     NimBLEClient* _pClient = nullptr;
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
     NimBLERemoteCharacteristic* _pReadChr = nullptr;
     EcoflowClientCallback* _clientCallback;
-    NimBLEScan* _pScan = nullptr;
     NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
-    void _startScan();
-    class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
-        public:
-            AdvertisedDeviceCallbacks(EcoflowESP32* instance);
-            void onResult(NimBLEAdvertisedDevice* advertisedDevice) override;
-        private:
-            EcoflowESP32* _instance;
-    };
+public:
+    void connectTo(NimBLEAdvertisedDevice* device);
 
     EcoflowCrypto _crypto;
 
@@ -148,6 +146,8 @@ private:
         uint8_t* data;
         size_t length;
     };
+
+    std::vector<uint8_t> _rxBuffer;
 };
 
 #endif // ECOFLOW_ESP32_H

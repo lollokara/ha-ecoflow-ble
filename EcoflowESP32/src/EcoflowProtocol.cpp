@@ -13,7 +13,7 @@ static void print_hex_protocol(const uint8_t* data, size_t size, const char* lab
         sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
     hex_str[size * 3] = '\0';
-    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+    //ESP_LOGD(TAG, "%s: %s", label, hex_str);
 }
 
 const uint8_t Packet::PREFIX;
@@ -61,14 +61,14 @@ static uint8_t crc8(const uint8_t* data, size_t len) {
 }
 
 Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
-    if (len < 20 || data[0] != PREFIX) {
+    if (len < 18 || data[0] != PREFIX) { // Minimum length reduced for V2
         return nullptr;
     }
 
     uint8_t version = data[1];
     uint16_t payload_len = data[2] | (data[3] << 8);
 
-    if (version == 3) {
+    if (version == 3 || version == 19) { // Allow version 19 as V3 (Delta 3 quirks?)
         if (crc16(data, len - 2) != (data[len - 2] | (data[len - 1] << 8))) {
             ESP_LOGE(TAG, "Packet CRC16 mismatch");
             return nullptr;
@@ -84,14 +84,33 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
     uint32_t seq = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
     uint8_t src = data[12];
     uint8_t dest = data[13];
-    uint8_t dsrc = data[14];
-    uint8_t ddest = data[15];
-    uint8_t cmd_set = data[16];
-    uint8_t cmd_id = data[17];
+
+    uint8_t dsrc = 0;
+    uint8_t ddest = 0;
+    uint8_t cmd_set = 0;
+    uint8_t cmd_id = 0;
+    size_t payload_offset = 0;
+
+    if (version == 3 || version == 19) {
+        dsrc = data[14];
+        ddest = data[15];
+        cmd_set = data[16];
+        cmd_id = data[17];
+        payload_offset = 18;
+    } else if (version == 2) {
+        // V2: No dsrc/ddst fields
+        cmd_set = data[14];
+        cmd_id = data[15];
+        payload_offset = 16;
+    } else {
+        ESP_LOGE(TAG, "Unsupported packet version %d", version);
+        print_hex_protocol(data, len, "Unknown Version Packet");
+        return nullptr;
+    }
 
     std::vector<uint8_t> payload;
     if (payload_len > 0) {
-        payload.assign(data + 18, data + 18 + payload_len);
+        payload.assign(data + payload_offset, data + payload_offset + payload_len);
         if (is_xor && data[6] != 0) {
             for (size_t i = 0; i < payload.size(); ++i) {
                 payload[i] ^= data[6];
@@ -119,11 +138,16 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(0);
     bytes.push_back(_src);
     bytes.push_back(_dest);
-    bytes.push_back(_check_type); // dsrc
-    bytes.push_back(_encrypted); // ddest
+
+    if (_version == 3) {
+        bytes.push_back(_check_type); // dsrc
+        bytes.push_back(_encrypted); // ddest
+    }
+
     bytes.push_back(_cmdSet);
     bytes.push_back(_cmdId);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
+
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);
@@ -172,41 +196,40 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     return packet_data;
 }
 
-std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated) {
+std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, std::vector<uint8_t>& rxBuffer, bool isAuthenticated) {
     std::vector<Packet> packets;
-    static std::vector<uint8_t> buffer;
 
     ESP_LOGD(TAG, "parsePackets: Received %d bytes", len);
     print_hex_protocol(data, len, "Received Data");
 
-    buffer.insert(buffer.end(), data, data + len);
+    rxBuffer.insert(rxBuffer.end(), data, data + len);
 
-    while (buffer.size() >= 8) { // Minimum size of an EncPacket
-        if (buffer[0] != (PREFIX & 0xFF) || buffer[1] != ((PREFIX >> 8) & 0xFF)) {
+    while (rxBuffer.size() >= 8) { // Minimum size of an EncPacket
+        if (rxBuffer[0] != (PREFIX & 0xFF) || rxBuffer[1] != ((PREFIX >> 8) & 0xFF)) {
             ESP_LOGE(TAG, "parsePackets: Invalid prefix, discarding byte");
-            buffer.erase(buffer.begin());
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
-        uint16_t frame_len = buffer[4] | (buffer[5] << 8);
+        uint16_t frame_len = rxBuffer[4] | (rxBuffer[5] << 8);
         size_t total_len = 6 + frame_len;
-        if (buffer.size() < total_len) {
+        if (rxBuffer.size() < total_len) {
             break;
         }
 
         if (frame_len < 2) { // Must include 2 bytes for CRC
-            buffer.erase(buffer.begin());
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
-        uint16_t crc_from_packet = buffer[total_len - 2] | (buffer[total_len - 1] << 8);
-        if (crc_from_packet != crc16(buffer.data(), total_len - 2)) {
-            buffer.erase(buffer.begin());
+        uint16_t crc_from_packet = rxBuffer[total_len - 2] | (rxBuffer[total_len - 1] << 8);
+        if (crc_from_packet != crc16(rxBuffer.data(), total_len - 2)) {
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
         size_t payload_len = frame_len - 2;
-        std::vector<uint8_t> encrypted_payload(buffer.begin() + 6, buffer.begin() + 6 + payload_len);
+        std::vector<uint8_t> encrypted_payload(rxBuffer.begin() + 6, rxBuffer.begin() + 6 + payload_len);
 
         std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
         crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
@@ -225,7 +248,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             delete packet;
         }
 
-        buffer.erase(buffer.begin(), buffer.begin() + total_len);
+        rxBuffer.erase(rxBuffer.begin(), rxBuffer.begin() + total_len);
     }
     return packets;
 }
