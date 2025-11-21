@@ -1,6 +1,6 @@
 /**
  * @file DeviceManager.h
- * @author Jules
+ * @author Lollokara
  * @brief Manages connections to multiple EcoFlow devices.
  *
  * This header defines the DeviceManager class, a singleton responsible for

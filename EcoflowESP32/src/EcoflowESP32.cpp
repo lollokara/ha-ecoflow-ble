@@ -1,6 +1,6 @@
 /**
  * @file EcoflowESP32.cpp
- * @author Jules
+ * @author Lollokara
  * @brief Implementation file for the EcoflowESP32 library.
  *
  * This file contains the core logic for managing the BLE connection, handling

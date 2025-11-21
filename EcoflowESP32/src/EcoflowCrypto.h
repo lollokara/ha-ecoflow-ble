@@ -1,6 +1,6 @@
 /**
  * @file EcoflowCrypto.h
- * @author Jules
+ * @author Lollokara
  * @brief Handles all cryptographic operations for the EcoFlow BLE protocol.
  *
  * This file defines the EcoflowCrypto class, which is responsible for:

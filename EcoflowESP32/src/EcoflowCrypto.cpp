@@ -1,6 +1,6 @@
 /**
  * @file EcoflowCrypto.cpp
- * @author Jules
+ * @author Lollokara
  * @brief Implementation of cryptographic functions for the EcoFlow BLE protocol.
  */
 

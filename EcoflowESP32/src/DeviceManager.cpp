@@ -1,6 +1,6 @@
 /**
  * @file DeviceManager.cpp
- * @author Jules
+ * @author Lollokara
  * @brief Implementation for the DeviceManager class.
  *
  * This file contains the logic for managing multiple EcoFlow devices, including

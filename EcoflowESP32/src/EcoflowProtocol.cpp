@@ -1,6 +1,6 @@
 /**
  * @file EcoflowProtocol.cpp
- * @author Jules
+ * @author Lollokara
  * @brief Implementation of the EcoFlow BLE protocol packet structures.
  *
  * This file contains the serialization and deserialization logic for the

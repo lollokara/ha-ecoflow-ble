@@ -1,6 +1,6 @@
 /**
  * @file EcoflowESP32.h
- * @author Jules
+ * @author Lollokara
  * @brief Main header file for the EcoflowESP32 library.
  *
  * This file defines the primary class, EcoflowESP32, which manages the BLE

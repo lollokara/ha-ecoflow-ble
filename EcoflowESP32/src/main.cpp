@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @author Jules
+ * @author Lollokara
  * @brief Main application file for the ESP32 EcoFlow Controller.
  *
  * This file contains the primary application logic, including:

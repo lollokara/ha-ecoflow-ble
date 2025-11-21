@@ -1,6 +1,6 @@
 /**
  * @file EcoflowProtocol.h
- * @author Jules
+ * @author Lollokara
  * @brief Defines the packet structures for the EcoFlow BLE protocol.
  *
  * This file contains the definitions for the two main packet types used in
