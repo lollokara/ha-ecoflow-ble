@@ -79,6 +79,12 @@ void DeviceManager::update() {
     if (_hasPendingConnection && _pendingDevice) {
         stopScan(); // Ensure scan is stopped before connecting
 
+        // Check if any other device is currently trying to connect to avoid race conditions
+        if (isAnyConnecting()) {
+            ESP_LOGW("DeviceManager", "Another device is connecting, deferring pending connection");
+            return; // Defer processing this pending connection
+        }
+
         ESP_LOGI("DeviceManager", "Executing pending connection to %s", _pendingConnectSN.c_str());
         saveDevice(_targetScanType, _pendingConnectMac, _pendingConnectSN);
 
@@ -104,13 +110,14 @@ void DeviceManager::update() {
     slotW2.isConnected = slotW2.instance->isConnected();
 
     // Auto-reconnection / Scanning Logic
-    if (!_isScanning) {
+    if (!_isScanning && !isAnyConnecting()) {
         // If we have a disconnected device that is configured (has MAC), we should scan for it.
+        // But ONLY if no device is currently busy connecting.
         // Priority: Target Type if user requested, otherwise cycle or scan for all?
         // NimBLE Scan finds everything. We just need to filter in onResult.
 
-        bool d3NeedsConnect = !slotD3.isConnected && !slotD3.macAddress.empty();
-        bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty();
+        bool d3NeedsConnect = !slotD3.isConnected && !slotD3.macAddress.empty() && !d3.isConnecting();
+        bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting();
 
         if (d3NeedsConnect || w2NeedsConnect) {
              // Start generic background scan
@@ -121,7 +128,12 @@ void DeviceManager::update() {
     }
 
     if (_isScanning) {
-        if (millis() - _scanStartTime > 10000) { // 10s scan timeout
+        // Force stop scan if a device started connecting (triggered externally or state change)
+        if (isAnyConnecting()) {
+            stopScan();
+            ESP_LOGI("DeviceManager", "Stopping scan due to active connection attempt");
+        }
+        else if (millis() - _scanStartTime > 10000) { // 10s scan timeout
             stopScan();
             ESP_LOGI("DeviceManager", "Scan timeout/cycle");
         }
@@ -215,6 +227,10 @@ void DeviceManager::stopScan() {
 
 bool DeviceManager::isScanning() {
     return _isScanning;
+}
+
+bool DeviceManager::isAnyConnecting() {
+    return d3.isConnecting() || w2.isConnecting();
 }
 
 void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {

@@ -39,6 +39,7 @@ public:
 
     // Scanning state
     bool isScanning();
+    bool isAnyConnecting();
 
 private:
     DeviceManager();
