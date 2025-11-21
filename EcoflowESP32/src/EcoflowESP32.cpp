@@ -84,8 +84,6 @@ void EcoflowESP32::_startScan() {
         _pScan->setInterval(100);
         _pScan->setWindow(99);
     }
-    // Use non-blocking scan for 0 (forever) until we stop it manually when device is found.
-    // This prevents the BLE task from hanging.
     _pScan->start(0, nullptr, false);
 }
 
@@ -98,7 +96,6 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _pClient->setClientCallbacks(_clientCallback);
     _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
 
-    // Increased stack size to prevent potential overflow
     xTaskCreate(ble_task_entry, "ble_task", 8192, this, 5, &_ble_task_handle);
     return true;
 }
@@ -131,9 +128,6 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             self->_lastState = self->_state;
         }
 
-        // If scanning indefinitely, we might want to restart occasionally if it gets stuck,
-        // but NimBLE is usually reliable.
-        // If we haven't found the device after 10s, maybe just log or restart scan to be safe.
         if (self->_state == ConnectionState::SCANNING && millis() - self->_lastScanTime > 10000) {
             ESP_LOGW(TAG, "Scan running for >10s, restarting scan to be safe");
             self->_pScan->stop();
@@ -142,7 +136,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
 
         if (self->_pAdvertisedDevice) {
             if (!self->_pClient->isConnected()) {
-                if (millis() - self->_lastConnectionAttempt > 10000) { // Increased timeout
+                if (millis() - self->_lastConnectionAttempt > 10000) {
                     self->_lastConnectionAttempt = millis();
                     if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
                         ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
@@ -159,12 +153,10 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         } else if (self->_state != ConnectionState::SCANNING) {
-             // Fallback if we are disconnected but not scanning (and not manually handled yet)
              if (self->_state == ConnectionState::DISCONNECTED || self->_state == ConnectionState::NOT_CONNECTED) {
                  self->_startScan();
              }
 
-            // Check if client claims disconnected but our state thinks otherwise
             if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
                 if (!self->_pClient->isConnected()) {
                      ESP_LOGW(TAG, "Client disconnected unexpectedly");
@@ -199,7 +191,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             } else if (self->_state == ConnectionState::CONNECTED) {
                 self->_startAuthentication();
             } else if (self->_state > ConnectionState::CONNECTED && self->_state < ConnectionState::AUTHENTICATED) {
-                if (millis() - self->_lastAuthActivity > 10000) { // New timeout for auth steps
+                if (millis() - self->_lastAuthActivity > 10000) {
                     ESP_LOGW(TAG, "Authentication timed out");
                     self->_pClient->disconnect();
                 }
@@ -377,21 +369,18 @@ int EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
 int EcoflowESP32::getACVoltage() { return _data.acVoltage; }
 int EcoflowESP32::getACFrequency() { return _data.acFrequency; }
 
-// New getters
 int EcoflowESP32::getSolarInputPower() { return _data.solarInputPower; }
 int EcoflowESP32::getAcOutputPower() { return _data.acOutputPower; }
 int EcoflowESP32::getDcOutputPower() { return _data.dcOutputPower; }
 int EcoflowESP32::getCellTemperature() { return _data.cellTemperature; }
+int EcoflowESP32::getMaxChargeLevel() { return _data.maxChargeLevel; }
+int EcoflowESP32::getMinDischargeLevel() { return _data.minDischargeLevel; }
 
 bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
 bool EcoflowESP32::isUsbOn() { return _data.usbOn; }
 
 bool EcoflowESP32::isConnected() {
-    // Check if we are in a state that implies an active connection.
-    // CONNECTED is the start of active connection states.
-    // AUTHENTICATED is the highest state.
-    // States after AUTHENTICATED in the enum are error or disconnect states.
     return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
 }
 bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENTICATED; }
@@ -428,9 +417,8 @@ bool EcoflowESP32::setAC(bool on) {
 }
 
 bool EcoflowESP32::setAcChargingLimit(int watts) {
-    if (watts < 200 || watts > 2900) { // Approximate safety limits, adjust as needed
+    if (watts < 200 || watts > 2900) {
         ESP_LOGW(TAG, "AC Charging limit %d W out of range", watts);
-        // Proceed anyway as the device might cap it
     }
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
 
@@ -440,6 +428,30 @@ bool EcoflowESP32::setAcChargingLimit(int watts) {
     config.has_cfg_plug_in_info_ac_in_chg_pow_max = true;
     config.cfg_plug_in_info_ac_in_chg_pow_max = watts;
 
+    _sendConfigPacket(config);
+    return true;
+}
+
+bool EcoflowESP32::setMaxChargeLevel(int percent) {
+    if (percent < 50 || percent > 100) {
+        ESP_LOGW(TAG, "Max Charge Level %d%% out of range", percent);
+        return false;
+    }
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    config.has_cfg_max_chg_soc = true;
+    config.cfg_max_chg_soc = percent;
+    _sendConfigPacket(config);
+    return true;
+}
+
+bool EcoflowESP32::setMinDischargeLevel(int percent) {
+    if (percent < 0 || percent > 30) {
+        ESP_LOGW(TAG, "Min Discharge Level %d%% out of range", percent);
+        return false;
+    }
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+    config.has_cfg_min_dsg_soc = true;
+    config.cfg_min_dsg_soc = percent;
     _sendConfigPacket(config);
     return true;
 }

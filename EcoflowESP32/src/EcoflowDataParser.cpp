@@ -7,7 +7,6 @@
 static const char* TAG = "EcoflowDataParser";
 
 bool pb_decode_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    // We don't need to actually decode strings for this application
     return pb_read(stream, NULL, stream->bytes_left);
 }
 
@@ -28,16 +27,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             ESP_LOGD(TAG, "Successfully decoded protobuf message");
 
             // Reliable Battery Percentage
-            // Try BMS SOC first, then CMS SOC.
-            // Sometimes cms_batt_soc reports 0 incorrectly.
             if (proto_msg.has_bms_batt_soc && proto_msg.bms_batt_soc > 0) {
                  data.batteryLevel = (int)proto_msg.bms_batt_soc;
                  ESP_LOGD(TAG, "Battery level (BMS): %d%%", data.batteryLevel);
             } else if (proto_msg.has_cms_batt_soc) {
                 data.batteryLevel = (int)proto_msg.cms_batt_soc;
                 ESP_LOGD(TAG, "Battery level (CMS): %d%%", data.batteryLevel);
-            } else {
-                ESP_LOGD(TAG, "Battery level field missing in packet");
             }
 
             // Power readings
@@ -66,6 +61,14 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             // Cell Temperature (C)
             if (proto_msg.has_bms_max_cell_temp) {
                 data.cellTemperature = (int)proto_msg.bms_max_cell_temp;
+            }
+
+            // Limits
+            if (proto_msg.has_cms_max_chg_soc) {
+                data.maxChargeLevel = (int)proto_msg.cms_max_chg_soc;
+            }
+            if (proto_msg.has_cms_min_dsg_soc) {
+                data.minDischargeLevel = (int)proto_msg.cms_min_dsg_soc;
             }
 
             // Status flags

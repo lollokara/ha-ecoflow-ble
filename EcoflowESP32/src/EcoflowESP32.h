@@ -77,6 +77,8 @@ public:
     int getAcOutputPower();
     int getDcOutputPower();
     int getCellTemperature();
+    int getMaxChargeLevel();
+    int getMinDischargeLevel();
 
     bool isAcOn();
     bool isDcOn();
@@ -92,6 +94,10 @@ public:
 
     // New method for dynamic AC charging limit
     bool setAcChargingLimit(int watts);
+
+    // New methods for battery limits
+    bool setMaxChargeLevel(int percent);
+    bool setMinDischargeLevel(int percent);
 
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);

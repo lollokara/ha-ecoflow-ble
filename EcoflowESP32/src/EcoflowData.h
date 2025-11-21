@@ -20,6 +20,10 @@ struct EcoflowData {
     int dcOutputPower = 0;
     int cellTemperature = 0;
 
+    // Limits
+    int maxChargeLevel = 100;
+    int minDischargeLevel = 0;
+
     // Connection Status
     bool isConnected = false;
 };
