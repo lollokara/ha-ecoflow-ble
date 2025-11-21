@@ -126,14 +126,6 @@ void EcoflowESP32::disconnectAndForget() {
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
-    // Don't delete _pAdvertisedDevice here, we might want to reconnect using it?
-    // Actually DeviceManager handles finding it again.
-    // But if we just lost connection, we might want to keep the AdvertisedDevice to retry immediately?
-    // The logic in ble_task_entry handles retries if _pAdvertisedDevice is present.
-    // But if we reached MAX_CONNECT_ATTEMPTS, we delete it.
-    // For simple disconnect, let's leave it.
-    // But if we want to force rescan, we should delete it.
-    // Let's delete it to force DeviceManager to find it again (fresh RSSI etc).
     if (_pAdvertisedDevice) {
         delete _pAdvertisedDevice;
         _pAdvertisedDevice = nullptr;
@@ -141,7 +133,6 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
 }
 
 void EcoflowESP32::update() {
-    // This function can be used for other non-BLE related tasks if needed.
 }
 
 void EcoflowESP32::ble_task_entry(void* pvParameters) {
@@ -176,9 +167,6 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         } else {
-            // If disconnected and no advertised device to connect to, we wait for DeviceManager to give us one.
-
-             // Check if client claims disconnected but our state thinks otherwise
             if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
                 if (!self->_pClient->isConnected()) {
                      ESP_LOGW(TAG, "Client disconnected unexpectedly");
@@ -288,7 +276,6 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
-    // Packet::reset_sequence(); // Removed static reset
     _txSeq = 0;
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
@@ -313,9 +300,6 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         if (pkt->getDest() == 0x21) {
             ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
-            // Reply packets usually echo the sequence number or use their own?
-            // The reference code mirrors the sequence from the received packet for replies?
-            // "packet.seq" in python replyPacket.
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
@@ -385,42 +369,76 @@ bool EcoflowESP32::_sendCommand(const std::vector<uint8_t>& command) {
     return false;
 }
 
+// --- Updated Getters with Protocol Version Logic ---
+
 int EcoflowESP32::getBatteryLevel() {
-    ESP_LOGV(TAG, "Battery level is: %d%%", _data.batteryLevel);
-    return _data.batteryLevel;
+    if (_protocolVersion == 2) return _data.wave2.batSoc;
+    return (int)_data.delta3.batteryLevel;
 }
-int EcoflowESP32::getInputPower() { return _data.inputPower; }
-int EcoflowESP32::getOutputPower() { return _data.outputPower; }
-int EcoflowESP32::getBatteryVoltage() { return _data.batteryVoltage; }
-int EcoflowESP32::getACVoltage() { return _data.acVoltage; }
-int EcoflowESP32::getACFrequency() { return _data.acFrequency; }
+int EcoflowESP32::getInputPower() {
+    if (_protocolVersion == 2) return (_data.wave2.batPwrWatt > 0) ? _data.wave2.batPwrWatt : 0;
+    return (int)_data.delta3.inputPower;
+}
+int EcoflowESP32::getOutputPower() {
+    if (_protocolVersion == 2) return (_data.wave2.batPwrWatt < 0) ? abs(_data.wave2.batPwrWatt) : 0;
+    return (int)_data.delta3.outputPower;
+}
+int EcoflowESP32::getBatteryVoltage() { return 0; } // Not in filtered list
+int EcoflowESP32::getACVoltage() { return 0; } // Not in filtered list
+int EcoflowESP32::getACFrequency() { return 0; } // Not in filtered list
 
 // New getters
-int EcoflowESP32::getSolarInputPower() { return _data.solarInputPower; }
-int EcoflowESP32::getAcOutputPower() { return _data.acOutputPower; }
-int EcoflowESP32::getDcOutputPower() { return _data.dcOutputPower; }
-int EcoflowESP32::getCellTemperature() { return _data.cellTemperature; }
-int EcoflowESP32::getAmbientTemperature() { return _data.currentTemp; }
-int EcoflowESP32::getMaxChgSoc() { return _data.maxChgSoc; }
-int EcoflowESP32::getMinDsgSoc() { return _data.minDsgSoc; }
-int EcoflowESP32::getAcChgLimit() { return _data.acChgLimit; }
+int EcoflowESP32::getSolarInputPower() {
+    if (_protocolVersion == 2) return _data.wave2.mpptPwrWatt;
+    return (int)_data.delta3.solarInputPower;
+}
+int EcoflowESP32::getAcOutputPower() {
+    if (_protocolVersion == 2) return 0; // Wave 2 is DC only usually?
+    return (int)abs(_data.delta3.acOutputPower);
+}
+int EcoflowESP32::getDcOutputPower() {
+    if (_protocolVersion == 2) return _data.wave2.psdrPwrWatt;
+    return (int)abs(_data.delta3.dc12vOutputPower);
+}
+int EcoflowESP32::getCellTemperature() {
+    if (_protocolVersion == 2) return (int)_data.wave2.outLetTemp;
+    return _data.delta3.cellTemperature;
+}
+int EcoflowESP32::getAmbientTemperature() {
+    if (_protocolVersion == 2) return (int)_data.wave2.envTemp;
+    return 0;
+}
+int EcoflowESP32::getMaxChgSoc() {
+    if (_protocolVersion == 2) return 100; // Wave 2 doesn't have this exposed in packet?
+    return _data.delta3.batteryChargeLimitMax;
+}
+int EcoflowESP32::getMinDsgSoc() {
+    if (_protocolVersion == 2) return 0;
+    return _data.delta3.batteryChargeLimitMin;
+}
+int EcoflowESP32::getAcChgLimit() {
+    if (_protocolVersion == 2) return 0;
+    return _data.delta3.acChargingSpeed;
+}
 
-bool EcoflowESP32::isAcOn() { return _data.acOn; }
-bool EcoflowESP32::isDcOn() { return _data.dcOn; }
-bool EcoflowESP32::isUsbOn() { return _data.usbOn; }
+bool EcoflowESP32::isAcOn() {
+    if (_protocolVersion == 2) return (_data.wave2.mode != 0);
+    return _data.delta3.acOn;
+}
+bool EcoflowESP32::isDcOn() {
+    if (_protocolVersion == 2) return (_data.wave2.powerMode != 0);
+    return _data.delta3.dcOn;
+}
+bool EcoflowESP32::isUsbOn() {
+    if (_protocolVersion == 2) return false;
+    return _data.delta3.usbOn;
+}
 
 bool EcoflowESP32::isConnected() {
-    // Check if we are in a state that implies an active connection.
-    // CONNECTED is the start of active connection states.
-    // AUTHENTICATED is the highest state.
-    // States after AUTHENTICATED in the enum are error or disconnect states.
     return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
 }
 
 bool EcoflowESP32::isConnecting() {
-    // Connecting includes Created (pending task pickup), Establishing, and all auth steps before Authenticated
-    // Exclude SCANNING as that's now handled by DeviceManager, but EcoflowESP32 state might still reflect it if not updated.
-    // Here we care if we are "busy trying to connect".
     return (_state >= ConnectionState::CREATED && _state < ConnectionState::AUTHENTICATED) || _state == ConnectionState::ESTABLISHING_CONNECTION;
 }
 
@@ -474,9 +492,8 @@ bool EcoflowESP32::setAC(bool on) {
 }
 
 bool EcoflowESP32::setAcChargingLimit(int watts) {
-    if (watts < 200 || watts > 2900) { // Approximate safety limits, adjust as needed
+    if (watts < 200 || watts > 2900) {
         ESP_LOGW(TAG, "AC Charging limit %d W out of range", watts);
-        // Proceed anyway as the device might cap it
     }
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
 

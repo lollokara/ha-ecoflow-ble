@@ -12,7 +12,7 @@ enum class DisplayAction {
     TOGGLE_DC,
     TOGGLE_USB,
     SET_AC_LIMIT,
-    SET_SOC_LIMITS, // New action
+    SET_SOC_LIMITS,
     CONNECT_DEVICE,
     DISCONNECT_DEVICE
 };

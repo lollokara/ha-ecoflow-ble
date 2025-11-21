@@ -121,11 +121,7 @@ void handleAction(DisplayAction action) {
     }
 
     // Handle Control Actions (Require Authentication on the ACTIVE VIEW device)
-    // Note: SOC settings apply to D3 (Delta 2) usually.
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
-    // If the menu action targets a specific device type (like Limits are only for D3),
-    // we should ideally check that. But currentViewDevice usually tracks what we are editing.
-    // Except for connection menu.
 
     if (dev && dev->isAuthenticated()) {
         switch(action) {
@@ -177,9 +173,6 @@ void loop() {
 
     DisplayAction action = DisplayAction::NONE;
 
-    // Map button events to Input Enum
-    // UP/DOWN: only care about Short (1) or maybe Hold? Requirement only specifies Central Button logic.
-    // Let's assume UP/DOWN short press is navigation.
     if (upEvent == 1) action = handleDisplayInput(ButtonInput::BTN_UP);
     if (downEvent == 1) action = handleDisplayInput(ButtonInput::BTN_DOWN);
 
@@ -193,25 +186,6 @@ void loop() {
     // 4. Process Pending Action (from Timeout)
     DisplayAction pending = getPendingAction();
     handleAction(pending);
-
-    // Update View based on Menu Selection
-    // We only change currentViewDevice if we are in a context that demands it (like Device Menu)
-    // Or if the Dashboard allows cycling view.
-    // The Dashboard logic will be inside Display.cpp, but we need to feed it data.
-    // Actually, Display.cpp calls updateDisplay with *currentData*.
-    // We need to fetch data from the device that matches the *Dashboard View* if in Dashboard mode.
-    // Display.cpp doesn't expose "Current Dashboard View Device" easily back to main.
-    // Solution: Pass BOTH devices to updateDisplay, or let Display manager decide which data to use?
-    // Better: Let Display.cpp request the data it needs? No, Display shouldn't access DeviceManager directly for data.
-    // Wait, Display.cpp *already* includes DeviceManager.h and uses it in drawDeviceSelectMenu.
-    // So we can just let Display.cpp pull whatever it needs from DeviceManager directly?
-    // Currently updateDisplay takes `EcoflowData`.
-    // If we want Dashboard to show W2 or D3, we should probably let Display.cpp handle fetching the right data
-    // OR we update `EcoflowData` struct to contain data for BOTH?
-    // Or we call `updateDisplay` with the `DeviceManager` instance?
-
-    // Let's allow Display.cpp to query DeviceManager for the specific device data it needs for the current view.
-    // This simplifies main loop.
 
     // 5. Refresh Data (Periodic)
     if (millis() - last_data_refresh > 2000) {
@@ -229,32 +203,18 @@ void loop() {
     if (millis() - last_display_update > 20) {
         last_display_update = millis();
 
-        // We pass a dummy EcoflowData or just the active one?
-        // Since Display.cpp will now manage multiple views, let's pass the D3 data as "primary"
-        // but Display.cpp will likely access DeviceManager for W2 data if needed.
         EcoflowESP32* activeDev = DeviceManager::getInstance().getDevice(currentViewDevice);
-
-        // Construct legacy EcoflowData for compatibility, but Display.cpp will be smarter.
-        EcoflowData data;
-        if (activeDev) {
-             data.batteryLevel = activeDev->getBatteryLevel();
-             data.inputPower = activeDev->getInputPower();
-             data.outputPower = activeDev->getOutputPower();
-             data.solarInputPower = activeDev->getSolarInputPower();
-             data.acOutputPower = activeDev->getAcOutputPower();
-             data.dcOutputPower = activeDev->getDcOutputPower();
-             data.acOn = activeDev->isAcOn();
-             data.dcOn = activeDev->isDcOn();
-             data.usbOn = activeDev->isUsbOn();
-             data.isConnected = activeDev->isConnected();
-             // Update limits for editing
-             data.maxChgSoc = activeDev->getMaxChgSoc();
-             data.minDsgSoc = activeDev->getMinDsgSoc();
-        }
-
         DeviceSlot* activeSlot = DeviceManager::getInstance().getSlot(currentViewDevice);
         bool scanning = DeviceManager::getInstance().isScanning();
 
-        updateDisplay(data, activeSlot, scanning);
+        if (activeDev) {
+             // Pass the actual internal data struct directly
+             // This works because we updated EcoflowESP32 class to hold the new EcoflowData struct
+             // and updated Display.cpp to handle it.
+             updateDisplay(activeDev->_data, activeSlot, scanning);
+        } else {
+             EcoflowData empty;
+             updateDisplay(empty, activeSlot, scanning);
+        }
     }
 }

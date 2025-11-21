@@ -65,6 +65,8 @@ public:
     bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion = 3);
     void update();
 
+    const EcoflowData& getData() const { return _data; }
+
     int getBatteryLevel();
     int getInputPower();
     int getOutputPower();
@@ -109,6 +111,26 @@ public:
     uint32_t _lastScanTime = 0;
     uint32_t _lastAuthActivity = 0;
 
+    // Public for task access
+    void connectTo(NimBLEAdvertisedDevice* device);
+
+    // For task access
+    EcoflowCrypto _crypto;
+    EcoflowData _data;
+    NimBLEClient* _pClient = nullptr;
+    NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
+
+    static void ble_task_entry(void* pvParameters);
+    TaskHandle_t _ble_task_handle = nullptr;
+    QueueHandle_t _ble_queue = nullptr;
+
+    struct BleNotification {
+        uint8_t* data;
+        size_t length;
+    };
+
+    std::vector<uint8_t> _rxBuffer;
+
 private:
     static void notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
     void _handlePacket(Packet* pkt);
@@ -130,28 +152,10 @@ private:
     uint8_t _protocolVersion = 3;
     uint32_t _txSeq = 0;
 
-    NimBLEClient* _pClient = nullptr;
+    NimBLEClient* _pClientPrivate = nullptr; // Not used, using public one for task
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
     NimBLERemoteCharacteristic* _pReadChr = nullptr;
     EcoflowClientCallback* _clientCallback;
-    NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
-public:
-    void connectTo(NimBLEAdvertisedDevice* device);
-
-    EcoflowCrypto _crypto;
-
-    EcoflowData _data;
-
-    static void ble_task_entry(void* pvParameters);
-    TaskHandle_t _ble_task_handle = nullptr;
-    QueueHandle_t _ble_queue = nullptr;
-
-    struct BleNotification {
-        uint8_t* data;
-        size_t length;
-    };
-
-    std::vector<uint8_t> _rxBuffer;
 };
 
 #endif // ECOFLOW_ESP32_H

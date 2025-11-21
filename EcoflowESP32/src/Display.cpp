@@ -96,22 +96,6 @@ int tempMinDsg = 0;
 uint32_t cRed, cYellow, cGreen, cWhite, cOff, cBlue;
 uint32_t frameBuffer[9][20];
 
-// --- Forward Declarations ---
-void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2);
-void drawSelectionMenu();
-void drawDetailMenu();
-void drawSettingsSubmenu();
-void drawLimitsSubmenu();
-void drawEditScreen(String label, int value, String unit);
-void drawDeviceSelectMenu(DeviceSlot* slotD3, DeviceSlot* slotW2);
-void drawDeviceActionMenu(DeviceSlot* slot);
-void drawNcScreen();
-void drawText(int x, int y, String text, uint32_t color);
-void renderFrame();
-void clearFrame();
-int getTextWidth(String text);
-void flashScreen(uint32_t color);
-
 // --- Helper: Map (x,y) to strip index ---
 uint16_t getPixelIndex(int x, int y) {
     if (x < 0 || x >= NUM_COLS || y < 0 || y >= NUM_ROWS) return NUMPIXELS;
@@ -147,6 +131,16 @@ void clearFrame() {
             frameBuffer[y][x] = cOff;
         }
     }
+}
+
+void renderFrame() {
+    strip.clear();
+    for(int y=0; y<NUM_ROWS; y++) {
+        for(int x=0; x<NUM_COLS; x++) {
+            if(frameBuffer[y][x] != 0) setPixel(x, y, frameBuffer[y][x]);
+        }
+    }
+    strip.show();
 }
 
 int drawChar(int x, int y, char c, uint32_t color) {
@@ -186,62 +180,6 @@ void flashScreen(uint32_t color) {
     strip.fill(0);
 }
 
-// --- State Machine & Logic ---
-
-void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScanning) {
-    currentData = data;
-    DeviceSlot* slotD3 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_2);
-    DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
-
-    clearFrame();
-
-    unsigned long now = millis();
-    unsigned long timeout = 10000; // Default 10s
-    if (currentState == MenuState::DASHBOARD) timeout = 0; // No timeout
-    else if (currentState == MenuState::EDIT_CHG || currentState == MenuState::EDIT_SOC_UP || currentState == MenuState::EDIT_SOC_DN) {
-        timeout = 60000; // 60s for editing
-    }
-
-    if (timeout > 0 && (now - lastInteractionTime > timeout)) {
-        currentState = MenuState::DASHBOARD;
-    }
-
-    if (currentState == MenuState::DASHBOARD) {
-        drawDashboard(slotD3, slotW2);
-    } else if (currentState == MenuState::SELECTION) {
-        strip.setBrightness(25);
-        drawSelectionMenu();
-    } else if (currentState == MenuState::DETAIL) {
-        strip.setBrightness(25);
-        drawDetailMenu();
-    } else if (currentState == MenuState::SETTINGS_SUBMENU) {
-        strip.setBrightness(25);
-        drawSettingsSubmenu();
-    } else if (currentState == MenuState::LIMITS_SUBMENU) {
-        strip.setBrightness(25);
-        drawLimitsSubmenu();
-    } else if (currentState == MenuState::EDIT_CHG) {
-        strip.setBrightness(25);
-        drawEditScreen("CHG", tempAcLimit, ""); // or /10
-    } else if (currentState == MenuState::EDIT_SOC_UP) {
-        strip.setBrightness(25);
-        drawEditScreen("UP", tempMaxChg, "%");
-    } else if (currentState == MenuState::EDIT_SOC_DN) {
-        strip.setBrightness(25);
-        drawEditScreen("DN", tempMinDsg, "%");
-    } else if (currentState == MenuState::DEVICE_SELECT) {
-        strip.setBrightness(25);
-        drawDeviceSelectMenu(slotD3, slotW2);
-    } else if (currentState == MenuState::DEVICE_ACTION) {
-        strip.setBrightness(25);
-        DeviceSlot* s = (currentDevicePage == DevicePage::D3) ? slotD3 : slotW2;
-        drawDeviceActionMenu(s);
-    }
-
-    if (isScanning) setPixel(19, 0, cBlue);
-    renderFrame();
-}
-
 void drawNcScreen() {
     String text = "NC";
     int width = getTextWidth(text) - 1;
@@ -250,16 +188,12 @@ void drawNcScreen() {
 }
 
 void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2) {
-    // Validity check for view
     bool w2Connected = slotW2->isConnected;
     bool w2HasBatt = w2Connected && (slotW2->instance->getBatteryLevel() > 0);
 
-    // Ensure current view is valid
     if (currentDashboardView == DashboardView::W2_BATT && !w2HasBatt) currentDashboardView = DashboardView::D3_BATT;
     if (currentDashboardView == DashboardView::W2_TEMP && !w2Connected) currentDashboardView = DashboardView::D3_BATT;
     if ((currentDashboardView == DashboardView::D3_BATT || currentDashboardView == DashboardView::D3_SOLAR) && !slotD3->isConnected) {
-         // If main device disconnected, show NC (user request implication)
-         // But we allow navigation.
          strip.setBrightness(25);
          drawNcScreen();
          return;
@@ -273,11 +207,11 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2) {
         case DashboardView::D3_BATT:
         {
             int batt = slotD3->instance->getBatteryLevel();
-            if (slotD3->instance->getInputPower() > 0) { // Charging
+            if (slotD3->instance->getInputPower() > 0) {
                 float t = (float)millis() / 2000.0f;
                 float val = (sin(t) + 1.0f) / 2.0f;
-                int minB = 7; // ~3% of 255
-                int maxB = 51; // ~20% of 255
+                int minB = 7;
+                int maxB = 51;
                 brightness = minB + (int)(val * (maxB - minB));
                 color = cGreen;
             } else {
@@ -292,7 +226,7 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2) {
         case DashboardView::D3_SOLAR:
         {
             int solar = slotD3->instance->getSolarInputPower();
-            text = String(solar); // No unit
+            text = String(solar);
             color = cYellow;
             break;
         }
@@ -306,7 +240,7 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2) {
         }
         case DashboardView::W2_TEMP:
         {
-            int temp = slotW2->instance->getAmbientTemperature(); // Ambient
+            int temp = slotW2->instance->getAmbientTemperature();
             text = String(temp) + "C";
             color = cWhite;
             break;
@@ -357,34 +291,77 @@ void drawSelectionMenu() {
     }
 }
 
-void drawDetailMenu() {
+void drawDetailMenu(DeviceType activeType) {
     String text = "";
     uint32_t color = cWhite;
+
+    bool acOn = false;
+    int acOut = 0;
+    bool dcOn = false;
+    int dcOut = 0;
+    bool usbOn = false;
+    int solIn = 0;
+    int totIn = 0;
+
+    switch (activeType) {
+        case DeviceType::DELTA_2:
+            // Default to Delta/River V3 logic
+            acOn = currentData.delta3.acOn;
+            acOut = abs((int)currentData.delta3.acOutputPower);
+            dcOn = currentData.delta3.dcOn;
+            dcOut = abs((int)currentData.delta3.dc12vOutputPower);
+            usbOn = currentData.delta3.usbOn;
+            solIn = (int)currentData.delta3.solarInputPower;
+            totIn = (int)currentData.delta3.inputPower;
+            break;
+
+        case DeviceType::WAVE_2:
+            // Default to Wave 2 logic
+            acOn = (currentData.wave2.mode != 0);
+            acOut = 0;
+            dcOn = (currentData.wave2.powerMode != 0);
+            dcOut = currentData.wave2.psdrPwrWatt;
+            usbOn = false;
+            solIn = currentData.wave2.mpptPwrWatt;
+            totIn = (currentData.wave2.batPwrWatt > 0) ? currentData.wave2.batPwrWatt : 0;
+            break;
+
+        default:
+            // Fallback for unknown devices
+            acOn = false;
+            acOut = 0;
+            dcOn = false;
+            dcOut = 0;
+            usbOn = false;
+            solIn = 0;
+            totIn = 0;
+            break;
+    }
+
     switch(currentSelection) {
         case SelectionPage::AC:
-            text = currentData.acOn ? String(currentData.acOutputPower) + "W" : "OFF";
-            color = currentData.acOn ? cGreen : cRed;
+            text = acOn ? String(acOut) + "W" : "OFF";
+            color = acOn ? cGreen : cRed;
             break;
         case SelectionPage::DC:
-            text = currentData.dcOn ? String(currentData.dcOutputPower) + "W" : "OFF";
-            color = currentData.dcOn ? cGreen : cRed;
+            text = dcOn ? String(dcOut) + "W" : "OFF";
+            color = dcOn ? cGreen : cRed;
             break;
         case SelectionPage::USB:
-            text = currentData.usbOn ? "ON" : "OFF";
-            color = currentData.usbOn ? cGreen : cRed;
+            text = usbOn ? "ON" : "OFF";
+            color = usbOn ? cGreen : cRed;
             break;
         case SelectionPage::SOL:
-            text = String(currentData.solarInputPower) + "W";
+            text = String(solIn) + "W";
             color = cYellow;
             break;
         case SelectionPage::IN:
-            text = String(currentData.inputPower) + "W";
+            text = String(totIn) + "W";
             color = cYellow;
             break;
         default: break;
     }
     int width = getTextWidth(text) - 1;
-    // Simple centered drawing
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, color);
 }
@@ -404,15 +381,8 @@ void drawLimitsSubmenu() {
 }
 
 void drawEditScreen(String label, int value, String unit) {
-    // Display Value being edited
-    // Maybe show label briefly or alternating?
-    // For CHG, show "40" (400/10)? Or "400"? 20 cols is plenty for "400".
-
     String text;
     if (currentState == MenuState::EDIT_CHG) {
-        text = String(value / 10); // e.g. 400 -> 40. User preference from previous code?
-        // Or just show full value? User said "edit value with up and down".
-        // Let's show full value if it fits. 1500 fits.
         text = String(value);
     } else {
         text = String(value) + unit;
@@ -445,26 +415,68 @@ void drawDeviceActionMenu(DeviceSlot* slot) {
     drawText(x, 1, text, color);
 }
 
-void renderFrame() {
-    strip.clear();
-    for(int y=0; y<NUM_ROWS; y++) {
-        for(int x=0; x<NUM_COLS; x++) {
-            if(frameBuffer[y][x] != 0) setPixel(x, y, frameBuffer[y][x]);
-        }
-    }
-    strip.show();
-}
+// --- State Machine & Logic ---
 
-// --- Input Handling ---
+void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScanning) {
+    currentData = data;
+    DeviceSlot* slotD3 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_2);
+    DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
+
+    clearFrame();
+
+    unsigned long now = millis();
+    unsigned long timeout = 10000; // Default 10s
+    if (currentState == MenuState::DASHBOARD) timeout = 0; // No timeout
+    else if (currentState == MenuState::EDIT_CHG || currentState == MenuState::EDIT_SOC_UP || currentState == MenuState::EDIT_SOC_DN) {
+        timeout = 60000; // 60s for editing
+    }
+
+    if (timeout > 0 && (now - lastInteractionTime > timeout)) {
+        currentState = MenuState::DASHBOARD;
+    }
+
+    if (currentState == MenuState::DASHBOARD) {
+        drawDashboard(slotD3, slotW2);
+    } else if (currentState == MenuState::SELECTION) {
+        strip.setBrightness(25);
+        drawSelectionMenu();
+    } else if (currentState == MenuState::DETAIL) {
+        strip.setBrightness(25);
+        DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_2;
+        drawDetailMenu(activeType);
+    } else if (currentState == MenuState::SETTINGS_SUBMENU) {
+        strip.setBrightness(25);
+        drawSettingsSubmenu();
+    } else if (currentState == MenuState::LIMITS_SUBMENU) {
+        strip.setBrightness(25);
+        drawLimitsSubmenu();
+    } else if (currentState == MenuState::EDIT_CHG) {
+        strip.setBrightness(25);
+        drawEditScreen("CHG", tempAcLimit, "");
+    } else if (currentState == MenuState::EDIT_SOC_UP) {
+        strip.setBrightness(25);
+        drawEditScreen("UP", tempMaxChg, "%");
+    } else if (currentState == MenuState::EDIT_SOC_DN) {
+        strip.setBrightness(25);
+        drawEditScreen("DN", tempMinDsg, "%");
+    } else if (currentState == MenuState::DEVICE_SELECT) {
+        strip.setBrightness(25);
+        drawDeviceSelectMenu(slotD3, slotW2);
+    } else if (currentState == MenuState::DEVICE_ACTION) {
+        strip.setBrightness(25);
+        DeviceSlot* s = (currentDevicePage == DevicePage::D3) ? slotD3 : slotW2;
+        drawDeviceActionMenu(s);
+    }
+
+    if (isScanning) setPixel(19, 0, cBlue);
+    renderFrame();
+}
 
 DisplayAction handleDisplayInput(ButtonInput input) {
     lastInteractionTime = millis();
 
-    // Global Back (1s)
     if (currentState != MenuState::DASHBOARD) {
         if (input == ButtonInput::BTN_ENTER_MEDIUM) {
-            // If in deep submenu, go back one level or straight to Dashboard?
-            // "bring me back to the main menu" -> Dashboard.
             currentState = MenuState::DASHBOARD;
             return DisplayAction::NONE;
         }
@@ -476,12 +488,10 @@ DisplayAction handleDisplayInput(ButtonInput input) {
              bool w2Avail = sW2->isConnected;
              bool w2BattAvail = w2Avail && (sW2->instance->getBatteryLevel() > 0);
 
-             // Helper for cycling
              int currentIdx = (int)currentDashboardView;
              int nextIdx = currentIdx;
              int dir = (input == ButtonInput::BTN_UP) ? 1 : -1;
 
-             // Simple state cycle attempt
              for(int i=0; i<4; i++) {
                  nextIdx += dir;
                  if(nextIdx > 3) nextIdx = 0;
@@ -526,7 +536,6 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 }
                 break;
             case ButtonInput::BTN_ENTER_LONG:
-                // Execute Action for current item
                 flashScreen(cWhite);
                 switch(currentSelection) {
                     case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
@@ -550,9 +559,8 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             case ButtonInput::BTN_ENTER_SHORT:
                 if (currentSettingsPage == SettingsPage::CHG) {
                     currentState = MenuState::EDIT_CHG;
-                    // Initialize with current setting
-                    tempAcLimit = currentData.acChgLimit;
-                    if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400; // Safety default
+                    tempAcLimit = currentData.delta3.acChargingSpeed;
+                    if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
                 } else {
                     currentState = MenuState::LIMITS_SUBMENU;
                     currentLimitsPage = LimitsPage::UP;
@@ -571,12 +579,11 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 else currentLimitsPage = LimitsPage::UP;
                 break;
             case ButtonInput::BTN_ENTER_SHORT:
-                // Sync both values to ensure we don't overwrite the unedited one with a stale default
-                tempMaxChg = currentData.maxChgSoc;
-                if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100; // Validate/Default
+                tempMaxChg = currentData.delta3.batteryChargeLimitMax;
+                if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100;
 
-                tempMinDsg = currentData.minDsgSoc;
-                if (tempMinDsg < 0 || tempMinDsg > 30) tempMinDsg = 0; // Validate/Default
+                tempMinDsg = currentData.delta3.batteryChargeLimitMin;
+                if (tempMinDsg < 0 || tempMinDsg > 30) tempMinDsg = 0;
 
                 if (currentLimitsPage == LimitsPage::UP) {
                     currentState = MenuState::EDIT_SOC_UP;
@@ -599,12 +606,9 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempAcLimit -= 100;
                 if (tempAcLimit < 400) tempAcLimit = 400;
                 break;
-            case ButtonInput::BTN_ENTER_LONG: // Confirm
+            case ButtonInput::BTN_ENTER_LONG:
                 flashScreen(cWhite);
-                currentState = MenuState::DASHBOARD; // Or back to Settings? Requirement: "execute action... bring back to main menu" implied?
-                // "bring me back to the main menu" was for 1s press.
-                // 3s executes action. Usually one would stay or go back.
-                // Let's go back to Dashboard to confirm it's done.
+                currentState = MenuState::DASHBOARD;
                 return DisplayAction::SET_AC_LIMIT;
             default: break;
         }
@@ -621,10 +625,10 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempMaxChg -= 10;
                 if (tempMaxChg < 50) tempMaxChg = 50;
                 break;
-            case ButtonInput::BTN_ENTER_LONG: // Confirm
+            case ButtonInput::BTN_ENTER_LONG:
                 flashScreen(cWhite);
                 currentState = MenuState::DASHBOARD;
-                return DisplayAction::SET_SOC_LIMITS; // Need new action
+                return DisplayAction::SET_SOC_LIMITS;
             default: break;
         }
         return DisplayAction::NONE;
@@ -640,7 +644,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempMinDsg -= 10;
                 if (tempMinDsg < 0) tempMinDsg = 0;
                 break;
-            case ButtonInput::BTN_ENTER_LONG: // Confirm
+            case ButtonInput::BTN_ENTER_LONG:
                 flashScreen(cWhite);
                 currentState = MenuState::DASHBOARD;
                 return DisplayAction::SET_SOC_LIMITS;
@@ -650,7 +654,6 @@ DisplayAction handleDisplayInput(ButtonInput input) {
     }
 
     if (currentState == MenuState::DETAIL) {
-        // Toggling for non-edit items
         if (input == ButtonInput::BTN_ENTER_LONG) {
             flashScreen(cWhite);
             switch(currentSelection) {
