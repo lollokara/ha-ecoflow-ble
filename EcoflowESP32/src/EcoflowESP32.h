@@ -124,6 +124,7 @@ private:
     std::string _deviceSn;
     std::string _ble_address;
     uint8_t _protocolVersion = 3;
+    uint32_t _txSeq = 0;
 
     NimBLEClient* _pClient = nullptr;
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
@@ -145,6 +146,8 @@ public:
         uint8_t* data;
         size_t length;
     };
+
+    std::vector<uint8_t> _rxBuffer;
 };
 
 #endif // ECOFLOW_ESP32_H

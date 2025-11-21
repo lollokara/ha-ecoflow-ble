@@ -92,7 +92,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 
     if (!_ble_task_handle) {
         // Increased stack size to prevent potential overflow
-        xTaskCreate(ble_task_entry, "ble_task", 8192, this, 5, &_ble_task_handle);
+        xTaskCreate(ble_task_entry, "ble_task", 12288, this, 5, &_ble_task_handle);
     }
     return true;
 }
@@ -264,7 +264,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                         self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
                         self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
                         ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, 0, 0x0d);
+                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, self->_txSeq++, 0x0d);
                         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
                         self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
                     } else {
@@ -272,7 +272,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     }
                 }
             } else {
-                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->isAuthenticated());
+                std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
                 for (auto &packet : packets) {
                     self->_handlePacket(&packet);
                 }
@@ -288,7 +288,8 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
     _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
-    Packet::reset_sequence();
+    // Packet::reset_sequence(); // Removed static reset
+    _txSeq = 0;
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
         return;
@@ -312,6 +313,9 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         if (pkt->getDest() == 0x21) {
             ESP_LOGD(TAG, "Replying to packet with cmdSet=0x%02x, cmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
+            // Reply packets usually echo the sequence number or use their own?
+            // The reference code mirrors the sequence from the received packet for replies?
+            // "packet.seq" in python replyPacket.
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
@@ -340,7 +344,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
 
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, 0, 0x0d);
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -366,7 +370,7 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
     }
 
     std::vector<uint8_t> payload(buffer, buffer + stream.bytes_written);
-    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion);
+    Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     _sendCommand(enc_packet.toBytes(&_crypto));
 }
@@ -420,7 +424,7 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
-    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, 0, 0x0d);
+    Packet packet(0x01, 0x02, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
 }

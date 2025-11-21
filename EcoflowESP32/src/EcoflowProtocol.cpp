@@ -196,41 +196,40 @@ std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto* crypto) const {
     return packet_data;
 }
 
-std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, bool isAuthenticated) {
+std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, std::vector<uint8_t>& rxBuffer, bool isAuthenticated) {
     std::vector<Packet> packets;
-    static std::vector<uint8_t> buffer;
 
     ESP_LOGD(TAG, "parsePackets: Received %d bytes", len);
     print_hex_protocol(data, len, "Received Data");
 
-    buffer.insert(buffer.end(), data, data + len);
+    rxBuffer.insert(rxBuffer.end(), data, data + len);
 
-    while (buffer.size() >= 8) { // Minimum size of an EncPacket
-        if (buffer[0] != (PREFIX & 0xFF) || buffer[1] != ((PREFIX >> 8) & 0xFF)) {
+    while (rxBuffer.size() >= 8) { // Minimum size of an EncPacket
+        if (rxBuffer[0] != (PREFIX & 0xFF) || rxBuffer[1] != ((PREFIX >> 8) & 0xFF)) {
             ESP_LOGE(TAG, "parsePackets: Invalid prefix, discarding byte");
-            buffer.erase(buffer.begin());
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
-        uint16_t frame_len = buffer[4] | (buffer[5] << 8);
+        uint16_t frame_len = rxBuffer[4] | (rxBuffer[5] << 8);
         size_t total_len = 6 + frame_len;
-        if (buffer.size() < total_len) {
+        if (rxBuffer.size() < total_len) {
             break;
         }
 
         if (frame_len < 2) { // Must include 2 bytes for CRC
-            buffer.erase(buffer.begin());
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
-        uint16_t crc_from_packet = buffer[total_len - 2] | (buffer[total_len - 1] << 8);
-        if (crc_from_packet != crc16(buffer.data(), total_len - 2)) {
-            buffer.erase(buffer.begin());
+        uint16_t crc_from_packet = rxBuffer[total_len - 2] | (rxBuffer[total_len - 1] << 8);
+        if (crc_from_packet != crc16(rxBuffer.data(), total_len - 2)) {
+            rxBuffer.erase(rxBuffer.begin());
             continue;
         }
 
         size_t payload_len = frame_len - 2;
-        std::vector<uint8_t> encrypted_payload(buffer.begin() + 6, buffer.begin() + 6 + payload_len);
+        std::vector<uint8_t> encrypted_payload(rxBuffer.begin() + 6, rxBuffer.begin() + 6 + payload_len);
 
         std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
         crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
@@ -249,7 +248,7 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             delete packet;
         }
 
-        buffer.erase(buffer.begin(), buffer.begin() + total_len);
+        rxBuffer.erase(rxBuffer.begin(), rxBuffer.begin() + total_len);
     }
     return packets;
 }
