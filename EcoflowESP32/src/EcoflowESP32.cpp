@@ -97,17 +97,18 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     return true;
 }
 
+void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
+    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
+    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
+    _state = ConnectionState::CREATED; // Signal task to connect
+    _connectionRetries = 0; // Reset retries
+}
+
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
     _state = ConnectionState::SERVICE_DISCOVERY;
     _lastAuthActivity = millis();
     ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
-}
-
-void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
-    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
-    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
-    _state = ConnectionState::CREATED; // Signal task to connect
 }
 
 void EcoflowESP32::disconnectAndForget() {
@@ -117,18 +118,30 @@ void EcoflowESP32::disconnectAndForget() {
     _ble_address = "";
     _deviceSn = "";
     _state = ConnectionState::NOT_CONNECTED;
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
+    }
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
-    delete _pAdvertisedDevice;
-    _pAdvertisedDevice = nullptr;
-    // DeviceManager will handle rescanning/reconnection if needed
+    // Don't delete _pAdvertisedDevice here, we might want to reconnect using it?
+    // Actually DeviceManager handles finding it again.
+    // But if we just lost connection, we might want to keep the AdvertisedDevice to retry immediately?
+    // The logic in ble_task_entry handles retries if _pAdvertisedDevice is present.
+    // But if we reached MAX_CONNECT_ATTEMPTS, we delete it.
+    // For simple disconnect, let's leave it.
+    // But if we want to force rescan, we should delete it.
+    // Let's delete it to force DeviceManager to find it again (fresh RSSI etc).
+    if (_pAdvertisedDevice) {
+        delete _pAdvertisedDevice;
+        _pAdvertisedDevice = nullptr;
+    }
 }
 
 void EcoflowESP32::update() {
     // This function can be used for other non-BLE related tasks if needed.
-    // The main BLE logic is now in ble_task_entry.
 }
 
 void EcoflowESP32::ble_task_entry(void* pvParameters) {
@@ -141,13 +154,18 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
 
         if (self->_pAdvertisedDevice) {
             if (!self->_pClient->isConnected()) {
-                if (millis() - self->_lastConnectionAttempt > 10000) { // Increased timeout
+                // Check if we are waiting for a retry delay
+                if (millis() - self->_lastConnectionAttempt > 5000) { // 5s retry delay
                     self->_lastConnectionAttempt = millis();
                     if (self->_connectionRetries < MAX_CONNECT_ATTEMPTS) {
                         ESP_LOGI(TAG, "Connecting... (Attempt %d/%d)", self->_connectionRetries + 1, MAX_CONNECT_ATTEMPTS);
                         self->_state = ConnectionState::ESTABLISHING_CONNECTION;
                         self->_connectionRetries++;
-                        self->_pClient->connect(self->_pAdvertisedDevice);
+                        if(self->_pClient->connect(self->_pAdvertisedDevice)) {
+                             // Connect successful, onConnect will be called
+                        } else {
+                             ESP_LOGE(TAG, "Connect failed");
+                        }
                     } else {
                         ESP_LOGE(TAG, "Max connection attempts reached. Waiting for manager.");
                         delete self->_pAdvertisedDevice;
@@ -158,7 +176,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 }
             }
         } else {
-             // If disconnected and no advertised device to connect to, we wait for DeviceManager to give us one.
+            // If disconnected and no advertised device to connect to, we wait for DeviceManager to give us one.
 
              // Check if client claims disconnected but our state thinks otherwise
             if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {

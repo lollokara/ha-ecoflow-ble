@@ -74,6 +74,7 @@ private:
     bool _hasPendingConnection = false;
     std::string _pendingConnectMac;
     std::string _pendingConnectSN;
+    NimBLEAdvertisedDevice* _pendingDevice = nullptr;
 };
 
 #endif

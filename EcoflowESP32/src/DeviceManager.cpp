@@ -76,7 +76,7 @@ void DeviceManager::initialize() {
 
 void DeviceManager::update() {
     // Handle Pending Connection from Scan
-    if (_hasPendingConnection) {
+    if (_hasPendingConnection && _pendingDevice) {
         stopScan(); // Ensure scan is stopped before connecting
 
         ESP_LOGI("DeviceManager", "Executing pending connection to %s", _pendingConnectSN.c_str());
@@ -84,28 +84,16 @@ void DeviceManager::update() {
 
         EcoflowESP32* dev = getDevice(_targetScanType);
         uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+
+        // Initialize credentials
         dev->begin(ECOFLOW_USER_ID, _pendingConnectSN, _pendingConnectMac, version);
 
-        // Since we have the advertised device pointer in the callback,
-        // we could optimize by passing it if we stored it, but begin() sets up basics.
-        // Wait, EcoflowESP32::begin() doesn't connect anymore, it just sets creds.
-        // We need to tell it to connect!
-        // But we don't have the AdvertisedDevice object here easily unless we stored a copy.
-        // Re-scanning to connect is inefficient if we just found it.
-        // However, EcoflowESP32::begin used to start scanning for a specific address.
-        // Now we want DeviceManager to find it and hand it over.
+        // Pass the captured device to start connection
+        dev->connectTo(_pendingDevice);
 
-        // Issue: NimBLEAdvertisedDevice pointers from callbacks are temporary/managed by Scan.
-        // We need to initiate connection via address if we don't have the object.
-        // But NimBLEClient::connect() takes AdvertisedDevice* OR address.
-        // EcoflowESP32 currently expects an AdvertisedDevice in connectTo().
-        // We should probably let DeviceManager restart a targetted scan OR
-        // since we just found it, we should have grabbed it.
-
-        // Since we are in a loop, let's simplify:
-        // We saved the MAC.
-        // If any device is disconnected but has a MAC saved, we should be scanning for it.
-
+        // Cleanup
+        delete _pendingDevice;
+        _pendingDevice = nullptr;
         _hasPendingConnection = false;
     }
 
@@ -236,36 +224,37 @@ void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* adver
 }
 
 void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
-    if (_hasPendingConnection) return; // Already found one
+    if (_hasPendingConnection) return; // Already found one, ignore others
     if (!device->haveManufacturerData()) return;
 
     std::string data = device->getManufacturerData();
     std::string sn = extractSerial(data);
 
     if (sn.length() > 0) {
-        ESP_LOGD("DeviceManager", "Found SN: %s", sn.c_str());
-
         // Check matches for D3 slot
         if (!slotD3.isConnected && !d3.isConnecting()) {
             bool isD3 = isTargetDevice(sn, DeviceType::DELTA_2);
-            // If we have a saved MAC, only connect if it matches. If no MAC (new pairing), connect if type matches.
             bool match = false;
+            // Match if saved MAC matches OR if scanning specifically for new D3
             if (!slotD3.macAddress.empty()) {
                 if (device->getAddress().toString() == slotD3.macAddress) match = true;
             } else if (isD3 && _targetScanType == DeviceType::DELTA_2) {
-                match = true; // New pairing discovery
+                match = true;
             }
 
             if (match) {
-                ESP_LOGI("DeviceManager", "Connecting D3 (%s)", sn.c_str());
-                d3.connectTo(device); // Pass the device object directly!
-                // Save if it was a new pairing
-                if (slotD3.macAddress.empty()) {
-                     saveDevice(DeviceType::DELTA_2, device->getAddress().toString(), sn);
-                     // Ensure begin is called with correct SN for auth if this was a fresh discovery
-                     d3.begin(ECOFLOW_USER_ID, sn, device->getAddress().toString(), 3);
-                }
-                return; // One connection per scan cycle to be safe? NimBLE is single threaded mostly.
+                ESP_LOGI("DeviceManager", "Match found for D3 (%s)! Pending connection...", sn.c_str());
+
+                _pendingConnectMac = device->getAddress().toString();
+                _pendingConnectSN = sn;
+                _targetScanType = DeviceType::DELTA_2;
+
+                if (_pendingDevice) delete _pendingDevice;
+                _pendingDevice = new NimBLEAdvertisedDevice(*device);
+
+                _hasPendingConnection = true;
+                stopScan(); // Stop immediately to prevent resource contention
+                return;
             }
         }
 
@@ -276,16 +265,21 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
             if (!slotW2.macAddress.empty()) {
                 if (device->getAddress().toString() == slotW2.macAddress) match = true;
             } else if (isW2 && _targetScanType == DeviceType::WAVE_2) {
-                match = true; // New pairing discovery
+                match = true;
             }
 
             if (match) {
-                ESP_LOGI("DeviceManager", "Connecting W2 (%s)", sn.c_str());
-                w2.connectTo(device);
-                 if (slotW2.macAddress.empty()) {
-                     saveDevice(DeviceType::WAVE_2, device->getAddress().toString(), sn);
-                     w2.begin(ECOFLOW_USER_ID, sn, device->getAddress().toString(), 2);
-                }
+                ESP_LOGI("DeviceManager", "Match found for W2 (%s)! Pending connection...", sn.c_str());
+
+                _pendingConnectMac = device->getAddress().toString();
+                _pendingConnectSN = sn;
+                _targetScanType = DeviceType::WAVE_2;
+
+                if (_pendingDevice) delete _pendingDevice;
+                _pendingDevice = new NimBLEAdvertisedDevice(*device);
+
+                _hasPendingConnection = true;
+                stopScan();
                 return;
             }
         }
