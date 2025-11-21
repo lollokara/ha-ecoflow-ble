@@ -68,7 +68,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
     uint8_t version = data[1];
     uint16_t payload_len = data[2] | (data[3] << 8);
 
-    if (version == 3) {
+    if (version == 3 || version == 19) { // Allow version 19 as V3 (Delta 3 quirks?)
         if (crc16(data, len - 2) != (data[len - 2] | (data[len - 1] << 8))) {
             ESP_LOGE(TAG, "Packet CRC16 mismatch");
             return nullptr;
@@ -91,7 +91,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
     uint8_t cmd_id = 0;
     size_t payload_offset = 0;
 
-    if (version == 3) {
+    if (version == 3 || version == 19) {
         dsrc = data[14];
         ddest = data[15];
         cmd_set = data[16];
@@ -104,6 +104,7 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
         payload_offset = 16;
     } else {
         ESP_LOGE(TAG, "Unsupported packet version %d", version);
+        print_hex_protocol(data, len, "Unknown Version Packet");
         return nullptr;
     }
 

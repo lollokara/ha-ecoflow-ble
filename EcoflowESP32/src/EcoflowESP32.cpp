@@ -80,13 +80,20 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     _deviceSn = deviceSn;
     _ble_address = ble_address;
     _protocolVersion = protocolVersion;
-    // NimBLEDevice::init(""); // Moved to DeviceManager::initialize to avoid re-init
-    _pClient = NimBLEDevice::createClient();
-    _pClient->setClientCallbacks(_clientCallback);
-    _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
 
-    // Increased stack size to prevent potential overflow
-    xTaskCreate(ble_task_entry, "ble_task", 8192, this, 5, &_ble_task_handle);
+    if (!_pClient) {
+        _pClient = NimBLEDevice::createClient();
+        _pClient->setClientCallbacks(_clientCallback);
+    }
+
+    if (!_ble_queue) {
+        _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
+    }
+
+    if (!_ble_task_handle) {
+        // Increased stack size to prevent potential overflow
+        xTaskCreate(ble_task_entry, "ble_task", 8192, this, 5, &_ble_task_handle);
+    }
     return true;
 }
 
