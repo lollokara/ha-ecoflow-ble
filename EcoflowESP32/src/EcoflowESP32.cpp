@@ -400,6 +400,10 @@ int EcoflowESP32::getSolarInputPower() { return _data.solarInputPower; }
 int EcoflowESP32::getAcOutputPower() { return _data.acOutputPower; }
 int EcoflowESP32::getDcOutputPower() { return _data.dcOutputPower; }
 int EcoflowESP32::getCellTemperature() { return _data.cellTemperature; }
+int EcoflowESP32::getAmbientTemperature() { return _data.currentTemp; }
+int EcoflowESP32::getMaxChgSoc() { return _data.maxChgSoc; }
+int EcoflowESP32::getMinDsgSoc() { return _data.minDsgSoc; }
+int EcoflowESP32::getAcChgLimit() { return _data.acChgLimit; }
 
 bool EcoflowESP32::isAcOn() { return _data.acOn; }
 bool EcoflowESP32::isDcOn() { return _data.dcOn; }
@@ -433,6 +437,22 @@ bool EcoflowESP32::setDC(bool on) {
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;
     config.cfg_dc_12v_out_open = on;
+    _sendConfigPacket(config);
+    return true;
+}
+
+bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
+    pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+
+    if (maxChg >= 50 && maxChg <= 100) {
+        config.has_cfg_max_chg_soc = true;
+        config.cfg_max_chg_soc = maxChg;
+    }
+    if (minDsg >= 0 && minDsg <= 30) {
+        config.has_cfg_min_dsg_soc = true;
+        config.cfg_min_dsg_soc = minDsg;
+    }
+
     _sendConfigPacket(config);
     return true;
 }

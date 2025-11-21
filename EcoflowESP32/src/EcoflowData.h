@@ -20,6 +20,13 @@ struct EcoflowData {
     int dcOutputPower = 0;
     int cellTemperature = 0;
 
+    // SOC Limits
+    int maxChgSoc = 100; // Default
+    int minDsgSoc = 0;   // Default
+
+    // AC Charging Limit
+    int acChgLimit = 400; // Default
+
     // Wave 2 Specifics
     int currentTemp = 0;
     int setTemp = 0;

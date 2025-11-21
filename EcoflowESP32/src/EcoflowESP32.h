@@ -77,6 +77,10 @@ public:
     int getAcOutputPower();
     int getDcOutputPower();
     int getCellTemperature();
+    int getAmbientTemperature();
+    int getMaxChgSoc();
+    int getMinDsgSoc();
+    int getAcChgLimit();
 
     bool isAcOn();
     bool isDcOn();
@@ -91,8 +95,8 @@ public:
     bool setDC(bool on);
     bool setUSB(bool on);
 
-    // New method for dynamic AC charging limit
     bool setAcChargingLimit(int watts);
+    bool setBatterySOCLimits(int maxChg, int minDsg);
 
     void disconnectAndForget();
 
