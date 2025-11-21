@@ -83,6 +83,7 @@ public:
     bool isUsbOn();
 
     bool isConnected();
+    bool isConnecting();
     bool isAuthenticated();
 
     bool requestData();

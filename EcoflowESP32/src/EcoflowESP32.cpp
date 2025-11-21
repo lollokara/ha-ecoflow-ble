@@ -390,6 +390,14 @@ bool EcoflowESP32::isConnected() {
     // States after AUTHENTICATED in the enum are error or disconnect states.
     return _state >= ConnectionState::CONNECTED && _state <= ConnectionState::AUTHENTICATED;
 }
+
+bool EcoflowESP32::isConnecting() {
+    // Connecting includes Created (pending task pickup), Establishing, and all auth steps before Authenticated
+    // Exclude SCANNING as that's now handled by DeviceManager, but EcoflowESP32 state might still reflect it if not updated.
+    // Here we care if we are "busy trying to connect".
+    return (_state >= ConnectionState::CREATED && _state < ConnectionState::AUTHENTICATED) || _state == ConnectionState::ESTABLISHING_CONNECTION;
+}
+
 bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENTICATED; }
 
 bool EcoflowESP32::requestData() {

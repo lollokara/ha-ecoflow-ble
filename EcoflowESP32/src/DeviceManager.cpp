@@ -246,7 +246,7 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
         ESP_LOGD("DeviceManager", "Found SN: %s", sn.c_str());
 
         // Check matches for D3 slot
-        if (!slotD3.isConnected) {
+        if (!slotD3.isConnected && !d3.isConnecting()) {
             bool isD3 = isTargetDevice(sn, DeviceType::DELTA_2);
             // If we have a saved MAC, only connect if it matches. If no MAC (new pairing), connect if type matches.
             bool match = false;
@@ -270,7 +270,7 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
         }
 
         // Check matches for W2 slot
-        if (!slotW2.isConnected) {
+        if (!slotW2.isConnected && !w2.isConnecting()) {
             bool isW2 = isTargetDevice(sn, DeviceType::WAVE_2);
             bool match = false;
             if (!slotW2.macAddress.empty()) {
