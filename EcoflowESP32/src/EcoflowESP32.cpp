@@ -264,7 +264,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                         self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
                         self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
                         ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 0x03, 0, 0x0d);
+                        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, 0, 0x0d);
                         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
                         self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
                     } else {
