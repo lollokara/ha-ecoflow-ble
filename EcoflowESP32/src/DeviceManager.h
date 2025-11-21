@@ -76,6 +76,8 @@ private:
     std::string _pendingConnectMac;
     std::string _pendingConnectSN;
     NimBLEAdvertisedDevice* _pendingDevice = nullptr;
+
+    SemaphoreHandle_t _scanMutex;
 };
 
 #endif

@@ -56,6 +56,8 @@ DeviceManager::DeviceManager() {
     slotW2.name = "W2";
     slotW2.type = DeviceType::WAVE_2;
     slotW2.isConnected = false;
+
+    _scanMutex = xSemaphoreCreateMutex();
 }
 
 void DeviceManager::initialize() {
@@ -76,31 +78,42 @@ void DeviceManager::initialize() {
 
 void DeviceManager::update() {
     // Handle Pending Connection from Scan
-    if (_hasPendingConnection && _pendingDevice) {
-        stopScan(); // Ensure scan is stopped before connecting
+    if (_hasPendingConnection) {
+        // Protect access to _pendingDevice and scan state
+        if (xSemaphoreTake(_scanMutex, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+            if (_pendingDevice) {
+                if (pScan && pScan->isScanning()) {
+                    pScan->stop();
+                    pScan->clearResults();
+                    _isScanning = false;
+                }
 
-        // Check if any other device is currently trying to connect to avoid race conditions
-        if (isAnyConnecting()) {
-            ESP_LOGW("DeviceManager", "Another device is connecting, deferring pending connection");
-            return; // Defer processing this pending connection
+                // Check if any other device is currently trying to connect to avoid race conditions
+                if (isAnyConnecting()) {
+                    ESP_LOGW("DeviceManager", "Another device is connecting, deferring pending connection");
+                    xSemaphoreGive(_scanMutex);
+                    return; // Defer processing this pending connection
+                }
+
+                ESP_LOGI("DeviceManager", "Executing pending connection to %s", _pendingConnectSN.c_str());
+                saveDevice(_targetScanType, _pendingConnectMac, _pendingConnectSN);
+
+                EcoflowESP32* dev = getDevice(_targetScanType);
+                uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+
+                // Initialize credentials
+                dev->begin(ECOFLOW_USER_ID, _pendingConnectSN, _pendingConnectMac, version);
+
+                // Pass the captured device to start connection
+                dev->connectTo(_pendingDevice);
+
+                // Cleanup
+                delete _pendingDevice;
+                _pendingDevice = nullptr;
+                _hasPendingConnection = false;
+            }
+            xSemaphoreGive(_scanMutex);
         }
-
-        ESP_LOGI("DeviceManager", "Executing pending connection to %s", _pendingConnectSN.c_str());
-        saveDevice(_targetScanType, _pendingConnectMac, _pendingConnectSN);
-
-        EcoflowESP32* dev = getDevice(_targetScanType);
-        uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
-
-        // Initialize credentials
-        dev->begin(ECOFLOW_USER_ID, _pendingConnectSN, _pendingConnectMac, version);
-
-        // Pass the captured device to start connection
-        dev->connectTo(_pendingDevice);
-
-        // Cleanup
-        delete _pendingDevice;
-        _pendingDevice = nullptr;
-        _hasPendingConnection = false;
     }
 
     slotD3.instance->update();
@@ -218,11 +231,14 @@ void DeviceManager::startScan(DeviceType type) {
 }
 
 void DeviceManager::stopScan() {
-    if (pScan) {
-        pScan->stop();
-        pScan->clearResults();
+    if (xSemaphoreTake(_scanMutex, portMAX_DELAY) == pdTRUE) {
+        if (pScan) {
+            pScan->stop();
+            pScan->clearResults();
+        }
+        _isScanning = false;
+        xSemaphoreGive(_scanMutex);
     }
-    _isScanning = false;
 }
 
 bool DeviceManager::isScanning() {
@@ -241,64 +257,72 @@ void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* adver
 
 void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
     if (_hasPendingConnection) return; // Already found one, ignore others
-    if (!device->haveManufacturerData()) return;
 
-    std::string data = device->getManufacturerData();
-    std::string sn = extractSerial(data);
-
-    if (sn.length() > 0) {
-        // Check matches for D3 slot
-        if (!slotD3.isConnected && !d3.isConnecting()) {
-            bool isD3 = isTargetDevice(sn, DeviceType::DELTA_2);
-            bool match = false;
-            // Match if saved MAC matches OR if scanning specifically for new D3
-            if (!slotD3.macAddress.empty()) {
-                if (device->getAddress().toString() == slotD3.macAddress) match = true;
-            } else if (isD3 && _targetScanType == DeviceType::DELTA_2) {
-                match = true;
-            }
-
-            if (match) {
-                ESP_LOGI("DeviceManager", "Match found for D3 (%s)! Pending connection...", sn.c_str());
-
-                _pendingConnectMac = device->getAddress().toString();
-                _pendingConnectSN = sn;
-                _targetScanType = DeviceType::DELTA_2;
-
-                if (_pendingDevice) delete _pendingDevice;
-                _pendingDevice = new NimBLEAdvertisedDevice(*device);
-
-                _hasPendingConnection = true;
-                stopScan(); // Stop immediately to prevent resource contention
-                return;
-            }
+    if (xSemaphoreTake(_scanMutex, 100 / portTICK_PERIOD_MS) == pdTRUE) {
+        // Double check inside lock
+        if (_hasPendingConnection) {
+            xSemaphoreGive(_scanMutex);
+            return;
         }
 
-        // Check matches for W2 slot
-        if (!slotW2.isConnected && !w2.isConnecting()) {
-            bool isW2 = isTargetDevice(sn, DeviceType::WAVE_2);
-            bool match = false;
-            if (!slotW2.macAddress.empty()) {
-                if (device->getAddress().toString() == slotW2.macAddress) match = true;
-            } else if (isW2 && _targetScanType == DeviceType::WAVE_2) {
-                match = true;
+        if (!device->haveManufacturerData()) {
+            xSemaphoreGive(_scanMutex);
+            return;
+        }
+
+        std::string data = device->getManufacturerData();
+        std::string sn = extractSerial(data);
+
+        if (sn.length() > 0) {
+            bool found = false;
+            // Check matches for D3 slot
+            if (!slotD3.isConnected && !d3.isConnecting()) {
+                bool isD3 = isTargetDevice(sn, DeviceType::DELTA_2);
+                bool match = false;
+                // Match if saved MAC matches OR if scanning specifically for new D3
+                if (!slotD3.macAddress.empty()) {
+                    if (device->getAddress().toString() == slotD3.macAddress) match = true;
+                } else if (isD3 && _targetScanType == DeviceType::DELTA_2) {
+                    match = true;
+                }
+
+                if (match) {
+                    ESP_LOGI("DeviceManager", "Match found for D3 (%s)! Pending connection...", sn.c_str());
+                    _pendingConnectMac = device->getAddress().toString();
+                    _pendingConnectSN = sn;
+                    _targetScanType = DeviceType::DELTA_2;
+                    found = true;
+                }
             }
 
-            if (match) {
-                ESP_LOGI("DeviceManager", "Match found for W2 (%s)! Pending connection...", sn.c_str());
+            // Check matches for W2 slot if not found D3
+            if (!found && !slotW2.isConnected && !w2.isConnecting()) {
+                bool isW2 = isTargetDevice(sn, DeviceType::WAVE_2);
+                bool match = false;
+                if (!slotW2.macAddress.empty()) {
+                    if (device->getAddress().toString() == slotW2.macAddress) match = true;
+                } else if (isW2 && _targetScanType == DeviceType::WAVE_2) {
+                    match = true;
+                }
 
-                _pendingConnectMac = device->getAddress().toString();
-                _pendingConnectSN = sn;
-                _targetScanType = DeviceType::WAVE_2;
+                if (match) {
+                    ESP_LOGI("DeviceManager", "Match found for W2 (%s)! Pending connection...", sn.c_str());
+                    _pendingConnectMac = device->getAddress().toString();
+                    _pendingConnectSN = sn;
+                    _targetScanType = DeviceType::WAVE_2;
+                    found = true;
+                }
+            }
 
+            if (found) {
                 if (_pendingDevice) delete _pendingDevice;
                 _pendingDevice = new NimBLEAdvertisedDevice(*device);
-
                 _hasPendingConnection = true;
-                stopScan();
-                return;
+                // Do NOT call stopScan() here. Let the main loop handle it safely.
+                // Calling stopScan() -> clearResults() inside onResult callback causes race conditions/heap corruption.
             }
         }
+        xSemaphoreGive(_scanMutex);
     }
 }
 
