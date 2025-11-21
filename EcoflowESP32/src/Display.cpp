@@ -2,8 +2,8 @@
 #include "Font.h"
 #include <math.h>
 
-#define DATAPIN    8
-#define CLOCKPIN   18
+#define DATAPIN    14
+#define CLOCKPIN   13
 #define NUM_ROWS   9
 #define NUM_COLS   20
 #define NUMPIXELS  (NUM_ROWS * NUM_COLS)

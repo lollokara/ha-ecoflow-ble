@@ -235,7 +235,7 @@ void loop() {
         if (currentViewDevice == DeviceType::WAVE_2 && data.isConnected) {
             // We don't have a direct temp field in EcoflowData struct yet that maps 1:1 to Wave 2 specifics,
             // but we have getCellTemperature. Let's also print to Serial as requested.
-             ESP_LOGI("Wave2", "Temp Cell: %d, SolarInput: %d", activeDev->getCellTemperature(), activeDev->getSolarInputPower());
+            //ESP_LOGI("Wave2", "Temp Cell: %d, SolarInput: %d", activeDev->getCellTemperature(), activeDev->getSolarInputPower());
         }
 
         DeviceSlot* activeSlot = DeviceManager::getInstance().getSlot(currentViewDevice);
