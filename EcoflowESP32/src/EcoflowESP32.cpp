@@ -75,39 +75,12 @@ EcoflowESP32::~EcoflowESP32() {
     }
 }
 
-EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32* instance) : _instance(instance) {}
-
-void EcoflowESP32::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-    if (advertisedDevice->getAddress().toString() == _instance->_ble_address) {
-        ESP_LOGI(TAG, "Found device");
-        _instance->_pScan->stop();
-        _instance->_pAdvertisedDevice = new NimBLEAdvertisedDevice(*advertisedDevice);
-    }
-}
-
-void EcoflowESP32::_startScan() {
-    ESP_LOGI(TAG, "Starting scan...");
-    _lastScanTime = millis();
-    _state = ConnectionState::SCANNING;
-    _connectionRetries = 0;
-    if (!_pScan) {
-        _pScan = NimBLEDevice::getScan();
-        _pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks(this), true);
-        _pScan->setActiveScan(true);
-        _pScan->setInterval(100);
-        _pScan->setWindow(99);
-    }
-    // Use non-blocking scan for 0 (forever) until we stop it manually when device is found.
-    // This prevents the BLE task from hanging.
-    _pScan->start(0, nullptr, false);
-}
-
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
     _protocolVersion = protocolVersion;
-    NimBLEDevice::init("");
+    // NimBLEDevice::init(""); // Moved to DeviceManager::initialize to avoid re-init
     _pClient = NimBLEDevice::createClient();
     _pClient->setClientCallbacks(_clientCallback);
     _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
@@ -124,13 +97,15 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
 }
 
+void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
+    if (_pAdvertisedDevice) delete _pAdvertisedDevice;
+    _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
+    _state = ConnectionState::CREATED; // Signal task to connect
+}
+
 void EcoflowESP32::disconnectAndForget() {
     if (_pClient && _pClient->isConnected()) {
         _pClient->disconnect();
-    }
-    if (_pScan) {
-        _pScan->stop();
-        _pScan->clearResults();
     }
     _ble_address = "";
     _deviceSn = "";
@@ -141,10 +116,7 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
     delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
-    // Restart scan to reconnect only if we have an address
-    if (!_ble_address.empty()) {
-        _startScan();
-    }
+    // DeviceManager will handle rescanning/reconnection if needed
 }
 
 void EcoflowESP32::update() {
@@ -160,15 +132,6 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             self->_lastState = self->_state;
         }
 
-        // If scanning indefinitely, we might want to restart occasionally if it gets stuck,
-        // but NimBLE is usually reliable.
-        // If we haven't found the device after 10s, maybe just log or restart scan to be safe.
-        if (self->_state == ConnectionState::SCANNING && millis() - self->_lastScanTime > 10000) {
-            ESP_LOGW(TAG, "Scan running for >10s, restarting scan to be safe");
-            self->_pScan->stop();
-            self->_startScan();
-        }
-
         if (self->_pAdvertisedDevice) {
             if (!self->_pClient->isConnected()) {
                 if (millis() - self->_lastConnectionAttempt > 10000) { // Increased timeout
@@ -179,21 +142,18 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                         self->_connectionRetries++;
                         self->_pClient->connect(self->_pAdvertisedDevice);
                     } else {
-                        ESP_LOGE(TAG, "Max connection attempts reached, restarting scan");
+                        ESP_LOGE(TAG, "Max connection attempts reached. Waiting for manager.");
                         delete self->_pAdvertisedDevice;
                         self->_pAdvertisedDevice = nullptr;
                         self->_connectionRetries = 0;
-                        self->_startScan();
+                        self->_state = ConnectionState::DISCONNECTED;
                     }
                 }
             }
-        } else if (self->_state != ConnectionState::SCANNING) {
-             // Fallback if we are disconnected but not scanning (and not manually handled yet)
-             if (self->_state == ConnectionState::DISCONNECTED || self->_state == ConnectionState::NOT_CONNECTED) {
-                 self->_startScan();
-             }
+        } else {
+             // If disconnected and no advertised device to connect to, we wait for DeviceManager to give us one.
 
-            // Check if client claims disconnected but our state thinks otherwise
+             // Check if client claims disconnected but our state thinks otherwise
             if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTED) {
                 if (!self->_pClient->isConnected()) {
                      ESP_LOGW(TAG, "Client disconnected unexpectedly");

@@ -128,16 +128,9 @@ private:
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
     NimBLERemoteCharacteristic* _pReadChr = nullptr;
     EcoflowClientCallback* _clientCallback;
-    NimBLEScan* _pScan = nullptr;
     NimBLEAdvertisedDevice* _pAdvertisedDevice = nullptr;
-    void _startScan();
-    class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
-        public:
-            AdvertisedDeviceCallbacks(EcoflowESP32* instance);
-            void onResult(NimBLEAdvertisedDevice* advertisedDevice) override;
-        private:
-            EcoflowESP32* _instance;
-    };
+public:
+    void connectTo(NimBLEAdvertisedDevice* device);
 
     EcoflowCrypto _crypto;
 
