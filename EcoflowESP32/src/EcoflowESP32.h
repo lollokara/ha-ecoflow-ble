@@ -93,6 +93,8 @@ public:
     // New method for dynamic AC charging limit
     bool setAcChargingLimit(int watts);
 
+    void disconnectAndForget();
+
     void onConnect(NimBLEClient* pclient);
     void onDisconnect(NimBLEClient* pclient);
 
@@ -113,7 +115,7 @@ private:
     void _handleAuthPacket(Packet* pkt);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
 
-    static EcoflowESP32* _instance;
+    static std::vector<EcoflowESP32*> _instances;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
     ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
 

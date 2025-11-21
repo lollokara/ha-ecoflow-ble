@@ -17,7 +17,9 @@ EcoflowData currentData;
 enum class MenuState {
     MAIN_MENU,
     SELECTION,
-    DETAIL
+    DETAIL,
+    DEVICE_SELECT,
+    DEVICE_ACTION
 };
 
 enum class SelectionPage {
@@ -26,11 +28,25 @@ enum class SelectionPage {
     USB,
     SOL,
     IN,
-    SET
+    SET,
+    DEV
+};
+
+enum class DevicePage {
+    D3,
+    W2
+};
+
+enum class DeviceActionPage {
+    CON,
+    DIS,
+    RET
 };
 
 MenuState currentState = MenuState::MAIN_MENU;
 SelectionPage currentSelection = SelectionPage::AC;
+DevicePage currentDevicePage = DevicePage::D3;
+DeviceActionPage currentDeviceAction = DeviceActionPage::CON;
 
 unsigned long lastInteractionTime = 0;
 unsigned long lastScrollTime = 0;
@@ -46,6 +62,7 @@ int slideDirection = 0; // 1 = Up, -1 = Down
 
 // Pending Action for Timeout
 DisplayAction pendingAction = DisplayAction::NONE;
+DeviceType targetDeviceType = DeviceType::DELTA_2;
 
 // --- Colors ---
 uint32_t cRed;
@@ -66,6 +83,8 @@ int tempAcLimit = 400;
 void drawMainMenu();
 void drawSelectionMenu();
 void drawDetailMenu();
+void drawDeviceSelectMenu(DeviceSlot* slotD3, DeviceSlot* slotW2);
+void drawDeviceActionMenu(DeviceSlot* slot);
 void drawNcScreen();
 void drawText(int x, int y, String text, uint32_t color);
 void renderFrame();
@@ -158,17 +177,12 @@ int getTextWidth(String text) {
 
 // --- State Machine & Logic ---
 
-void updateDisplay(const EcoflowData& data) {
+void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScanning) {
     currentData = data;
-    clearFrame();
+    // activeSlot helps us know connection status of other devices if needed,
+    // but currentData comes from the "Active View" device in main loop.
 
-    // Priority 1: Disconnected
-    if (!currentData.isConnected) {
-        strip.setBrightness(25);
-        drawNcScreen();
-        renderFrame();
-        return;
-    }
+    clearFrame();
 
     // Check Timeouts
     unsigned long now = millis();
@@ -184,21 +198,49 @@ void updateDisplay(const EcoflowData& data) {
                 currentState = MenuState::MAIN_MENU;
             }
         }
-    } else if (currentState == MenuState::SELECTION) {
+    } else if (currentState == MenuState::SELECTION || currentState == MenuState::DEVICE_SELECT || currentState == MenuState::DEVICE_ACTION) {
         if (now - lastInteractionTime > 10000) { // 10s
             currentState = MenuState::MAIN_MENU;
         }
     }
 
+    // Priority 1: Disconnected (Only if in Main Menu or Detail View of that device)
+    // If in Device Menu, we want to see options even if disconnected.
+    if ((currentState == MenuState::MAIN_MENU || currentState == MenuState::DETAIL || currentState == MenuState::SELECTION) && !currentData.isConnected) {
+        strip.setBrightness(25);
+        drawNcScreen();
+        // Show device name if possible?
+        // drawText(0, 1, activeSlot->name + " NC", cRed);
+        renderFrame();
+        return;
+    }
+
     if (currentState == MenuState::MAIN_MENU) {
         drawMainMenu();
+        // Optional: Show small indicator of which device
+        // drawText(0,0, activeSlot->name, cBlue); // Might overlap
     } else if (currentState == MenuState::SELECTION) {
-        // Reset brightness in case we came from breathing
         strip.setBrightness(25);
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
         strip.setBrightness(25);
         drawDetailMenu();
+    } else if (currentState == MenuState::DEVICE_SELECT) {
+        strip.setBrightness(25);
+        DeviceSlot* s1 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_2);
+        DeviceSlot* s2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
+        drawDeviceSelectMenu(s1, s2);
+    } else if (currentState == MenuState::DEVICE_ACTION) {
+        strip.setBrightness(25);
+        // Get slot for currentDevicePage
+        DeviceType t = (currentDevicePage == DevicePage::D3) ? DeviceType::DELTA_2 : DeviceType::WAVE_2;
+        DeviceSlot* s = DeviceManager::getInstance().getSlot(t);
+        drawDeviceActionMenu(s);
+    }
+
+    // Show Scanning Indicator overlay if needed?
+    if (isScanning) {
+        setPixel(19, 0, cBlue);
     }
 
     renderFrame();
@@ -259,6 +301,7 @@ String getSelectionText(SelectionPage page) {
         case SelectionPage::SOL: return "SOL";
         case SelectionPage::IN: return "IN";
         case SelectionPage::SET: return "SET";
+        case SelectionPage::DEV: return "DEV";
         default: return "?";
     }
 }
@@ -379,6 +422,47 @@ void drawDetailMenu() {
     }
 }
 
+void drawDeviceSelectMenu(DeviceSlot* slotD3, DeviceSlot* slotW2) {
+    String text = "";
+    uint32_t color = cWhite;
+
+    if (currentDevicePage == DevicePage::D3) {
+        text = "D3";
+        color = slotD3->isConnected ? cGreen : cRed;
+    } else {
+        text = "W2";
+        color = slotW2->isConnected ? cGreen : cRed;
+    }
+
+    int width = getTextWidth(text) - 1;
+    int x = (NUM_COLS - width) / 2;
+    drawText(x, 1, text, color);
+}
+
+void drawDeviceActionMenu(DeviceSlot* slot) {
+    String text = "";
+    uint32_t color = cWhite;
+
+    switch(currentDeviceAction) {
+        case DeviceActionPage::CON:
+            text = "CON";
+            color = cBlue;
+            break;
+        case DeviceActionPage::DIS:
+            text = "DIS";
+            color = cRed;
+            break;
+        case DeviceActionPage::RET:
+            text = "RET";
+            color = cYellow;
+            break;
+    }
+
+    int width = getTextWidth(text) - 1;
+    int x = (NUM_COLS - width) / 2;
+    drawText(x, 1, text, color);
+}
+
 void renderFrame() {
     strip.clear();
     for(int y=0; y<NUM_ROWS; y++) {
@@ -417,7 +501,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
         switch(input) {
             case ButtonInput::BTN_UP: // Previous Page
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::SET;
+                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::DEV;
                 else currentSelection = (SelectionPage)((int)currentSelection - 1);
 
                 slideDirection = -1;
@@ -427,7 +511,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
 
             case ButtonInput::BTN_DOWN: // Next Page
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::SET) currentSelection = SelectionPage::AC;
+                if (currentSelection == SelectionPage::DEV) currentSelection = SelectionPage::AC;
                 else currentSelection = (SelectionPage)((int)currentSelection + 1);
 
                 slideDirection = 1;
@@ -436,10 +520,62 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 break;
 
             case ButtonInput::BTN_ENTER_SHORT:
-                currentState = MenuState::DETAIL;
-                scrollOffset = -5;
+                if (currentSelection == SelectionPage::DEV) {
+                    currentState = MenuState::DEVICE_SELECT;
+                    currentDevicePage = DevicePage::D3;
+                } else {
+                    currentState = MenuState::DETAIL;
+                    scrollOffset = -5;
+                }
                 break;
 
+            default: break;
+        }
+        return DisplayAction::NONE;
+    }
+
+    if (currentState == MenuState::DEVICE_SELECT) {
+        switch(input) {
+            case ButtonInput::BTN_UP:
+            case ButtonInput::BTN_DOWN:
+                if (currentDevicePage == DevicePage::D3) currentDevicePage = DevicePage::W2;
+                else currentDevicePage = DevicePage::D3;
+                break;
+            case ButtonInput::BTN_ENTER_SHORT:
+                currentState = MenuState::DEVICE_ACTION;
+                currentDeviceAction = DeviceActionPage::CON;
+
+                // Set Target for Actions
+                targetDeviceType = (currentDevicePage == DevicePage::D3) ? DeviceType::DELTA_2 : DeviceType::WAVE_2;
+                break;
+            case ButtonInput::BTN_ENTER_LONG:
+                currentState = MenuState::SELECTION;
+                break;
+            default: break;
+        }
+        return DisplayAction::NONE;
+    }
+
+    if (currentState == MenuState::DEVICE_ACTION) {
+        switch(input) {
+            case ButtonInput::BTN_UP:
+            case ButtonInput::BTN_DOWN:
+                if (currentDeviceAction == DeviceActionPage::CON) currentDeviceAction = DeviceActionPage::DIS;
+                else if (currentDeviceAction == DeviceActionPage::DIS) currentDeviceAction = DeviceActionPage::RET;
+                else currentDeviceAction = DeviceActionPage::CON;
+                break;
+            case ButtonInput::BTN_ENTER_SHORT:
+                if (currentDeviceAction == DeviceActionPage::CON) {
+                    return DisplayAction::CONNECT_DEVICE;
+                } else if (currentDeviceAction == DeviceActionPage::DIS) {
+                    return DisplayAction::DISCONNECT_DEVICE;
+                } else {
+                    currentState = MenuState::DEVICE_SELECT; // Return
+                }
+                break;
+            case ButtonInput::BTN_ENTER_LONG:
+                 currentState = MenuState::DEVICE_SELECT;
+                 break;
             default: break;
         }
         return DisplayAction::NONE;
@@ -498,4 +634,8 @@ DisplayAction getPendingAction() {
 
 int getSetAcLimit() {
     return tempAcLimit;
+}
+
+DeviceType getTargetDeviceType() {
+    return targetDeviceType;
 }

@@ -22,65 +22,53 @@ namespace EcoflowDataParser {
 void parsePacket(const Packet& pkt, EcoflowData& data) {
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
         ESP_LOGD(TAG, "Parsing data packet with cmdId=0x%02x", pkt.getCmdId());
-        pd335_sys_DisplayPropertyUpload proto_msg = pd335_sys_DisplayPropertyUpload_init_zero;
+
+        // Try parsing as DisplayPropertyUpload
+        pd335_sys_DisplayPropertyUpload display_msg = pd335_sys_DisplayPropertyUpload_init_zero;
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
-        if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &proto_msg)) {
-            ESP_LOGD(TAG, "Successfully decoded protobuf message");
+
+        if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &display_msg)) {
+            ESP_LOGD(TAG, "Successfully decoded DisplayPropertyUpload");
 
             // Reliable Battery Percentage
-            // Try BMS SOC first, then CMS SOC.
-            // Sometimes cms_batt_soc reports 0 incorrectly.
-            if (proto_msg.has_bms_batt_soc && proto_msg.bms_batt_soc > 0) {
-                 data.batteryLevel = (int)proto_msg.bms_batt_soc;
-                 ESP_LOGD(TAG, "Battery level (BMS): %d%%", data.batteryLevel);
-            } else if (proto_msg.has_cms_batt_soc) {
-                data.batteryLevel = (int)proto_msg.cms_batt_soc;
-                ESP_LOGD(TAG, "Battery level (CMS): %d%%", data.batteryLevel);
-            } else {
-                ESP_LOGD(TAG, "Battery level field missing in packet");
+            if (display_msg.has_bms_batt_soc && display_msg.bms_batt_soc > 0) {
+                 data.batteryLevel = (int)display_msg.bms_batt_soc;
+            } else if (display_msg.has_cms_batt_soc) {
+                data.batteryLevel = (int)display_msg.cms_batt_soc;
             }
 
             // Power readings
-            if (proto_msg.has_pow_in_sum_w) {
-                data.inputPower = (int)proto_msg.pow_in_sum_w;
-            }
-            if (proto_msg.has_pow_out_sum_w) {
-                data.outputPower = (int)proto_msg.pow_out_sum_w;
-            }
-
-            // Solar Input Power (W)
-            if (proto_msg.has_pow_get_pv) {
-                data.solarInputPower = (int)proto_msg.pow_get_pv;
-            }
-
-            // AC Output Power (W)
-            if (proto_msg.has_pow_get_ac_out) {
-                data.acOutputPower = (int)proto_msg.pow_get_ac_out;
-            }
-
-            // DC Output Power (W)
-            if (proto_msg.has_pow_get_12v) {
-                data.dcOutputPower = (int)proto_msg.pow_get_12v;
-            }
-
-            // Cell Temperature (C)
-            if (proto_msg.has_bms_max_cell_temp) {
-                data.cellTemperature = (int)proto_msg.bms_max_cell_temp;
-            }
+            if (display_msg.has_pow_in_sum_w) data.inputPower = (int)display_msg.pow_in_sum_w;
+            if (display_msg.has_pow_out_sum_w) data.outputPower = (int)display_msg.pow_out_sum_w;
+            if (display_msg.has_pow_get_pv) data.solarInputPower = (int)display_msg.pow_get_pv;
+            if (display_msg.has_pow_get_ac_out) data.acOutputPower = (int)display_msg.pow_get_ac_out;
+            if (display_msg.has_pow_get_12v) data.dcOutputPower = (int)display_msg.pow_get_12v;
+            if (display_msg.has_bms_max_cell_temp) data.cellTemperature = (int)display_msg.bms_max_cell_temp;
 
             // Status flags
-            if (proto_msg.has_flow_info_ac_out) {
-                data.acOn = (proto_msg.flow_info_ac_out & 0b11) >= 0b10;
-            }
-            if (proto_msg.has_flow_info_12v) {
-                data.dcOn = (proto_msg.flow_info_12v & 0b11) >= 0b10;
-            }
-            if (proto_msg.has_flow_info_qcusb1) {
-                 data.usbOn = (proto_msg.flow_info_qcusb1 & 0b11) >= 0b10;
-            }
+            if (display_msg.has_flow_info_ac_out) data.acOn = (display_msg.flow_info_ac_out & 0b11) >= 0b10;
+            if (display_msg.has_flow_info_12v) data.dcOn = (display_msg.flow_info_12v & 0b11) >= 0b10;
+            if (display_msg.has_flow_info_qcusb1) data.usbOn = (display_msg.flow_info_qcusb1 & 0b11) >= 0b10;
 
         } else {
-            ESP_LOGE(TAG, "Failed to decode protobuf message");
+             // If failed, try parsing as RuntimePropertyUpload (which contains more temp fields)
+             // Reset stream or creating new one not reliable if data consumed. Recreate.
+             stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+             pd335_sys_RuntimePropertyUpload runtime_msg = pd335_sys_RuntimePropertyUpload_init_zero;
+             if (pb_decode(&stream, pd335_sys_RuntimePropertyUpload_fields, &runtime_msg)) {
+                 ESP_LOGD(TAG, "Successfully decoded RuntimePropertyUpload");
+
+                 // Log Temps for Wave 2 Debugging
+                 if (runtime_msg.has_temp_pcs_dc) ESP_LOGI(TAG, "Temp PCS DC: %f", runtime_msg.temp_pcs_dc);
+                 if (runtime_msg.has_temp_pcs_ac) ESP_LOGI(TAG, "Temp PCS AC: %f", runtime_msg.temp_pcs_ac);
+                 if (runtime_msg.has_temp_pv) ESP_LOGI(TAG, "Temp PV: %f", runtime_msg.temp_pv);
+                 if (runtime_msg.has_temp_pv2) ESP_LOGI(TAG, "Temp PV2: %f", runtime_msg.temp_pv2);
+
+                 // If cellTemperature is not set by DisplayProperty, maybe we can get it here?
+                 // But Runtime doesn't seem to have cell temp exposed same way usually.
+             } else {
+                 ESP_LOGE(TAG, "Failed to decode protobuf message as Display or Runtime Property");
+             }
         }
     }
 }

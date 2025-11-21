@@ -20,18 +20,24 @@ static void print_hex_esp(const uint8_t* data, size_t size, const char* label) {
 }
 
 
-EcoflowESP32* EcoflowESP32::_instance = nullptr;
+std::vector<EcoflowESP32*> EcoflowESP32::_instances;
 
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     ESP_LOGV(TAG, "Notify callback received %d bytes", length);
     print_hex_esp(pData, length, "Notify Data");
-    if (_instance && _instance->_ble_queue) {
-        BleNotification* notification = new BleNotification;
-        notification->data = new uint8_t[length];
-        memcpy(notification->data, pData, length);
-        notification->length = length;
-        xQueueSend(_instance->_ble_queue, &notification, portMAX_DELAY);
+
+    NimBLEClient* pClient = pRemoteCharacteristic->getRemoteService()->getClient();
+    for (auto* instance : _instances) {
+        if (instance->_pClient == pClient && instance->_ble_queue) {
+            BleNotification* notification = new BleNotification;
+            notification->data = new uint8_t[length];
+            memcpy(notification->data, pData, length);
+            notification->length = length;
+            xQueueSend(instance->_ble_queue, &notification, portMAX_DELAY);
+            return;
+        }
     }
+    ESP_LOGW(TAG, "Notification received but no matching instance found");
 }
 
 EcoflowClientCallback::EcoflowClientCallback(EcoflowESP32* instance) : _instance(instance) {}
@@ -51,7 +57,7 @@ void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
 }
 
 EcoflowESP32::EcoflowESP32() {
-    _instance = this;
+    _instances.push_back(this);
     _clientCallback = new EcoflowClientCallback(this);
 }
 
@@ -60,6 +66,13 @@ EcoflowESP32::~EcoflowESP32() {
         NimBLEDevice::deleteClient(_pClient);
     }
     delete _clientCallback;
+
+    for (auto it = _instances.begin(); it != _instances.end(); ++it) {
+        if (*it == this) {
+            _instances.erase(it);
+            break;
+        }
+    }
 }
 
 EcoflowESP32::AdvertisedDeviceCallbacks::AdvertisedDeviceCallbacks(EcoflowESP32* instance) : _instance(instance) {}
@@ -110,12 +123,27 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     ESP_LOGI("EcoflowESP32", "onConnect: State changed to SERVICE_DISCOVERY");
 }
 
+void EcoflowESP32::disconnectAndForget() {
+    if (_pClient && _pClient->isConnected()) {
+        _pClient->disconnect();
+    }
+    if (_pScan) {
+        _pScan->stop();
+        _pScan->clearResults();
+    }
+    _ble_address = "";
+    _deviceSn = "";
+    _state = ConnectionState::NOT_CONNECTED;
+}
+
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     _state = ConnectionState::DISCONNECTED;
     delete _pAdvertisedDevice;
     _pAdvertisedDevice = nullptr;
-    // Restart scan to reconnect
-    _startScan();
+    // Restart scan to reconnect only if we have an address
+    if (!_ble_address.empty()) {
+        _startScan();
+    }
 }
 
 void EcoflowESP32::update() {
