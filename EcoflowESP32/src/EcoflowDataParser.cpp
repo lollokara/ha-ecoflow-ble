@@ -114,7 +114,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
              bool updated = false;
 
              if (mr521_msg.has_cms_batt_soc) { d3p.batteryLevel = mr521_msg.cms_batt_soc; updated = true; }
-             if (mr521_msg.has_pow_get_ac) { d3p.acInputPower = -std::abs(mr521_msg.pow_get_ac); updated = true; } // _out_power logic
+             if (mr521_msg.has_pow_get_ac) { d3p.acInputPower = -mr521_msg.pow_get_ac; updated = true; } // _out_power logic
              if (mr521_msg.has_pow_get_ac_lv_out) { d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out); updated = true; }
              if (mr521_msg.has_pow_get_ac_hv_out) { d3p.acHvOutputPower = -std::abs(mr521_msg.pow_get_ac_hv_out); updated = true; }
 
@@ -136,6 +136,8 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
 
              if (mr521_msg.has_cms_min_dsg_soc) d3p.batteryChargeLimitMin = mr521_msg.cms_min_dsg_soc;
              if (mr521_msg.has_cms_max_chg_soc) d3p.batteryChargeLimitMax = mr521_msg.cms_max_chg_soc;
+
+             if (mr521_msg.has_bms_max_cell_temp) d3p.cellTemperature = mr521_msg.bms_max_cell_temp;
 
              if (mr521_msg.has_flow_info_12v) d3p.dc12vPort = is_flow_on(mr521_msg.flow_info_12v);
              if (mr521_msg.has_flow_info_ac_lv_out) d3p.acLvPort = is_flow_on(mr521_msg.flow_info_ac_lv_out);

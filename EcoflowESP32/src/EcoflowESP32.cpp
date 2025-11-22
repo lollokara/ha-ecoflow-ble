@@ -416,6 +416,7 @@ int EcoflowESP32::getDcOutputPower() {
 }
 int EcoflowESP32::getCellTemperature() {
     if (_protocolVersion == 2) return (int)_data.wave2.outLetTemp;
+    if (_deviceSn.rfind("MR51", 0) == 0) return _data.deltaPro3.cellTemperature;
     return _data.delta3.cellTemperature;
 }
 int EcoflowESP32::getAmbientTemperature() {
