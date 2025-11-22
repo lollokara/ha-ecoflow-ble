@@ -17,6 +17,13 @@ private:
     static void handleDelta3Command(String cmd, String args);
     static void handleDeltaPro3Command(String cmd, String args);
     static void handleAltChargerCommand(String cmd, String args);
+
+    // Read Handlers
+    static void handleWave2Read(String cmd);
+    static void handleDelta3Read(String cmd);
+    static void handleDeltaPro3Read(String cmd);
+    static void handleAltChargerRead(String cmd);
+
     static float parseFloat(String s);
 };
 

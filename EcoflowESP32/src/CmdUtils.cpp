@@ -23,31 +23,19 @@ void CmdUtils::processInput(String input) {
             handleWave2Command(cmd, args);
             return;
         }
-
-        // D3 / D3P / AltChg Commands - try all if specific commands overlap?
-        // Let's split by device prefix if possible, or try to match unique commands.
-        // Or check if a device is connected.
-
-        // Simpler: Try to execute on all relevant connected devices? No, that's dangerous.
-        // User didn't specify a way to select target device in CLI.
-        // I'll implement prefixes: d3_set_..., d3p_set_..., ac_set_...
-        // AND keep generic ones for Wave 2 as requested originally.
-
-        if (cmd.startsWith("d3_")) {
-            handleDelta3Command(cmd, args);
-            return;
-        }
-        if (cmd.startsWith("d3p_")) {
-            handleDeltaPro3Command(cmd, args);
-            return;
-        }
-        if (cmd.startsWith("ac_")) {
-            handleAltChargerCommand(cmd, args);
-            return;
-        }
-
-        // Fallback for original Wave 2 commands which didn't have prefix
-        handleWave2Command(cmd, args);
+        handleWave2Command(cmd, args); // Fallback
+    } else if (cmd.startsWith("d3_")) {
+        if (cmd.startsWith("d3_get_")) handleDelta3Read(cmd);
+        else handleDelta3Command(cmd, args);
+    } else if (cmd.startsWith("d3p_")) {
+        if (cmd.startsWith("d3p_get_")) handleDeltaPro3Read(cmd);
+        else handleDeltaPro3Command(cmd, args);
+    } else if (cmd.startsWith("ac_")) {
+        if (cmd.startsWith("ac_get_")) handleAltChargerRead(cmd);
+        else handleAltChargerCommand(cmd, args);
+    } else if (cmd.startsWith("get_")) {
+        // Generic Wave 2 gets
+        handleWave2Read(cmd);
     } else {
         Serial.println("Unknown command. Type 'help' for list.");
     }
@@ -56,41 +44,33 @@ void CmdUtils::processInput(String input) {
 void CmdUtils::printHelp() {
     Serial.println("=== Available Commands ===");
 
-    Serial.println("\n[Wave 2]");
-    Serial.println("  set_ambient_light <status>      (0x5C)");
-    Serial.println("  set_automatic_drain <enable>    (0x59)");
-    Serial.println("  set_beep_enabled <flag>         (0x56)");
-    Serial.println("  set_fan_speed <fan_gear>        (0x5E)");
-    Serial.println("  set_main_mode <mode>            (0x51)");
-    Serial.println("  set_power_state <mode>          (0x5B)");
-    Serial.println("  set_temperature <temp_value>    (0x58)");
-    Serial.println("  set_countdown_timer <status>    (0x55)");
-    Serial.println("  set_idle_screen_timeout <time>  (0x54)");
-    Serial.println("  set_sub_mode <sub_mode>         (0x52)");
-    Serial.println("  set_temperature_display_type <type> (0x5D)");
-    Serial.println("  set_temperature_unit <unit>     (0x53)");
+    Serial.println("\n[Wave 2] (get_ or set_)");
+    Serial.println("  get_temp / set_temperature <val>");
+    Serial.println("  get_fan_speed / set_fan_speed <val>");
+    Serial.println("  get_mode / set_main_mode <val>");
+    Serial.println("  get_power");
+    Serial.println("  get_battery");
+    Serial.println("  set_ambient_light <0/1>");
+    // ... other writes omitted for brevity but exist
 
     Serial.println("\n[Delta 3] (Prefix: d3_)");
-    Serial.println("  d3_set_ac <0/1>");
-    Serial.println("  d3_set_dc <0/1>");
-    Serial.println("  d3_set_usb <0/1>");
+    Serial.println("  d3_get_switches / d3_set_ac/dc/usb <0/1>");
+    Serial.println("  d3_get_power");
+    Serial.println("  d3_get_battery / d3_set_soc_max/min");
     Serial.println("  d3_set_ac_limit <watts>");
-    Serial.println("  d3_set_soc_max <%>");
-    Serial.println("  d3_set_soc_min <%>");
 
     Serial.println("\n[Delta Pro 3] (Prefix: d3p_)");
-    Serial.println("  d3p_set_ac_hv <0/1>");
-    Serial.println("  d3p_set_ac_lv <0/1>");
+    Serial.println("  d3p_get_switches / d3p_set_ac_hv/lv <0/1>");
+    Serial.println("  d3p_get_power");
+    Serial.println("  d3p_get_battery");
     Serial.println("  d3p_set_energy_backup <0/1>");
-    Serial.println("  d3p_set_energy_backup_level <%>");
 
     Serial.println("\n[Alternator Charger] (Prefix: ac_)");
-    Serial.println("  ac_set_open <0/1>");
-    Serial.println("  ac_set_mode <mode>");
+    Serial.println("  ac_get_status / ac_set_open <0/1>");
+    Serial.println("  ac_get_power");
+    Serial.println("  ac_get_battery");
+    Serial.println("  ac_set_mode <val>");
     Serial.println("  ac_set_power_limit <watts>");
-    Serial.println("  ac_set_batt_voltage <volts>");
-    Serial.println("  ac_set_car_chg_limit <amps>");
-    Serial.println("  ac_set_dev_chg_limit <amps>");
 }
 
 uint8_t CmdUtils::parseHexByte(String s) {
@@ -105,67 +85,44 @@ float CmdUtils::parseFloat(String s) {
     return s.toFloat();
 }
 
+// --- Write Handlers ---
+
 void CmdUtils::handleWave2Command(String cmd, String args) {
     EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
     if (!w2 || !w2->isAuthenticated()) {
-        // Only warn if we are sure it's a Wave 2 command, but since we fallback here, silent fail or check cmd validity first
-        // But for user feedback:
-        // Serial.println("Wave 2 not connected.");
-        // We will proceed but if commands are specific they will fail inside EcoflowESP32 if checks exist,
-        // actually existing checks in EcoflowESP32 just return/fail silently usually.
-        // Let's keep the check.
+        // Warn if desired
     }
-
     uint8_t val = parseHexByte(args);
 
-    if (cmd.equalsIgnoreCase("set_ambient_light")) {
-        if(w2) w2->setAmbientLight(val);
-    } else if (cmd.equalsIgnoreCase("set_automatic_drain")) {
-        if(w2) w2->setAutomaticDrain(val);
-    } else if (cmd.equalsIgnoreCase("set_beep_enabled")) {
-        if(w2) w2->setBeep(val);
-    } else if (cmd.equalsIgnoreCase("set_fan_speed")) {
-        if(w2) w2->setFanSpeed(val);
-    } else if (cmd.equalsIgnoreCase("set_main_mode")) {
-        if(w2) w2->setMainMode(val);
-    } else if (cmd.equalsIgnoreCase("set_power_state")) {
-        if(w2) w2->setPowerState(val);
-    } else if (cmd.equalsIgnoreCase("set_temperature")) {
-        if(w2) w2->setTemperature(val);
-    } else if (cmd.equalsIgnoreCase("set_countdown_timer")) {
-        if(w2) w2->setCountdownTimer(val);
-    } else if (cmd.equalsIgnoreCase("set_idle_screen_timeout")) {
-        if(w2) w2->setIdleScreenTimeout(val);
-    } else if (cmd.equalsIgnoreCase("set_sub_mode")) {
-        if(w2) w2->setSubMode(val);
-    } else if (cmd.equalsIgnoreCase("set_temperature_display_type")) {
-        if(w2) w2->setTempDisplayType(val);
-    } else if (cmd.equalsIgnoreCase("set_temperature_unit")) {
-        if(w2) w2->setTempUnit(val);
-    }
+    if (cmd.equalsIgnoreCase("set_ambient_light")) { if(w2) w2->setAmbientLight(val); }
+    else if (cmd.equalsIgnoreCase("set_automatic_drain")) { if(w2) w2->setAutomaticDrain(val); }
+    else if (cmd.equalsIgnoreCase("set_beep_enabled")) { if(w2) w2->setBeep(val); }
+    else if (cmd.equalsIgnoreCase("set_fan_speed")) { if(w2) w2->setFanSpeed(val); }
+    else if (cmd.equalsIgnoreCase("set_main_mode")) { if(w2) w2->setMainMode(val); }
+    else if (cmd.equalsIgnoreCase("set_power_state")) { if(w2) w2->setPowerState(val); }
+    else if (cmd.equalsIgnoreCase("set_temperature")) { if(w2) w2->setTemperature(val); }
+    else if (cmd.equalsIgnoreCase("set_countdown_timer")) { if(w2) w2->setCountdownTimer(val); }
+    else if (cmd.equalsIgnoreCase("set_idle_screen_timeout")) { if(w2) w2->setIdleScreenTimeout(val); }
+    else if (cmd.equalsIgnoreCase("set_sub_mode")) { if(w2) w2->setSubMode(val); }
+    else if (cmd.equalsIgnoreCase("set_temperature_display_type")) { if(w2) w2->setTempDisplayType(val); }
+    else if (cmd.equalsIgnoreCase("set_temperature_unit")) { if(w2) w2->setTempUnit(val); }
 }
 
 void CmdUtils::handleDelta3Command(String cmd, String args) {
     EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-    if (!d3 || !d3->isAuthenticated()) {
-        Serial.println("D3 not ready.");
-        return;
-    }
+    if (!d3 || !d3->isAuthenticated()) { Serial.println("D3 not ready."); return; }
 
     if (cmd.equalsIgnoreCase("d3_set_ac")) d3->setAC(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3_set_dc")) d3->setDC(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3_set_usb")) d3->setUSB(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3_set_ac_limit")) d3->setAcChargingLimit(args.toInt());
-    else if (cmd.equalsIgnoreCase("d3_set_soc_max")) d3->setBatterySOCLimits(args.toInt(), d3->getMinDsgSoc()); // Preserves other limit? ideally yes but getMinDsgSoc accesses cached data
+    else if (cmd.equalsIgnoreCase("d3_set_soc_max")) d3->setBatterySOCLimits(args.toInt(), d3->getMinDsgSoc());
     else if (cmd.equalsIgnoreCase("d3_set_soc_min")) d3->setBatterySOCLimits(d3->getMaxChgSoc(), args.toInt());
 }
 
 void CmdUtils::handleDeltaPro3Command(String cmd, String args) {
     EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-    if (!d3p || !d3p->isAuthenticated()) {
-        Serial.println("D3P not ready.");
-        return;
-    }
+    if (!d3p || !d3p->isAuthenticated()) { Serial.println("D3P not ready."); return; }
 
     if (cmd.equalsIgnoreCase("d3p_set_ac_hv")) d3p->setAcHvPort(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3p_set_ac_lv")) d3p->setAcLvPort(parseHexByte(args));
@@ -175,10 +132,7 @@ void CmdUtils::handleDeltaPro3Command(String cmd, String args) {
 
 void CmdUtils::handleAltChargerCommand(String cmd, String args) {
     EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-    if (!ac || !ac->isAuthenticated()) {
-        Serial.println("AC not ready.");
-        return;
-    }
+    if (!ac || !ac->isAuthenticated()) { Serial.println("AC not ready."); return; }
 
     if (cmd.equalsIgnoreCase("ac_set_open")) ac->setChargerOpen(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("ac_set_mode")) ac->setChargerMode(args.toInt());
@@ -186,4 +140,55 @@ void CmdUtils::handleAltChargerCommand(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("ac_set_batt_voltage")) ac->setBatteryVoltage(parseFloat(args));
     else if (cmd.equalsIgnoreCase("ac_set_car_chg_limit")) ac->setCarBatteryChargeLimit(parseFloat(args));
     else if (cmd.equalsIgnoreCase("ac_set_dev_chg_limit")) ac->setDeviceBatteryChargeLimit(parseFloat(args));
+}
+
+// --- Read Handlers ---
+
+void CmdUtils::handleWave2Read(String cmd) {
+    EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+    if (!w2) return;
+    const Wave2Data& d = w2->getData().wave2;
+
+    if (cmd.equalsIgnoreCase("get_temp")) Serial.printf("Temp: Set=%d, Env=%.2f, Outlet=%.2f\n", d.setTemp, d.envTemp, d.outLetTemp);
+    else if (cmd.equalsIgnoreCase("get_fan_speed")) Serial.printf("Fan Speed: %d\n", d.fanValue);
+    else if (cmd.equalsIgnoreCase("get_mode")) Serial.printf("Mode: %d, SubMode: %d\n", d.mode, d.subMode);
+    else if (cmd.equalsIgnoreCase("get_power")) Serial.printf("Power: Bat=%dW, MPPT=%dW, PSDR=%dW\n", d.batPwrWatt, d.mpptPwrWatt, d.psdrPwrWatt);
+    else if (cmd.equalsIgnoreCase("get_battery")) Serial.printf("Batt: %d%% (Stat: %d), Rem: %dm\n", d.batSoc, d.batChgStatus, d.remainingTime);
+    else if (cmd.equalsIgnoreCase("get_power_state")) Serial.printf("Power State: %d\n", d.powerMode);
+    else Serial.println("Unknown get command for Wave 2");
+}
+
+void CmdUtils::handleDelta3Read(String cmd) {
+    EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+    if (!d3) return;
+    const Delta3Data& d = d3->getData().delta3;
+
+    if (cmd.equalsIgnoreCase("d3_get_switches")) Serial.printf("AC: %d, DC: %d, USB: %d\n", d.acOn, d.dcOn, d.usbOn);
+    else if (cmd.equalsIgnoreCase("d3_get_power")) Serial.printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC Out: %.1fW, Solar: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acOutputPower, d.solarInputPower);
+    else if (cmd.equalsIgnoreCase("d3_get_battery")) Serial.printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
+    else if (cmd.equalsIgnoreCase("d3_get_settings")) Serial.printf("AC Limit: %dW\n", d.acChargingSpeed);
+    else Serial.println("Unknown get command for Delta 3");
+}
+
+void CmdUtils::handleDeltaPro3Read(String cmd) {
+    EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+    if (!d3p) return;
+    const DeltaPro3Data& d = d3p->getData().deltaPro3;
+
+    if (cmd.equalsIgnoreCase("d3p_get_switches")) Serial.printf("AC LV: %d, AC HV: %d, DC: %d\n", d.acLvPort, d.acHvPort, d.dc12vPort);
+    else if (cmd.equalsIgnoreCase("d3p_get_power")) Serial.printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC LV: %.1fW, AC HV: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acLvOutputPower, d.acHvOutputPower);
+    else if (cmd.equalsIgnoreCase("d3p_get_battery")) Serial.printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
+    else if (cmd.equalsIgnoreCase("d3p_get_energy_backup")) Serial.printf("Enabled: %d, Level: %d%%\n", d.energyBackup, d.energyBackupBatteryLevel);
+    else Serial.println("Unknown get command for Delta Pro 3");
+}
+
+void CmdUtils::handleAltChargerRead(String cmd) {
+    EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+    if (!ac) return;
+    const AlternatorChargerData& d = ac->getData().alternatorCharger;
+
+    if (cmd.equalsIgnoreCase("ac_get_status")) Serial.printf("Open: %d, Mode: %d\n", d.chargerOpen, d.chargerMode);
+    else if (cmd.equalsIgnoreCase("ac_get_power")) Serial.printf("DC Power: %.1fW, Limit: %dW\n", d.dcPower, d.powerLimit);
+    else if (cmd.equalsIgnoreCase("ac_get_battery")) Serial.printf("Dev Batt: %.1f%%, Car Batt: %.2fV\n", d.batteryLevel, d.carBatteryVoltage);
+    else Serial.println("Unknown get command for Alternator Charger");
 }
