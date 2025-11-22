@@ -18,6 +18,8 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "pd335_sys.pb.h"
+#include "mr521.pb.h"
+#include "dc009_apl_comm.pb.h"
 
 #define MAX_CONNECT_ATTEMPTS 5
 
@@ -163,6 +165,20 @@ public:
     void setTempDisplayType(uint8_t type);
     void setTempUnit(uint8_t unit);
 
+    // Delta Pro 3 Specific Commands
+    bool setEnergyBackup(bool enabled);
+    bool setEnergyBackupLevel(int level);
+    bool setAcHvPort(bool enabled);
+    bool setAcLvPort(bool enabled);
+
+    // Alternator Charger Specific Commands
+    bool setChargerOpen(bool enabled);
+    bool setChargerMode(int mode);
+    bool setPowerLimit(int limit);
+    bool setBatteryVoltage(float voltage);
+    bool setCarBatteryChargeLimit(float amps);
+    bool setDeviceBatteryChargeLimit(float amps);
+
     /**
      * @brief Disconnects from the device and clears saved credentials.
      */
@@ -208,6 +224,8 @@ private:
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
+    void _sendConfigPacket(const mr521_ConfigWrite& config);
+    void _sendConfigPacket(const dc009_apl_comm_ConfigWrite& config);
 
     static std::vector<EcoflowESP32*> _instances;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
