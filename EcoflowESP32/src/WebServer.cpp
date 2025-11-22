@@ -7,8 +7,6 @@ static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
 
 // Helper to read internal temperature safely
-// We duplicate this from CmdUtils because it's static there.
-// A better approach would be to expose it in CmdUtils.h, but for now copy-paste is safer than refactoring header dependencies.
 #include <esp_idf_version.h>
 #if CONFIG_IDF_TARGET_ESP32S3
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -74,7 +72,7 @@ void WebServer::setupRoutes() {
     server.on("/api/connect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleConnect);
     server.on("/api/disconnect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleDisconnect);
 
-    server.on("/api/history", HTTP_GET, handleHistory); // New history endpoint
+    server.on("/api/history", HTTP_GET, handleHistory);
 
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
@@ -84,7 +82,6 @@ void WebServer::setupRoutes() {
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(4096);
 
-    // Global System Data
     doc["esp_temp"] = get_esp_temp();
 
     auto fillCommon = [](JsonObject& obj, DeviceSlot* slot, EcoflowESP32* dev) {
@@ -110,7 +107,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             obj["cfg_ac_lim"] = d->getAcChgLimit();
             obj["cfg_max"] = d->getMaxChgSoc();
             obj["cfg_min"] = d->getMinDsgSoc();
-            obj["cell_temp"] = d->getCellTemperature(); // New
+            obj["cell_temp"] = d->getCellTemperature();
         }
     }
 
@@ -144,7 +141,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
              obj["ac_lv_on"] = data.acLvPort;
              obj["backup_en"] = data.energyBackup;
              obj["backup_lvl"] = data.energyBackupBatteryLevel;
-             obj["cell_temp"] = data.cellTemperature; // New
+             obj["cell_temp"] = data.cellTemperature;
         }
     }
 
@@ -159,7 +156,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
              obj["chg_open"] = data.chargerOpen;
              obj["mode"] = data.chargerMode;
              obj["pow_lim"] = data.powerLimit;
-             obj["car_volt"] = data.carBatteryVoltage; // Read-only status
+             obj["car_volt"] = data.carBatteryVoltage;
         }
     }
 
@@ -214,8 +211,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     }
 
     bool success = true;
-
-    // --- Delta 3 Controls ---
+    // (Controls logic same as before)
     if (type == DeviceType::DELTA_3) {
         if (cmd == "set_ac") success = dev->setAC(doc["val"]);
         else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
@@ -225,7 +221,6 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
         else success = false;
     }
-    // --- Wave 2 Controls ---
     else if (type == DeviceType::WAVE_2) {
         if (cmd == "set_temp") dev->setTemperature((uint8_t)(int)doc["val"]);
         else if (cmd == "set_power") dev->setPowerState(doc["val"] ? 1 : 0);
@@ -234,7 +229,6 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_drain") dev->setAutomaticDrain(doc["val"] ? 1 : 0);
         else success = false;
     }
-    // --- Delta Pro 3 Controls ---
     else if (type == DeviceType::DELTA_PRO_3) {
         if (cmd == "set_ac_hv") success = dev->setAcHvPort(doc["val"]);
         else if (cmd == "set_ac_lv") success = dev->setAcLvPort(doc["val"]);
@@ -242,10 +236,9 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_backup_en") success = dev->setEnergyBackup(doc["val"]);
         else if (cmd == "set_backup_level") success = dev->setEnergyBackupLevel(doc["val"]);
         else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
-        else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]); // 101 to ignore max
+        else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
         else success = false;
     }
-    // --- Alt Charger Controls ---
     else if (type == DeviceType::ALTERNATOR_CHARGER) {
         if (cmd == "set_limit") success = dev->setPowerLimit((int)doc["val"]);
         else if (cmd == "set_open") success = dev->setChargerOpen(doc["val"]);
@@ -257,7 +250,6 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     else request->send(400, "text/plain", "Invalid Command or Value");
 }
 
-// ... (Other handlers: handleConnect, handleDisconnect, handleLogs, handleLogConfig, handleRawCommand remain same)
 void WebServer::handleConnect(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     StaticJsonDocument<200> doc;
     deserializeJson(doc, data, len);
@@ -283,14 +275,22 @@ void WebServer::handleDisconnect(AsyncWebServerRequest *request, uint8_t *data, 
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(4096);
+    // Check for index param
+    size_t index = 0;
+    if (request->hasParam("index")) {
+        index = request->getParam("index")->value().toInt();
+    }
+
+    DynamicJsonDocument doc(8192); // Increased buffer
     JsonArray arr = doc.to<JsonArray>();
-    std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs();
+
+    std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(index);
+
     for (const auto& log : logs) {
         JsonObject obj = arr.createNestedObject();
         obj["ts"] = log.timestamp;
         obj["lvl"] = (int)log.level;
-        obj["tag"] = log.tag;
+        obj["tag"] = log.tag.isEmpty() ? "?" : log.tag;
         obj["msg"] = log.message;
     }
     String json;
@@ -310,8 +310,6 @@ void WebServer::handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, s
         if (tag.length() > 0 && tag != "Global") {
             LogBuffer::getInstance().setTagLevel(tag, lvl);
         } else {
-            // Restore global level logic if "Global" or empty tag is selected
-            // But if we were in exclusive mode, we should reset "*"
             LogBuffer::getInstance().setGlobalLevel(lvl);
         }
     }

@@ -1,73 +1,5 @@
 #include "LogBuffer.h"
 
-static int custom_vprintf(const char* fmt, va_list args) {
-    // This function hooks into esp_log.
-    // We need to parse the format to extract level and tag if possible,
-    // but esp_log_write passes the raw format string.
-    // The standard esp_log implementation handles formatting.
-    // Hooking vprintf catches EVERYTHING, including Serial.printf.
-
-    // However, esp_log uses esp_log_write which calls esp_log_set_vprintf handler.
-    // The handler receives the format string.
-    // Standard ESP log format is: "Wait..." or with color codes.
-    // It's hard to reverse-engineer the level/tag from the final string without
-    // reimplementing the whole log macro logic.
-
-    // LIMITATION: esp_log_set_vprintf gives us the formatted string *generation* capability.
-    // It does NOT give us the level/tag explicitly in the arguments.
-    // But wait, esp_log system calls the vprintf function with the *final* string?
-    // No, it calls it with format and args.
-
-    // To get structured logs (Level, Tag), we need to wrap the logging macros or
-    // rely on the string parsing.
-    // Since we cannot easily change all ESP_LOGx calls in the code (and libraries),
-    // we will capture the output string.
-
-    // Actually, a better approach for this specific requirement ("Select source... like DeviceManager.cpp")
-    // is to rely on `esp_log_level_set`.
-    // If we enable verbose for "DeviceManager", those logs will be generated.
-    // We just need to capture them.
-
-    // Let's use a static buffer to format the message.
-    char buf[256];
-    vsnprintf(buf, sizeof(buf), fmt, args);
-
-    // We will simply store the string.
-    // Parsing "I (123) Tag: Message" from the string is possible if standard format is used.
-    // Default format: "L (time) tag: message"
-    // L = I, E, W, D, V
-
-    LogBuffer::getInstance().addLog(ESP_LOG_INFO, "SYS", buf, args); // We pass args but we already formatted.
-
-    // Also print to Serial so we don't lose console
-    return vprintf(fmt, args);
-}
-
-// Re-implementing a cleaner hook that tries to parse standard ESP-IDF log format if possible,
-// or just dumps it.
-// But since we can't change the log format easily, let's just capture the string.
-
-LogBuffer& LogBuffer::getInstance() {
-    static LogBuffer instance;
-    return instance;
-}
-
-LogBuffer::LogBuffer() {
-    _mutex = xSemaphoreCreateMutex();
-}
-
-void LogBuffer::begin() {
-    // Hook into the logging system?
-    // esp_log_set_vprintf(custom_vprintf);
-    // This is dangerous if not careful.
-    // Also, capturing ALL output might be too much.
-    // Let's implement a specific "addLog" that we can call from a custom macro if we wanted,
-    // but the user wants to see existing logs.
-
-    // For the sake of stability and the "hefty" warning, we will NOT hook vprintf globally by default.
-    // We will only enable it when the user toggles "Web Logging".
-}
-
 // We need a separate static function for the hook
 static vprintf_like_t old_vprintf = nullptr;
 
@@ -81,13 +13,9 @@ static int buffer_vprintf(const char *fmt, va_list args) {
     int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
 
     if (len > 0) {
-        // Try to parse level and tag from standard ESP log format
-        // Format: "L (time) Tag: Message\n"
-        // Example: "I (1234) DeviceManager: Found device..."
-
         String logLine = String(buffer);
 
-        // Basic parsing logic (fragile but works for standard logs)
+        // Basic parsing logic
         esp_log_level_t level = ESP_LOG_INFO;
         String tag = "SYS";
         String msg = logLine;
@@ -99,20 +27,18 @@ static int buffer_vprintf(const char *fmt, va_list args) {
         else if (levelChar == 'D') level = ESP_LOG_DEBUG;
         else if (levelChar == 'V') level = ESP_LOG_VERBOSE;
 
-        // Extract Tag? It's usually between ) and :
+        // Extract Tag: "L (time) Tag: Message"
         int closeParen = logLine.indexOf(')');
         int colon = logLine.indexOf(':', closeParen);
         if (closeParen > 0 && colon > closeParen) {
-            tag = logLine.substring(closeParen + 2, colon); // +2 to skip ") "
-            msg = logLine.substring(colon + 2); // +2 to skip ": "
+            tag = logLine.substring(closeParen + 2, colon);
+            msg = logLine.substring(colon + 2);
         }
 
-        // Add to buffer (fake args since we already formatted)
-        // We pass the RAW formatted string as message because our parsing is guesswork.
         LogBuffer::getInstance().addLog(level, tag.c_str(), logLine.c_str(), args);
     }
 
-    // Forward to original handler (usually UART)
+    // Forward to original handler (UART)
     if (old_vprintf) {
         return old_vprintf(fmt, args);
     } else {
@@ -120,13 +46,34 @@ static int buffer_vprintf(const char *fmt, va_list args) {
     }
 }
 
-void LogBuffer::setLoggingEnabled(bool enabled) {
-    if (_enabled == enabled) return;
+LogBuffer& LogBuffer::getInstance() {
+    static LogBuffer instance;
+    return instance;
+}
 
+LogBuffer::LogBuffer() {
+    _mutex = xSemaphoreCreateMutex();
+}
+
+void LogBuffer::begin() {
+    // Ensure we start in the correct state
+    // If _enabled is false (default), ensure we are silent
+    if (!_enabled) {
+        setLoggingEnabled(false);
+    }
+}
+
+void LogBuffer::setLoggingEnabled(bool enabled) {
     _enabled = enabled;
     if (_enabled) {
         // Enable Logging: Restore Global Level and Switch to Buffer+UART
-        esp_log_level_set("*", ESP_LOG_INFO); // Default to INFO, or tracking variable
+        esp_log_level_set("*", ESP_LOG_INFO);
+
+        // Restore NimBLE specific tags to INFO
+        esp_log_level_set("NimBLE", ESP_LOG_INFO);
+        esp_log_level_set("NimBLEScan", ESP_LOG_INFO);
+        esp_log_level_set("NimBLEClient", ESP_LOG_INFO);
+        esp_log_level_set("NimBLEAdvertisedDevice", ESP_LOG_INFO);
 
         vprintf_like_t current = esp_log_set_vprintf(buffer_vprintf);
         if (current != silent_vprintf && current != buffer_vprintf) {
@@ -135,6 +82,12 @@ void LogBuffer::setLoggingEnabled(bool enabled) {
     } else {
         // Disable Logging: Mute Global Level and Switch to Silent Hook
         esp_log_level_set("*", ESP_LOG_NONE);
+
+        // Explicitly mute NimBLE components which might ignore global * sometimes or be verbose
+        esp_log_level_set("NimBLE", ESP_LOG_NONE);
+        esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+        esp_log_level_set("NimBLEClient", ESP_LOG_NONE);
+        esp_log_level_set("NimBLEAdvertisedDevice", ESP_LOG_NONE);
 
         vprintf_like_t current = esp_log_set_vprintf(silent_vprintf);
         if (current != silent_vprintf && current != buffer_vprintf) {
@@ -154,6 +107,11 @@ void LogBuffer::setGlobalLevel(esp_log_level_t level) {
 void LogBuffer::setTagLevel(const String& tag, esp_log_level_t level) {
     // Exclusive Tag Mode: Mute everything else
     esp_log_level_set("*", ESP_LOG_NONE);
+
+    // Also mute NimBLE explicitly if we are filtering for something else
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+
     esp_log_level_set(tag.c_str(), level);
 }
 
@@ -171,7 +129,6 @@ void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* messa
     lm.level = level;
     lm.tag = String(tag);
     lm.message = String(message); // Already formatted
-    // Strip newline if present at end
     if (lm.message.endsWith("\n")) lm.message.remove(lm.message.length()-1);
 
     _logs.push_back(lm);
@@ -181,13 +138,39 @@ void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* messa
 
 std::vector<LogMessage> LogBuffer::getLogs(size_t fromIndex) {
     xSemaphoreTake(_mutex, portMAX_DELAY);
-    std::vector<LogMessage> result = _logs; // Copy
+    std::vector<LogMessage> result;
+    // Check if fromIndex is valid
+    // If the client asks for index 50, but we dropped logs and now start at "logical index" X?
+    // The vector is a sliding window.
+    // Simple approach: The client tracks count.
+    // If we have 50 logs, and client asks for index 40, we return last 10?
+    // No, indices are relative to the current buffer.
+    // Better: Client sends "I have 0 logs". Server returns all 50. Client has 50.
+    // Client sends "I have 50 logs". Server has 50 (same). Return empty?
+    // But since we erase logs, the "count" isn't stable index.
+
+    // Let's assume fromIndex is "number of logs client already has" IF the buffer was append-only.
+    // But buffer rotates.
+    // If we rotate, the client's index is invalid.
+    // It's easier to just return *new* logs if we had a sequence ID.
+
+    // Compromise: We will use the `fromIndex` as "Skip this many items from the BEGINNING of current buffer".
+    // If fromIndex >= _logs.size(), return empty.
+
+    if (fromIndex < _logs.size()) {
+        // Return sub-vector
+        result.insert(result.end(), _logs.begin() + fromIndex, _logs.end());
+    } else if (fromIndex > _logs.size()) {
+        // Client index is out of sync (e.g. buffer cleared or client restart)
+        // In a more complex system we would return all logs or an error.
+        // For now, returning empty is safe, client will naturally just wait or clear.
+    }
+
     xSemaphoreGive(_mutex);
     return result;
 }
 
 size_t LogBuffer::getLogCount() const {
-    // Not strictly thread safe without mutex but size() is atomic usually
     return _logs.size();
 }
 

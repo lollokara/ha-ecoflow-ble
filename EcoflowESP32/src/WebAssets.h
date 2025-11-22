@@ -60,7 +60,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
         /* Console */
         #console { font-family: monospace; background: #000; color: #0f0; padding: 10px; border-radius: 8px; height: 200px; overflow-y: auto; font-size: 0.8em; margin-top: 20px; }
-        .log-line { border-bottom: 1px solid #111; padding: 2px 0; }
+        .log-line { border-bottom: 1px solid #111; padding: 2px 0; word-wrap: break-word; }
         .log-V { color: #888; } .log-D { color: #aaa; } .log-I { color: #fff; } .log-W { color: #ea0; } .log-E { color: #f44; }
 
         /* Intro */
@@ -116,6 +116,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="ctrl-row">
                     <select id="log-tag" onchange="setLogConfig()" style="width: 100%; padding: 8px; background: #333; border:1px solid #444; color:#fff; border-radius:4px;">
                         <option value="Global">Global (All Tags)</option>
+                        <option value="NimBLE">NimBLE</option>
+                        <option value="NimBLEScan">NimBLEScan</option>
                         <option value="CmdUtils">CmdUtils</option>
                         <option value="EcoflowCrypto">EcoflowCrypto</option>
                         <option value="EcoflowDataParser">EcoflowDataParser</option>
@@ -123,7 +125,12 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                         <option value="EcoflowProtocol">EcoflowProtocol</option>
                         <option value="WebServer">WebServer</option>
                         <option value="DeviceManager">DeviceManager</option>
+                        <option value="System">System</option>
+                        <option value="WiFi">WiFi</option>
                     </select>
+                </div>
+                <div class="ctrl-row" style="justify-content: flex-end; font-size: 0.8em;">
+                     <label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label>
                 </div>
                 <div id="console"></div>
                 <div class="ctrl-row">
@@ -142,10 +149,11 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     const API = '/api';
     let state = {};
     let logPollInterval = null;
+    let lastLogCount = 0;
 
     function el(id) { return document.getElementById(id); }
 
-    // --- Templates ---
+    // --- Templates (Same as before) ---
     const renderD3 = (d) => `
         <div class="card">
             <div class="header" onclick="toggleCtrl('${d.type}')">
@@ -363,17 +371,21 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
     function update() {
         fetch(API + '/status').then(r => r.json()).then(data => {
-            // Update ESP Temp
             if(data.esp_temp) el('esp-temp').innerText = data.esp_temp.toFixed(1) + '°C';
 
             const list = el('device-list');
+            // Only rebuild list if device count/type changed to avoid losing open state,
+            // but here we rebuild string.
+            // We rely on 'open' class logic in previous code which re-opens panels.
+            // Ideally we should diff. But for now, this works.
+
             let html = '';
             let anyConnected = false;
 
             const types = ['d3', 'w2', 'd3p', 'ac'];
             types.forEach(type => {
                 const d = data[type];
-                if (d) { // Ensure device data exists in response
+                if (d) {
                     d.type = type;
                     if (d.connected) {
                         anyConnected = true;
@@ -481,10 +493,15 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
     function startLogPoll() {
         if (logPollInterval) return;
+        // Reset lastLogCount when re-opening to avoid gaps or duplication if buffer rotated
+        // Actually, if we use index, we should fetch ALL logs first time.
+        lastLogCount = 0;
+        el('console').innerHTML = ''; // Clear visually on open
+
         logPollInterval = setInterval(() => {
-            fetch(API + '/logs').then(r => r.json()).then(logs => {
+            fetch(API + '/logs?index=' + lastLogCount).then(r => r.json()).then(logs => {
                 const c = el('console');
-                c.innerHTML = ''; // Clear previous logs to avoid duplication
+
                 logs.forEach(l => {
                     const d = new Date(l.ts);
                     const time = d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
@@ -493,7 +510,14 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     line.innerText = `[${time}] ${l.tag}: ${l.msg}`;
                     c.appendChild(line);
                 });
-                if(logs.length > 0) c.scrollTop = c.scrollHeight;
+
+                // Update index
+                lastLogCount += logs.length;
+
+                // Auto-scroll
+                if(logs.length > 0 && el('auto-scroll').checked) {
+                    c.scrollTop = c.scrollHeight;
+                }
             });
         }, 1000);
     }
@@ -517,6 +541,9 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
     function clearLogs() {
         el('console').innerHTML = '';
+        // We don't reset lastLogCount on server side, but since server buffer rotates,
+        // our index is relative to "logs retrieved".
+        // Actually, if we clear client side, we just keep fetching new ones.
     }
 
     function sendCli() {
@@ -534,7 +561,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 line.className = 'log-line log-I';
                 line.innerText = `> ${cmd}`;
                 c.appendChild(line);
-                c.scrollTop = c.scrollHeight;
+                if (el('auto-scroll').checked) c.scrollTop = c.scrollHeight;
             } else {
                 alert('Command failed');
             }

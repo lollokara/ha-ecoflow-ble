@@ -295,11 +295,57 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         if (pkt->getDest() == 0x21) {
              bool shouldReply = true;
              // Filter V3 Config Write Acks (used by Delta 3, D3P, AltChg controls)
-             if (pkt->getCmdSet() == 0xFE && pkt->getCmdId() == 0x11) shouldReply = false;
+             // 0xFE, 0x11 is standard data push. But ACK for config writes is also 0xFE/0x11 sometimes?
+             // Wait, standard data push IS 0xFE, 0x11. We SHOULD reply to data push.
+             // But ConfigWrite (write) uses 0xFE/0x11 too? No, usually ConfigWrite is 0x20/0x02?
+             // Check _sendConfigPacket: it sends 0xFE, 0x11.
+             // So data push AND config write use same opcode? That's confusing.
+             // The device echoes the write packet back as ACK?
+             // If so, the payload size might distinguish it, OR we just reply to everything.
+             // BUT if we reply to the ACK, and device ACKs our reply... infinite loop.
 
-             // Filter V2 Set Command Acks (used by Wave 2 controls)
-             // 0x50 is data, others (0x51-0x5E) are controls.
+             // Let's filter by source too.
+             // If we get a packet, we reply.
+             // If the packet was an ECHO of what we sent (CmdSet=0xFE, CmdId=0x11), we must be careful.
+             // A pure ConfigWrite ACK usually has a smaller payload or specific content.
+             // Standard data push (unsolicited) is large.
+             // Let's rely on "Only reply if payload > X" or "Only reply if it's not a command ACK".
+
+             // Actually, for Delta 3, the device sends 0xFE, 0x11 periodically. We must reply to keep getting them.
+             // But when we send a config, we send 0xFE, 0x11. The device might echo it.
+             // If we reply to the echo, does it matter?
+             // Loop happens if: Device sends P -> We send ACK -> Device sends P (response to ACK?).
+             // V3 protocol usually doesn't require ACK for ACK.
+
+             // For Wave 2 (V2): 0x50 is data. 0x51-0x5E are controls.
+             // Controls (sets) get an ACK. We should NOT reply to the ACK.
              if (pkt->getCmdSet() == 0x42 && pkt->getCmdId() != 0x50) shouldReply = false;
+
+             // For Delta 3 (V3):
+             // If we send a config, we are the source. We don't receive it back unless it's an echo.
+             // If we receive a packet where dest is US (0x20/0x21), we reply.
+             // The problem is "command sent over and over".
+             // This implies WE are sending the command repeatedly.
+             // This happens if the logic in the backend triggers a send.
+             // The only place we send commands is `setXXX` or `_handlePacket` (reply).
+             // If we are caught in a reply loop, we might be flooding the channel.
+
+             // Refined logic: Only reply to KNOWN data push opcodes that require keep-alive.
+             // Wave 2: 0x42, 0x50 (Data).
+             // Delta 3: 0xFE, 0x11 (Data).
+             // Anything else? 0x01 (Ping)?
+
+             if (pkt->getCmdSet() == 0xFE && pkt->getCmdId() == 0x11) {
+                 // Delta 3 Data. We should reply.
+                 shouldReply = true;
+             } else if (pkt->getCmdSet() == 0x42 && pkt->getCmdId() == 0x50) {
+                 // Wave 2 Data. We should reply.
+                 shouldReply = true;
+             } else {
+                 // Everything else (ACKs, other notifications), do NOT reply.
+                 // This breaks the loop.
+                 shouldReply = false;
+             }
 
              if (shouldReply) {
                 Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
