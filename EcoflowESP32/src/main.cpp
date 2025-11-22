@@ -14,6 +14,7 @@
 #include "Credentials.h"
 #include "Display.h"
 #include "DeviceManager.h"
+#include "CmdUtils.h"
 
 // Define GPIO pins for the buttons
 #define BTN_UP_PIN    4
@@ -102,6 +103,22 @@ DeviceType currentViewDevice = DeviceType::DELTA_3;
 void handleAction(DisplayAction action);
 
 /**
+ * @brief Checks the Serial buffer for new commands.
+ */
+void checkSerial() {
+    static String inputBuffer = "";
+    while (Serial.available()) {
+        char c = (char)Serial.read();
+        if (c == '\n') {
+            CmdUtils::processInput(inputBuffer);
+            inputBuffer = "";
+        } else if (c >= 32 && c <= 126) {
+            inputBuffer += c;
+        }
+    }
+}
+
+/**
  * @brief Standard Arduino setup function. Initializes all components.
  */
 void setup() {
@@ -124,6 +141,9 @@ void loop() {
 
     // 1. Update the Device Manager (handles all BLE communication)
     DeviceManager::getInstance().update();
+
+    // Check Serial for CLI commands
+    checkSerial();
 
     // 2. Check for button inputs and translate them to display actions
     DisplayAction action = DisplayAction::NONE;

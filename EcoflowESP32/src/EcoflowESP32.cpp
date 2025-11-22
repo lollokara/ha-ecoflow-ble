@@ -466,6 +466,74 @@ bool EcoflowESP32::setAC(bool on) {
     return true;
 }
 
+//--------------------------------------------------------------------------
+//--- Wave 2 Specific Commands
+//--------------------------------------------------------------------------
+
+bool EcoflowESP32::_sendWave2Command(uint8_t cmdId, const std::vector<uint8_t>& payload) {
+    if (!isAuthenticated()) return false;
+
+    // Wave 2 uses Protocol V2: src=0x21, dest=0x42, cmdSet=0x42
+    Packet packet(0x21, 0x42, 0x42, cmdId, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
+
+    // For V2, we need to construct the packet carefully.
+    // The EcoflowProtocol::Packet::toBytes method handles V2 logic if _version is 2.
+    // However, EcoflowESP32::_protocolVersion handles this.
+
+    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
+    return _sendCommand(enc_packet.toBytes(&_crypto));
+}
+
+void EcoflowESP32::setAmbientLight(uint8_t status) {
+    _sendWave2Command(0x5C, {status});
+}
+
+void EcoflowESP32::setAutomaticDrain(uint8_t enable) {
+    _sendWave2Command(0x59, {enable});
+}
+
+void EcoflowESP32::setBeep(uint8_t on) {
+    _sendWave2Command(0x56, {on});
+}
+
+void EcoflowESP32::setFanSpeed(uint8_t speed) {
+    _sendWave2Command(0x5E, {speed});
+}
+
+void EcoflowESP32::setMainMode(uint8_t mode) {
+    _sendWave2Command(0x51, {mode});
+}
+
+void EcoflowESP32::setPowerState(uint8_t on) {
+    _sendWave2Command(0x5B, {on});
+}
+
+void EcoflowESP32::setTemperature(uint8_t temp) {
+    _sendWave2Command(0x58, {temp});
+}
+
+void EcoflowESP32::setCountdownTimer(uint8_t status) {
+    // User specified: [0x00, 0x00, status]
+    _sendWave2Command(0x55, {0x00, 0x00, status});
+}
+
+void EcoflowESP32::setIdleScreenTimeout(uint8_t time) {
+    // User specified: [0x00, 0x00, time]
+    _sendWave2Command(0x54, {0x00, 0x00, time});
+}
+
+void EcoflowESP32::setSubMode(uint8_t sub_mode) {
+    _sendWave2Command(0x52, {sub_mode});
+}
+
+void EcoflowESP32::setTempDisplayType(uint8_t type) {
+    _sendWave2Command(0x5D, {type});
+}
+
+void EcoflowESP32::setTempUnit(uint8_t unit) {
+    _sendWave2Command(0x53, {unit});
+}
+
 bool EcoflowESP32::setDC(bool on) {
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;

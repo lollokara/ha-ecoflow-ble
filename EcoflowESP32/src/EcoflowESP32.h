@@ -149,6 +149,20 @@ public:
     bool setAcChargingLimit(int watts);
     bool setBatterySOCLimits(int maxChg, int minDsg);
 
+    // Wave 2 Specific Commands
+    void setAmbientLight(uint8_t status);
+    void setAutomaticDrain(uint8_t enable);
+    void setBeep(uint8_t on);
+    void setFanSpeed(uint8_t speed);
+    void setMainMode(uint8_t mode);
+    void setPowerState(uint8_t on);
+    void setTemperature(uint8_t temp);
+    void setCountdownTimer(uint8_t status);
+    void setIdleScreenTimeout(uint8_t time);
+    void setSubMode(uint8_t sub_mode);
+    void setTempDisplayType(uint8_t type);
+    void setTempUnit(uint8_t unit);
+
     /**
      * @brief Disconnects from the device and clears saved credentials.
      */
@@ -188,7 +202,8 @@ private:
     void _handlePacket(Packet* pkt);
 
     bool _sendCommand(const std::vector<uint8_t>& command);
-    
+    bool _sendWave2Command(uint8_t cmdId, const std::vector<uint8_t>& payload);
+
     // --- Authentication Flow ---
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
