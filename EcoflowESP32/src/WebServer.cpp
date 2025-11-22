@@ -169,8 +169,21 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
 }
 
 void WebServer::handleHistory(AsyncWebServerRequest *request) {
-    if (request->hasParam("type") && request->getParam("type")->value() == "w2") {
-        std::vector<int> hist = DeviceManager::getInstance().getWave2TempHistory();
+    if (request->hasParam("type")) {
+        String type = request->getParam("type")->value();
+        std::vector<int> hist;
+
+        if (type == "w2") {
+            hist = DeviceManager::getInstance().getWave2TempHistory();
+        } else if (type == "d3") {
+            hist = DeviceManager::getInstance().getSolarHistory(DeviceType::DELTA_3);
+        } else if (type == "d3p") {
+            hist = DeviceManager::getInstance().getSolarHistory(DeviceType::DELTA_PRO_3);
+        } else {
+            request->send(400, "text/plain", "Invalid Type");
+            return;
+        }
+
         DynamicJsonDocument doc(2048);
         JsonArray arr = doc.to<JsonArray>();
         for(int t : hist) arr.add(t);
@@ -178,7 +191,7 @@ void WebServer::handleHistory(AsyncWebServerRequest *request) {
         serializeJson(doc, json);
         request->send(200, "application/json", json);
     } else {
-        request->send(400, "text/plain", "Invalid Type");
+        request->send(400, "text/plain", "Missing Type");
     }
 }
 
@@ -209,6 +222,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_usb") success = dev->setUSB(doc["val"]);
         else if (cmd == "set_ac_lim") success = dev->setAcChargingLimit(doc["val"]);
         else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
+        else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
         else success = false;
     }
     // --- Wave 2 Controls ---
@@ -224,8 +238,11 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     else if (type == DeviceType::DELTA_PRO_3) {
         if (cmd == "set_ac_hv") success = dev->setAcHvPort(doc["val"]);
         else if (cmd == "set_ac_lv") success = dev->setAcLvPort(doc["val"]);
+        else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
         else if (cmd == "set_backup_en") success = dev->setEnergyBackup(doc["val"]);
         else if (cmd == "set_backup_level") success = dev->setEnergyBackupLevel(doc["val"]);
+        else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
+        else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]); // 101 to ignore max
         else success = false;
     }
     // --- Alt Charger Controls ---

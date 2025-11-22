@@ -336,17 +336,38 @@ void DeviceManager::_updateHistory() {
         if (slotW2.isConnected) {
             int temp = w2.getAmbientTemperature();
             _wave2History.push_back((int8_t)temp);
-            if (_wave2History.size() > 60) {
-                _wave2History.pop_front();
-            }
+            if (_wave2History.size() > 60) _wave2History.pop_front();
+        }
+
+        // Delta 3 Solar Input
+        if (slotD3.isConnected) {
+            int solar = d3.getSolarInputPower();
+            _d3SolarHistory.push_back((int16_t)solar);
+            if (_d3SolarHistory.size() > 60) _d3SolarHistory.pop_front();
+        }
+
+        // Delta Pro 3 Solar Input
+        if (slotD3P.isConnected) {
+            const DeltaPro3Data& data = d3p.getData().deltaPro3;
+            int solar = (int)(data.solarLvPower + data.solarHvPower);
+            _d3pSolarHistory.push_back((int16_t)solar);
+            if (_d3pSolarHistory.size() > 60) _d3pSolarHistory.pop_front();
         }
     }
 }
 
 std::vector<int> DeviceManager::getWave2TempHistory() {
     std::vector<int> result;
-    for (int8_t t : _wave2History) {
-        result.push_back((int)t);
+    for (int8_t t : _wave2History) result.push_back((int)t);
+    return result;
+}
+
+std::vector<int> DeviceManager::getSolarHistory(DeviceType type) {
+    std::vector<int> result;
+    if (type == DeviceType::DELTA_3) {
+        for (int16_t val : _d3SolarHistory) result.push_back((int)val);
+    } else if (type == DeviceType::DELTA_PRO_3) {
+        for (int16_t val : _d3pSolarHistory) result.push_back((int)val);
     }
     return result;
 }

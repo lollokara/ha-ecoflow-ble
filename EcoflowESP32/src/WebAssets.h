@@ -170,11 +170,21 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <input type="range" min="200" max="2000" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
 
                 <div class="ctrl-row">
-                    <span>Max Charge: <b id="val-max-${d.type}">${d.cfg_max}</b>%</span>
+                    <span>Max Charge (50-100%): <b id="val-max-${d.type}">${d.cfg_max}</b>%</span>
                 </div>
                 <input type="range" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
 
                 <div class="ctrl-row">
+                    <span>Min Discharge (0-30%): <b id="val-min-${d.type}">${d.cfg_min}</b>%</span>
+                </div>
+                <input type="range" min="0" max="30" step="1" value="${d.cfg_min}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
+
+                <div style="margin-top:15px">
+                    <span style="font-size:0.8em; color:#aaa">Solar Input (1h)</span>
+                    <canvas id="graph-d3" class="graph" width="300" height="150"></canvas>
+                </div>
+
+                <div class="ctrl-row" style="margin-top:15px">
                     <button class="btn btn-danger" style="width:100%" onclick="disconnect('${d.type}')">Disconnect</button>
                 </div>
             </div>
@@ -242,6 +252,11 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <h3><span class="status-dot ${d.conn?'on':''}"></span>Delta Pro 3 (${d.sn})</h3>
                 <span class="stat-val">${d.batt}%</span>
             </div>
+            <div class="grid grid-3">
+                <div class="stat"><div class="stat-label">In</div><div class="stat-val">${d.in}W</div></div>
+                <div class="stat"><div class="stat-label">Out</div><div class="stat-val">${d.out}W</div></div>
+                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val">${d.solar}W</div></div>
+            </div>
             <div style="text-align:center; margin-bottom:10px; color:#aaa; font-size:0.8em;">Cell Temp: ${d.cell_temp}°C</div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
@@ -253,10 +268,35 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <label class="switch"><input type="checkbox" ${d.ac_hv_on?'checked':''} onchange="cmd('${d.type}', 'set_ac_hv', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
+                    <span>DC (12V)</span>
+                    <label class="switch"><input type="checkbox" ${d.dc_on?'checked':''} onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
+                </div>
+
+                <hr style="border-color:#333">
+                <div class="ctrl-row">
+                    <span>Max Charge (50-100%): <b id="val-max-${d.type}">${d.cfg_max}</b>%</span>
+                </div>
+                <input type="range" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
+
+                <div class="ctrl-row">
+                    <span>Min Discharge (0-30%): <b id="val-min-${d.type}">${d.cfg_min}</b>%</span>
+                </div>
+                <input type="range" min="0" max="30" step="1" value="${d.cfg_min}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
+
+                <div class="ctrl-row">
                     <span>Energy Backup</span>
                     <label class="switch"><input type="checkbox" ${d.backup_en?'checked':''} onchange="cmd('${d.type}', 'set_backup_en', this.checked)"><span class="slider"></span></label>
                 </div>
-                <input type="range" min="0" max="100" value="${d.backup_lvl}" onchange="cmd('${d.type}', 'set_backup_level', parseInt(this.value))">
+                <div class="ctrl-row">
+                    <span>Backup Level: <b id="val-bkp-${d.type}">${d.backup_lvl}</b>%</span>
+                </div>
+                <input type="range" min="0" max="100" value="${d.backup_lvl}" onchange="cmd('${d.type}', 'set_backup_level', parseInt(this.value))" oninput="el('val-bkp-${d.type}').innerText=this.value">
+
+                <div style="margin-top:15px">
+                    <span style="font-size:0.8em; color:#aaa">Solar Input (1h)</span>
+                    <canvas id="graph-d3p" class="graph" width="300" height="150"></canvas>
+                </div>
+
                 <div class="ctrl-row">
                     <button class="btn btn-danger" style="width:100%" onclick="disconnect('${d.type}')">Disconnect</button>
                 </div>
@@ -341,7 +381,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                            const panel = el('ctrl-'+type);
                            if(wasOpen && panel) {
                                panel.classList.add('open');
-                               if(type === 'w2') loadGraph();
+                               if(type === 'w2' || type === 'd3' || type === 'd3p') loadGraph(type);
                            }
                         }, 0);
                     }
@@ -359,13 +399,13 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     function toggleCtrl(id) {
         const e = el('ctrl-'+id);
         e.classList.toggle('open');
-        if(id === 'w2' && e.classList.contains('open')) loadGraph();
+        if((id === 'w2' || id === 'd3' || id === 'd3p') && e.classList.contains('open')) loadGraph(id);
     }
 
-    function loadGraph() {
-        const canvas = el('graph-w2');
+    function loadGraph(type) {
+        const canvas = el('graph-' + type);
         if(!canvas) return;
-        fetch(API + '/history?type=w2').then(r => r.json()).then(data => {
+        fetch(API + '/history?type=' + type).then(r => r.json()).then(data => {
             const ctx = canvas.getContext('2d');
             const w = canvas.width;
             const h = canvas.height;

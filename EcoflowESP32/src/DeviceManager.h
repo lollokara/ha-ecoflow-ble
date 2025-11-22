@@ -103,7 +103,8 @@ public:
     String getDeviceStatusJson();
 
     // --- Telemetry History ---
-    std::vector<int> getWave2TempHistory(); // Returns the last 60 minutes of ambient temp
+    std::vector<int> getWave2TempHistory();
+    std::vector<int> getSolarHistory(DeviceType type);
 
 private:
     DeviceManager();
@@ -123,6 +124,8 @@ private:
 
     // Telemetry History
     std::deque<int8_t> _wave2History;
+    std::deque<int16_t> _d3SolarHistory;
+    std::deque<int16_t> _d3pSolarHistory;
     uint32_t _lastHistorySample = 0;
 
     // BLE Scanning members

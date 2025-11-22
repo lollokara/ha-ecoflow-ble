@@ -702,6 +702,15 @@ void EcoflowESP32::setTempUnit(uint8_t unit) {
 }
 
 bool EcoflowESP32::setDC(bool on) {
+    // D3P uses MR521 protocol
+    if (_deviceSn.rfind("MR51", 0) == 0) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        config.has_cfg_dc_12v_out_open = true;
+        config.cfg_dc_12v_out_open = on;
+        _sendConfigPacket(config);
+        return true;
+    }
+
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;
     config.cfg_dc_12v_out_open = on;
@@ -731,6 +740,23 @@ bool EcoflowESP32::setAcChargingLimit(int watts) {
 }
 
 bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
+    if (_deviceSn.rfind("MR51", 0) == 0) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        if (maxChg >= 50 && maxChg <= 100) {
+            config.has_cfg_max_chg_soc = true;
+            config.cfg_max_chg_soc = maxChg;
+        }
+        // If 101 is passed, we ignore maxChg updates (allows setting only min)
+        // But here we check range 50-100, so 101 is inherently ignored.
+
+        if (minDsg >= 0 && minDsg <= 30) {
+            config.has_cfg_min_dsg_soc = true;
+            config.cfg_min_dsg_soc = minDsg;
+        }
+        _sendConfigPacket(config);
+        return true;
+    }
+
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     if (maxChg >= 50 && maxChg <= 100) {
         config.has_cfg_max_chg_soc = true;
