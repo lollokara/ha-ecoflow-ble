@@ -291,10 +291,21 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         // Reply to packets that require it to keep the data flowing
+        // We must FILTER out Command Acks to prevent infinite loops when we send commands via Web UI.
         if (pkt->getDest() == 0x21) {
-            Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
-            EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
-            _sendCommand(enc_reply.toBytes(&_crypto));
+             bool shouldReply = true;
+             // Filter V3 Config Write Acks (used by Delta 3, D3P, AltChg controls)
+             if (pkt->getCmdSet() == 0xFE && pkt->getCmdId() == 0x11) shouldReply = false;
+
+             // Filter V2 Set Command Acks (used by Wave 2 controls)
+             // 0x50 is data, others (0x51-0x5E) are controls.
+             if (pkt->getCmdSet() == 0x42 && pkt->getCmdId() != 0x50) shouldReply = false;
+
+             if (shouldReply) {
+                Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
+                EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
+                _sendCommand(enc_reply.toBytes(&_crypto));
+             }
         }
     } else {
         _handleAuthPacket(pkt);

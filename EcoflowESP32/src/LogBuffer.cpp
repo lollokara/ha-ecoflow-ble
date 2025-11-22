@@ -71,6 +71,10 @@ void LogBuffer::begin() {
 // We need a separate static function for the hook
 static vprintf_like_t old_vprintf = nullptr;
 
+static int silent_vprintf(const char *fmt, va_list args) {
+    return 0; // Do nothing
+}
+
 static int buffer_vprintf(const char *fmt, va_list args) {
     // Format the message
     char buffer[256];
@@ -121,14 +125,20 @@ void LogBuffer::setLoggingEnabled(bool enabled) {
 
     _enabled = enabled;
     if (_enabled) {
-        old_vprintf = esp_log_set_vprintf(buffer_vprintf);
+        // Enable Logging: Switch from Silent (or default) to Buffer+UART
+        vprintf_like_t current = esp_log_set_vprintf(buffer_vprintf);
+        // If we were silent, current is silent_vprintf. We don't want that as old_vprintf.
+        // We want the original UART handler.
+        // If old_vprintf is null, it means we haven't saved the UART handler yet?
+        // Or if we were disabled, we set it to silent.
+        if (current != silent_vprintf && current != buffer_vprintf) {
+             old_vprintf = current;
+        }
     } else {
-        if (old_vprintf) {
-            esp_log_set_vprintf(old_vprintf);
-            old_vprintf = nullptr;
-        } else {
-            // Restore default
-            esp_log_set_vprintf(vprintf);
+        // Disable Logging: Switch to Silent
+        vprintf_like_t current = esp_log_set_vprintf(silent_vprintf);
+        if (current != silent_vprintf && current != buffer_vprintf) {
+            old_vprintf = current;
         }
     }
 }
@@ -142,6 +152,8 @@ void LogBuffer::setGlobalLevel(esp_log_level_t level) {
 }
 
 void LogBuffer::setTagLevel(const String& tag, esp_log_level_t level) {
+    // Exclusive Tag Mode: Mute everything else
+    esp_log_level_set("*", ESP_LOG_NONE);
     esp_log_level_set(tag.c_str(), level);
 }
 

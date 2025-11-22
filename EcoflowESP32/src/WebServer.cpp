@@ -307,9 +307,11 @@ void WebServer::handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, s
     if (doc.containsKey("level")) {
         String tag = doc.containsKey("tag") ? doc["tag"].as<String>() : "";
         esp_log_level_t lvl = (esp_log_level_t)(int)doc["level"];
-        if (tag.length() > 0) {
+        if (tag.length() > 0 && tag != "Global") {
             LogBuffer::getInstance().setTagLevel(tag, lvl);
         } else {
+            // Restore global level logic if "Global" or empty tag is selected
+            // But if we were in exclusive mode, we should reset "*"
             LogBuffer::getInstance().setGlobalLevel(lvl);
         }
     }

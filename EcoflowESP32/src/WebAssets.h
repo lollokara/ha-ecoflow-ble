@@ -114,8 +114,16 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     </select>
                 </div>
                 <div class="ctrl-row">
-                    <input type="text" id="log-tag" placeholder="Tag (e.g. DeviceManager)" style="width: 100%; padding: 8px; background: #333; border:1px solid #444; color:#fff; border-radius:4px;">
-                    <button class="btn btn-sub" onclick="setLogConfig()">Set Filter</button>
+                    <select id="log-tag" onchange="setLogConfig()" style="width: 100%; padding: 8px; background: #333; border:1px solid #444; color:#fff; border-radius:4px;">
+                        <option value="Global">Global (All Tags)</option>
+                        <option value="CmdUtils">CmdUtils</option>
+                        <option value="EcoflowCrypto">EcoflowCrypto</option>
+                        <option value="EcoflowDataParser">EcoflowDataParser</option>
+                        <option value="EcoflowESP32">EcoflowESP32</option>
+                        <option value="EcoflowProtocol">EcoflowProtocol</option>
+                        <option value="WebServer">WebServer</option>
+                        <option value="DeviceManager">DeviceManager</option>
+                    </select>
                 </div>
                 <div id="console"></div>
                 <div class="ctrl-row">
