@@ -4,10 +4,10 @@
 // DO NOT COMMIT THIS FILE – add it to .gitignore.
 
 // Your EcoFlow account user ID (integer as string)
-// instructions here https://github.com/rabits/ha-ef-ble/wiki
 static const char ECOFLOW_USER_ID[] = "1921517708356313089";
 
-//Do not touch this, is used in the handshake for the BLE Auth.
+// Your device serial number
+static const char ECOFLOW_DEVICE_SN[] = "P231ZEBAPH342310";
 
 static const uint8_t ECOFLOW_KEYDATA[] = {
     0xd1,0x82,0x4a,0x0a,0x4b,0x08,0xd2,0x96,0xa0,0x78,0xd7,0x06,0xa4,0x61,0x27,0xf1,

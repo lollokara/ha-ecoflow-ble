@@ -13,17 +13,9 @@
 #define DEVICE_MANAGER_H
 
 #include "EcoflowESP32.h"
+#include "types.h"
 #include <vector>
 #include <Preferences.h>
-
-/**
- * @enum DeviceType
- * @brief Enumerates the supported EcoFlow device types.
- */
-enum class DeviceType {
-    DELTA_3, // Represents the Delta 3 device
-    WAVE_2   // Represents the Wave 2 device
-};
 
 /**
  * @struct DeviceSlot
@@ -104,14 +96,24 @@ public:
       */
     bool isAnyConnecting();
 
+    // --- Management Commands ---
+    void printStatus();
+    void forget(DeviceType type);
+    String getDeviceStatusJson();
+
 private:
     DeviceManager();
 
     // Device instances
     EcoflowESP32 d3;
     EcoflowESP32 w2;
+    EcoflowESP32 d3p;
+    EcoflowESP32 ac;
+
     DeviceSlot slotD3;
     DeviceSlot slotW2;
+    DeviceSlot slotD3P;
+    DeviceSlot slotAC;
 
     Preferences prefs;
 

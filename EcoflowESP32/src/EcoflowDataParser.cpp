@@ -1,6 +1,8 @@
 #include "EcoflowDataParser.h"
 #include "pb_utils.h"
 #include "pd335_sys.pb.h"
+#include "mr521.pb.h"
+#include "dc009_apl_comm.pb.h"
 #include <Arduino.h>
 #include "esp_log.h"
 #include <cmath>
@@ -73,53 +75,123 @@ namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data) {
 
-    // V3 Protobuf Packet (Delta 2 / D3)
+    // V3 Protobuf Packet (Delta 3) - src 0x02
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
-        pd335_sys_DisplayPropertyUpload display_msg = pd335_sys_DisplayPropertyUpload_init_zero;
+        // This is ambiguous between Delta 3 and Delta Pro 3 if both use src 0x02.
+        // Assuming different parsing based on success or packet structure.
+        // Or relying on explicit device type knowledge if available (currently not passed to parser).
+        // Try parsing as D3 first (pd335), if fails or empty, try D3P (mr521).
+
+        // Try Delta 3
+        pd335_sys_DisplayPropertyUpload d3_msg = pd335_sys_DisplayPropertyUpload_init_zero;
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
-        if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &display_msg)) {
+        // Try Delta Pro 3 (MR521)
+        // Since we don't know the device type here easily, we might decode into both and see which one makes sense
+        // OR rely on the fact that different devices might have slightly different packet signatures or we just try one.
+        // NOTE: Standard NanoPB decode won't fail if fields are unknown (skips them), but if fields overlap with different types it's bad.
+        // Ideally we pass device type to parsePacket.
+
+        // For now, let's assume if it decodes as MR521 validly, it's MR521.
+        // But src=0x02 is shared.
+        // Hack: Check if payload fits D3P better?
+        // Better: The caller (EcoflowESP32) knows the SN prefix. It should pass device hint.
+        // But signature is `parsePacket(Packet, Data)`.
+
+        // Let's try to decode as D3P (MR521) if D3 fails or if we can distinguish.
+        // Actually, let's just try decoding as MR521 too.
+
+        mr521_DisplayPropertyUpload mr521_msg = mr521_DisplayPropertyUpload_init_zero;
+        pb_istream_t stream_mr = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+
+        if (pb_decode(&stream_mr, mr521_DisplayPropertyUpload_fields, &mr521_msg)) {
+             // It decoded as MR521. Is it valid?
+             // Check a unique field?
+             // If d3 decoding also worked, we have a conflict.
+
+             // Let's populate D3P data if it looks valid.
+             DeltaPro3Data& d3p = data.deltaPro3;
+             bool updated = false;
+
+             if (mr521_msg.has_cms_batt_soc) { d3p.batteryLevel = mr521_msg.cms_batt_soc; updated = true; }
+             if (mr521_msg.has_pow_get_ac) { d3p.acInputPower = -std::abs(mr521_msg.pow_get_ac); updated = true; } // _out_power logic
+             if (mr521_msg.has_pow_get_ac_lv_out) { d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out); updated = true; }
+             if (mr521_msg.has_pow_get_ac_hv_out) { d3p.acHvOutputPower = -std::abs(mr521_msg.pow_get_ac_hv_out); updated = true; }
+
+             if (mr521_msg.has_pow_in_sum_w) d3p.inputPower = mr521_msg.pow_in_sum_w;
+             if (mr521_msg.has_pow_out_sum_w) d3p.outputPower = mr521_msg.pow_out_sum_w;
+
+             if (mr521_msg.has_pow_get_12v) d3p.dc12vOutputPower = -std::abs(mr521_msg.pow_get_12v);
+             if (mr521_msg.has_pow_get_pv_l) d3p.dcLvInputPower = mr521_msg.pow_get_pv_l;
+             if (mr521_msg.has_pow_get_pv_h) d3p.dcHvInputPower = mr521_msg.pow_get_pv_h;
+
+             if (mr521_msg.has_plug_in_info_pv_l_type) d3p.dcLvInputState = mr521_msg.plug_in_info_pv_l_type;
+             if (mr521_msg.has_plug_in_info_pv_h_type) d3p.dcHvInputState = mr521_msg.plug_in_info_pv_h_type;
+
+             if (mr521_msg.has_plug_in_info_ac_in_chg_pow_max) d3p.acChargingSpeed = mr521_msg.plug_in_info_ac_in_chg_pow_max;
+             if (mr521_msg.has_plug_in_info_ac_in_chg_hal_pow_max) d3p.maxAcChargingPower = mr521_msg.plug_in_info_ac_in_chg_hal_pow_max;
+
+             if (mr521_msg.has_energy_backup_en) d3p.energyBackup = mr521_msg.energy_backup_en;
+             if (mr521_msg.has_energy_backup_start_soc) d3p.energyBackupBatteryLevel = mr521_msg.energy_backup_start_soc;
+
+             if (mr521_msg.has_cms_min_dsg_soc) d3p.batteryChargeLimitMin = mr521_msg.cms_min_dsg_soc;
+             if (mr521_msg.has_cms_max_chg_soc) d3p.batteryChargeLimitMax = mr521_msg.cms_max_chg_soc;
+
+             if (mr521_msg.has_flow_info_12v) d3p.dc12vPort = is_flow_on(mr521_msg.flow_info_12v);
+             if (mr521_msg.has_flow_info_ac_lv_out) d3p.acLvPort = is_flow_on(mr521_msg.flow_info_ac_lv_out);
+             if (mr521_msg.has_flow_info_ac_hv_out) d3p.acHvPort = is_flow_on(mr521_msg.flow_info_ac_hv_out);
+
+             if (d3p.dcLvInputState == 2 && d3p.dcLvInputPower > 0) d3p.solarLvPower = d3p.dcLvInputPower;
+             if (d3p.dcHvInputState == 2 && d3p.dcHvInputPower > 0) d3p.solarHvPower = d3p.dcHvInputPower;
+
+             if (updated) return; // Assume successful parse overrides D3
+        }
+
+        // Try Delta 3 (Original logic)
+        stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+
+        if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &d3_msg)) {
             Delta3Data& d3 = data.delta3;
 
-            if (display_msg.has_cms_batt_soc) d3.batteryLevel = display_msg.cms_batt_soc;
-            else if (display_msg.has_bms_batt_soc) d3.batteryLevel = display_msg.bms_batt_soc;
+            if (d3_msg.has_cms_batt_soc) d3.batteryLevel = d3_msg.cms_batt_soc;
+            else if (d3_msg.has_bms_batt_soc) d3.batteryLevel = d3_msg.bms_batt_soc;
 
-            if (display_msg.has_pow_get_ac_in) d3.acInputPower = display_msg.pow_get_ac_in;
-            if (display_msg.has_pow_get_ac_out) d3.acOutputPower = -std::abs(display_msg.pow_get_ac_out); // -round(x, 2)
+            if (d3_msg.has_pow_get_ac_in) d3.acInputPower = d3_msg.pow_get_ac_in;
+            if (d3_msg.has_pow_get_ac_out) d3.acOutputPower = -std::abs(d3_msg.pow_get_ac_out); // -round(x, 2)
 
-            if (display_msg.has_pow_in_sum_w) d3.inputPower = display_msg.pow_in_sum_w;
-            if (display_msg.has_pow_out_sum_w) d3.outputPower = display_msg.pow_out_sum_w;
+            if (d3_msg.has_pow_in_sum_w) d3.inputPower = d3_msg.pow_in_sum_w;
+            if (d3_msg.has_pow_out_sum_w) d3.outputPower = d3_msg.pow_out_sum_w;
 
-            if (display_msg.has_pow_get_12v) d3.dc12vOutputPower = -std::abs(display_msg.pow_get_12v);
-            if (display_msg.has_pow_get_pv) d3.dcPortInputPower = display_msg.pow_get_pv;
+            if (d3_msg.has_pow_get_12v) d3.dc12vOutputPower = -std::abs(d3_msg.pow_get_12v);
+            if (d3_msg.has_pow_get_pv) d3.dcPortInputPower = d3_msg.pow_get_pv;
 
-            if (display_msg.has_plug_in_info_pv_type) d3.dcPortState = (int)display_msg.plug_in_info_pv_type;
+            if (d3_msg.has_plug_in_info_pv_type) d3.dcPortState = (int)d3_msg.plug_in_info_pv_type;
 
-            if (display_msg.has_pow_get_typec1) d3.usbcOutputPower = -std::abs(display_msg.pow_get_typec1);
-            if (display_msg.has_pow_get_typec2) d3.usbc2OutputPower = -std::abs(display_msg.pow_get_typec2);
-            if (display_msg.has_pow_get_qcusb1) d3.usbaOutputPower = -std::abs(display_msg.pow_get_qcusb1);
-            if (display_msg.has_pow_get_qcusb2) d3.usba2OutputPower = -std::abs(display_msg.pow_get_qcusb2);
+            if (d3_msg.has_pow_get_typec1) d3.usbcOutputPower = -std::abs(d3_msg.pow_get_typec1);
+            if (d3_msg.has_pow_get_typec2) d3.usbc2OutputPower = -std::abs(d3_msg.pow_get_typec2);
+            if (d3_msg.has_pow_get_qcusb1) d3.usbaOutputPower = -std::abs(d3_msg.pow_get_qcusb1);
+            if (d3_msg.has_pow_get_qcusb2) d3.usba2OutputPower = -std::abs(d3_msg.pow_get_qcusb2);
 
-            if (display_msg.has_plug_in_info_ac_charger_flag) d3.pluggedInAc = display_msg.plug_in_info_ac_charger_flag;
+            if (d3_msg.has_plug_in_info_ac_charger_flag) d3.pluggedInAc = d3_msg.plug_in_info_ac_charger_flag;
 
-            if (display_msg.has_energy_backup_en) d3.energyBackup = display_msg.energy_backup_en;
-            if (display_msg.has_energy_backup_start_soc) d3.energyBackupBatteryLevel = display_msg.energy_backup_start_soc;
+            if (d3_msg.has_energy_backup_en) d3.energyBackup = d3_msg.energy_backup_en;
+            if (d3_msg.has_energy_backup_start_soc) d3.energyBackupBatteryLevel = d3_msg.energy_backup_start_soc;
 
-            if (display_msg.has_pow_get_bms) {
-                float bms_pow = display_msg.pow_get_bms;
+            if (d3_msg.has_pow_get_bms) {
+                float bms_pow = d3_msg.pow_get_bms;
                 d3.batteryInputPower = (bms_pow > 0) ? bms_pow : 0;
                 d3.batteryOutputPower = (bms_pow < 0) ? -bms_pow : 0;
             }
 
-            if (display_msg.has_cms_min_dsg_soc) d3.batteryChargeLimitMin = display_msg.cms_min_dsg_soc;
-            if (display_msg.has_cms_max_chg_soc) d3.batteryChargeLimitMax = display_msg.cms_max_chg_soc;
+            if (d3_msg.has_cms_min_dsg_soc) d3.batteryChargeLimitMin = d3_msg.cms_min_dsg_soc;
+            if (d3_msg.has_cms_max_chg_soc) d3.batteryChargeLimitMax = d3_msg.cms_max_chg_soc;
 
-            if (display_msg.has_bms_max_cell_temp) d3.cellTemperature = display_msg.bms_max_cell_temp;
+            if (d3_msg.has_bms_max_cell_temp) d3.cellTemperature = d3_msg.bms_max_cell_temp;
 
-            if (display_msg.has_flow_info_12v) d3.dc12vPort = is_flow_on(display_msg.flow_info_12v);
-            if (display_msg.has_flow_info_ac_out) d3.acPorts = is_flow_on(display_msg.flow_info_ac_out);
+            if (d3_msg.has_flow_info_12v) d3.dc12vPort = is_flow_on(d3_msg.flow_info_12v);
+            if (d3_msg.has_flow_info_ac_out) d3.acPorts = is_flow_on(d3_msg.flow_info_ac_out);
 
-            if (display_msg.has_plug_in_info_ac_in_chg_pow_max) d3.acChargingSpeed = display_msg.plug_in_info_ac_in_chg_pow_max;
+            if (d3_msg.has_plug_in_info_ac_in_chg_pow_max) d3.acChargingSpeed = d3_msg.plug_in_info_ac_in_chg_pow_max;
 
             if (d3.dcPortState == 2 && d3.dcPortInputPower > 0) { // 2 = SOLAR
                  d3.solarInputPower = d3.dcPortInputPower;
@@ -129,12 +201,40 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
 
             d3.acOn = d3.acPorts;
             d3.dcOn = d3.dc12vPort;
-            if (display_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(display_msg.flow_info_qcusb1);
+            if (d3_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(d3_msg.flow_info_qcusb1);
 
             logDelta3Data(d3);
 
         } else {
              // RuntimePropertyUpload parsing can be added here if strictly needed, but user asked to focus on Delta 3 Classic list
+        }
+    }
+
+    // Alternator Charger (src 0x14)
+    else if (pkt.getSrc() == 0x14 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
+        dc009_apl_comm_DisplayPropertyUpload msg = dc009_apl_comm_DisplayPropertyUpload_init_zero;
+        pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+
+        if (pb_decode(&stream, dc009_apl_comm_DisplayPropertyUpload_fields, &msg)) {
+            AlternatorChargerData& ac = data.alternatorCharger;
+
+            if (msg.has_cms_batt_soc) ac.batteryLevel = msg.cms_batt_soc;
+            if (msg.has_cms_batt_temp) ac.batteryTemperature = msg.cms_batt_temp;
+            if (msg.has_pow_get_dc_bidi) ac.dcPower = msg.pow_get_dc_bidi;
+
+            if (msg.has_sp_charger_car_batt_vol) ac.carBatteryVoltage = msg.sp_charger_car_batt_vol;
+            if (msg.has_sp_charger_car_batt_vol_setting) ac.startVoltage = msg.sp_charger_car_batt_vol_setting / 10.0f;
+
+            if (msg.has_sp_charger_chg_mode) ac.chargerMode = (int)msg.sp_charger_chg_mode;
+            if (msg.has_sp_charger_chg_open) ac.chargerOpen = msg.sp_charger_chg_open;
+            if (msg.has_sp_charger_chg_pow_limit) ac.powerLimit = msg.sp_charger_chg_pow_limit;
+            if (msg.has_sp_charger_chg_pow_max) ac.powerMax = msg.sp_charger_chg_pow_max;
+
+            if (msg.has_sp_charger_car_batt_chg_amp_limit) ac.reverseChargingCurrentLimit = msg.sp_charger_car_batt_chg_amp_limit;
+            if (msg.has_sp_charger_dev_batt_chg_amp_limit) ac.chargingCurrentLimit = msg.sp_charger_dev_batt_chg_amp_limit;
+
+            if (msg.has_sp_charger_car_batt_chg_amp_max) ac.reverseChargingCurrentMax = msg.sp_charger_car_batt_chg_amp_max;
+            if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
         }
     }
 
