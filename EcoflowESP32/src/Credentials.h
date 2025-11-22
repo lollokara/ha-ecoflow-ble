@@ -5,7 +5,7 @@
 
 // Your EcoFlow account user ID (integer as string)
 // instructions here https://github.com/rabits/ha-ef-ble/wiki
-static const char ECOFLOW_USER_ID[] = "insert here your account string";
+static const char ECOFLOW_USER_ID[] = "1921517708356313089";
 
 //Do not touch this, is used in the handshake for the BLE Auth.
 
