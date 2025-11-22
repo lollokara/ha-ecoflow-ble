@@ -23,8 +23,11 @@ static void cmd_printf(const char* format, ...) {
     vsnprintf(loc_buf, sizeof(loc_buf), format, arg);
     va_end(arg);
 
-    // Print to Serial
-    Serial.print(loc_buf);
+    // Print to Serial ONLY if logging is enabled
+    // This respects the "Global Disable" requirement
+    if (LogBuffer::getInstance().isLoggingEnabled()) {
+        Serial.print(loc_buf);
+    }
 
     // Send to LogBuffer (as INFO level, tag "CLI")
     // We mimic standard log behavior: strip trailing newline for LogBuffer if desired,

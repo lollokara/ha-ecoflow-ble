@@ -484,6 +484,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         logPollInterval = setInterval(() => {
             fetch(API + '/logs').then(r => r.json()).then(logs => {
                 const c = el('console');
+                c.innerHTML = ''; // Clear previous logs to avoid duplication
                 logs.forEach(l => {
                     const d = new Date(l.ts);
                     const time = d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();

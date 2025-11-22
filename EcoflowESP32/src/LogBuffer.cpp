@@ -125,17 +125,17 @@ void LogBuffer::setLoggingEnabled(bool enabled) {
 
     _enabled = enabled;
     if (_enabled) {
-        // Enable Logging: Switch from Silent (or default) to Buffer+UART
+        // Enable Logging: Restore Global Level and Switch to Buffer+UART
+        esp_log_level_set("*", ESP_LOG_INFO); // Default to INFO, or tracking variable
+
         vprintf_like_t current = esp_log_set_vprintf(buffer_vprintf);
-        // If we were silent, current is silent_vprintf. We don't want that as old_vprintf.
-        // We want the original UART handler.
-        // If old_vprintf is null, it means we haven't saved the UART handler yet?
-        // Or if we were disabled, we set it to silent.
         if (current != silent_vprintf && current != buffer_vprintf) {
              old_vprintf = current;
         }
     } else {
-        // Disable Logging: Switch to Silent
+        // Disable Logging: Mute Global Level and Switch to Silent Hook
+        esp_log_level_set("*", ESP_LOG_NONE);
+
         vprintf_like_t current = esp_log_set_vprintf(silent_vprintf);
         if (current != silent_vprintf && current != buffer_vprintf) {
             old_vprintf = current;
