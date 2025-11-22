@@ -15,6 +15,7 @@
 #include "EcoflowESP32.h"
 #include "types.h"
 #include <vector>
+#include <deque>
 #include <Preferences.h>
 
 /**
@@ -101,6 +102,9 @@ public:
     void forget(DeviceType type);
     String getDeviceStatusJson();
 
+    // --- Telemetry History ---
+    std::vector<int> getWave2TempHistory(); // Returns the last 60 minutes of ambient temp
+
 private:
     DeviceManager();
 
@@ -116,6 +120,10 @@ private:
     DeviceSlot slotAC;
 
     Preferences prefs;
+
+    // Telemetry History
+    std::deque<int8_t> _wave2History;
+    uint32_t _lastHistorySample = 0;
 
     // BLE Scanning members
     NimBLEScan* pScan = nullptr;
@@ -142,6 +150,7 @@ private:
     void loadDevices();
     void _handlePendingConnection();
     void _manageScanning();
+    void _updateHistory();
 
     // Connection queue members (not currently used but kept for potential future use)
     bool _hasPendingConnection = false;

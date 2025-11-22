@@ -107,6 +107,9 @@ void DeviceManager::update() {
 
     // 3. Manage the scanning state (auto-reconnect or timeout).
     _manageScanning();
+
+    // 4. Update telemetry history (every 60 seconds)
+    _updateHistory();
 }
 
 void DeviceManager::scanAndConnect(DeviceType type) {
@@ -323,6 +326,29 @@ void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const st
         slotAC.macAddress = mac;
         slotAC.serialNumber = sn;
     }
+}
+
+void DeviceManager::_updateHistory() {
+    if (millis() - _lastHistorySample > 60000) { // Every minute
+        _lastHistorySample = millis();
+
+        // Wave 2 Ambient Temp
+        if (slotW2.isConnected) {
+            int temp = w2.getAmbientTemperature();
+            _wave2History.push_back((int8_t)temp);
+            if (_wave2History.size() > 60) {
+                _wave2History.pop_front();
+            }
+        }
+    }
+}
+
+std::vector<int> DeviceManager::getWave2TempHistory() {
+    std::vector<int> result;
+    for (int8_t t : _wave2History) {
+        result.push_back((int)t);
+    }
+    return result;
 }
 
 

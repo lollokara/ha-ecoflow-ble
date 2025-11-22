@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 
-// Minified HTML/CSS/JS for the Ecoflow Controller Web Interface
-// This single string contains the entire frontend application.
 const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
@@ -14,11 +12,14 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     <title>Ecoflow Controller</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --primary: #00E676; --danger: #ff5252; --text: #e0e0e0; --sub: #a0a0a0; }
-        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; padding-bottom: 100px; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; padding-bottom: 100px; overflow-x: hidden; }
+        #canvas-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.6; }
         h1, h2, h3 { margin: 0; }
-        .container { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        .card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .container { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 1; }
+        .card { background: rgba(30, 30, 30, 0.85); backdrop-filter: blur(8px); border-radius: 12px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 12px rgba(0,0,0,0.4); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer; transition: opacity 0.2s; }
+        .header:hover { opacity: 0.8; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; margin-right: 8px; display: inline-block; }
         .status-dot.on { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }
@@ -67,13 +68,18 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         select { padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 1em; }
 
         .hidden { display: none !important; }
+        canvas.graph { width: 100%; height: 150px; background: #222; border-radius: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
+    <canvas id="canvas-bg"></canvas>
     <div class="container">
         <div class="header">
             <h2>⚡ Ecoflow CTRL</h2>
-            <div id="global-status" class="status-dot"></div>
+            <div style="display:flex; align-items:center; gap:10px">
+                <span id="esp-temp" style="font-size:0.8em; color:#aaa">--°C</span>
+                <div id="global-status" class="status-dot"></div>
+            </div>
         </div>
 
         <div id="intro-screen" class="intro hidden">
@@ -143,6 +149,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="stat"><div class="stat-label">Out</div><div class="stat-val">${d.out}W</div></div>
                 <div class="stat"><div class="stat-label">Solar</div><div class="stat-val">${d.solar}W</div></div>
             </div>
+            <div style="text-align:center; margin-bottom:10px; color:#aaa; font-size:0.8em;">Cell Temp: ${d.cell_temp}°C</div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
                     <span>AC Output</span>
@@ -197,7 +204,6 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <span>Power</span>
                     <label class="switch"><input type="checkbox" ${d.pwr?'checked':''} onchange="cmd('${d.type}', 'set_power', this.checked)"><span class="slider"></span></label>
                 </div>
-
                 <div class="ctrl-row">
                     <span>Mode</span>
                     <select onchange="cmd('${d.type}', 'set_mode', parseInt(this.value))" style="width:100px">
@@ -206,7 +212,6 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                         <option value="2" ${d.mode==2?'selected':''}>Fan</option>
                     </select>
                 </div>
-
                 <div class="ctrl-row">
                     <span>Fan Speed</span>
                     <select onchange="cmd('${d.type}', 'set_fan', parseInt(this.value))" style="width:100px">
@@ -215,11 +220,77 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                         <option value="2" ${d.fan==2?'selected':''}>High</option>
                     </select>
                 </div>
-
                  <div class="ctrl-row">
                     <span>Auto Drain</span>
                     <label class="switch"><input type="checkbox" ${d.drain?'checked':''} onchange="cmd('${d.type}', 'set_drain', this.checked)"><span class="slider"></span></label>
                 </div>
+
+                <div style="margin-top:15px">
+                    <span style="font-size:0.8em; color:#aaa">Temp History (1h)</span>
+                    <canvas id="graph-w2" class="graph" width="300" height="150"></canvas>
+                </div>
+
+                <div class="ctrl-row" style="margin-top:15px">
+                    <button class="btn btn-danger" style="width:100%" onclick="disconnect('${d.type}')">Disconnect</button>
+                </div>
+            </div>
+        </div>`;
+
+    const renderD3P = (d) => `
+        <div class="card">
+            <div class="header" onclick="toggleCtrl('${d.type}')">
+                <h3><span class="status-dot ${d.conn?'on':''}"></span>Delta Pro 3 (${d.sn})</h3>
+                <span class="stat-val">${d.batt}%</span>
+            </div>
+            <div style="text-align:center; margin-bottom:10px; color:#aaa; font-size:0.8em;">Cell Temp: ${d.cell_temp}°C</div>
+            <div class="controls" id="ctrl-${d.type}">
+                <div class="ctrl-row">
+                    <span>AC Low Volt</span>
+                    <label class="switch"><input type="checkbox" ${d.ac_lv_on?'checked':''} onchange="cmd('${d.type}', 'set_ac_lv', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="ctrl-row">
+                    <span>AC High Volt</span>
+                    <label class="switch"><input type="checkbox" ${d.ac_hv_on?'checked':''} onchange="cmd('${d.type}', 'set_ac_hv', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="ctrl-row">
+                    <span>Energy Backup</span>
+                    <label class="switch"><input type="checkbox" ${d.backup_en?'checked':''} onchange="cmd('${d.type}', 'set_backup_en', this.checked)"><span class="slider"></span></label>
+                </div>
+                <input type="range" min="0" max="100" value="${d.backup_lvl}" onchange="cmd('${d.type}', 'set_backup_level', parseInt(this.value))">
+                <div class="ctrl-row">
+                    <button class="btn btn-danger" style="width:100%" onclick="disconnect('${d.type}')">Disconnect</button>
+                </div>
+            </div>
+        </div>`;
+
+    const renderAC = (d) => `
+        <div class="card">
+            <div class="header" onclick="toggleCtrl('${d.type}')">
+                <h3><span class="status-dot ${d.conn?'on':''}"></span>Alt Charger (${d.sn})</h3>
+                <span class="stat-val">${d.batt}%</span>
+            </div>
+            <div class="grid">
+                <div class="stat"><div class="stat-label">Car Batt</div><div class="stat-val">${d.car_volt.toFixed(1)}V</div></div>
+                <div class="stat"><div class="stat-label">Limit</div><div class="stat-val">${d.pow_lim}W</div></div>
+            </div>
+            <div class="controls" id="ctrl-${d.type}">
+                <div class="ctrl-row">
+                    <span>Charger Enabled</span>
+                    <label class="switch"><input type="checkbox" ${d.chg_open?'checked':''} onchange="cmd('${d.type}', 'set_open', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="ctrl-row">
+                    <span>Mode</span>
+                    <select onchange="cmd('${d.type}', 'set_mode', parseInt(this.value))" style="width:120px">
+                        <option value="0" ${d.mode==0?'selected':''}>Idle</option>
+                        <option value="1" ${d.mode==1?'selected':''}>Charge</option>
+                        <option value="2" ${d.mode==2?'selected':''}>Maintenance</option>
+                        <option value="3" ${d.mode==3?'selected':''}>Reverse</option>
+                    </select>
+                </div>
+                <div class="ctrl-row">
+                    <span>Power Limit: <b id="val-ac-lim">${d.pow_lim}</b>W</span>
+                </div>
+                <input type="range" min="100" max="800" step="50" value="${d.pow_lim}" onchange="cmd('${d.type}', 'set_limit', parseInt(this.value))" oninput="el('val-ac-lim').innerText=this.value">
 
                 <div class="ctrl-row">
                     <button class="btn btn-danger" style="width:100%" onclick="disconnect('${d.type}')">Disconnect</button>
@@ -244,6 +315,9 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
     function update() {
         fetch(API + '/status').then(r => r.json()).then(data => {
+            // Update ESP Temp
+            if(data.esp_temp) el('esp-temp').innerText = data.esp_temp.toFixed(1) + '°C';
+
             const list = el('device-list');
             let html = '';
             let anyConnected = false;
@@ -255,20 +329,20 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     d.type = type;
                     if (d.connected) {
                         anyConnected = true;
-                        // Keep control panel open if it was open
                         const wasOpen = el('ctrl-'+type)?.classList.contains('open');
 
                         if (type === 'd3') html += renderD3(d);
                         else if (type === 'w2') html += renderW2(d);
+                        else if (type === 'd3p') html += renderD3P(d);
+                        else if (type === 'ac') html += renderAC(d);
                         else html += renderCommon(d);
 
-                        // We need to re-apply 'open' class after render in next tick,
-                        // but doing full innerHTML replacement kills DOM state.
-                        // Better approach: Only update values if elements exist.
-                        // For simplicity in this SPA, we just rebuild and restore state (hacky but works for small lists).
-                        // Re-applying open state:
                         setTimeout(() => {
-                           if(wasOpen) el('ctrl-'+type)?.classList.add('open');
+                           const panel = el('ctrl-'+type);
+                           if(wasOpen && panel) {
+                               panel.classList.add('open');
+                               if(type === 'w2') loadGraph();
+                           }
                         }, 0);
                     }
                 }
@@ -285,6 +359,47 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     function toggleCtrl(id) {
         const e = el('ctrl-'+id);
         e.classList.toggle('open');
+        if(id === 'w2' && e.classList.contains('open')) loadGraph();
+    }
+
+    function loadGraph() {
+        const canvas = el('graph-w2');
+        if(!canvas) return;
+        fetch(API + '/history?type=w2').then(r => r.json()).then(data => {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0,0,w,h);
+
+            if(!data || data.length === 0) {
+                ctx.fillStyle = '#555';
+                ctx.fillText('No Data', w/2-20, h/2);
+                return;
+            }
+
+            ctx.strokeStyle = '#00E676';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            const min = Math.min(...data) - 2;
+            const max = Math.max(...data) + 2;
+            const range = max - min || 1;
+
+            data.forEach((val, i) => {
+                const x = (i / (data.length - 1)) * w;
+                const y = h - ((val - min) / range) * h;
+                if(i===0) ctx.moveTo(x,y);
+                else ctx.lineTo(x,y);
+            });
+            ctx.stroke();
+
+            // Current value dot
+            const lastY = h - ((data[data.length-1] - min) / range) * h;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(w-4, lastY, 3, 0, Math.PI*2);
+            ctx.fill();
+        });
     }
 
     function connectDevice() {
@@ -299,7 +414,6 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     }
 
     function cmd(type, cmdName, val) {
-        // Convert bool to int/bool as needed by backend
         fetch(API + '/control', {
             method: 'POST',
             headers:{'Content-Type':'application/json'},
@@ -366,7 +480,6 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         }).then(r => {
             if(r.ok) {
                 el('cli-input').value = '';
-                // Optimistically add to log console
                 const c = el('console');
                 const line = document.createElement('div');
                 line.className = 'log-line log-I';
@@ -379,8 +492,66 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         });
     }
 
-    setInterval(update, 2000);
+    setInterval(update, 1000);
     update(); // Initial call
+
+    // --- Particle Background ---
+    const canvas = document.getElementById('canvas-bg');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let w, h;
+
+    function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        initParticles();
+    }
+
+    function initParticles() {
+        particles = [];
+        const cnt = Math.floor(w * h / 15000); // density
+        for(let i=0; i<cnt; i++) {
+            particles.push({
+                x: Math.random()*w, y: Math.random()*h,
+                vx: (Math.random()-0.5)*0.5, vy: (Math.random()-0.5)*0.5
+            });
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0,0,w,h);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+
+        for(let i=0; i<particles.length; i++) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            if(p.x < 0 || p.x > w) p.vx *= -1;
+            if(p.y < 0 || p.y > h) p.vy *= -1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2);
+            ctx.fill();
+
+            // Connect
+            for(let j=i+1; j<particles.length; j++) {
+                let p2 = particles[j];
+                let dx = p.x - p2.x, dy = p.y - p2.y;
+                let dist = dx*dx + dy*dy;
+                if(dist < 15000) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    draw();
 </script>
 </body>
 </html>

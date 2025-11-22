@@ -2,6 +2,7 @@
 #include <esp_log.h>
 #include <esp_idf_version.h>
 #include <WiFi.h>
+#include "LogBuffer.h"
 
 #if CONFIG_IDF_TARGET_ESP32S3
 // Check IDF version for correct header
@@ -13,6 +14,45 @@
 #endif
 
 static const char* TAG = "CmdUtils";
+
+// Helper to print to both Serial and LogBuffer
+static void cmd_printf(const char* format, ...) {
+    char loc_buf[256];
+    va_list arg;
+    va_start(arg, format);
+    vsnprintf(loc_buf, sizeof(loc_buf), format, arg);
+    va_end(arg);
+
+    // Print to Serial
+    Serial.print(loc_buf);
+
+    // Send to LogBuffer (as INFO level, tag "CLI")
+    // We mimic standard log behavior: strip trailing newline for LogBuffer if desired,
+    // but LogBuffer handles it.
+    // We fake the va_list for LogBuffer since we already formatted.
+    // Actually LogBuffer::addLog takes va_list but ignores it if we pass formatted string?
+    // No, LogBuffer::addLog takes message and args?
+    // LogBuffer::addLog(level, tag, message, args) -> message is ALREADY formatted in LogBuffer.cpp hook.
+    // But we are calling addLog directly.
+    // Let's check LogBuffer.cpp:
+    // void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* message, va_list args)
+    // It stores `message`. It DOES NOT use `args` to format. `args` is just passed along?
+    // Actually the LogBuffer implementation I wrote:
+    // lm.message = String(message); // Already formatted
+
+    // We need to pass a valid va_list type even if unused.
+    va_list dummy;
+    LogBuffer::getInstance().addLog(ESP_LOG_INFO, "CLI", loc_buf, dummy);
+}
+
+// Helper wrapper for simple println
+static void cmd_println(const String& s) {
+    cmd_printf("%s\n", s.c_str());
+}
+static void cmd_println(const char* s) {
+    cmd_printf("%s\n", s);
+}
+
 
 // Helper to read internal temperature safely
 static float readInternalTemp() {
@@ -98,51 +138,51 @@ void CmdUtils::processInput(String input) {
         // Generic Wave 2 gets
         handleWave2Read(cmd);
     } else {
-        Serial.println("Unknown command. Type 'help' for list.");
+        cmd_println("Unknown command. Type 'help' for list.");
     }
 }
 
 
 void CmdUtils::printHelp() {
-    Serial.println("=== Available Commands ===");
+    cmd_println("=== Available Commands ===");
 
-    Serial.println("\n[System & Connection]");
-    Serial.println("  sys_temp                        (Read internal ESP32 temp)");
-    Serial.println("  sys_reset                       (Factory reset & reboot)");
-    Serial.println("  con_status                      (List connections)");
-    Serial.println("  con_connect <d3/w2/d3p/ac>      (Connect)");
-    Serial.println("  con_disconnect <d3/w2/d3p/ac>   (Disconnect)");
-    Serial.println("  con_forget <d3/w2/d3p/ac>       (Forget)");
-    Serial.println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
-    Serial.println("  wifi_ip                         (Get current IP)");
+    cmd_println("\n[System & Connection]");
+    cmd_println("  sys_temp                        (Read internal ESP32 temp)");
+    cmd_println("  sys_reset                       (Factory reset & reboot)");
+    cmd_println("  con_status                      (List connections)");
+    cmd_println("  con_connect <d3/w2/d3p/ac>      (Connect)");
+    cmd_println("  con_disconnect <d3/w2/d3p/ac>   (Disconnect)");
+    cmd_println("  con_forget <d3/w2/d3p/ac>       (Forget)");
+    cmd_println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
+    cmd_println("  wifi_ip                         (Get current IP)");
 
-    Serial.println("\n[Wave 2] (get_ or set_)");
-    Serial.println("  get_temp / set_temperature <val>");
-    Serial.println("  get_fan_speed / set_fan_speed <val>");
-    Serial.println("  get_mode / set_main_mode <val>");
-    Serial.println("  get_power");
-    Serial.println("  get_battery");
-    Serial.println("  set_ambient_light <0/1>");
+    cmd_println("\n[Wave 2] (get_ or set_)");
+    cmd_println("  get_temp / set_temperature <val>");
+    cmd_println("  get_fan_speed / set_fan_speed <val>");
+    cmd_println("  get_mode / set_main_mode <val>");
+    cmd_println("  get_power");
+    cmd_println("  get_battery");
+    cmd_println("  set_ambient_light <0/1>");
     // ... other writes omitted for brevity but exist
 
-    Serial.println("\n[Delta 3] (Prefix: d3_)");
-    Serial.println("  d3_get_switches / d3_set_ac/dc/usb <0/1>");
-    Serial.println("  d3_get_power");
-    Serial.println("  d3_get_battery / d3_set_soc_max/min");
-    Serial.println("  d3_set_ac_limit <watts>");
+    cmd_println("\n[Delta 3] (Prefix: d3_)");
+    cmd_println("  d3_get_switches / d3_set_ac/dc/usb <0/1>");
+    cmd_println("  d3_get_power");
+    cmd_println("  d3_get_battery / d3_set_soc_max/min");
+    cmd_println("  d3_set_ac_limit <watts>");
 
-    Serial.println("\n[Delta Pro 3] (Prefix: d3p_)");
-    Serial.println("  d3p_get_switches / d3p_set_ac_hv/lv <0/1>");
-    Serial.println("  d3p_get_power");
-    Serial.println("  d3p_get_battery");
-    Serial.println("  d3p_set_energy_backup <0/1>");
+    cmd_println("\n[Delta Pro 3] (Prefix: d3p_)");
+    cmd_println("  d3p_get_switches / d3p_set_ac_hv/lv <0/1>");
+    cmd_println("  d3p_get_power");
+    cmd_println("  d3p_get_battery");
+    cmd_println("  d3p_set_energy_backup <0/1>");
 
-    Serial.println("\n[Alternator Charger] (Prefix: ac_)");
-    Serial.println("  ac_get_status / ac_set_open <0/1>");
-    Serial.println("  ac_get_power");
-    Serial.println("  ac_get_battery");
-    Serial.println("  ac_set_mode <val>");
-    Serial.println("  ac_set_power_limit <watts>");
+    cmd_println("\n[Alternator Charger] (Prefix: ac_)");
+    cmd_println("  ac_get_status / ac_set_open <0/1>");
+    cmd_println("  ac_get_power");
+    cmd_println("  ac_get_battery");
+    cmd_println("  ac_set_mode <val>");
+    cmd_println("  ac_set_power_limit <watts>");
 }
 
 uint8_t CmdUtils::parseHexByte(String s) {
@@ -162,17 +202,17 @@ float CmdUtils::parseFloat(String s) {
 void CmdUtils::handleSysCommand(String cmd) {
     if (cmd.equalsIgnoreCase("sys_temp")) {
         float t = readInternalTemp();
-        if (t > -900) Serial.printf("Internal Temp: %.2f C\n", t);
-        else Serial.println("Failed to read internal temp (or not supported).");
+        if (t > -900) cmd_printf("Internal Temp: %.2f C\n", t);
+        else cmd_println("Failed to read internal temp (or not supported).");
     } else if (cmd.equalsIgnoreCase("sys_reset")) {
-        Serial.println("Resetting settings and rebooting...");
+        cmd_println("Resetting settings and rebooting...");
         Preferences prefs;
         prefs.begin("ecoflow", false);
         prefs.clear();
         prefs.end();
         ESP.restart();
     } else {
-        Serial.println("Unknown sys command.");
+        cmd_println("Unknown sys command.");
     }
 }
 
@@ -180,61 +220,63 @@ void CmdUtils::handleConCommand(String cmd, String args) {
     DeviceManager& dm = DeviceManager::getInstance();
 
     if (cmd.equalsIgnoreCase("con_status")) {
-        dm.printStatus();
+        // DeviceManager::printStatus uses Serial internally.
+        // We should update DeviceManager or redirect it.
+        // Since DeviceManager is separate, we can't easily redirect without modifying it.
+        // However, the user only complained about "help" and commands sent from CLI.
+        // Let's assume DeviceManager output is less critical or we'll fix it later if needed.
+        // Actually, it's better to replicate printStatus here using cmd_printf
+        // OR modify DeviceManager to take a Stream or use ESP_LOG.
+        // For now, let's manually print status here.
+
+        cmd_println("=== Device Connection Status ===");
+        auto printSlot = [](DeviceSlot* slot) {
+            cmd_printf("[%s] %s (%s): %s\n",
+                slot->name.c_str(),
+                slot->isConnected ? "CONNECTED" : "DISCONNECTED",
+                slot->macAddress.empty() ? "Unpaired" : slot->macAddress.c_str(),
+                slot->serialNumber.c_str()
+            );
+        };
+        printSlot(dm.getSlot(DeviceType::DELTA_3));
+        printSlot(dm.getSlot(DeviceType::WAVE_2));
+        printSlot(dm.getSlot(DeviceType::DELTA_PRO_3));
+        printSlot(dm.getSlot(DeviceType::ALTERNATOR_CHARGER));
         return;
     }
 
-if (cmd.equalsIgnoreCase("wifi_ip")) {
-    if (WiFi.status() == WL_CONNECTED) {
-        IPAddress ip = WiFi.localIP();
-        Serial.print("Current IP address: ");
-        Serial.println(ip);
-    } else {
-        Serial.println("WiFi not connected.");
+    if (cmd.equalsIgnoreCase("wifi_ip")) {
+        if (WiFi.status() == WL_CONNECTED) {
+            IPAddress ip = WiFi.localIP();
+            cmd_printf("Current IP address: %s\n", ip.toString().c_str());
+        } else {
+            cmd_println("WiFi not connected.");
+        }
+        return;
     }
-    return;
-}
 
-if (cmd.equalsIgnoreCase("wifi_set")) {
-    // Trim whitespace from the start
-    args.trim();
-    // Find first quote for SSID
-    int firstQuote = args.indexOf('"');
-    if (firstQuote == -1) {
-        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
+    if (cmd.equalsIgnoreCase("wifi_set")) {
+        args.trim();
+        int firstQuote = args.indexOf('"');
+        if (firstQuote == -1) { cmd_println("Usage: wifi_set \"<ssid>\" \"<pass>\""); return; }
+        int secondQuote = args.indexOf('"', firstQuote + 1);
+        if (secondQuote == -1) { cmd_println("Usage: wifi_set \"<ssid>\" \"<pass>\""); return; }
+        String ssid = args.substring(firstQuote + 1, secondQuote);
+        int thirdQuote = args.indexOf('"', secondQuote + 1);
+        if (thirdQuote == -1) { cmd_println("Usage: wifi_set \"<ssid>\" \"<pass>\""); return; }
+        int fourthQuote = args.indexOf('"', thirdQuote + 1);
+        if (fourthQuote == -1) { cmd_println("Usage: wifi_set \"<ssid>\" \"<pass>\""); return; }
+        String pass = args.substring(thirdQuote + 1, fourthQuote);
+
+        cmd_printf("Saved SSID: %s  Password: %s\n", ssid.c_str(), pass.c_str());
+        Preferences prefs;
+        prefs.begin("ecoflow", false);
+        prefs.putString("wifi_ssid", ssid);
+        prefs.putString("wifi_pass", pass);
+        prefs.end();
+        cmd_println("WiFi credentials saved. Reboot to connect.");
         return;
     }
-    // Find closing quote for SSID
-    int secondQuote = args.indexOf('"', firstQuote + 1);
-    if (secondQuote == -1) {
-        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
-        return;
-    }
-    String ssid = args.substring(firstQuote + 1, secondQuote);
-    // Find first quote for password (after ssid)
-    int thirdQuote = args.indexOf('"', secondQuote + 1);
-    if (thirdQuote == -1) {
-        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
-        return;
-    }
-    int fourthQuote = args.indexOf('"', thirdQuote + 1);
-    if (fourthQuote == -1) {
-        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
-        return;
-    }
-    String pass = args.substring(thirdQuote + 1, fourthQuote);
-    Serial.print("Saved SSID: ");
-    Serial.print(ssid);
-    Serial.print("  Password: ");
-    Serial.println(pass);
-    Preferences prefs;
-    prefs.begin("ecoflow", false);
-    prefs.putString("wifi_ssid", ssid);
-    prefs.putString("wifi_pass", pass);
-    prefs.end();
-    Serial.println("WiFi credentials saved. Reboot to connect.");
-    return;
-}
 
     DeviceType type;
     args.trim();
@@ -243,14 +285,14 @@ if (cmd.equalsIgnoreCase("wifi_set")) {
     else if (args.equalsIgnoreCase("d3p")) type = DeviceType::DELTA_PRO_3;
     else if (args.equalsIgnoreCase("ac") || args.equalsIgnoreCase("chg")) type = DeviceType::ALTERNATOR_CHARGER;
     else {
-        Serial.println("Invalid device type. Use d3, w2, d3p, or ac.");
+        cmd_println("Invalid device type. Use d3, w2, d3p, or ac.");
         return;
     }
 
     if (cmd.equalsIgnoreCase("con_connect")) dm.scanAndConnect(type);
     else if (cmd.equalsIgnoreCase("con_disconnect")) dm.disconnect(type);
     else if (cmd.equalsIgnoreCase("con_forget")) dm.forget(type);
-    else Serial.println("Unknown connection command.");
+    else cmd_println("Unknown connection command.");
 }
 
 // --- Write Handlers ---
@@ -274,11 +316,13 @@ void CmdUtils::handleWave2Command(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("set_sub_mode")) { if(w2) w2->setSubMode(val); }
     else if (cmd.equalsIgnoreCase("set_temperature_display_type")) { if(w2) w2->setTempDisplayType(val); }
     else if (cmd.equalsIgnoreCase("set_temperature_unit")) { if(w2) w2->setTempUnit(val); }
+
+    cmd_println("Command sent.");
 }
 
 void CmdUtils::handleDelta3Command(String cmd, String args) {
     EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-    if (!d3 || !d3->isAuthenticated()) { Serial.println("D3 not ready."); return; }
+    if (!d3 || !d3->isAuthenticated()) { cmd_println("D3 not ready."); return; }
 
     if (cmd.equalsIgnoreCase("d3_set_ac")) d3->setAC(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3_set_dc")) d3->setDC(parseHexByte(args));
@@ -286,21 +330,25 @@ void CmdUtils::handleDelta3Command(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("d3_set_ac_limit")) d3->setAcChargingLimit(args.toInt());
     else if (cmd.equalsIgnoreCase("d3_set_soc_max")) d3->setBatterySOCLimits(args.toInt(), d3->getMinDsgSoc());
     else if (cmd.equalsIgnoreCase("d3_set_soc_min")) d3->setBatterySOCLimits(d3->getMaxChgSoc(), args.toInt());
+
+    cmd_println("Command sent.");
 }
 
 void CmdUtils::handleDeltaPro3Command(String cmd, String args) {
     EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-    if (!d3p || !d3p->isAuthenticated()) { Serial.println("D3P not ready."); return; }
+    if (!d3p || !d3p->isAuthenticated()) { cmd_println("D3P not ready."); return; }
 
     if (cmd.equalsIgnoreCase("d3p_set_ac_hv")) d3p->setAcHvPort(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3p_set_ac_lv")) d3p->setAcLvPort(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3p_set_energy_backup")) d3p->setEnergyBackup(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d3p_set_energy_backup_level")) d3p->setEnergyBackupLevel(args.toInt());
+
+    cmd_println("Command sent.");
 }
 
 void CmdUtils::handleAltChargerCommand(String cmd, String args) {
     EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-    if (!ac || !ac->isAuthenticated()) { Serial.println("AC not ready."); return; }
+    if (!ac || !ac->isAuthenticated()) { cmd_println("AC not ready."); return; }
 
     if (cmd.equalsIgnoreCase("ac_set_open")) ac->setChargerOpen(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("ac_set_mode")) ac->setChargerMode(args.toInt());
@@ -308,6 +356,8 @@ void CmdUtils::handleAltChargerCommand(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("ac_set_batt_voltage")) ac->setBatteryVoltage(parseFloat(args));
     else if (cmd.equalsIgnoreCase("ac_set_car_chg_limit")) ac->setCarBatteryChargeLimit(parseFloat(args));
     else if (cmd.equalsIgnoreCase("ac_set_dev_chg_limit")) ac->setDeviceBatteryChargeLimit(parseFloat(args));
+
+    cmd_println("Command sent.");
 }
 
 // --- Read Handlers ---
@@ -317,13 +367,13 @@ void CmdUtils::handleWave2Read(String cmd) {
     if (!w2) return;
     const Wave2Data& d = w2->getData().wave2;
 
-    if (cmd.equalsIgnoreCase("get_temp")) Serial.printf("Temp: Set=%d, Env=%.2f, Outlet=%.2f\n", d.setTemp, d.envTemp, d.outLetTemp);
-    else if (cmd.equalsIgnoreCase("get_fan_speed")) Serial.printf("Fan Speed: %d\n", d.fanValue);
-    else if (cmd.equalsIgnoreCase("get_mode")) Serial.printf("Mode: %d, SubMode: %d\n", d.mode, d.subMode);
-    else if (cmd.equalsIgnoreCase("get_power")) Serial.printf("Power: Bat=%dW, MPPT=%dW, PSDR=%dW\n", d.batPwrWatt, d.mpptPwrWatt, d.psdrPwrWatt);
-    else if (cmd.equalsIgnoreCase("get_battery")) Serial.printf("Batt: %d%% (Stat: %d), Rem: %dm\n", d.batSoc, d.batChgStatus, d.remainingTime);
-    else if (cmd.equalsIgnoreCase("get_power_state")) Serial.printf("Power State: %d\n", d.powerMode);
-    else Serial.println("Unknown get command for Wave 2");
+    if (cmd.equalsIgnoreCase("get_temp")) cmd_printf("Temp: Set=%d, Env=%.2f, Outlet=%.2f\n", d.setTemp, d.envTemp, d.outLetTemp);
+    else if (cmd.equalsIgnoreCase("get_fan_speed")) cmd_printf("Fan Speed: %d\n", d.fanValue);
+    else if (cmd.equalsIgnoreCase("get_mode")) cmd_printf("Mode: %d, SubMode: %d\n", d.mode, d.subMode);
+    else if (cmd.equalsIgnoreCase("get_power")) cmd_printf("Power: Bat=%dW, MPPT=%dW, PSDR=%dW\n", d.batPwrWatt, d.mpptPwrWatt, d.psdrPwrWatt);
+    else if (cmd.equalsIgnoreCase("get_battery")) cmd_printf("Batt: %d%% (Stat: %d), Rem: %dm\n", d.batSoc, d.batChgStatus, d.remainingTime);
+    else if (cmd.equalsIgnoreCase("get_power_state")) cmd_printf("Power State: %d\n", d.powerMode);
+    else cmd_println("Unknown get command for Wave 2");
 }
 
 void CmdUtils::handleDelta3Read(String cmd) {
@@ -331,11 +381,11 @@ void CmdUtils::handleDelta3Read(String cmd) {
     if (!d3) return;
     const Delta3Data& d = d3->getData().delta3;
 
-    if (cmd.equalsIgnoreCase("d3_get_switches")) Serial.printf("AC: %d, DC: %d, USB: %d\n", d.acOn, d.dcOn, d.usbOn);
-    else if (cmd.equalsIgnoreCase("d3_get_power")) Serial.printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC Out: %.1fW, Solar: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acOutputPower, d.solarInputPower);
-    else if (cmd.equalsIgnoreCase("d3_get_battery")) Serial.printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
-    else if (cmd.equalsIgnoreCase("d3_get_settings")) Serial.printf("AC Limit: %dW\n", d.acChargingSpeed);
-    else Serial.println("Unknown get command for Delta 3");
+    if (cmd.equalsIgnoreCase("d3_get_switches")) cmd_printf("AC: %d, DC: %d, USB: %d\n", d.acOn, d.dcOn, d.usbOn);
+    else if (cmd.equalsIgnoreCase("d3_get_power")) cmd_printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC Out: %.1fW, Solar: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acOutputPower, d.solarInputPower);
+    else if (cmd.equalsIgnoreCase("d3_get_battery")) cmd_printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
+    else if (cmd.equalsIgnoreCase("d3_get_settings")) cmd_printf("AC Limit: %dW\n", d.acChargingSpeed);
+    else cmd_println("Unknown get command for Delta 3");
 }
 
 void CmdUtils::handleDeltaPro3Read(String cmd) {
@@ -343,11 +393,11 @@ void CmdUtils::handleDeltaPro3Read(String cmd) {
     if (!d3p) return;
     const DeltaPro3Data& d = d3p->getData().deltaPro3;
 
-    if (cmd.equalsIgnoreCase("d3p_get_switches")) Serial.printf("AC LV: %d, AC HV: %d, DC: %d\n", d.acLvPort, d.acHvPort, d.dc12vPort);
-    else if (cmd.equalsIgnoreCase("d3p_get_power")) Serial.printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC LV: %.1fW, AC HV: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acLvOutputPower, d.acHvOutputPower);
-    else if (cmd.equalsIgnoreCase("d3p_get_battery")) Serial.printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
-    else if (cmd.equalsIgnoreCase("d3p_get_energy_backup")) Serial.printf("Enabled: %d, Level: %d%%\n", d.energyBackup, d.energyBackupBatteryLevel);
-    else Serial.println("Unknown get command for Delta Pro 3");
+    if (cmd.equalsIgnoreCase("d3p_get_switches")) cmd_printf("AC LV: %d, AC HV: %d, DC: %d\n", d.acLvPort, d.acHvPort, d.dc12vPort);
+    else if (cmd.equalsIgnoreCase("d3p_get_power")) cmd_printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC LV: %.1fW, AC HV: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acLvOutputPower, d.acHvOutputPower);
+    else if (cmd.equalsIgnoreCase("d3p_get_battery")) cmd_printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
+    else if (cmd.equalsIgnoreCase("d3p_get_energy_backup")) cmd_printf("Enabled: %d, Level: %d%%\n", d.energyBackup, d.energyBackupBatteryLevel);
+    else cmd_println("Unknown get command for Delta Pro 3");
 }
 
 void CmdUtils::handleAltChargerRead(String cmd) {
@@ -355,8 +405,8 @@ void CmdUtils::handleAltChargerRead(String cmd) {
     if (!ac) return;
     const AlternatorChargerData& d = ac->getData().alternatorCharger;
 
-    if (cmd.equalsIgnoreCase("ac_get_status")) Serial.printf("Open: %d, Mode: %d\n", d.chargerOpen, d.chargerMode);
-    else if (cmd.equalsIgnoreCase("ac_get_power")) Serial.printf("DC Power: %.1fW, Limit: %dW\n", d.dcPower, d.powerLimit);
-    else if (cmd.equalsIgnoreCase("ac_get_battery")) Serial.printf("Dev Batt: %.1f%%, Car Batt: %.2fV\n", d.batteryLevel, d.carBatteryVoltage);
-    else Serial.println("Unknown get command for Alternator Charger");
+    if (cmd.equalsIgnoreCase("ac_get_status")) cmd_printf("Open: %d, Mode: %d\n", d.chargerOpen, d.chargerMode);
+    else if (cmd.equalsIgnoreCase("ac_get_power")) cmd_printf("DC Power: %.1fW, Limit: %dW\n", d.dcPower, d.powerLimit);
+    else if (cmd.equalsIgnoreCase("ac_get_battery")) cmd_printf("Dev Batt: %.1f%%, Car Batt: %.2fV\n", d.batteryLevel, d.carBatteryVoltage);
+    else cmd_println("Unknown get command for Alternator Charger");
 }

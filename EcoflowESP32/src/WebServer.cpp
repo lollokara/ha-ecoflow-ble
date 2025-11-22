@@ -6,6 +6,44 @@
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
 
+// Helper to read internal temperature safely
+// We duplicate this from CmdUtils because it's static there.
+// A better approach would be to expose it in CmdUtils.h, but for now copy-paste is safer than refactoring header dependencies.
+#include <esp_idf_version.h>
+#if CONFIG_IDF_TARGET_ESP32S3
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <driver/temperature_sensor.h>
+#else
+#include <driver/temp_sensor.h>
+#endif
+#endif
+
+static float get_esp_temp() {
+#if CONFIG_IDF_TARGET_ESP32S3
+    float tsens_out = 0.0f;
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        temperature_sensor_handle_t temp_handle = NULL;
+        temperature_sensor_config_t temp_sensor = { .range_min = 10, .range_max = 85 };
+        if (temperature_sensor_install(&temp_sensor, &temp_handle) == ESP_OK) {
+            temperature_sensor_enable(temp_handle);
+            temperature_sensor_get_celsius(temp_handle, &tsens_out);
+            temperature_sensor_disable(temp_handle);
+            temperature_sensor_uninstall(temp_handle);
+        }
+    #else
+        temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
+        temp_sensor.dac_offset = TSENS_DAC_L2;
+        temp_sensor_set_config(temp_sensor);
+        temp_sensor_start();
+        temp_sensor_read_celsius(&tsens_out);
+        temp_sensor_stop();
+    #endif
+    return tsens_out;
+#else
+    return 0.0f;
+#endif
+}
+
 void WebServer::begin() {
     Preferences prefs;
     prefs.begin("ecoflow", true);
@@ -17,7 +55,6 @@ void WebServer::begin() {
         WiFi.mode(WIFI_STA);
         WiFi.begin(ssid.c_str(), pass.c_str());
         ESP_LOGI(TAG, "Connecting to WiFi: %s", ssid.c_str());
-        // We don't block here, let it connect in background
     } else {
         ESP_LOGW(TAG, "No WiFi credentials saved. Web UI disabled.");
         return;
@@ -28,7 +65,6 @@ void WebServer::begin() {
 }
 
 void WebServer::setupRoutes() {
-    // Serve the Single Page Application (gzipped/minified via raw literal)
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send_P(200, "text/html", WEB_APP_HTML);
     });
@@ -38,17 +74,18 @@ void WebServer::setupRoutes() {
     server.on("/api/connect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleConnect);
     server.on("/api/disconnect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleDisconnect);
 
+    server.on("/api/history", HTTP_GET, handleHistory); // New history endpoint
+
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
-    // Build JSON response
-    // We use DynamicJsonDocument if size is unpredictable, but here we have fixed devices.
-    // To avoid fragmentation, let's estimate size. 4 devices * ~200 bytes = 800 bytes.
-    // Plus overhead. 2KB is safe.
     DynamicJsonDocument doc(4096);
+
+    // Global System Data
+    doc["esp_temp"] = get_esp_temp();
 
     auto fillCommon = [](JsonObject& obj, DeviceSlot* slot, EcoflowESP32* dev) {
         obj["connected"] = slot->isConnected;
@@ -73,6 +110,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             obj["cfg_ac_lim"] = d->getAcChgLimit();
             obj["cfg_max"] = d->getMaxChgSoc();
             obj["cfg_min"] = d->getMinDsgSoc();
+            obj["cell_temp"] = d->getCellTemperature(); // New
         }
     }
 
@@ -87,11 +125,10 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             obj["amb_temp"] = (int)data.envTemp;
             obj["out_temp"] = (int)data.outLetTemp;
             obj["set_temp"] = (int)data.setTemp;
-            obj["mode"] = (int)data.mode; // 0=Cool, 1=Heat, 2=Fan
-            obj["fan"] = (int)data.fanValue; // 0=Low, 1=Med, 2=High
+            obj["mode"] = (int)data.mode;
+            obj["fan"] = (int)data.fanValue;
             obj["pwr"] = (data.powerMode != 0);
-            obj["drain"] = (data.wteFthEn != 0); // Mapping autoDrain to wteFthEn based on offset
-            // obj["light"] = (data.rgbState != 0); // RGB state not clearly mapped in struct yet?
+            obj["drain"] = (data.wteFthEn != 0);
         }
     }
 
@@ -102,7 +139,12 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         JsonObject obj = doc.createNestedObject("d3p");
         fillCommon(obj, s, d);
         if (s->isConnected) {
-             // Add specific fields if needed
+             const auto& data = d->getData().deltaPro3;
+             obj["ac_hv_on"] = data.acHvPort;
+             obj["ac_lv_on"] = data.acLvPort;
+             obj["backup_en"] = data.energyBackup;
+             obj["backup_lvl"] = data.energyBackupBatteryLevel;
+             obj["cell_temp"] = data.cellTemperature; // New
         }
     }
 
@@ -113,13 +155,31 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         JsonObject obj = doc.createNestedObject("ac");
         fillCommon(obj, s, d);
         if (s->isConnected) {
-             // Add specific fields if needed
+             const auto& data = d->getData().alternatorCharger;
+             obj["chg_open"] = data.chargerOpen;
+             obj["mode"] = data.chargerMode;
+             obj["pow_lim"] = data.powerLimit;
+             obj["car_volt"] = data.carBatteryVoltage; // Read-only status
         }
     }
 
     String json;
     serializeJson(doc, json);
     request->send(200, "application/json", json);
+}
+
+void WebServer::handleHistory(AsyncWebServerRequest *request) {
+    if (request->hasParam("type") && request->getParam("type")->value() == "w2") {
+        std::vector<int> hist = DeviceManager::getInstance().getWave2TempHistory();
+        DynamicJsonDocument doc(2048);
+        JsonArray arr = doc.to<JsonArray>();
+        for(int t : hist) arr.add(t);
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    } else {
+        request->send(400, "text/plain", "Invalid Type");
+    }
 }
 
 void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -148,7 +208,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
         else if (cmd == "set_usb") success = dev->setUSB(doc["val"]);
         else if (cmd == "set_ac_lim") success = dev->setAcChargingLimit(doc["val"]);
-        else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1); // -1 ignores min
+        else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
         else success = false;
     }
     // --- Wave 2 Controls ---
@@ -158,18 +218,21 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_mode") dev->setMainMode((uint8_t)(int)doc["val"]);
         else if (cmd == "set_fan") dev->setFanSpeed((uint8_t)(int)doc["val"]);
         else if (cmd == "set_drain") dev->setAutomaticDrain(doc["val"] ? 1 : 0);
-        else if (cmd == "set_light") dev->setAmbientLight(doc["val"] ? 1 : 0); // Assuming 1=on/max
         else success = false;
     }
     // --- Delta Pro 3 Controls ---
     else if (type == DeviceType::DELTA_PRO_3) {
-        // TODO: Map specific D3P commands if different
-        if (cmd == "set_ac") success = dev->setAC(doc["val"]);
+        if (cmd == "set_ac_hv") success = dev->setAcHvPort(doc["val"]);
+        else if (cmd == "set_ac_lv") success = dev->setAcLvPort(doc["val"]);
+        else if (cmd == "set_backup_en") success = dev->setEnergyBackup(doc["val"]);
+        else if (cmd == "set_backup_level") success = dev->setEnergyBackupLevel(doc["val"]);
         else success = false;
     }
     // --- Alt Charger Controls ---
     else if (type == DeviceType::ALTERNATOR_CHARGER) {
         if (cmd == "set_limit") success = dev->setPowerLimit((int)doc["val"]);
+        else if (cmd == "set_open") success = dev->setChargerOpen(doc["val"]);
+        else if (cmd == "set_mode") success = dev->setChargerMode((int)doc["val"]);
         else success = false;
     }
 
@@ -177,16 +240,15 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     else request->send(400, "text/plain", "Invalid Command or Value");
 }
 
+// ... (Other handlers: handleConnect, handleDisconnect, handleLogs, handleLogConfig, handleRawCommand remain same)
 void WebServer::handleConnect(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     StaticJsonDocument<200> doc;
     deserializeJson(doc, data, len);
     String typeStr = doc["type"];
-
     DeviceType type = DeviceType::DELTA_3;
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
-
     DeviceManager::getInstance().scanAndConnect(type);
     request->send(200, "text/plain", "Scanning...");
 }
@@ -195,21 +257,17 @@ void WebServer::handleDisconnect(AsyncWebServerRequest *request, uint8_t *data, 
     StaticJsonDocument<200> doc;
     deserializeJson(doc, data, len);
     String typeStr = doc["type"];
-
     DeviceType type = DeviceType::DELTA_3;
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
-
     DeviceManager::getInstance().disconnect(type);
     request->send(200, "text/plain", "Disconnected");
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
-    // Return buffered logs as JSON
     DynamicJsonDocument doc(4096);
     JsonArray arr = doc.to<JsonArray>();
-
     std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs();
     for (const auto& log : logs) {
         JsonObject obj = arr.createNestedObject();
@@ -218,7 +276,6 @@ void WebServer::handleLogs(AsyncWebServerRequest *request) {
         obj["tag"] = log.tag;
         obj["msg"] = log.message;
     }
-
     String json;
     serializeJson(doc, json);
     request->send(200, "application/json", json);
@@ -227,30 +284,24 @@ void WebServer::handleLogs(AsyncWebServerRequest *request) {
 void WebServer::handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     StaticJsonDocument<200> doc;
     deserializeJson(doc, data, len);
-
     if (doc.containsKey("enable")) {
         LogBuffer::getInstance().setLoggingEnabled(doc["enable"]);
     }
-
     if (doc.containsKey("level")) {
-        // Check if specific tag is provided
         String tag = doc.containsKey("tag") ? doc["tag"].as<String>() : "";
         esp_log_level_t lvl = (esp_log_level_t)(int)doc["level"];
-
         if (tag.length() > 0) {
             LogBuffer::getInstance().setTagLevel(tag, lvl);
         } else {
             LogBuffer::getInstance().setGlobalLevel(lvl);
         }
     }
-
     request->send(200, "text/plain", "OK");
 }
 
 void WebServer::handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     StaticJsonDocument<200> doc;
     deserializeJson(doc, data, len);
-
     if (doc.containsKey("cmd")) {
         String cmd = doc["cmd"];
         if (cmd.length() > 0) {
