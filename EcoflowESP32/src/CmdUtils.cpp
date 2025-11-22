@@ -1,7 +1,55 @@
 #include "CmdUtils.h"
 #include <esp_log.h>
+#include <esp_idf_version.h>
+
+#if CONFIG_IDF_TARGET_ESP32S3
+// Check IDF version for correct header
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <driver/temperature_sensor.h>
+#else
+#include <driver/temp_sensor.h>
+#endif
+#endif
 
 static const char* TAG = "CmdUtils";
+
+// Helper to read internal temperature safely
+static float readInternalTemp() {
+#if CONFIG_IDF_TARGET_ESP32S3
+    float tsens_out = 0.0f;
+
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        // New API (IDF v5+)
+        temperature_sensor_handle_t temp_handle = NULL;
+        temperature_sensor_config_t temp_sensor = {
+            .range_min = 10,
+            .range_max = 85,
+        };
+        if (temperature_sensor_install(&temp_sensor, &temp_handle) == ESP_OK) {
+            temperature_sensor_enable(temp_handle);
+            temperature_sensor_get_celsius(temp_handle, &tsens_out);
+            temperature_sensor_disable(temp_handle);
+            temperature_sensor_uninstall(temp_handle);
+        } else {
+            return -999.0f; // Error
+        }
+    #else
+        // Legacy API (IDF v4.4)
+        temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
+        temp_sensor.dac_offset = TSENS_DAC_L2; // Set range
+        temp_sensor_set_config(temp_sensor);
+        temp_sensor_start();
+        if (temp_sensor_read_celsius(&tsens_out) != ESP_OK) {
+            return -999.0f;
+        }
+        temp_sensor_stop();
+    #endif
+
+    return tsens_out;
+#else
+    return -1.0f; // Not supported on this chip
+#endif
+}
 
 void CmdUtils::processInput(String input) {
     input.trim();
@@ -13,6 +61,12 @@ void CmdUtils::processInput(String input) {
 
     if (cmd.equalsIgnoreCase("help") || cmd.equalsIgnoreCase("-h")) {
         printHelp();
+        return;
+    }
+
+    // System diagnostics
+    if (cmd.startsWith("sys_")) {
+        handleSysCommand(cmd);
         return;
     }
 
@@ -43,6 +97,9 @@ void CmdUtils::processInput(String input) {
 
 void CmdUtils::printHelp() {
     Serial.println("=== Available Commands ===");
+
+    Serial.println("\n[System]");
+    Serial.println("  sys_temp                        (Read internal ESP32 temp)");
 
     Serial.println("\n[Wave 2] (get_ or set_)");
     Serial.println("  get_temp / set_temperature <val>");
@@ -83,6 +140,18 @@ uint8_t CmdUtils::parseHexByte(String s) {
 
 float CmdUtils::parseFloat(String s) {
     return s.toFloat();
+}
+
+// --- System Handler ---
+
+void CmdUtils::handleSysCommand(String cmd) {
+    if (cmd.equalsIgnoreCase("sys_temp")) {
+        float t = readInternalTemp();
+        if (t > -900) Serial.printf("Internal Temp: %.2f C\n", t);
+        else Serial.println("Failed to read internal temp (or not supported).");
+    } else {
+        Serial.println("Unknown sys command.");
+    }
 }
 
 // --- Write Handlers ---

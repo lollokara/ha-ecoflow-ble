@@ -24,6 +24,9 @@ private:
     static void handleDeltaPro3Read(String cmd);
     static void handleAltChargerRead(String cmd);
 
+    // System Commands
+    static void handleSysCommand(String cmd);
+
     static float parseFloat(String s);
 };
 
