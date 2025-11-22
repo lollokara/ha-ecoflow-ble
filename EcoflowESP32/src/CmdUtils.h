@@ -26,6 +26,7 @@ private:
 
     // System Commands
     static void handleSysCommand(String cmd);
+    static void handleConCommand(String cmd, String args);
 
     static float parseFloat(String s);
 };

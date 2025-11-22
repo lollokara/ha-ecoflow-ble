@@ -156,6 +156,49 @@ bool DeviceManager::isAnyConnecting() {
     return d3.isConnecting() || w2.isConnecting() || d3p.isConnecting() || ac.isConnecting();
 }
 
+//--------------------------------------------------------------------------
+//--- Management Commands
+//--------------------------------------------------------------------------
+
+void DeviceManager::printStatus() {
+    Serial.println("=== Device Connection Status ===");
+
+    auto printSlot = [](DeviceSlot& slot) {
+        Serial.printf("[%s] %s (%s): %s\n",
+            slot.name.c_str(),
+            slot.isConnected ? "CONNECTED" : "DISCONNECTED",
+            slot.macAddress.empty() ? "Unpaired" : slot.macAddress.c_str(),
+            slot.serialNumber.c_str()
+        );
+    };
+
+    printSlot(slotD3);
+    printSlot(slotW2);
+    printSlot(slotD3P);
+    printSlot(slotAC);
+}
+
+void DeviceManager::forget(DeviceType type) {
+    disconnect(type);
+    // disconnect already clears prefs and slot info
+    Serial.println("Device forgotten.");
+}
+
+String DeviceManager::getDeviceStatusJson() {
+    // Simple JSON construction manually to avoid big dependency overhead if not needed,
+    // but since we added ArduinoJson, let's use it?
+    // Actually manual string building is often faster/smaller for simple fixed structures.
+    // Let's use string building for now.
+
+    String json = "{";
+    json += "\"d3\":{\"connected\":" + String(slotD3.isConnected) + ", \"sn\":\"" + String(slotD3.serialNumber.c_str()) + "\", \"batt\":" + String(d3.getBatteryLevel()) + "},";
+    json += "\"w2\":{\"connected\":" + String(slotW2.isConnected) + ", \"sn\":\"" + String(slotW2.serialNumber.c_str()) + "\", \"batt\":" + String(w2.getBatteryLevel()) + "},";
+    json += "\"d3p\":{\"connected\":" + String(slotD3P.isConnected) + ", \"sn\":\"" + String(slotD3P.serialNumber.c_str()) + "\", \"batt\":" + String((int)d3p.getData().deltaPro3.batteryLevel) + "},";
+    json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String((int)ac.getData().alternatorCharger.batteryLevel) + "}";
+    json += "}";
+    return json;
+}
+
 
 //--------------------------------------------------------------------------
 //--- Private Helper Methods

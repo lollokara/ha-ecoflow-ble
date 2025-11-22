@@ -70,6 +70,12 @@ void CmdUtils::processInput(String input) {
         return;
     }
 
+    // Connection Manager
+    if (cmd.startsWith("con_") || cmd.startsWith("wifi_")) {
+        handleConCommand(cmd, args);
+        return;
+    }
+
     // Try handling based on prefix or known commands
     if (cmd.startsWith("set_")) {
         // Wave 2 commands
@@ -98,8 +104,14 @@ void CmdUtils::processInput(String input) {
 void CmdUtils::printHelp() {
     Serial.println("=== Available Commands ===");
 
-    Serial.println("\n[System]");
+    Serial.println("\n[System & Connection]");
     Serial.println("  sys_temp                        (Read internal ESP32 temp)");
+    Serial.println("  sys_reset                       (Factory reset & reboot)");
+    Serial.println("  con_status                      (List connections)");
+    Serial.println("  con_connect <d3/w2/d3p/ac>      (Connect)");
+    Serial.println("  con_disconnect <d3/w2/d3p/ac>   (Disconnect)");
+    Serial.println("  con_forget <d3/w2/d3p/ac>       (Forget)");
+    Serial.println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
 
     Serial.println("\n[Wave 2] (get_ or set_)");
     Serial.println("  get_temp / set_temperature <val>");
@@ -149,9 +161,56 @@ void CmdUtils::handleSysCommand(String cmd) {
         float t = readInternalTemp();
         if (t > -900) Serial.printf("Internal Temp: %.2f C\n", t);
         else Serial.println("Failed to read internal temp (or not supported).");
+    } else if (cmd.equalsIgnoreCase("sys_reset")) {
+        Serial.println("Resetting settings and rebooting...");
+        Preferences prefs;
+        prefs.begin("ecoflow", false);
+        prefs.clear();
+        prefs.end();
+        ESP.restart();
     } else {
         Serial.println("Unknown sys command.");
     }
+}
+
+void CmdUtils::handleConCommand(String cmd, String args) {
+    DeviceManager& dm = DeviceManager::getInstance();
+
+    if (cmd.equalsIgnoreCase("con_status")) {
+        dm.printStatus();
+        return;
+    }
+
+    if (cmd.equalsIgnoreCase("wifi_set")) {
+        int space = args.indexOf(' ');
+        if (space == -1) { Serial.println("Usage: wifi_set <ssid> <pass>"); return; }
+        String ssid = args.substring(0, space);
+        String pass = args.substring(space+1);
+
+        Preferences prefs;
+        prefs.begin("ecoflow", false);
+        prefs.putString("wifi_ssid", ssid);
+        prefs.putString("wifi_pass", pass);
+        prefs.end();
+        Serial.println("WiFi credentials saved. Reboot to connect.");
+        return;
+    }
+
+    DeviceType type;
+    args.trim();
+    if (args.equalsIgnoreCase("d3")) type = DeviceType::DELTA_3;
+    else if (args.equalsIgnoreCase("w2")) type = DeviceType::WAVE_2;
+    else if (args.equalsIgnoreCase("d3p")) type = DeviceType::DELTA_PRO_3;
+    else if (args.equalsIgnoreCase("ac") || args.equalsIgnoreCase("chg")) type = DeviceType::ALTERNATOR_CHARGER;
+    else {
+        Serial.println("Invalid device type. Use d3, w2, d3p, or ac.");
+        return;
+    }
+
+    if (cmd.equalsIgnoreCase("con_connect")) dm.scanAndConnect(type);
+    else if (cmd.equalsIgnoreCase("con_disconnect")) dm.disconnect(type);
+    else if (cmd.equalsIgnoreCase("con_forget")) dm.forget(type);
+    else Serial.println("Unknown connection command.");
 }
 
 // --- Write Handlers ---

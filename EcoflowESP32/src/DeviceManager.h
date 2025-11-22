@@ -96,6 +96,11 @@ public:
       */
     bool isAnyConnecting();
 
+    // --- Management Commands ---
+    void printStatus();
+    void forget(DeviceType type);
+    String getDeviceStatusJson();
+
 private:
     DeviceManager();
 

@@ -15,6 +15,7 @@
 #include "Display.h"
 #include "DeviceManager.h"
 #include "CmdUtils.h"
+#include "WebServer.h"
 
 // Define GPIO pins for the buttons
 #define BTN_UP_PIN    4
@@ -130,6 +131,8 @@ void setup() {
     pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
     pinMode(BTN_ENTER_PIN, INPUT_PULLUP);
     DeviceManager::getInstance().initialize();
+
+    WebServer::begin();
 }
 
 /**
