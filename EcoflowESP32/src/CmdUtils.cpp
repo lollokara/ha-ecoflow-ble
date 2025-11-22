@@ -1,6 +1,7 @@
 #include "CmdUtils.h"
 #include <esp_log.h>
 #include <esp_idf_version.h>
+#include <WiFi.h>
 
 #if CONFIG_IDF_TARGET_ESP32S3
 // Check IDF version for correct header
@@ -101,6 +102,7 @@ void CmdUtils::processInput(String input) {
     }
 }
 
+
 void CmdUtils::printHelp() {
     Serial.println("=== Available Commands ===");
 
@@ -112,6 +114,7 @@ void CmdUtils::printHelp() {
     Serial.println("  con_disconnect <d3/w2/d3p/ac>   (Disconnect)");
     Serial.println("  con_forget <d3/w2/d3p/ac>       (Forget)");
     Serial.println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
+    Serial.println("  wifi_ip                         (Get current IP)");
 
     Serial.println("\n[Wave 2] (get_ or set_)");
     Serial.println("  get_temp / set_temperature <val>");
@@ -181,20 +184,57 @@ void CmdUtils::handleConCommand(String cmd, String args) {
         return;
     }
 
-    if (cmd.equalsIgnoreCase("wifi_set")) {
-        int space = args.indexOf(' ');
-        if (space == -1) { Serial.println("Usage: wifi_set <ssid> <pass>"); return; }
-        String ssid = args.substring(0, space);
-        String pass = args.substring(space+1);
+if (cmd.equalsIgnoreCase("wifi_ip")) {
+    if (WiFi.status() == WL_CONNECTED) {
+        IPAddress ip = WiFi.localIP();
+        Serial.print("Current IP address: ");
+        Serial.println(ip);
+    } else {
+        Serial.println("WiFi not connected.");
+    }
+    return;
+}
 
-        Preferences prefs;
-        prefs.begin("ecoflow", false);
-        prefs.putString("wifi_ssid", ssid);
-        prefs.putString("wifi_pass", pass);
-        prefs.end();
-        Serial.println("WiFi credentials saved. Reboot to connect.");
+if (cmd.equalsIgnoreCase("wifi_set")) {
+    // Trim whitespace from the start
+    args.trim();
+    // Find first quote for SSID
+    int firstQuote = args.indexOf('"');
+    if (firstQuote == -1) {
+        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
         return;
     }
+    // Find closing quote for SSID
+    int secondQuote = args.indexOf('"', firstQuote + 1);
+    if (secondQuote == -1) {
+        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
+        return;
+    }
+    String ssid = args.substring(firstQuote + 1, secondQuote);
+    // Find first quote for password (after ssid)
+    int thirdQuote = args.indexOf('"', secondQuote + 1);
+    if (thirdQuote == -1) {
+        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
+        return;
+    }
+    int fourthQuote = args.indexOf('"', thirdQuote + 1);
+    if (fourthQuote == -1) {
+        Serial.println("Usage: wifi_set \"<ssid>\" \"<pass>\"");
+        return;
+    }
+    String pass = args.substring(thirdQuote + 1, fourthQuote);
+    Serial.print("Saved SSID: ");
+    Serial.print(ssid);
+    Serial.print("  Password: ");
+    Serial.println(pass);
+    Preferences prefs;
+    prefs.begin("ecoflow", false);
+    prefs.putString("wifi_ssid", ssid);
+    prefs.putString("wifi_pass", pass);
+    prefs.end();
+    Serial.println("WiFi credentials saved. Reboot to connect.");
+    return;
+}
 
     DeviceType type;
     args.trim();
