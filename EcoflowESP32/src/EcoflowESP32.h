@@ -224,6 +224,7 @@ private:
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
+    uint8_t _getDeviceDest();
     void _sendConfigPacket(const mr521_ConfigWrite& config);
     void _sendConfigPacket(const dc009_apl_comm_ConfigWrite& config);
 

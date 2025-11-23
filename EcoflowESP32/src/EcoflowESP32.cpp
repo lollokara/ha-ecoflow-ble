@@ -227,9 +227,52 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
         // --- Process Incoming Notifications ---
         BleNotification* notification;
         if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
-            std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
-            for (auto &packet : packets) {
-                self->_handlePacket(&packet);
+            self->_lastAuthActivity = millis();
+            if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+                auto parsed_payload = EncPacket::parseSimple(notification->data, notification->length);
+                if (!parsed_payload.empty() && parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) {
+                    uint8_t peer_pub_key[41];
+                    peer_pub_key[0] = 0x04; // Add the 0x04 prefix for mbedtls
+                    memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
+                    if (self->_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+                        self->_state = ConnectionState::REQUESTING_SESSION_KEY;
+                        ESP_LOGD(TAG, "Shared secret computed, requesting session key");
+                        std::vector<uint8_t> req_payload = {0x02};
+                        EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+                        self->_sendCommand(enc_packet.toBytes());
+                    } else {
+                        ESP_LOGE(TAG, "Failed to compute shared secret");
+                        self->_pClient->disconnect();
+                    }
+                }
+            } else if (self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+                auto parsed_payload = EncPacket::parseSimple(notification->data, notification->length);
+                if (!parsed_payload.empty() && parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
+                    std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
+                    self->_crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
+
+                    if (!decrypted_payload.empty()) {
+                        uint8_t padding = decrypted_payload.back();
+                        if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                            decrypted_payload.resize(decrypted_payload.size() - padding);
+                        }
+                    }
+
+                    if (decrypted_payload.size() >= 18) {
+                        self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
+                        self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
+                        ESP_LOGD(TAG, "Session key generated, requesting auth status");
+                        uint8_t dest = self->_getDeviceDest();
+                        Packet auth_status_pkt(0x21, dest, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, self->_txSeq++, 0x0d);
+                        EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
+                        self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
+                    }
+                }
+            } else {
+                 std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
+                for (auto &packet : packets) {
+                    self->_handlePacket(&packet);
+                }
             }
             delete[] notification->data;
             delete notification;
@@ -266,21 +309,27 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
 
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
-    _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
-    _txSeq = 0;
+    _txSeq = esp_random();
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
         return;
     }
 
     std::vector<uint8_t> payload;
-    payload.push_back(0x01);
-    payload.push_back(0x00);
+    payload.push_back(0x01); // Handshake type: Public Key
+    payload.push_back(0x00); // Reserved
     uint8_t* pub_key = _crypto.get_public_key();
     payload.insert(payload.end(), pub_key, pub_key + _crypto.get_public_key_len());
 
+    ESP_LOGD(TAG, "Initiating handshake: Sending public key...");
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
-    _sendCommand(enc_packet.toBytes());
+    if (_sendCommand(enc_packet.toBytes())) {
+        _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
+        _lastAuthActivity = millis();
+    } else {
+        ESP_LOGE(TAG, "Failed to send public key packet.");
+        _pClient->disconnect();
+    }
 }
 
 /**
@@ -291,67 +340,10 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data);
         // Reply to packets that require it to keep the data flowing
-        // We must FILTER out Command Acks to prevent infinite loops when we send commands via Web UI.
         if (pkt->getDest() == 0x21) {
-             bool shouldReply = true;
-             // Filter V3 Config Write Acks (used by Delta 3, D3P, AltChg controls)
-             // 0xFE, 0x11 is standard data push. But ACK for config writes is also 0xFE/0x11 sometimes?
-             // Wait, standard data push IS 0xFE, 0x11. We SHOULD reply to data push.
-             // But ConfigWrite (write) uses 0xFE/0x11 too? No, usually ConfigWrite is 0x20/0x02?
-             // Check _sendConfigPacket: it sends 0xFE, 0x11.
-             // So data push AND config write use same opcode? That's confusing.
-             // The device echoes the write packet back as ACK?
-             // If so, the payload size might distinguish it, OR we just reply to everything.
-             // BUT if we reply to the ACK, and device ACKs our reply... infinite loop.
-
-             // Let's filter by source too.
-             // If we get a packet, we reply.
-             // If the packet was an ECHO of what we sent (CmdSet=0xFE, CmdId=0x11), we must be careful.
-             // A pure ConfigWrite ACK usually has a smaller payload or specific content.
-             // Standard data push (unsolicited) is large.
-             // Let's rely on "Only reply if payload > X" or "Only reply if it's not a command ACK".
-
-             // Actually, for Delta 3, the device sends 0xFE, 0x11 periodically. We must reply to keep getting them.
-             // But when we send a config, we send 0xFE, 0x11. The device might echo it.
-             // If we reply to the echo, does it matter?
-             // Loop happens if: Device sends P -> We send ACK -> Device sends P (response to ACK?).
-             // V3 protocol usually doesn't require ACK for ACK.
-
-             // For Wave 2 (V2): 0x50 is data. 0x51-0x5E are controls.
-             // Controls (sets) get an ACK. We should NOT reply to the ACK.
-             if (pkt->getCmdSet() == 0x42 && pkt->getCmdId() != 0x50) shouldReply = false;
-
-             // For Delta 3 (V3):
-             // If we send a config, we are the source. We don't receive it back unless it's an echo.
-             // If we receive a packet where dest is US (0x20/0x21), we reply.
-             // The problem is "command sent over and over".
-             // This implies WE are sending the command repeatedly.
-             // This happens if the logic in the backend triggers a send.
-             // The only place we send commands is `setXXX` or `_handlePacket` (reply).
-             // If we are caught in a reply loop, we might be flooding the channel.
-
-             // Refined logic: Only reply to KNOWN data push opcodes that require keep-alive.
-             // Wave 2: 0x42, 0x50 (Data).
-             // Delta 3: 0xFE, 0x11 (Data).
-             // Anything else? 0x01 (Ping)?
-
-             if (pkt->getCmdSet() == 0xFE && pkt->getCmdId() == 0x11) {
-                 // Delta 3 Data. We should reply.
-                 shouldReply = true;
-             } else if (pkt->getCmdSet() == 0x42 && pkt->getCmdId() == 0x50) {
-                 // Wave 2 Data. We should reply.
-                 shouldReply = true;
-             } else {
-                 // Everything else (ACKs, other notifications), do NOT reply.
-                 // This breaks the loop.
-                 shouldReply = false;
-             }
-
-             if (shouldReply) {
-                Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
-                EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
-                _sendCommand(enc_reply.toBytes(&_crypto));
-             }
+            Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
+            EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
+            _sendCommand(enc_reply.toBytes(&_crypto));
         }
     } else {
         _handleAuthPacket(pkt);
@@ -396,7 +388,8 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             for(int i=0; i<16; i++) sprintf(&hex_data[i*2], "%02X", md5_data[i]);
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
+            uint8_t dest = _getDeviceDest();
+            Packet auth_pkt(0x21, dest, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
@@ -408,6 +401,10 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             ESP_LOGE(TAG, "Authentication failed!");
         }
     }
+}
+
+uint8_t EcoflowESP32::_getDeviceDest() {
+    return (_protocolVersion == 2) ? 0x42 : 0x02;
 }
 
 //--------------------------------------------------------------------------
@@ -473,7 +470,6 @@ int EcoflowESP32::getDcOutputPower() {
 }
 int EcoflowESP32::getCellTemperature() {
     if (_protocolVersion == 2) return (int)_data.wave2.outLetTemp;
-    if (_deviceSn.rfind("MR51", 0) == 0) return _data.deltaPro3.cellTemperature;
     return _data.delta3.cellTemperature;
 }
 int EcoflowESP32::getAmbientTemperature() {
@@ -760,15 +756,6 @@ void EcoflowESP32::setTempUnit(uint8_t unit) {
 }
 
 bool EcoflowESP32::setDC(bool on) {
-    // D3P uses MR521 protocol
-    if (_deviceSn.rfind("MR51", 0) == 0) {
-        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
-        config.has_cfg_dc_12v_out_open = true;
-        config.cfg_dc_12v_out_open = on;
-        _sendConfigPacket(config);
-        return true;
-    }
-
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;
     config.cfg_dc_12v_out_open = on;
@@ -798,23 +785,6 @@ bool EcoflowESP32::setAcChargingLimit(int watts) {
 }
 
 bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
-    if (_deviceSn.rfind("MR51", 0) == 0) {
-        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
-        if (maxChg >= 50 && maxChg <= 100) {
-            config.has_cfg_max_chg_soc = true;
-            config.cfg_max_chg_soc = maxChg;
-        }
-        // If 101 is passed, we ignore maxChg updates (allows setting only min)
-        // But here we check range 50-100, so 101 is inherently ignored.
-
-        if (minDsg >= 0 && minDsg <= 30) {
-            config.has_cfg_min_dsg_soc = true;
-            config.cfg_min_dsg_soc = minDsg;
-        }
-        _sendConfigPacket(config);
-        return true;
-    }
-
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     if (maxChg >= 50 && maxChg <= 100) {
         config.has_cfg_max_chg_soc = true;
