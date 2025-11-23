@@ -374,9 +374,11 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
         _crypto.generate_session_key(decrypted_payload.data() + 16,
                                      decrypted_payload.data());
         _state = ConnectionState::REQUESTING_AUTH_STATUS;
-        // Auth status packet always uses version 3 and sequence 0
+        // Auth status packet uses device protocol version (2 or 3) and sequence 0
+        // Use version 3 for V3/V19 devices, version 2 for V2 devices
+        uint8_t auth_version = (_protocolVersion == 2) ? 2 : 3;
         Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
-                               3, 0, 0x0d);
+                               auth_version, 0, 0x0d);
         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
                                   EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                   auth_status_pkt.toBytes());
@@ -470,8 +472,9 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             for(int i=0; i<16; i++) sprintf(&hex_data[i*2], "%02X", md5_data[i]);
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-            // Authentication packets always use dest 0x35, version 3, and sequence 0
-            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 3, 0, 0x0d);
+            // Authentication packets always use dest 0x35, derived version, and sequence 0
+            uint8_t auth_version = (_protocolVersion == 2) ? 2 : 3;
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, auth_version, 0, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
