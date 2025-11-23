@@ -59,7 +59,7 @@ void LogBuffer::begin() {
     // Ensure we start in the correct state
     // If _enabled is false (default), ensure we are silent
     if (!_enabled) {
-        setLoggingEnabled(true);
+        setLoggingEnabled(false);
     }
 }
 

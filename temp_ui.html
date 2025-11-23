@@ -1,9 +1,4 @@
-#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
 
-#include <Arduino.h>
-
-const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -131,7 +126,35 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .disabled-ui { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
         canvas.graph { width: 100%; height: 150px; background: #222; border-radius: 8px; margin-top: 10px; }
     </style>
-</head>
+
+    <script>
+    window.fetch = async (url, options) => {
+        console.log('Mock Fetch:', url);
+        if (url.includes('/api/status')) {
+            return {
+                json: async () => ({
+                    esp_temp: 42.5,
+                    d3: { connected: true, sn: 'D3-123', name: 'Delta 3', batt: 85, in: 100, out: 200, solar: 50, cell_temp: 25, ac_on: true, dc_on: false, usb_on: true, ac_out_pow: 150, dc_out_pow: 0, usb_out_pow: 50, cfg_ac_lim: 800, cfg_max: 100, cfg_min: 0 },
+                    w2: { connected: true, sn: 'W2-456', name: 'Wave 2', batt: 60, amb_temp: 24, out_temp: 18, set_temp: 20, mode: 0, sub_mode: 2, fan: 1, pwr: true, drain: false, light: true, beep: false, pwr_bat: -100, pwr_mppt: 0, pwr_psdr: 0 },
+                    d3p: { connected: false },
+                    ac: { connected: false }
+                })
+            };
+        }
+        if (url.includes('/api/history')) {
+            return { json: async () => [20, 21, 20, 19, 18, 18, 18] };
+        }
+        if (url.includes('/api/control')) {
+            const body = JSON.parse(options.body);
+            console.log('Control:', body);
+            // For testing, we can't easily update state without a real backend loop,
+            // but we can verify the click happened.
+            return { ok: true };
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+    </script>
+    </head>
 <body>
     <canvas id="canvas-bg"></canvas>
     <div class="container">
@@ -858,6 +881,3 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </script>
 </body>
 </html>
-)rawliteral";
-
-#endif // WEB_ASSETS_H

@@ -98,6 +98,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         JsonObject obj = doc.createNestedObject("d3");
         fillCommon(obj, s, d);
         if (s->isConnected) {
+            const auto& data = d->getData().delta3;
             obj["in"] = d->getInputPower();
             obj["out"] = d->getOutputPower();
             obj["solar"] = d->getSolarInputPower();
@@ -108,6 +109,9 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             obj["cfg_max"] = d->getMaxChgSoc();
             obj["cfg_min"] = d->getMinDsgSoc();
             obj["cell_temp"] = d->getCellTemperature();
+            obj["ac_out_pow"] = (int)abs(data.acOutputPower);
+            obj["dc_out_pow"] = (int)abs(data.dc12vOutputPower);
+            obj["usb_out_pow"] = (int)(abs(data.usbcOutputPower) + abs(data.usbc2OutputPower) + abs(data.usbaOutputPower) + abs(data.usba2OutputPower));
         }
     }
 
@@ -123,9 +127,16 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             obj["out_temp"] = (int)data.outLetTemp;
             obj["set_temp"] = (int)data.setTemp;
             obj["mode"] = (int)data.mode;
+            obj["sub_mode"] = (int)data.subMode;
             obj["fan"] = (int)data.fanValue;
             obj["pwr"] = (data.powerMode != 0);
             obj["drain"] = (data.wteFthEn != 0);
+            obj["light"] = (data.rgbState != 0); // Assuming rgbState > 0 is ON
+            obj["beep"] = (data.beepEnable != 0);
+            // Power readings for dynamic display
+            obj["pwr_bat"] = (int)data.batPwrWatt;
+            obj["pwr_mppt"] = (int)data.mpptPwrWatt;
+            obj["pwr_psdr"] = (int)data.psdrPwrWatt;
         }
     }
 
@@ -223,10 +234,13 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     }
     else if (type == DeviceType::WAVE_2) {
         if (cmd == "set_temp") dev->setTemperature((uint8_t)(int)doc["val"]);
-        else if (cmd == "set_power") dev->setPowerState(doc["val"] ? 1 : 0);
+        else if (cmd == "set_power") dev->setPowerState(doc["val"] ? 1 : 2); // 1=ON, 2=OFF
         else if (cmd == "set_mode") dev->setMainMode((uint8_t)(int)doc["val"]);
+        else if (cmd == "set_sub_mode") dev->setSubMode((uint8_t)(int)doc["val"]);
         else if (cmd == "set_fan") dev->setFanSpeed((uint8_t)(int)doc["val"]);
         else if (cmd == "set_drain") dev->setAutomaticDrain(doc["val"] ? 1 : 0);
+        else if (cmd == "set_light") dev->setAmbientLight(doc["val"] ? 1 : 2); // 1=on, 2=off as per notes
+        else if (cmd == "set_beep") dev->setBeep(doc["val"] ? 1 : 0);
         else success = false;
     }
     else if (type == DeviceType::DELTA_PRO_3) {
