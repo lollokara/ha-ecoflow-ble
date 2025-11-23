@@ -25,6 +25,7 @@ enum class MenuState {
     DEVICE_SELECT,
     DEVICE_ACTION,
     WAVE2_MENU,
+    EDIT_W2_PWR,
     EDIT_W2_MOD,
     EDIT_W2_SPD,
     EDIT_W2_SMD
@@ -357,7 +358,16 @@ void drawDetailMenu(DeviceType activeType) {
             solIn = 0;
             totIn = 0;
             break;
-        default: break;
+        default:
+            // Fallback for unknown devices
+            acOn = false;
+            acOut = 0;
+            dcOn = false;
+            dcOut = 0;
+            usbOn = false;
+            solIn = 0;
+            totIn = 0;
+            break;
     }
 
     switch(currentSelection) {
@@ -393,54 +403,38 @@ void drawWave2Menu() {
     uint32_t color = cWhite;
     bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
 
-    switch(currentWave2Page) {
-        case Wave2MenuPage::PWR:
-            text = (currentData.wave2.powerMode == 1) ? "ON" : "OFF";
-            color = (currentData.wave2.powerMode == 1) ? cGreen : cRed;
-            break;
-        case Wave2MenuPage::MOD:
-            switch(currentData.wave2.mode) {
+    if (currentState == MenuState::WAVE2_MENU) {
+        // In the main menu, show the Labels
+        switch(currentWave2Page) {
+            case Wave2MenuPage::PWR: text = "PWR"; break;
+            case Wave2MenuPage::MOD: text = "MOD"; break;
+            case Wave2MenuPage::SPD: text = "SPD"; break;
+            case Wave2MenuPage::SMD:
+                 if (!showSmd) { currentWave2Page = Wave2MenuPage::PWR; text="PWR"; }
+                 else text = "SMD";
+                 break;
+        }
+    } else {
+        // In Edit/Detail states, show the Values
+        if (currentState == MenuState::EDIT_W2_PWR) {
+            text = (tempW2Val == 1) ? "ON" : "OFF";
+            color = (tempW2Val == 1) ? cGreen : cRed;
+        } else if (currentState == MenuState::EDIT_W2_MOD) {
+            switch(tempW2Val) {
                 case 0: text = "ICE"; color = cBlue; break;
                 case 1: text = "HOT"; color = cRed; break;
                 case 2: text = "AIR"; color = cWhite; break;
-                default: text = "UNK"; break;
             }
-            break;
-        case Wave2MenuPage::SPD:
-            text = String(currentData.wave2.fanValue + 1);
+        } else if (currentState == MenuState::EDIT_W2_SPD) {
+            text = String(tempW2Val + 1);
             color = cYellow;
-            break;
-        case Wave2MenuPage::SMD:
-            if (!showSmd) {
-                currentWave2Page = Wave2MenuPage::PWR;
-                return;
-            }
-            switch(currentData.wave2.subMode) {
+        } else if (currentState == MenuState::EDIT_W2_SMD) {
+            switch(tempW2Val) {
                 case 0: text = "MAX"; break;
                 case 1: text = "NGT"; break;
                 case 2: text = "ECO"; break;
                 case 3: text = "NOR"; break;
             }
-            color = cWhite;
-            break;
-    }
-
-    // Override text if in editing mode
-    if (currentState == MenuState::EDIT_W2_MOD) {
-        switch(tempW2Val) {
-            case 0: text = "ICE"; color = cBlue; break;
-            case 1: text = "HOT"; color = cRed; break;
-            case 2: text = "AIR"; color = cWhite; break;
-        }
-    } else if (currentState == MenuState::EDIT_W2_SPD) {
-        text = String(tempW2Val + 1);
-        color = cYellow;
-    } else if (currentState == MenuState::EDIT_W2_SMD) {
-        switch(tempW2Val) {
-            case 0: text = "MAX"; break;
-            case 1: text = "NGT"; break;
-            case 2: text = "ECO"; break;
-            case 3: text = "NOR"; break;
         }
     }
 
@@ -561,7 +555,7 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
         else if (currentDevicePage == DevicePage::D3P) s = slotD3P;
         else if (currentDevicePage == DevicePage::CHG) s = slotAC;
         drawDeviceActionMenu(s);
-    } else if (currentState == MenuState::WAVE2_MENU || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
+    } else if (currentState == MenuState::WAVE2_MENU || currentState == MenuState::EDIT_W2_PWR || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
         strip.setBrightness(25);
         drawWave2Menu();
     }
@@ -597,6 +591,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 currentState = MenuState::DEVICE_SELECT; break;
             case MenuState::WAVE2_MENU:
                 currentState = MenuState::SELECTION; break;
+            case MenuState::EDIT_W2_PWR:
             case MenuState::EDIT_W2_MOD:
             case MenuState::EDIT_W2_SPD:
             case MenuState::EDIT_W2_SMD:
@@ -685,8 +680,9 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 break;
             case ButtonInput::BTN_ENTER_SHORT:
                 if (currentWave2Page == Wave2MenuPage::PWR) {
-                    flashScreen(cWhite);
-                    return DisplayAction::W2_TOGGLE_PWR;
+                    currentState = MenuState::EDIT_W2_PWR;
+                    tempW2Val = currentData.wave2.powerMode;
+                    if (tempW2Val < 1 || tempW2Val > 2) tempW2Val = 2; // Default to OFF if unknown
                 } else if (currentWave2Page == Wave2MenuPage::MOD) {
                     currentState = MenuState::EDIT_W2_MOD;
                     tempW2Val = currentData.wave2.mode;
@@ -703,25 +699,31 @@ DisplayAction handleDisplayInput(ButtonInput input) {
     }
 
     // Common logic for Editing states
-    if (currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
+    if (currentState == MenuState::EDIT_W2_PWR || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
         switch(input) {
             case ButtonInput::BTN_UP:
                 // Logic depends on state
+                if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
                 if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
                 if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
                 if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val++; if(tempW2Val>3) tempW2Val=0; }
                 break;
             case ButtonInput::BTN_DOWN:
+                if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
                 if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
                 if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
                 if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val--; if(tempW2Val<0) tempW2Val=3; }
                 break;
             case ButtonInput::BTN_ENTER_SHORT: // Confirm
                 flashScreen(cWhite);
-                currentState = MenuState::WAVE2_MENU;
-                if (currentState == MenuState::EDIT_W2_MOD) return DisplayAction::W2_SET_MODE;
-                if (currentState == MenuState::EDIT_W2_SPD) return DisplayAction::W2_SET_FAN;
-                if (currentState == MenuState::EDIT_W2_SMD) return DisplayAction::W2_SET_SUB_MODE;
+                {
+                    MenuState prevState = currentState;
+                    currentState = MenuState::WAVE2_MENU;
+                    if (prevState == MenuState::EDIT_W2_PWR) return DisplayAction::W2_SET_PWR;
+                    if (prevState == MenuState::EDIT_W2_MOD) return DisplayAction::W2_SET_MODE;
+                    if (prevState == MenuState::EDIT_W2_SPD) return DisplayAction::W2_SET_FAN;
+                    if (prevState == MenuState::EDIT_W2_SMD) return DisplayAction::W2_SET_SUB_MODE;
+                }
                 break;
         }
     }

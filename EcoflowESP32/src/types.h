@@ -30,7 +30,8 @@ enum class DisplayAction {
     W2_TOGGLE_PWR,
     W2_SET_MODE,
     W2_SET_FAN,
-    W2_SET_SUB_MODE
+    W2_SET_SUB_MODE,
+    W2_SET_PWR
 };
 
 #endif // TYPES_H

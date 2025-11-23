@@ -217,8 +217,11 @@ void handleAction(DisplayAction action) {
                 dev->setBatterySOCLimits(getSetMaxChgSoc(), getSetMinDsgSoc());
                 break;
             case DisplayAction::W2_TOGGLE_PWR:
-                // Toggles based on current state. Wave 2: 1=ON, 2=OFF.
+                // Deprecated, use W2_SET_PWR
                 dev->setPowerState(dev->getData().wave2.powerMode == 1 ? 2 : 1);
+                break;
+            case DisplayAction::W2_SET_PWR:
+                dev->setPowerState((uint8_t)getSetW2Val());
                 break;
             case DisplayAction::W2_SET_MODE:
                 // If OFF, turn ON first? User said: "if off should turn on the wave 2 and then set the mode"
