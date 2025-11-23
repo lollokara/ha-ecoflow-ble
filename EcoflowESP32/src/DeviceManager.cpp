@@ -241,6 +241,7 @@ void DeviceManager::_handlePendingConnection() {
             }
 
             uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+            ESP_LOGI("DeviceManager", "Connecting to %s (Type %d) with Protocol Version %d", slot->name.c_str(), (int)_targetScanType, version);
             slot->instance->begin(ECOFLOW_USER_ID, slot->serialNumber, slot->macAddress, version);
             slot->instance->connectTo(_pendingDevice);
 

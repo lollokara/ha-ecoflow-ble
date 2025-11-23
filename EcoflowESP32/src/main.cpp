@@ -199,6 +199,8 @@ void handleAction(DisplayAction action) {
 
     // For control actions, ensure the device is authenticated
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
+    EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+
     if (dev && dev->isAuthenticated()) {
         switch(action) {
             case DisplayAction::TOGGLE_AC:
@@ -216,32 +218,37 @@ void handleAction(DisplayAction action) {
             case DisplayAction::SET_SOC_LIMITS:
                 dev->setBatterySOCLimits(getSetMaxChgSoc(), getSetMinDsgSoc());
                 break;
+            default: break;
+        }
+    }
+
+    // Handle Wave 2 Specific Actions
+    if (w2 && w2->isAuthenticated()) {
+        switch(action) {
             case DisplayAction::W2_TOGGLE_PWR:
                 // Deprecated, use W2_SET_PWR
-                dev->setPowerState(dev->getData().wave2.powerMode == 1 ? 2 : 1);
+                w2->setPowerState(w2->getData().wave2.powerMode == 1 ? 2 : 1);
                 break;
             case DisplayAction::W2_SET_PWR:
-                dev->setPowerState((uint8_t)getSetW2Val());
+                w2->setPowerState((uint8_t)getSetW2Val());
                 break;
             case DisplayAction::W2_SET_MODE:
                 // If OFF, turn ON first? User said: "if off should turn on the wave 2 and then set the mode"
-                if (dev->getData().wave2.powerMode != 1) {
-                    dev->setPowerState(1);
+                if (w2->getData().wave2.powerMode != 1) {
+                    w2->setPowerState(1);
                     // We might need a delay or wait for state update, but for now we send both.
                     // The device might process them sequentially.
                     delay(200);
                 }
-                dev->setMainMode((uint8_t)getSetW2Val());
+                w2->setMainMode((uint8_t)getSetW2Val());
                 break;
             case DisplayAction::W2_SET_FAN:
-                 dev->setFanSpeed((uint8_t)getSetW2Val());
+                 w2->setFanSpeed((uint8_t)getSetW2Val());
                  break;
             case DisplayAction::W2_SET_SUB_MODE:
-                 dev->setSubMode((uint8_t)getSetW2Val());
+                 w2->setSubMode((uint8_t)getSetW2Val());
                  break;
             default: break;
         }
-    } else {
-        ESP_LOGI("main", "Action ignored: Device not authenticated");
     }
 }
