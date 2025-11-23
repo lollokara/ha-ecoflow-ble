@@ -427,8 +427,22 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: cmdId=0x%02x", pkt->getCmdId());
     if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data);
+
+        // For Protocol V2 (Wave 2), prevent infinite loops by NOT replying to Control/Status commands (0x51-0x5E)
+        // These packets are likely notifications that share the same ID as the Set command.
+        // Replying to them triggers the device to treat the ACK as a new Set command, creating a loop.
+        bool shouldReply = true;
+        if (_protocolVersion == 2) {
+             uint8_t cmdId = pkt->getCmdId();
+             // Range 0x51-0x5E covers all known Set/Control commands for Wave 2
+             if (cmdId >= 0x51 && cmdId <= 0x5E) {
+                 ESP_LOGD(TAG, "Skipping reply for Wave 2 Control Packet (CmdId: 0x%02x)", cmdId);
+                 shouldReply = false;
+             }
+        }
+
         // Reply to packets that require it to keep the data flowing
-        if (pkt->getDest() == 0x21) {
+        if (shouldReply && pkt->getDest() == 0x21) {
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
             _sendCommand(enc_reply.toBytes(&_crypto));
