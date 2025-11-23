@@ -22,6 +22,7 @@ private:
     static void handleControl(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleConnect(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleDisconnect(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    static void handleForget(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
     // Extended Data
     static void handleHistory(AsyncWebServerRequest *request);
