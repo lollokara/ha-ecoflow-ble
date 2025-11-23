@@ -217,25 +217,20 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
         }
 
         size_t payload_len = frame_len - 2;
-        std::vector<uint8_t> raw_payload(rxBuffer.begin() + 6, rxBuffer.begin() + 6 + payload_len);
-        std::vector<uint8_t> processed_payload;
+        std::vector<uint8_t> encrypted_payload(rxBuffer.begin() + 6, rxBuffer.begin() + 6 + payload_len);
 
-        if(isAuthenticated) {
-            processed_payload.resize(raw_payload.size());
-            crypto.decrypt_session(raw_payload.data(), raw_payload.size(), processed_payload.data());
+        std::vector<uint8_t> decrypted_payload(encrypted_payload.size());
+        crypto.decrypt_session(encrypted_payload.data(), encrypted_payload.size(), decrypted_payload.data());
 
-            // Remove PKCS7 padding
-            if (!processed_payload.empty()) {
-                uint8_t padding = processed_payload.back();
-                if (padding > 0 && padding <= 16 && processed_payload.size() >= padding) {
-                    processed_payload.resize(processed_payload.size() - padding);
-                }
+        // Remove PKCS7 padding
+        if (!decrypted_payload.empty()) {
+            uint8_t padding = decrypted_payload.back();
+            if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+                decrypted_payload.resize(decrypted_payload.size() - padding);
             }
-        } else {
-            processed_payload = raw_payload;
         }
 
-        Packet* packet = Packet::fromBytes(processed_payload.data(), processed_payload.size(), true); // is_xor=true for Delta 3
+        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
         if (packet) {
             packets.push_back(*packet);
             delete packet;
