@@ -23,7 +23,11 @@ enum class MenuState {
     EDIT_SOC_UP,
     EDIT_SOC_DN,
     DEVICE_SELECT,
-    DEVICE_ACTION
+    DEVICE_ACTION,
+    WAVE2_MENU,
+    EDIT_W2_MOD,
+    EDIT_W2_SPD,
+    EDIT_W2_SMD
 };
 
 enum class DashboardView {
@@ -37,12 +41,20 @@ enum class DashboardView {
 
 enum class SelectionPage {
     AC,
+    AIR,
     DC,
     USB,
     SOL,
     IN,
     SET,
     DEV
+};
+
+enum class Wave2MenuPage {
+    PWR,
+    MOD,
+    SPD,
+    SMD
 };
 
 enum class SettingsPage {
@@ -64,8 +76,7 @@ enum class DevicePage {
 
 enum class DeviceActionPage {
     CON,
-    DIS,
-    RET
+    DIS
 };
 
 MenuState currentState = MenuState::DASHBOARD;
@@ -90,11 +101,13 @@ int slideDirection = 0; // 1 = Up, -1 = Down
 // Pending Action for Timeout
 DisplayAction pendingAction = DisplayAction::NONE;
 DeviceType targetDeviceType = DeviceType::DELTA_3;
+Wave2MenuPage currentWave2Page = Wave2MenuPage::PWR;
 
 // Temp variables for editing
 int tempAcLimit = 400;
 int tempMaxChg = 100;
 int tempMinDsg = 0;
+int tempW2Val = 0;
 
 // --- Colors ---
 uint32_t cRed, cYellow, cGreen, cWhite, cOff, cBlue;
@@ -192,9 +205,6 @@ void drawNcScreen() {
 }
 
 void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, DeviceSlot* slotAC) {
-    // Basic dashboard logic: prioritize showing connected devices
-    // For now, keep it simple: cycle through views. If a view's device is not connected, skip or show NC.
-
     uint32_t color = cGreen;
     String text = "";
     int brightness = 25;
@@ -268,6 +278,7 @@ String getSelectionText(SelectionPage page) {
         case SelectionPage::IN: return "IN";
         case SelectionPage::SET: return "SET";
         case SelectionPage::DEV: return "DEV";
+        case SelectionPage::AIR: return "AIR";
         default: return "?";
     }
 }
@@ -311,7 +322,6 @@ void drawDetailMenu(DeviceType activeType) {
 
     switch (activeType) {
         case DeviceType::DELTA_3:
-            // Default to Delta/River V3 logic
             acOn = currentData.delta3.acOn;
             acOut = abs((int)currentData.delta3.acOutputPower);
             dcOn = currentData.delta3.dcOn;
@@ -320,9 +330,7 @@ void drawDetailMenu(DeviceType activeType) {
             solIn = (int)currentData.delta3.solarInputPower;
             totIn = (int)currentData.delta3.inputPower;
             break;
-
         case DeviceType::WAVE_2:
-            // Default to Wave 2 logic
             acOn = (currentData.wave2.mode != 0);
             acOut = 0;
             dcOn = (currentData.wave2.powerMode != 0);
@@ -331,17 +339,15 @@ void drawDetailMenu(DeviceType activeType) {
             solIn = currentData.wave2.mpptPwrWatt;
             totIn = (currentData.wave2.batPwrWatt > 0) ? currentData.wave2.batPwrWatt : 0;
             break;
-
         case DeviceType::DELTA_PRO_3:
             acOn = currentData.deltaPro3.acLvPort || currentData.deltaPro3.acHvPort;
             acOut = (int)(currentData.deltaPro3.acLvOutputPower + currentData.deltaPro3.acHvOutputPower);
             dcOn = currentData.deltaPro3.dc12vPort;
             dcOut = (int)currentData.deltaPro3.dc12vOutputPower;
-            usbOn = false; // Add USB flags if needed
+            usbOn = false;
             solIn = (int)(currentData.deltaPro3.solarLvPower + currentData.deltaPro3.solarHvPower);
             totIn = (int)currentData.deltaPro3.inputPower;
             break;
-
         case DeviceType::ALTERNATOR_CHARGER:
             acOn = false;
             acOut = 0;
@@ -351,17 +357,7 @@ void drawDetailMenu(DeviceType activeType) {
             solIn = 0;
             totIn = 0;
             break;
-
-        default:
-            // Fallback for unknown devices
-            acOn = false;
-            acOut = 0;
-            dcOn = false;
-            dcOut = 0;
-            usbOn = false;
-            solIn = 0;
-            totIn = 0;
-            break;
+        default: break;
     }
 
     switch(currentSelection) {
@@ -387,6 +383,67 @@ void drawDetailMenu(DeviceType activeType) {
             break;
         default: break;
     }
+    int width = getTextWidth(text) - 1;
+    int x = (NUM_COLS - width) / 2;
+    drawText(x, 1, text, color);
+}
+
+void drawWave2Menu() {
+    String text = "";
+    uint32_t color = cWhite;
+    bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
+
+    switch(currentWave2Page) {
+        case Wave2MenuPage::PWR:
+            text = (currentData.wave2.powerMode == 1) ? "ON" : "OFF";
+            color = (currentData.wave2.powerMode == 1) ? cGreen : cRed;
+            break;
+        case Wave2MenuPage::MOD:
+            switch(currentData.wave2.mode) {
+                case 0: text = "ICE"; color = cBlue; break;
+                case 1: text = "HOT"; color = cRed; break;
+                case 2: text = "AIR"; color = cWhite; break;
+                default: text = "UNK"; break;
+            }
+            break;
+        case Wave2MenuPage::SPD:
+            text = String(currentData.wave2.fanValue + 1);
+            color = cYellow;
+            break;
+        case Wave2MenuPage::SMD:
+            if (!showSmd) {
+                currentWave2Page = Wave2MenuPage::PWR;
+                return;
+            }
+            switch(currentData.wave2.subMode) {
+                case 0: text = "MAX"; break;
+                case 1: text = "NGT"; break;
+                case 2: text = "ECO"; break;
+                case 3: text = "NOR"; break;
+            }
+            color = cWhite;
+            break;
+    }
+
+    // Override text if in editing mode
+    if (currentState == MenuState::EDIT_W2_MOD) {
+        switch(tempW2Val) {
+            case 0: text = "ICE"; color = cBlue; break;
+            case 1: text = "HOT"; color = cRed; break;
+            case 2: text = "AIR"; color = cWhite; break;
+        }
+    } else if (currentState == MenuState::EDIT_W2_SPD) {
+        text = String(tempW2Val + 1);
+        color = cYellow;
+    } else if (currentState == MenuState::EDIT_W2_SMD) {
+        switch(tempW2Val) {
+            case 0: text = "MAX"; break;
+            case 1: text = "NGT"; break;
+            case 2: text = "ECO"; break;
+            case 3: text = "NOR"; break;
+        }
+    }
+
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, color);
@@ -441,7 +498,6 @@ void drawDeviceActionMenu(DeviceSlot* slot) {
     switch(currentDeviceAction) {
         case DeviceActionPage::CON: text = "CON"; color = cBlue; break;
         case DeviceActionPage::DIS: text = "DIS"; color = cRed; break;
-        case DeviceActionPage::RET: text = "RET"; color = cYellow; break;
     }
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
@@ -505,6 +561,9 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
         else if (currentDevicePage == DevicePage::D3P) s = slotD3P;
         else if (currentDevicePage == DevicePage::CHG) s = slotAC;
         drawDeviceActionMenu(s);
+    } else if (currentState == MenuState::WAVE2_MENU || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
+        strip.setBrightness(25);
+        drawWave2Menu();
     }
 
     if (isScanning) setPixel(19, 0, cBlue);
@@ -514,23 +573,48 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
 DisplayAction handleDisplayInput(ButtonInput input) {
     lastInteractionTime = millis();
 
-    if (currentState != MenuState::DASHBOARD) {
-        if (input == ButtonInput::BTN_ENTER_MEDIUM) {
-            currentState = MenuState::DASHBOARD;
-            return DisplayAction::NONE;
+    // Global Back Logic (Hold > 1s)
+    if (input == ButtonInput::BTN_ENTER_HOLD) {
+        switch(currentState) {
+            case MenuState::DASHBOARD:
+                break; // Ignore
+            case MenuState::SELECTION:
+                currentState = MenuState::DASHBOARD; break;
+            case MenuState::DETAIL:
+                currentState = MenuState::SELECTION; break;
+            case MenuState::SETTINGS_SUBMENU:
+                currentState = MenuState::SELECTION; break;
+            case MenuState::LIMITS_SUBMENU:
+                currentState = MenuState::SETTINGS_SUBMENU; break;
+            case MenuState::EDIT_CHG:
+                currentState = MenuState::SETTINGS_SUBMENU; break;
+            case MenuState::EDIT_SOC_UP:
+            case MenuState::EDIT_SOC_DN:
+                currentState = MenuState::LIMITS_SUBMENU; break;
+            case MenuState::DEVICE_SELECT:
+                currentState = MenuState::SELECTION; break;
+            case MenuState::DEVICE_ACTION:
+                currentState = MenuState::DEVICE_SELECT; break;
+            case MenuState::WAVE2_MENU:
+                currentState = MenuState::SELECTION; break;
+            case MenuState::EDIT_W2_MOD:
+            case MenuState::EDIT_W2_SPD:
+            case MenuState::EDIT_W2_SMD:
+                currentState = MenuState::WAVE2_MENU; break;
+            default:
+                currentState = MenuState::DASHBOARD; break;
         }
+        return DisplayAction::NONE;
     }
 
     if (currentState == MenuState::DASHBOARD) {
         if (input == ButtonInput::BTN_UP || input == ButtonInput::BTN_DOWN) {
-             // Cycle through all available dashboard views
              int currentIdx = (int)currentDashboardView;
              int dir = (input == ButtonInput::BTN_UP) ? 1 : -1;
              int nextIdx = currentIdx + dir;
              if (nextIdx > 5) nextIdx = 0;
              if (nextIdx < 0) nextIdx = 5;
              currentDashboardView = (DashboardView)nextIdx;
-
         } else if (input == ButtonInput::BTN_ENTER_SHORT) {
             currentState = MenuState::SELECTION;
             currentSelection = SelectionPage::AC;
@@ -542,13 +626,13 @@ DisplayAction handleDisplayInput(ButtonInput input) {
         switch(input) {
             case ButtonInput::BTN_UP:
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::DEV;
+                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::DEV; // Wrap last
                 else currentSelection = (SelectionPage)((int)currentSelection - 1);
                 slideDirection = -1; isAnimating = true; animationStep = 0;
                 break;
             case ButtonInput::BTN_DOWN:
                 prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::DEV) currentSelection = SelectionPage::AC;
+                if (currentSelection == SelectionPage::DEV) currentSelection = SelectionPage::AC; // Wrap first
                 else currentSelection = (SelectionPage)((int)currentSelection + 1);
                 slideDirection = 1; isAnimating = true; animationStep = 0;
                 break;
@@ -559,22 +643,87 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 } else if (currentSelection == SelectionPage::SET) {
                     currentState = MenuState::SETTINGS_SUBMENU;
                     currentSettingsPage = SettingsPage::CHG;
+                } else if (currentSelection == SelectionPage::AIR) {
+                    currentState = MenuState::WAVE2_MENU;
+                    currentWave2Page = Wave2MenuPage::PWR;
                 } else {
                     currentState = MenuState::DETAIL;
-                }
-                break;
-            case ButtonInput::BTN_ENTER_LONG:
-                flashScreen(cWhite);
-                switch(currentSelection) {
-                    case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
-                    case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
-                    case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
-                    default: break;
                 }
                 break;
              default: break;
         }
         return DisplayAction::NONE;
+    }
+
+    if (currentState == MenuState::DETAIL) {
+        if (input == ButtonInput::BTN_ENTER_SHORT) { // Toggle on Short Press
+            flashScreen(cWhite);
+            switch(currentSelection) {
+                case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
+                case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
+                case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
+                default: break;
+            }
+        }
+        return DisplayAction::NONE;
+    }
+
+    if (currentState == MenuState::WAVE2_MENU) {
+        bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
+        switch(input) {
+            case ButtonInput::BTN_UP:
+            case ButtonInput::BTN_DOWN:
+                {
+                    int max = showSmd ? 3 : 2;
+                    int cur = (int)currentWave2Page;
+                    int dir = (input == ButtonInput::BTN_UP) ? -1 : 1;
+                    cur = cur + dir;
+                    if (cur < 0) cur = max;
+                    if (cur > max) cur = 0;
+                    currentWave2Page = (Wave2MenuPage)cur;
+                }
+                break;
+            case ButtonInput::BTN_ENTER_SHORT:
+                if (currentWave2Page == Wave2MenuPage::PWR) {
+                    flashScreen(cWhite);
+                    return DisplayAction::W2_TOGGLE_PWR;
+                } else if (currentWave2Page == Wave2MenuPage::MOD) {
+                    currentState = MenuState::EDIT_W2_MOD;
+                    tempW2Val = currentData.wave2.mode;
+                } else if (currentWave2Page == Wave2MenuPage::SPD) {
+                    currentState = MenuState::EDIT_W2_SPD;
+                    tempW2Val = currentData.wave2.fanValue;
+                } else if (currentWave2Page == Wave2MenuPage::SMD) {
+                    currentState = MenuState::EDIT_W2_SMD;
+                    tempW2Val = currentData.wave2.subMode;
+                }
+                break;
+            default: break;
+        }
+    }
+
+    // Common logic for Editing states
+    if (currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
+        switch(input) {
+            case ButtonInput::BTN_UP:
+                // Logic depends on state
+                if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
+                if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
+                if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val++; if(tempW2Val>3) tempW2Val=0; }
+                break;
+            case ButtonInput::BTN_DOWN:
+                if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
+                if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
+                if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val--; if(tempW2Val<0) tempW2Val=3; }
+                break;
+            case ButtonInput::BTN_ENTER_SHORT: // Confirm
+                flashScreen(cWhite);
+                currentState = MenuState::WAVE2_MENU;
+                if (currentState == MenuState::EDIT_W2_MOD) return DisplayAction::W2_SET_MODE;
+                if (currentState == MenuState::EDIT_W2_SPD) return DisplayAction::W2_SET_FAN;
+                if (currentState == MenuState::EDIT_W2_SMD) return DisplayAction::W2_SET_SUB_MODE;
+                break;
+        }
     }
 
     if (currentState == MenuState::SETTINGS_SUBMENU) {
@@ -634,7 +783,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempAcLimit -= 100;
                 if (tempAcLimit < 400) tempAcLimit = 400;
                 break;
-            case ButtonInput::BTN_ENTER_LONG:
+            case ButtonInput::BTN_ENTER_SHORT: // Confirm
                 flashScreen(cWhite);
                 currentState = MenuState::DASHBOARD;
                 return DisplayAction::SET_AC_LIMIT;
@@ -653,7 +802,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempMaxChg -= 10;
                 if (tempMaxChg < 50) tempMaxChg = 50;
                 break;
-            case ButtonInput::BTN_ENTER_LONG:
+            case ButtonInput::BTN_ENTER_SHORT: // Confirm
                 flashScreen(cWhite);
                 currentState = MenuState::DASHBOARD;
                 return DisplayAction::SET_SOC_LIMITS;
@@ -672,24 +821,11 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 tempMinDsg -= 10;
                 if (tempMinDsg < 0) tempMinDsg = 0;
                 break;
-            case ButtonInput::BTN_ENTER_LONG:
+            case ButtonInput::BTN_ENTER_SHORT: // Confirm
                 flashScreen(cWhite);
                 currentState = MenuState::DASHBOARD;
                 return DisplayAction::SET_SOC_LIMITS;
             default: break;
-        }
-        return DisplayAction::NONE;
-    }
-
-    if (currentState == MenuState::DETAIL) {
-        if (input == ButtonInput::BTN_ENTER_LONG) {
-            flashScreen(cWhite);
-            switch(currentSelection) {
-                case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
-                case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
-                case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
-                default: break;
-            }
         }
         return DisplayAction::NONE;
     }
@@ -721,13 +857,11 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             case ButtonInput::BTN_UP:
             case ButtonInput::BTN_DOWN:
                 if (currentDeviceAction == DeviceActionPage::CON) currentDeviceAction = DeviceActionPage::DIS;
-                else if (currentDeviceAction == DeviceActionPage::DIS) currentDeviceAction = DeviceActionPage::RET;
                 else currentDeviceAction = DeviceActionPage::CON;
                 break;
             case ButtonInput::BTN_ENTER_SHORT:
                 if (currentDeviceAction == DeviceActionPage::CON) return DisplayAction::CONNECT_DEVICE;
-                else if (currentDeviceAction == DeviceActionPage::DIS) return DisplayAction::DISCONNECT_DEVICE;
-                else currentState = MenuState::DEVICE_SELECT;
+                else return DisplayAction::DISCONNECT_DEVICE;
                 break;
             default: break;
          }
@@ -746,3 +880,4 @@ int getSetAcLimit() { return tempAcLimit; }
 int getSetMaxChgSoc() { return tempMaxChg; }
 int getSetMinDsgSoc() { return tempMinDsg; }
 DeviceType getTargetDeviceType() { return targetDeviceType; }
+int getSetW2Val() { return tempW2Val; }

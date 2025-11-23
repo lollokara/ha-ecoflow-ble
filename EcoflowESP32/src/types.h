@@ -15,8 +15,7 @@ enum class ButtonInput {
     BTN_UP,
     BTN_DOWN,
     BTN_ENTER_SHORT,
-    BTN_ENTER_MEDIUM,
-    BTN_ENTER_LONG
+    BTN_ENTER_HOLD
 };
 
 enum class DisplayAction {
@@ -28,7 +27,10 @@ enum class DisplayAction {
     TOGGLE_USB,
     SET_AC_LIMIT,
     SET_SOC_LIMITS,
-    // Add more as needed
+    W2_TOGGLE_PWR,
+    W2_SET_MODE,
+    W2_SET_FAN,
+    W2_SET_SUB_MODE
 };
 
 #endif // TYPES_H

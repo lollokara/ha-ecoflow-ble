@@ -24,14 +24,13 @@
 
 // Timings for button press detection (in milliseconds)
 #define DEBOUNCE_DELAY 50
-#define MEDIUM_PRESS_TIME 1000
-#define LONG_PRESS_TIME 3000
+#define HOLD_PRESS_TIME 1000
 
 /**
  * @class Button
  * @brief A simple class to handle button inputs with debouncing and multiple press types.
  *
- * This class detects short, medium (1s), and long (3s) presses for a single button.
+ * This class detects short (<1s) and hold (>1s) presses for a single button.
  */
 class Button {
     int pin;
@@ -40,16 +39,15 @@ class Button {
     unsigned long lastDebounceTime;
     unsigned long pressedTime;
     bool isPressedState;
-    bool mediumPressHandled;
-    bool longPressHandled;
+    bool holdHandled;
 
 public:
     Button(int p) : pin(p), state(HIGH), lastReading(HIGH), lastDebounceTime(0),
-                    pressedTime(0), isPressedState(false), mediumPressHandled(false), longPressHandled(false) {}
+                    pressedTime(0), isPressedState(false), holdHandled(false) {}
     
     /**
      * @brief Checks the button state and returns the type of press event.
-     * @return 0 for no event, 1 for a short press, 2 for a medium press, 3 for a long press.
+     * @return 0 for no event, 1 for a short press, 2 for a hold.
      */
     int check() {
         int reading = digitalRead(pin);
@@ -65,12 +63,11 @@ public:
                 if (state == LOW) { // Button pressed
                     pressedTime = millis();
                     isPressedState = true;
-                    mediumPressHandled = false;
-                    longPressHandled = false;
+                    holdHandled = false;
                 } else { // Button released
                     if (isPressedState) {
                         isPressedState = false;
-                        if (!longPressHandled && !mediumPressHandled) {
+                        if (!holdHandled) {
                              event = 1; // Short press
                         }
                     }
@@ -78,15 +75,12 @@ public:
             }
         }
 
-        // Check for medium and long presses while the button is held down
+        // Check for hold while the button is held down
         if (isPressedState) {
             unsigned long duration = millis() - pressedTime;
-            if (!longPressHandled && duration >= LONG_PRESS_TIME) {
-                event = 3; // Long press
-                longPressHandled = true;
-            } else if (!mediumPressHandled && duration >= MEDIUM_PRESS_TIME) {
-                event = 2; // Medium press
-                mediumPressHandled = true;
+            if (!holdHandled && duration >= HOLD_PRESS_TIME) {
+                event = 2; // Hold
+                holdHandled = true;
             }
         }
 
@@ -157,8 +151,7 @@ void loop() {
     if (upEvent == 1) action = handleDisplayInput(ButtonInput::BTN_UP);
     if (downEvent == 1) action = handleDisplayInput(ButtonInput::BTN_DOWN);
     if (enterEvent == 1) action = handleDisplayInput(ButtonInput::BTN_ENTER_SHORT);
-    if (enterEvent == 2) action = handleDisplayInput(ButtonInput::BTN_ENTER_MEDIUM);
-    if (enterEvent == 3) action = handleDisplayInput(ButtonInput::BTN_ENTER_LONG);
+    if (enterEvent == 2) action = handleDisplayInput(ButtonInput::BTN_ENTER_HOLD);
 
     // 3. Process the action from the user input
     handleAction(action);
@@ -223,6 +216,26 @@ void handleAction(DisplayAction action) {
             case DisplayAction::SET_SOC_LIMITS:
                 dev->setBatterySOCLimits(getSetMaxChgSoc(), getSetMinDsgSoc());
                 break;
+            case DisplayAction::W2_TOGGLE_PWR:
+                // Toggles based on current state. Wave 2: 1=ON, 2=OFF.
+                dev->setPowerState(dev->getData().wave2.powerMode == 1 ? 2 : 1);
+                break;
+            case DisplayAction::W2_SET_MODE:
+                // If OFF, turn ON first? User said: "if off should turn on the wave 2 and then set the mode"
+                if (dev->getData().wave2.powerMode != 1) {
+                    dev->setPowerState(1);
+                    // We might need a delay or wait for state update, but for now we send both.
+                    // The device might process them sequentially.
+                    delay(200);
+                }
+                dev->setMainMode((uint8_t)getSetW2Val());
+                break;
+            case DisplayAction::W2_SET_FAN:
+                 dev->setFanSpeed((uint8_t)getSetW2Val());
+                 break;
+            case DisplayAction::W2_SET_SUB_MODE:
+                 dev->setSubMode((uint8_t)getSetW2Val());
+                 break;
             default: break;
         }
     } else {
