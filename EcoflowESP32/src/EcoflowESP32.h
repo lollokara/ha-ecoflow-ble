@@ -192,6 +192,7 @@ private:
     // --- Authentication Flow ---
     void _startAuthentication();
     void _handleAuthPacket(Packet* pkt);
+    void _handleAuthHandshake(const std::vector<uint8_t>& payload);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
 
     static std::vector<EcoflowESP32*> _instances;

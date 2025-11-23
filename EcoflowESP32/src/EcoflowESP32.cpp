@@ -240,11 +240,20 @@ void EcoflowESP32::ble_task_entry(void *pvParameters) {
     // --- Process Incoming Notifications ---
     BleNotification *notification;
     if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
-      std::vector<Packet> packets = EncPacket::parsePackets(
-          notification->data, notification->length, self->_crypto,
-          self->_rxBuffer, self->isAuthenticated());
-      for (auto &packet : packets) {
-        self->_handlePacket(&packet);
+      if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE ||
+          self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+        std::vector<uint8_t> raw_payload =
+            EncPacket::parseSimple(notification->data, notification->length);
+        if (!raw_payload.empty()) {
+          self->_handleAuthHandshake(raw_payload);
+        }
+      } else {
+        std::vector<Packet> packets = EncPacket::parsePackets(
+            notification->data, notification->length, self->_crypto,
+            self->_rxBuffer, self->isAuthenticated());
+        for (auto &packet : packets) {
+          self->_handlePacket(&packet);
+        }
       }
       delete[] notification->data;
       delete notification;
@@ -324,16 +333,31 @@ void EcoflowESP32::_handlePacket(Packet *pkt) {
 }
 
 /**
- * @brief Handles packets received during the authentication process.
+ * @brief Handles raw payload received during initial handshake (Public Key,
+ * Session Key).
  */
-void EcoflowESP32::_handleAuthPacket(Packet *pkt) {
-  ESP_LOGD(TAG, "_handleAuthPacket: cmdId=0x%02x", pkt->getCmdId());
-  const auto &payload = pkt->getPayload();
+void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
+  ESP_LOGV(TAG, "_handleAuthHandshake: received %d bytes", payload.size());
 
   if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-    if (!payload.empty() && payload.size() >= 43 && payload[0] == 0x01) {
+    // Payload structure: [01 00] [Len 2B] [Type 1B] [PubKey 40B]
+    // We need to extract the 40-byte public key.
+    // The "Working Logs" show:
+    // Notify Data: 5a 5a 00 01 2d 00 01 00 00 fc 72 ... (EncPacket Header +
+    // Payload) EncPacket::parseSimple returns the payload part: 01 00 00 fc 72
+    // ...
+    // The structure seems to be:
+    // Byte 0: 01 (Fixed?)
+    // Byte 1: 00 (Fixed?)
+    // Byte 2: 00 (Uncompressed point indicator for ECDH? usually 0x04. Logs say
+    // 00?)
+    // Wait, logs: "Notify Data: ... 01 00 00 fc ..."
+    // Previous code checked: if (!payload.empty() && payload.size() >= 43 &&
+    // payload[0] == 0x01) And skipped 3 bytes: memcpy(peer_pub_key + 1,
+    // payload.data() + 3, 40); So it skips 01 00 00.
+    if (payload.size() >= 43 && payload[0] == 0x01) {
       uint8_t peer_pub_key[41];
-      peer_pub_key[0] = 0x04;
+      peer_pub_key[0] = 0x04; // Uncompressed point
       memcpy(peer_pub_key + 1, payload.data() + 3, 40);
       if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
         _state = ConnectionState::REQUESTING_SESSION_KEY;
@@ -341,10 +365,13 @@ void EcoflowESP32::_handleAuthPacket(Packet *pkt) {
         EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND,
                              EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
         _sendCommand(enc_packet.toBytes());
+      } else {
+        ESP_LOGE(TAG, "Failed to compute shared secret");
       }
     }
   } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
     std::vector<uint8_t> decrypted_payload;
+    decrypted_payload.resize(payload.size());
     _crypto.decrypt_shared(payload.data(), payload.size(),
                            decrypted_payload.data());
     if (decrypted_payload.size() >= 18) {
@@ -357,8 +384,21 @@ void EcoflowESP32::_handleAuthPacket(Packet *pkt) {
                                 EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                 auth_status_pkt.toBytes());
       _sendCommand(enc_auth_status.toBytes(&_crypto));
+    } else {
+      ESP_LOGE(TAG, "Failed to decrypt session key");
     }
-  } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
+  }
+}
+
+/**
+ * @brief Handles packets received during the authentication process (Auth Status,
+ * Authenticating).
+ */
+void EcoflowESP32::_handleAuthPacket(Packet *pkt) {
+  ESP_LOGD(TAG, "_handleAuthPacket: cmdId=0x%02x", pkt->getCmdId());
+  const auto &payload = pkt->getPayload();
+
+  if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
     if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
       _state = ConnectionState::AUTHENTICATING;
       uint8_t md5_data[16];
