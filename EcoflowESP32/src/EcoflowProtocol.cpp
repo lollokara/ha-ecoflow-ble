@@ -13,7 +13,7 @@ static void print_hex_protocol(const uint8_t* data, size_t size, const char* lab
         sprintf(hex_str + i * 3, "%02x ", data[i]);
     }
     hex_str[size * 3] = '\0';
-    ESP_LOGD(TAG, "%s: %s", label, hex_str);
+    ESP_LOGV(TAG, "%s: %s", label, hex_str);
 }
 
 const uint8_t Packet::PREFIX;
