@@ -180,22 +180,6 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             }
         }
     }
-            obj["out"] = d->getOutputPower();
-            obj["solar"] = d->getSolarInputPower();
-            obj["ac_on"] = d->isAcOn();
-            obj["dc_on"] = d->isDcOn();
-            obj["usb_on"] = d->isUsbOn();
-            obj["cfg_ac_lim"] = d->getAcChgLimit();
-            obj["cfg_max"] = d->getMaxChgSoc();
-            obj["cfg_min"] = d->getMinDsgSoc();
-            obj["cell_temp"] = d->getCellTemperature();
-            obj["ac_out_pow"] = (int)abs(data.acOutputPower);
-            obj["dc_out_pow"] = (int)abs(data.dc12vOutputPower);
-            obj["usb_out_pow"] = (int)(abs(data.usbcOutputPower) + abs(data.usbc2OutputPower) + abs(data.usbaOutputPower) + abs(data.usba2OutputPower));
-        }
-    }
-
-    // Wave 2
     {
         DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
         EcoflowESP32* d = s->instance;
