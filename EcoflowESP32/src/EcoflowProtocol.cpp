@@ -251,10 +251,10 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             }
         }
 
-        // Python implementation does NOT use is_xor=True (isAuthenticated) for parsing packets.
-        // Enabling it corrupts the payload if seq[0] != 0.
-        // We pass false to match Python logic and fix "Zero Data" issue.
-        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), false);
+        // Re-enable XOR check based on isAuthenticated status.
+        // The observed payload corruption (repeating patterns) suggests missing XOR masking
+        // when seq[0] != 0, which is standard for Protocol V3/19.
+        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
         if (packet) {
             packets.push_back(*packet);
             delete packet;

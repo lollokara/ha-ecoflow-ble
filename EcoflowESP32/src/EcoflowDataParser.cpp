@@ -73,32 +73,15 @@ static void logWave2Data(const Wave2Data& w) {
 
 namespace EcoflowDataParser {
 
-static void print_hex_data(const uint8_t* data, size_t size, const char* label) {
-    if (size == 0) return;
-    // Limit to first 32 bytes for logging to avoid buffer overflow on stack
-    size_t log_len = std::min(size, (size_t)32);
-    char hex_str[log_len * 3 + 1];
-    for (size_t i = 0; i < log_len; i++) {
-        sprintf(hex_str + i * 3, "%02x ", data[i]);
-    }
-    hex_str[log_len * 3] = '\0';
-    ESP_LOGD(TAG, "%s: %s%s", label, hex_str, size > log_len ? "..." : "");
-}
-
 void parsePacket(const Packet& pkt, EcoflowData& data) {
-    ESP_LOGD(TAG, "parsePacket: src=0x%02x cmdSet=0x%02x cmdId=0x%02x len=%d ver=%d",
-             pkt.getSrc(), pkt.getCmdSet(), pkt.getCmdId(), pkt.getPayload().size(), pkt.getVersion());
 
     // V3 Protobuf Packet (Delta 3) - src 0x02
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
-        ESP_LOGD(TAG, "Processing Delta 3/Pro 3 packet");
-
         // Attempt to decode as Delta 3 (PD335) FIRST
         pd335_sys_DisplayPropertyUpload d3_msg = pd335_sys_DisplayPropertyUpload_init_zero;
         pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &d3_msg)) {
-            ESP_LOGD(TAG, "Decoded as PD335 (D3)");
             Delta3Data& d3 = data.delta3;
 
             if (d3_msg.has_cms_batt_soc) d3.batteryLevel = d3_msg.cms_batt_soc;
@@ -155,12 +138,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             return;
         }
 
-        ESP_LOGW(TAG, "PD335 Decode failed. Trying MR521...");
         mr521_DisplayPropertyUpload mr521_msg = mr521_DisplayPropertyUpload_init_zero;
         pb_istream_t stream_mr = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
         if (pb_decode(&stream_mr, mr521_DisplayPropertyUpload_fields, &mr521_msg)) {
-             ESP_LOGD(TAG, "Decoded as MR521 (D3P)");
              DeltaPro3Data& d3p = data.deltaPro3;
 
              if (mr521_msg.has_cms_batt_soc) d3p.batteryLevel = mr521_msg.cms_batt_soc;
@@ -198,9 +179,6 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
 
              return;
         }
-
-        ESP_LOGE(TAG, "Failed to decode packet as D3 (PD335) or D3P (MR521). Payload Hex:");
-        print_hex_data(pkt.getPayload().data(), pkt.getPayload().size(), "Payload");
     }
 
     // Alternator Charger (src 0x14)
