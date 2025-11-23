@@ -146,8 +146,6 @@ std::vector<uint8_t> Packet::toBytes() const {
                {(uint8_t)(_seq & 0xFF), (uint8_t)((_seq >> 8) & 0xFF),
                 (uint8_t)((_seq >> 16) & 0xFF),
                 (uint8_t)((_seq >> 24) & 0xFF)});
-  bytes.push_back(0); // Reserved
-  bytes.push_back(0); // Reserved
   bytes.push_back(_src);
   bytes.push_back(_dest);
 
@@ -178,30 +176,30 @@ EncPacket::EncPacket(uint8_t frame_type, uint8_t payload_type,
       _needs_ack(needs_ack), _is_ack(is_ack) {}
 
 std::vector<uint8_t> EncPacket::toBytes(EcoflowCrypto *crypto) const {
-  std::vector<uint8_t> processed_payload = _payload;
+  std::vector<uint8_t> encrypted_payload = _payload;
   if (crypto) {
-    // Apply PKCS7 padding before encryption
+    // PKCS7 padding
     int padding = 16 - (_payload.size() % 16);
     std::vector<uint8_t> padded_payload = _payload;
-    padded_payload.insert(padded_payload.end(), padding, padding);
-
-    processed_payload.resize(padded_payload.size());
+    for (int i = 0; i < padding; ++i) {
+      padded_payload.push_back(padding);
+    }
+    encrypted_payload.resize(padded_payload.size());
     crypto->encrypt_session(padded_payload.data(), padded_payload.size(),
-                            processed_payload.data());
+                            encrypted_payload.data());
   }
 
   std::vector<uint8_t> packet_data;
   packet_data.push_back(PREFIX & 0xFF);
   packet_data.push_back((PREFIX >> 8) & 0xFF);
-  packet_data.push_back((_frame_type << 4) | _payload_type);
-  packet_data.push_back(0x01); // Protocol version/hardcoded value
-
-  uint16_t len = processed_payload.size() + 2; // Payload + 2 bytes for CRC
+  packet_data.push_back((_frame_type << 4));
+  packet_data.push_back(0x01); // Hardcoded based on Python implementation
+  uint16_t len = encrypted_payload.size() + 2; // payload + 2 bytes for CRC
   packet_data.push_back(len & 0xFF);
   packet_data.push_back((len >> 8) & 0xFF);
 
-  packet_data.insert(packet_data.end(), processed_payload.begin(),
-                     processed_payload.end());
+  packet_data.insert(packet_data.end(), encrypted_payload.begin(),
+                     encrypted_payload.end());
 
   uint16_t crc = crc16(packet_data.data(), packet_data.size());
   packet_data.push_back(crc & 0xFF);
