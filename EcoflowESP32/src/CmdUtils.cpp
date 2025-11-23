@@ -147,7 +147,25 @@ void CmdUtils::processInput(String input) {
     }
 }
 
+/*WAVE 2 Commands:
 
+| Method name                        | cmd_id | Payload description                                                  |
+| ---------------------------------- | ------ | -------------------------------------------------------------------- |
+| set_ambient_light(status)          | 0x5C   | 1 byte: 0x01 = on, 0x02 = off    (no idea why 2 is off)              |
+| set_automatic_drain(enable)        | 0x59   | 1 byte: 0x01 = enable  0x00 = disable                                |
+| set_beep_enabled(flag)             | 0x56   | 1 byte: 0x01 = on, 0x00 = off                                        |
+| set_fan_speed(fan_gear)            | 0x5E   | 1 byte, 0x0 -> low 0x1 -> medium 0x2 -> high                         |
+| set_main_mode(mode)                | 0x51   | 1 byte, 0x0 -> Cold, 0x1 -> Warm, 0x2 Fan                            |
+| set_power_state(mode)              | 0x5B   | 1 byte: 0x01 = on, 0x00 = off                                        |
+| set_temperature(temp_value)        | 0x58   | 1 byte, 0x10 sets 16C 0x1F sets 30C                                  |
+| set_countdown_timer(time, status)  | 0x55   | 3 bytes: [0x00, 0x00, status], status meaning unidentified           |
+| set_idle_screen_timeout(time)      | 0x54   | 3 bytes: [0x00, 0x00, time], time possible values 0x00 and 0x01      |
+| set_sub_mode(sub_mode)             | 0x52   | 1 byte, 0x0 -> MAX, 0x1 -> Night, 0x2 -> Eco, 0x3 Normal             |
+| set_temperature_display_type(type) | 0x5D   | 1 byte, 0x0 -> Internal (House), 0x1 -> Airflow                      |
+| set_temperature_unit(unit)         | 0x53   | 1 byte: 0x00 or 0x01; 0x1 = °F and 0x0 = °C                          |
+
+
+*/
 void CmdUtils::printHelp() {
     cmd_println("=== Available Commands ===");
 

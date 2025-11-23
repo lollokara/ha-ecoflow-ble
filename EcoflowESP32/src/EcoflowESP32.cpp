@@ -17,7 +17,6 @@
 #include "mr521.pb.h"
 #include "dc009_apl_comm.pb.h"
 #include <pb_encode.h>
-
 static const char* TAG = "EcoflowESP32";
 
 // Static vector to hold instances for the static notify callback
