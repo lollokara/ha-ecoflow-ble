@@ -223,7 +223,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     break;
             }
         }
-
+        /*
         // --- Process Incoming Notifications ---
         BleNotification* notification;
         if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
@@ -276,6 +276,29 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
             }
             delete[] notification->data;
             delete notification;
+        }*/
+        BleNotification *notification;
+        if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
+          if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE ||
+              self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
+            std::vector<uint8_t> raw_payload =
+                EncPacket::parseSimple(notification->data, notification->length);
+            if (!raw_payload.empty()) {
+              self->_handleAuthHandshake(raw_payload);
+            }
+          } else {
+            std::vector<Packet> packets = EncPacket::parsePackets(
+                notification->data, notification->length, self->_crypto,
+                self->_rxBuffer, self->isAuthenticated());
+            if (packets.empty() && notification->length > 0) {
+                ESP_LOGW(TAG, "Received %d bytes but no packets parsed", notification->length);
+            }
+            for (auto &packet : packets) {
+              self->_handlePacket(&packet);
+            }
+          }
+          delete[] notification->data;
+          delete notification;
         }
 
         vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -307,9 +330,67 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     }
 }
 
+/**
+ * @brief Handles raw payload received during initial handshake (Public Key,
+ * Session Key).
+ */
+void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
+  ESP_LOGV(TAG, "_handleAuthHandshake: received %d bytes", payload.size());
+
+  if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+    if (payload.size() >= 43 && payload[0] == 0x01) {
+      uint8_t peer_pub_key[41];
+      peer_pub_key[0] = 0x04; // Uncompressed point
+      memcpy(peer_pub_key + 1, payload.data() + 3, 40);
+      if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+        _state = ConnectionState::REQUESTING_SESSION_KEY;
+        std::vector<uint8_t> req_payload = {0x02};
+        EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND,
+                             EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
+        _sendCommand(enc_packet.toBytes());
+      } else {
+        ESP_LOGE(TAG, "Failed to compute shared secret");
+      }
+    }
+  } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
+    if (payload.size() > 1) {
+      std::vector<uint8_t> decrypted_payload;
+      size_t encrypted_len = payload.size() - 1;
+      decrypted_payload.resize(encrypted_len);
+      // Decrypt starting from payload[1], length is size-1
+      _crypto.decrypt_shared(payload.data() + 1, encrypted_len,
+                             decrypted_payload.data());
+      
+      // Remove padding
+      if (!decrypted_payload.empty()) {
+          uint8_t padding = decrypted_payload.back();
+          if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
+              decrypted_payload.resize(decrypted_payload.size() - padding);
+          }
+      }
+
+      if (decrypted_payload.size() >= 18) {
+        // Use decrypted_payload.data() + 16 as seed, decrypted_payload.data() as srand
+        _crypto.generate_session_key(decrypted_payload.data() + 16,
+                                     decrypted_payload.data());
+        _state = ConnectionState::REQUESTING_AUTH_STATUS;
+        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
+                               _protocolVersion, _txSeq++, 0x0d);
+        EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
+                                  EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
+                                  auth_status_pkt.toBytes());
+        _sendCommand(enc_auth_status.toBytes(&_crypto));
+      }
+    } else {
+      ESP_LOGE(TAG, "Invalid session key payload size");
+    }
+  }
+}
+
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
-    _txSeq = esp_random();
+    //_txSeq = esp_random();
+    _txSeq = 1;
     if (!_crypto.generate_keys()) {
         ESP_LOGE(TAG, "Failed to generate keys");
         return;
@@ -389,6 +470,8 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
             uint8_t dest = _getDeviceDest();
+            //If setting dest = 0x35 it pairs but reads no data
+            dest = 0x35;
             Packet auth_pkt(0x21, dest, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));

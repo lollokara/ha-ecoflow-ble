@@ -227,7 +227,8 @@ private:
     uint8_t _getDeviceDest();
     void _sendConfigPacket(const mr521_ConfigWrite& config);
     void _sendConfigPacket(const dc009_apl_comm_ConfigWrite& config);
-
+    void _handleAuthHandshake(const std::vector<uint8_t>& payload);
+    
     static std::vector<EcoflowESP32*> _instances;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;
     ConnectionState _lastState = ConnectionState::NOT_CONNECTED;
