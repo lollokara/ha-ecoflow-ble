@@ -116,6 +116,14 @@ Packet* Packet::fromBytes(const uint8_t* data, size_t len, bool is_xor) {
                 payload[i] ^= data[6];
             }
         }
+
+        // Fix for Delta 3 / Protocol V3 version 19 packets
+        // Python implementation: if version == 19 and payload[-2:] == b"\xbb\xbb": payload = payload[:-2]
+        if (version == 19 && payload.size() >= 2) {
+            if (payload[payload.size() - 2] == 0xBB && payload[payload.size() - 1] == 0xBB) {
+                payload.resize(payload.size() - 2);
+            }
+        }
     }
 
     return new Packet(src, dest, cmd_set, cmd_id, payload, dsrc, ddest, version, seq, product_id);
@@ -242,7 +250,10 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             }
         }
 
-        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
+        // Python implementation does NOT use is_xor=True (isAuthenticated) for parsing packets.
+        // Enabling it corrupts the payload if seq[0] != 0.
+        // We pass false to match Python logic and fix "Zero Data" issue.
+        Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), false);
         if (packet) {
             packets.push_back(*packet);
             delete packet;

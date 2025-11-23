@@ -374,8 +374,9 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
         _crypto.generate_session_key(decrypted_payload.data() + 16,
                                      decrypted_payload.data());
         _state = ConnectionState::REQUESTING_AUTH_STATUS;
+        // Auth status packet always uses version 3 and sequence 0
         Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
-                               _protocolVersion, _txSeq++, 0x0d);
+                               3, 0, 0x0d);
         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
                                   EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                   auth_status_pkt.toBytes());
@@ -456,7 +457,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
         if (decrypted_payload.size() >= 18) {
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
             _state = ConnectionState::REQUESTING_AUTH_STATUS;
-            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
+            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 3, _txSeq++, 0x0d);
             EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
             _sendCommand(enc_auth_status.toBytes(&_crypto));
         }
@@ -469,10 +470,8 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             for(int i=0; i<16; i++) sprintf(&hex_data[i*2], "%02X", md5_data[i]);
             hex_data[32] = 0;
             std::vector<uint8_t> auth_payload(hex_data, hex_data + 32);
-            uint8_t dest = _getDeviceDest();
-            //If setting dest = 0x35 it pairs but reads no data
-            dest = 0x35;
-            Packet auth_pkt(0x21, dest, 0x35, 0x86, auth_payload, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
+            // Authentication packets always use dest 0x35, version 3, and sequence 0
+            Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, 3, 0, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
