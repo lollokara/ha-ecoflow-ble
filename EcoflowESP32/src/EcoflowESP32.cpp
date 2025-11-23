@@ -374,10 +374,13 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
         _crypto.generate_session_key(decrypted_payload.data() + 16,
                                      decrypted_payload.data());
         _state = ConnectionState::REQUESTING_AUTH_STATUS;
-        // Auth status packet (0x89) always uses Version 3 and Sequence 0, even for V2 devices.
-        // This step seems to be a standardized V3 service handshake.
+
+        // Use correct version and sequence for V2 devices
+        uint8_t auth_version = (_protocolVersion == 2) ? 2 : 3;
+        uint32_t auth_seq = (_protocolVersion == 2) ? _txSeq++ : 0;
+
         Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
-                               3, 0, 0x0d);
+                               auth_version, auth_seq, 0x0d);
         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
                                   EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                   auth_status_pkt.toBytes());
@@ -458,7 +461,11 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
         if (decrypted_payload.size() >= 18) {
             _crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
             _state = ConnectionState::REQUESTING_AUTH_STATUS;
-            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, 3, _txSeq++, 0x0d);
+
+            uint8_t auth_version = (_protocolVersion == 2) ? 2 : 3;
+            uint32_t auth_seq = (_protocolVersion == 2) ? _txSeq++ : 0;
+
+            Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, auth_version, auth_seq, 0x0d);
             EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
             _sendCommand(enc_auth_status.toBytes(&_crypto));
         }
