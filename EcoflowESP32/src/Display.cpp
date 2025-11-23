@@ -512,7 +512,8 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     unsigned long now = millis();
     unsigned long timeout = 10000; // Default 10s
     if (currentState == MenuState::DASHBOARD) timeout = 0; // No timeout
-    else if (currentState == MenuState::EDIT_CHG || currentState == MenuState::EDIT_SOC_UP || currentState == MenuState::EDIT_SOC_DN) {
+    else if (currentState == MenuState::EDIT_CHG || currentState == MenuState::EDIT_SOC_UP || currentState == MenuState::EDIT_SOC_DN ||
+             currentState == MenuState::EDIT_W2_PWR || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
         timeout = 60000; // 60s for editing
     }
 
@@ -602,271 +603,268 @@ DisplayAction handleDisplayInput(ButtonInput input) {
         return DisplayAction::NONE;
     }
 
-    if (currentState == MenuState::DASHBOARD) {
-        if (input == ButtonInput::BTN_UP || input == ButtonInput::BTN_DOWN) {
-             int currentIdx = (int)currentDashboardView;
-             int dir = (input == ButtonInput::BTN_UP) ? 1 : -1;
-             int nextIdx = currentIdx + dir;
-             if (nextIdx > 5) nextIdx = 0;
-             if (nextIdx < 0) nextIdx = 5;
-             currentDashboardView = (DashboardView)nextIdx;
-        } else if (input == ButtonInput::BTN_ENTER_SHORT) {
-            currentState = MenuState::SELECTION;
-            currentSelection = SelectionPage::AC;
-        }
-        return DisplayAction::NONE;
-    }
+    switch(currentState) {
+        case MenuState::DASHBOARD:
+            if (input == ButtonInput::BTN_UP || input == ButtonInput::BTN_DOWN) {
+                 int currentIdx = (int)currentDashboardView;
+                 int dir = (input == ButtonInput::BTN_UP) ? 1 : -1;
+                 int nextIdx = currentIdx + dir;
+                 if (nextIdx > 5) nextIdx = 0;
+                 if (nextIdx < 0) nextIdx = 5;
+                 currentDashboardView = (DashboardView)nextIdx;
+            } else if (input == ButtonInput::BTN_ENTER_SHORT) {
+                currentState = MenuState::SELECTION;
+                currentSelection = SelectionPage::AC;
+            }
+            break;
 
-    if (currentState == MenuState::SELECTION) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-                prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::DEV; // Wrap last
-                else currentSelection = (SelectionPage)((int)currentSelection - 1);
-                slideDirection = -1; isAnimating = true; animationStep = 0;
-                break;
-            case ButtonInput::BTN_DOWN:
-                prevSelection = currentSelection;
-                if (currentSelection == SelectionPage::DEV) currentSelection = SelectionPage::AC; // Wrap first
-                else currentSelection = (SelectionPage)((int)currentSelection + 1);
-                slideDirection = 1; isAnimating = true; animationStep = 0;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                if (currentSelection == SelectionPage::DEV) {
-                    currentState = MenuState::DEVICE_SELECT;
-                    currentDevicePage = DevicePage::D3;
-                } else if (currentSelection == SelectionPage::SET) {
-                    currentState = MenuState::SETTINGS_SUBMENU;
-                    currentSettingsPage = SettingsPage::CHG;
-                } else if (currentSelection == SelectionPage::AIR) {
-                    currentState = MenuState::WAVE2_MENU;
-                    currentWave2Page = Wave2MenuPage::PWR;
-                } else {
-                    currentState = MenuState::DETAIL;
+        case MenuState::SELECTION:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                    prevSelection = currentSelection;
+                    if (currentSelection == SelectionPage::AC) currentSelection = SelectionPage::DEV; // Wrap last
+                    else currentSelection = (SelectionPage)((int)currentSelection - 1);
+                    slideDirection = -1; isAnimating = true; animationStep = 0;
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    prevSelection = currentSelection;
+                    if (currentSelection == SelectionPage::DEV) currentSelection = SelectionPage::AC; // Wrap first
+                    else currentSelection = (SelectionPage)((int)currentSelection + 1);
+                    slideDirection = 1; isAnimating = true; animationStep = 0;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    if (currentSelection == SelectionPage::DEV) {
+                        currentState = MenuState::DEVICE_SELECT;
+                        currentDevicePage = DevicePage::D3;
+                    } else if (currentSelection == SelectionPage::SET) {
+                        currentState = MenuState::SETTINGS_SUBMENU;
+                        currentSettingsPage = SettingsPage::CHG;
+                    } else if (currentSelection == SelectionPage::AIR) {
+                        currentState = MenuState::WAVE2_MENU;
+                        currentWave2Page = Wave2MenuPage::PWR;
+                    } else {
+                        currentState = MenuState::DETAIL;
+                    }
+                    break;
+                 default: break;
+            }
+            break;
+
+        case MenuState::DETAIL:
+            if (input == ButtonInput::BTN_ENTER_SHORT) { // Toggle on Short Press
+                flashScreen(cWhite);
+                switch(currentSelection) {
+                    case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
+                    case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
+                    case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
+                    default: break;
                 }
-                break;
-             default: break;
-        }
-        return DisplayAction::NONE;
-    }
+            }
+            break;
 
-    if (currentState == MenuState::DETAIL) {
-        if (input == ButtonInput::BTN_ENTER_SHORT) { // Toggle on Short Press
-            flashScreen(cWhite);
-            switch(currentSelection) {
-                case SelectionPage::AC: return DisplayAction::TOGGLE_AC;
-                case SelectionPage::DC: return DisplayAction::TOGGLE_DC;
-                case SelectionPage::USB: return DisplayAction::TOGGLE_USB;
+        case MenuState::WAVE2_MENU:
+            {
+                bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
+                switch(input) {
+                    case ButtonInput::BTN_UP:
+                    case ButtonInput::BTN_DOWN:
+                        {
+                            int max = showSmd ? 3 : 2;
+                            int cur = (int)currentWave2Page;
+                            int dir = (input == ButtonInput::BTN_UP) ? -1 : 1;
+                            cur = cur + dir;
+                            if (cur < 0) cur = max;
+                            if (cur > max) cur = 0;
+                            currentWave2Page = (Wave2MenuPage)cur;
+                        }
+                        break;
+                    case ButtonInput::BTN_ENTER_SHORT:
+                        if (currentWave2Page == Wave2MenuPage::PWR) {
+                            currentState = MenuState::EDIT_W2_PWR;
+                            tempW2Val = currentData.wave2.powerMode;
+                            if (tempW2Val < 1 || tempW2Val > 2) tempW2Val = 2; // Default to OFF
+                        } else if (currentWave2Page == Wave2MenuPage::MOD) {
+                            currentState = MenuState::EDIT_W2_MOD;
+                            tempW2Val = currentData.wave2.mode;
+                        } else if (currentWave2Page == Wave2MenuPage::SPD) {
+                            currentState = MenuState::EDIT_W2_SPD;
+                            tempW2Val = currentData.wave2.fanValue;
+                        } else if (currentWave2Page == Wave2MenuPage::SMD) {
+                            currentState = MenuState::EDIT_W2_SMD;
+                            tempW2Val = currentData.wave2.subMode;
+                        }
+                        break;
+                    default: break;
+                }
+            }
+            break;
+
+        case MenuState::EDIT_W2_PWR:
+        case MenuState::EDIT_W2_MOD:
+        case MenuState::EDIT_W2_SPD:
+        case MenuState::EDIT_W2_SMD:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                    if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
+                    if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
+                    if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
+                    if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val++; if(tempW2Val>3) tempW2Val=0; }
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
+                    if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
+                    if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
+                    if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val--; if(tempW2Val<0) tempW2Val=3; }
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT: // Confirm
+                    flashScreen(cWhite);
+                    {
+                        MenuState prevState = currentState;
+                        currentState = MenuState::WAVE2_MENU;
+                        if (prevState == MenuState::EDIT_W2_PWR) return DisplayAction::W2_SET_PWR;
+                        if (prevState == MenuState::EDIT_W2_MOD) return DisplayAction::W2_SET_MODE;
+                        if (prevState == MenuState::EDIT_W2_SPD) return DisplayAction::W2_SET_FAN;
+                        if (prevState == MenuState::EDIT_W2_SMD) return DisplayAction::W2_SET_SUB_MODE;
+                    }
+                    break;
+            }
+            break;
+
+        case MenuState::SETTINGS_SUBMENU:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                case ButtonInput::BTN_DOWN:
+                    if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
+                    else currentSettingsPage = SettingsPage::CHG;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    if (currentSettingsPage == SettingsPage::CHG) {
+                        currentState = MenuState::EDIT_CHG;
+                        tempAcLimit = currentData.delta3.acChargingSpeed;
+                        if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
+                    } else {
+                        currentState = MenuState::LIMITS_SUBMENU;
+                        currentLimitsPage = LimitsPage::UP;
+                    }
+                    break;
+                 default: break;
+            }
+            break;
+
+        case MenuState::LIMITS_SUBMENU:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                case ButtonInput::BTN_DOWN:
+                    if (currentLimitsPage == LimitsPage::UP) currentLimitsPage = LimitsPage::DN;
+                    else currentLimitsPage = LimitsPage::UP;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    tempMaxChg = currentData.delta3.batteryChargeLimitMax;
+                    if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100;
+
+                    tempMinDsg = currentData.delta3.batteryChargeLimitMin;
+                    if (tempMinDsg < 0 || tempMinDsg > 30) tempMinDsg = 0;
+
+                    if (currentLimitsPage == LimitsPage::UP) {
+                        currentState = MenuState::EDIT_SOC_UP;
+                    } else {
+                        currentState = MenuState::EDIT_SOC_DN;
+                    }
+                    break;
                 default: break;
             }
-        }
-        return DisplayAction::NONE;
-    }
+            break;
 
-    if (currentState == MenuState::WAVE2_MENU) {
-        bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
-        switch(input) {
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-                {
-                    int max = showSmd ? 3 : 2;
-                    int cur = (int)currentWave2Page;
-                    int dir = (input == ButtonInput::BTN_UP) ? -1 : 1;
-                    cur = cur + dir;
-                    if (cur < 0) cur = max;
-                    if (cur > max) cur = 0;
-                    currentWave2Page = (Wave2MenuPage)cur;
-                }
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                if (currentWave2Page == Wave2MenuPage::PWR) {
-                    currentState = MenuState::EDIT_W2_PWR;
-                    tempW2Val = currentData.wave2.powerMode;
-                    if (tempW2Val < 1 || tempW2Val > 2) tempW2Val = 2; // Default to OFF if unknown
-                } else if (currentWave2Page == Wave2MenuPage::MOD) {
-                    currentState = MenuState::EDIT_W2_MOD;
-                    tempW2Val = currentData.wave2.mode;
-                } else if (currentWave2Page == Wave2MenuPage::SPD) {
-                    currentState = MenuState::EDIT_W2_SPD;
-                    tempW2Val = currentData.wave2.fanValue;
-                } else if (currentWave2Page == Wave2MenuPage::SMD) {
-                    currentState = MenuState::EDIT_W2_SMD;
-                    tempW2Val = currentData.wave2.subMode;
-                }
-                break;
-            default: break;
-        }
-    }
+        case MenuState::EDIT_CHG:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                    tempAcLimit += 100;
+                    if (tempAcLimit > 1500) tempAcLimit = 1500;
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    tempAcLimit -= 100;
+                    if (tempAcLimit < 400) tempAcLimit = 400;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT: // Confirm
+                    flashScreen(cWhite);
+                    currentState = MenuState::DASHBOARD;
+                    return DisplayAction::SET_AC_LIMIT;
+                default: break;
+            }
+            break;
 
-    // Common logic for Editing states
-    if (currentState == MenuState::EDIT_W2_PWR || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-                // Logic depends on state
-                if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
-                if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
-                if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val++; if(tempW2Val>2) tempW2Val=0; }
-                if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val++; if(tempW2Val>3) tempW2Val=0; }
-                break;
-            case ButtonInput::BTN_DOWN:
-                if (currentState == MenuState::EDIT_W2_PWR) { tempW2Val = (tempW2Val == 1) ? 2 : 1; }
-                if (currentState == MenuState::EDIT_W2_MOD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
-                if (currentState == MenuState::EDIT_W2_SPD) { tempW2Val--; if(tempW2Val<0) tempW2Val=2; }
-                if (currentState == MenuState::EDIT_W2_SMD) { tempW2Val--; if(tempW2Val<0) tempW2Val=3; }
-                break;
-            case ButtonInput::BTN_ENTER_SHORT: // Confirm
-                flashScreen(cWhite);
-                {
-                    MenuState prevState = currentState;
-                    currentState = MenuState::WAVE2_MENU;
-                    if (prevState == MenuState::EDIT_W2_PWR) return DisplayAction::W2_SET_PWR;
-                    if (prevState == MenuState::EDIT_W2_MOD) return DisplayAction::W2_SET_MODE;
-                    if (prevState == MenuState::EDIT_W2_SPD) return DisplayAction::W2_SET_FAN;
-                    if (prevState == MenuState::EDIT_W2_SMD) return DisplayAction::W2_SET_SUB_MODE;
-                }
-                break;
-        }
-    }
+        case MenuState::EDIT_SOC_UP:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                    tempMaxChg += 10;
+                    if (tempMaxChg > 100) tempMaxChg = 100;
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    tempMaxChg -= 10;
+                    if (tempMaxChg < 50) tempMaxChg = 50;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT: // Confirm
+                    flashScreen(cWhite);
+                    currentState = MenuState::DASHBOARD;
+                    return DisplayAction::SET_SOC_LIMITS;
+                default: break;
+            }
+            break;
 
-    if (currentState == MenuState::SETTINGS_SUBMENU) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-                if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
-                else currentSettingsPage = SettingsPage::CHG;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                if (currentSettingsPage == SettingsPage::CHG) {
-                    currentState = MenuState::EDIT_CHG;
-                    tempAcLimit = currentData.delta3.acChargingSpeed;
-                    if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
-                } else {
-                    currentState = MenuState::LIMITS_SUBMENU;
-                    currentLimitsPage = LimitsPage::UP;
-                }
-                break;
-             default: break;
-        }
-        return DisplayAction::NONE;
-    }
+        case MenuState::EDIT_SOC_DN:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                    tempMinDsg += 10;
+                    if (tempMinDsg > 30) tempMinDsg = 30;
+                    break;
+                case ButtonInput::BTN_DOWN:
+                    tempMinDsg -= 10;
+                    if (tempMinDsg < 0) tempMinDsg = 0;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT: // Confirm
+                    flashScreen(cWhite);
+                    currentState = MenuState::DASHBOARD;
+                    return DisplayAction::SET_SOC_LIMITS;
+                default: break;
+            }
+            break;
 
-    if (currentState == MenuState::LIMITS_SUBMENU) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-                if (currentLimitsPage == LimitsPage::UP) currentLimitsPage = LimitsPage::DN;
-                else currentLimitsPage = LimitsPage::UP;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                tempMaxChg = currentData.delta3.batteryChargeLimitMax;
-                if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100;
+        case MenuState::DEVICE_SELECT:
+            switch(input) {
+                case ButtonInput::BTN_UP:
+                case ButtonInput::BTN_DOWN:
+                    {
+                        int idx = (int)currentDevicePage;
+                        idx = (idx + 1) % 4; // 4 devices
+                        currentDevicePage = (DevicePage)idx;
+                    }
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    currentState = MenuState::DEVICE_ACTION;
+                    currentDeviceAction = DeviceActionPage::CON;
+                    if (currentDevicePage == DevicePage::D3) targetDeviceType = DeviceType::DELTA_3;
+                    else if (currentDevicePage == DevicePage::W2) targetDeviceType = DeviceType::WAVE_2;
+                    else if (currentDevicePage == DevicePage::D3P) targetDeviceType = DeviceType::DELTA_PRO_3;
+                    else if (currentDevicePage == DevicePage::CHG) targetDeviceType = DeviceType::ALTERNATOR_CHARGER;
+                    break;
+                default: break;
+            }
+            break;
 
-                tempMinDsg = currentData.delta3.batteryChargeLimitMin;
-                if (tempMinDsg < 0 || tempMinDsg > 30) tempMinDsg = 0;
-
-                if (currentLimitsPage == LimitsPage::UP) {
-                    currentState = MenuState::EDIT_SOC_UP;
-                } else {
-                    currentState = MenuState::EDIT_SOC_DN;
-                }
-                break;
-            default: break;
-        }
-        return DisplayAction::NONE;
-    }
-
-    if (currentState == MenuState::EDIT_CHG) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-                tempAcLimit += 100;
-                if (tempAcLimit > 1500) tempAcLimit = 1500;
-                break;
-            case ButtonInput::BTN_DOWN:
-                tempAcLimit -= 100;
-                if (tempAcLimit < 400) tempAcLimit = 400;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT: // Confirm
-                flashScreen(cWhite);
-                currentState = MenuState::DASHBOARD;
-                return DisplayAction::SET_AC_LIMIT;
-            default: break;
-        }
-        return DisplayAction::NONE;
-    }
-
-    if (currentState == MenuState::EDIT_SOC_UP) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-                tempMaxChg += 10;
-                if (tempMaxChg > 100) tempMaxChg = 100;
-                break;
-            case ButtonInput::BTN_DOWN:
-                tempMaxChg -= 10;
-                if (tempMaxChg < 50) tempMaxChg = 50;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT: // Confirm
-                flashScreen(cWhite);
-                currentState = MenuState::DASHBOARD;
-                return DisplayAction::SET_SOC_LIMITS;
-            default: break;
-        }
-        return DisplayAction::NONE;
-    }
-
-    if (currentState == MenuState::EDIT_SOC_DN) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-                tempMinDsg += 10;
-                if (tempMinDsg > 30) tempMinDsg = 30;
-                break;
-            case ButtonInput::BTN_DOWN:
-                tempMinDsg -= 10;
-                if (tempMinDsg < 0) tempMinDsg = 0;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT: // Confirm
-                flashScreen(cWhite);
-                currentState = MenuState::DASHBOARD;
-                return DisplayAction::SET_SOC_LIMITS;
-            default: break;
-        }
-        return DisplayAction::NONE;
-    }
-
-    if (currentState == MenuState::DEVICE_SELECT) {
-        switch(input) {
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-                {
-                    int idx = (int)currentDevicePage;
-                    idx = (idx + 1) % 4; // 4 devices
-                    currentDevicePage = (DevicePage)idx;
-                }
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                currentState = MenuState::DEVICE_ACTION;
-                currentDeviceAction = DeviceActionPage::CON;
-                if (currentDevicePage == DevicePage::D3) targetDeviceType = DeviceType::DELTA_3;
-                else if (currentDevicePage == DevicePage::W2) targetDeviceType = DeviceType::WAVE_2;
-                else if (currentDevicePage == DevicePage::D3P) targetDeviceType = DeviceType::DELTA_PRO_3;
-                else if (currentDevicePage == DevicePage::CHG) targetDeviceType = DeviceType::ALTERNATOR_CHARGER;
-                break;
-            default: break;
-        }
-    }
-
-    if (currentState == MenuState::DEVICE_ACTION) {
-         switch(input) {
-            case ButtonInput::BTN_UP:
-            case ButtonInput::BTN_DOWN:
-                if (currentDeviceAction == DeviceActionPage::CON) currentDeviceAction = DeviceActionPage::DIS;
-                else currentDeviceAction = DeviceActionPage::CON;
-                break;
-            case ButtonInput::BTN_ENTER_SHORT:
-                if (currentDeviceAction == DeviceActionPage::CON) return DisplayAction::CONNECT_DEVICE;
-                else return DisplayAction::DISCONNECT_DEVICE;
-                break;
-            default: break;
-         }
+        case MenuState::DEVICE_ACTION:
+             switch(input) {
+                case ButtonInput::BTN_UP:
+                case ButtonInput::BTN_DOWN:
+                    if (currentDeviceAction == DeviceActionPage::CON) currentDeviceAction = DeviceActionPage::DIS;
+                    else currentDeviceAction = DeviceActionPage::CON;
+                    break;
+                case ButtonInput::BTN_ENTER_SHORT:
+                    if (currentDeviceAction == DeviceActionPage::CON) return DisplayAction::CONNECT_DEVICE;
+                    else return DisplayAction::DISCONNECT_DEVICE;
+                    break;
+                default: break;
+             }
+             break;
     }
 
     return DisplayAction::NONE;
