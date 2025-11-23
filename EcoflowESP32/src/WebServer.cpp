@@ -135,7 +135,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
                 obj["mode"] = (int)data.mode;
                 obj["sub_mode"] = (int)data.subMode;
                 obj["fan"] = (int)data.fanValue;
-                obj["pwr"] = (data.powerMode != 0);
+                obj["pwr"] = (data.powerMode == 1);
                 obj["drain"] = (data.wteFthEn != 0);
                 obj["light"] = (data.rgbState != 0);
                 obj["beep"] = (data.beepEnable != 0);

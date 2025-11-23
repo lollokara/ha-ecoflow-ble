@@ -1,9 +1,4 @@
-#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
 
-#include <Arduino.h>
-
-const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,7 +188,25 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .intro { text-align: center; padding: 60px 20px; animation: fadeIn 1s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
-</head>
+
+    <script>
+    window.fetch = async (url, options) => {
+        console.log('Mock Fetch:', url);
+        if (url.includes('/api/status')) {
+            return {
+                json: async () => ({
+                    esp_temp: 42.0,
+                    d3: { connected: true, sn: 'D3-TEST', name: 'Delta 3', batt: 80, cfg_ac_lim: 600, ac_out_pow: 0, dc_out_pow: 0, usb_out_pow: 0 },
+                    w2: { connected: true, sn: 'W2-TEST', name: 'Wave 2', batt: 50, mode: 0, powerMode: 2, set_temp: 22, pwr: false }, // Mocking OFF state logic (backend sends pwr: false if mode=2)
+                    d3p: { connected: false },
+                    ac: { connected: false }
+                })
+            };
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+    </script>
+    </head>
 <body>
     <canvas id="canvas-bg"></canvas>
     <div class="container">
@@ -900,6 +913,3 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </script>
 </body>
 </html>
-)rawliteral";
-
-#endif // WEB_ASSETS_H
