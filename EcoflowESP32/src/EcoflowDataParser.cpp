@@ -74,9 +74,12 @@ static void logWave2Data(const Wave2Data& w) {
 namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data) {
+    ESP_LOGD(TAG, "parsePacket: src=0x%02x cmdSet=0x%02x cmdId=0x%02x len=%d",
+             pkt.getSrc(), pkt.getCmdSet(), pkt.getCmdId(), pkt.getPayload().size());
 
     // V3 Protobuf Packet (Delta 3) - src 0x02
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
+        ESP_LOGD(TAG, "Processing Delta 3/Pro 3 packet");
         // This is ambiguous between Delta 3 and Delta Pro 3 if both use src 0x02.
         // Assuming different parsing based on success or packet structure.
         // Or relying on explicit device type knowledge if available (currently not passed to parser).
@@ -105,6 +108,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         pb_istream_t stream_mr = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
         if (pb_decode(&stream_mr, mr521_DisplayPropertyUpload_fields, &mr521_msg)) {
+             ESP_LOGD(TAG, "Decoded as MR521 (D3P)");
              // It decoded as MR521. Is it valid?
              // Check a unique field?
              // If d3 decoding also worked, we have a conflict.
@@ -153,6 +157,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
         if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &d3_msg)) {
+            ESP_LOGD(TAG, "Decoded as PD335 (D3)");
             Delta3Data& d3 = data.delta3;
 
             if (d3_msg.has_cms_batt_soc) d3.batteryLevel = d3_msg.cms_batt_soc;
@@ -208,6 +213,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             logDelta3Data(d3);
 
         } else {
+             ESP_LOGE(TAG, "Failed to decode packet as D3P or D3");
              // RuntimePropertyUpload parsing can be added here if strictly needed, but user asked to focus on Delta 3 Classic list
         }
     }

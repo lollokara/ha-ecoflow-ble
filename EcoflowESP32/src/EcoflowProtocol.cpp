@@ -156,6 +156,7 @@ std::vector<uint8_t> Packet::toBytes() const {
     bytes.push_back(_cmdId);
     bytes.insert(bytes.end(), _payload.begin(), _payload.end());
 
+    // CRC calculation must include the entire packet except the CRC bytes themselves
     uint16_t crc = crc16(bytes.data(), bytes.size());
     bytes.push_back(crc & 0xFF);
     bytes.push_back((crc >> 8) & 0xFF);
