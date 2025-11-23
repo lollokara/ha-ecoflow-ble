@@ -248,9 +248,12 @@ void EcoflowESP32::ble_task_entry(void *pvParameters) {
           self->_handleAuthHandshake(raw_payload);
         }
       } else {
+        // We can decrypt if we have a session key, which happens from REQUESTING_AUTH_STATUS onwards
+        bool canDecrypt =
+            self->_state >= ConnectionState::REQUESTING_AUTH_STATUS;
         std::vector<Packet> packets = EncPacket::parsePackets(
             notification->data, notification->length, self->_crypto,
-            self->_rxBuffer, self->isAuthenticated());
+            self->_rxBuffer, canDecrypt);
         for (auto &packet : packets) {
           self->_handlePacket(&packet);
         }
@@ -370,22 +373,25 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
       }
     }
   } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
-    std::vector<uint8_t> decrypted_payload;
-    decrypted_payload.resize(payload.size());
-    _crypto.decrypt_shared(payload.data(), payload.size(),
-                           decrypted_payload.data());
-    if (decrypted_payload.size() >= 18) {
-      _crypto.generate_session_key(decrypted_payload.data() + 16,
-                                   decrypted_payload.data());
-      _state = ConnectionState::REQUESTING_AUTH_STATUS;
-      Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
-                             _protocolVersion, _txSeq++, 0x0d);
+    if (payload.size() > 1 && payload[0] == 0x02) {
+      std::vector<uint8_t> decrypted_payload;
+      decrypted_payload.resize(payload.size() - 1);
+      _crypto.decrypt_shared(payload.data() + 1, payload.size() - 1,
+                             decrypted_payload.data());
+
+      if (decrypted_payload.size() >= 18) {
+        _crypto.generate_session_key(decrypted_payload.data() + 16,
+                                     decrypted_payload.data());
+        _state = ConnectionState::REQUESTING_AUTH_STATUS;
+        Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01,
+                               _protocolVersion, _txSeq++, 0x0d);
       EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
                                 EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                 auth_status_pkt.toBytes());
       _sendCommand(enc_auth_status.toBytes(&_crypto));
-    } else {
-      ESP_LOGE(TAG, "Failed to decrypt session key");
+      } else {
+        ESP_LOGE(TAG, "Failed to decrypt session key");
+      }
     }
   }
 }
