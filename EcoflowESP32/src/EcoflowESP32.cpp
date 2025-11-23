@@ -97,6 +97,7 @@ EcoflowESP32::~EcoflowESP32() {
 //--------------------------------------------------------------------------
 
 bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
+    ESP_LOGI(TAG, "begin: Initializing device %s with protocol version %d", deviceSn.c_str(), protocolVersion);
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
@@ -376,6 +377,7 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
         _state = ConnectionState::REQUESTING_AUTH_STATUS;
 
         // Use correct version and sequence for V2 devices
+        ESP_LOGI(TAG, "_handleAuthHandshake: Requesting Auth Status. Protocol Version: %d", _protocolVersion);
         uint8_t auth_version = (_protocolVersion == 2) ? 2 : 3;
         uint32_t auth_seq = (_protocolVersion == 2) ? _txSeq++ : 0;
 
