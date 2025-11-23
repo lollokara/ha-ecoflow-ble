@@ -1,14 +1,3 @@
-/**
- * @file DeviceManager.h
- * @author Lollokara
- * @brief Manages connections to multiple EcoFlow devices.
- *
- * This header defines the DeviceManager class, a singleton responsible for
- * scanning, connecting to, and managing individual EcoFlowESP32 instances.
- * It is designed to handle different device types, like the Delta 3 and Wave 2,
- * and persists their connection details.
- */
-
 #ifndef DEVICE_MANAGER_H
 #define DEVICE_MANAGER_H
 
@@ -157,6 +146,7 @@ private:
 
     // Connection queue members (not currently used but kept for potential future use)
     bool _hasPendingConnection = false;
+    std::string _pendingSN;
     NimBLEAdvertisedDevice* _pendingDevice = nullptr;
     SemaphoreHandle_t _scanMutex;
 };

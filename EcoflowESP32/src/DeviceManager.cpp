@@ -231,7 +231,14 @@ void DeviceManager::_handlePendingConnection() {
 
             ESP_LOGI("DeviceManager", "Executing pending connection...");
             DeviceSlot* slot = getSlot(_targetScanType);
-            saveDevice(_targetScanType, _pendingDevice->getAddress().toString(), slot->serialNumber);
+
+            // Use _pendingSN captured during scan, not slot->serialNumber which might be empty
+            if (!_pendingSN.empty()) {
+                saveDevice(_targetScanType, _pendingDevice->getAddress().toString(), _pendingSN);
+            } else {
+                // Fallback to existing if available (shouldn't happen for new discovery)
+                saveDevice(_targetScanType, _pendingDevice->getAddress().toString(), slot->serialNumber);
+            }
 
             uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
             slot->instance->begin(ECOFLOW_USER_ID, slot->serialNumber, slot->macAddress, version);
@@ -241,6 +248,7 @@ void DeviceManager::_handlePendingConnection() {
             delete _pendingDevice;
             _pendingDevice = nullptr;
             _hasPendingConnection = false;
+            _pendingSN = "";
         }
         xSemaphoreGive(_scanMutex);
     }
@@ -453,6 +461,7 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
                 ESP_LOGI("DeviceManager", "Match found for %s (%s)! Pending connection...", targetSlot->name.c_str(), sn.c_str());
                 if (_pendingDevice) delete _pendingDevice;
                 _pendingDevice = new NimBLEAdvertisedDevice(*device);
+                _pendingSN = sn; // Capture the SN for connection
                 _hasPendingConnection = true;
                 _targetScanType = targetSlot->type; // Lock in the target type
             }
