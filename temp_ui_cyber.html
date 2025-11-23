@@ -1,9 +1,4 @@
-#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
 
-#include <Arduino.h>
-
-const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,7 +188,30 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .intro { text-align: center; padding: 60px 20px; animation: fadeIn 1s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
-</head>
+
+    <script>
+    window.fetch = async (url, options) => {
+        console.log('Mock Fetch:', url);
+        if (url.includes('/api/status')) {
+            return {
+                json: async () => ({
+                    esp_temp: 45.0,
+                    d3: { connected: true, sn: 'D3-ACTIVE', name: 'Delta 3', batt: 85, in: 100, out: 200, solar: 50, cell_temp: 25, ac_on: true, dc_on: false, usb_on: true, ac_out_pow: 150, dc_out_pow: 0, usb_out_pow: 50, cfg_ac_lim: 800, cfg_max: 100, cfg_min: 0 },
+                    // W2 is PAIRED but DISCONNECTED (Offline test)
+                    w2: { connected: false, paired: true, sn: 'W2-OFFLINE', name: 'Wave 2', batt: 0 },
+                    d3p: { connected: false },
+                    ac: { connected: false }
+                })
+            };
+        }
+        if (url.includes('/api/forget')) {
+            console.log('Forgot device');
+            return { ok: true };
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+    </script>
+    </head>
 <body>
     <canvas id="canvas-bg"></canvas>
     <div class="container">
@@ -899,6 +917,3 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </script>
 </body>
 </html>
-)rawliteral";
-
-#endif // WEB_ASSETS_H

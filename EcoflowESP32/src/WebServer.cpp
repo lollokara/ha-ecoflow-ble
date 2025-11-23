@@ -71,6 +71,7 @@ void WebServer::setupRoutes() {
     server.on("/api/control", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleControl);
     server.on("/api/connect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleConnect);
     server.on("/api/disconnect", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleDisconnect);
+    server.on("/api/forget", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleForget);
 
     server.on("/api/history", HTTP_GET, handleHistory);
 
@@ -88,6 +89,8 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         obj["connected"] = slot->isConnected;
         obj["sn"] = slot->serialNumber.c_str();
         obj["name"] = slot->name.c_str();
+        // If offline but has SN, we consider it "paired" and return minimal state
+        obj["paired"] = (slot->serialNumber.length() > 0);
         obj["batt"] = dev->getBatteryLevel();
     };
 
@@ -95,11 +98,88 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
     {
         DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::DELTA_3);
         EcoflowESP32* d = s->instance;
-        JsonObject obj = doc.createNestedObject("d3");
-        fillCommon(obj, s, d);
-        if (s->isConnected) {
-            const auto& data = d->getData().delta3;
-            obj["in"] = d->getInputPower();
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("d3");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().delta3;
+                obj["in"] = d->getInputPower();
+                obj["out"] = d->getOutputPower();
+                obj["solar"] = d->getSolarInputPower();
+                obj["ac_on"] = d->isAcOn();
+                obj["dc_on"] = d->isDcOn();
+                obj["usb_on"] = d->isUsbOn();
+                obj["cfg_ac_lim"] = d->getAcChgLimit();
+                obj["cfg_max"] = d->getMaxChgSoc();
+                obj["cfg_min"] = d->getMinDsgSoc();
+                obj["cell_temp"] = d->getCellTemperature();
+                obj["ac_out_pow"] = (int)abs(data.acOutputPower);
+                obj["dc_out_pow"] = (int)abs(data.dc12vOutputPower);
+                obj["usb_out_pow"] = (int)(abs(data.usbcOutputPower) + abs(data.usbc2OutputPower) + abs(data.usbaOutputPower) + abs(data.usba2OutputPower));
+            }
+        }
+    }
+
+    // Wave 2
+    {
+        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
+        EcoflowESP32* d = s->instance;
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("w2");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().wave2;
+                obj["amb_temp"] = (int)data.envTemp;
+                obj["out_temp"] = (int)data.outLetTemp;
+                obj["set_temp"] = (int)data.setTemp;
+                obj["mode"] = (int)data.mode;
+                obj["sub_mode"] = (int)data.subMode;
+                obj["fan"] = (int)data.fanValue;
+                obj["pwr"] = (data.powerMode != 0);
+                obj["drain"] = (data.wteFthEn != 0);
+                obj["light"] = (data.rgbState != 0);
+                obj["beep"] = (data.beepEnable != 0);
+                obj["pwr_bat"] = (int)data.batPwrWatt;
+                obj["pwr_mppt"] = (int)data.mpptPwrWatt;
+                obj["pwr_psdr"] = (int)data.psdrPwrWatt;
+            }
+        }
+    }
+
+    // Delta Pro 3
+    {
+        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
+        EcoflowESP32* d = s->instance;
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("d3p");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().deltaPro3;
+                obj["ac_hv_on"] = data.acHvPort;
+                obj["ac_lv_on"] = data.acLvPort;
+                obj["backup_en"] = data.energyBackup;
+                obj["backup_lvl"] = data.energyBackupBatteryLevel;
+                obj["cell_temp"] = data.cellTemperature;
+            }
+        }
+    }
+
+    // Alternator Charger
+    {
+        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
+        EcoflowESP32* d = s->instance;
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("ac");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().alternatorCharger;
+                obj["chg_open"] = data.chargerOpen;
+                obj["mode"] = data.chargerMode;
+                obj["pow_lim"] = data.powerLimit;
+                obj["car_volt"] = data.carBatteryVoltage;
+            }
+        }
+    }
             obj["out"] = d->getOutputPower();
             obj["solar"] = d->getSolarInputPower();
             obj["ac_on"] = d->isAcOn();
@@ -286,6 +366,18 @@ void WebServer::handleDisconnect(AsyncWebServerRequest *request, uint8_t *data, 
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
     DeviceManager::getInstance().disconnect(type);
     request->send(200, "text/plain", "Disconnected");
+}
+
+void WebServer::handleForget(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    StaticJsonDocument<200> doc;
+    deserializeJson(doc, data, len);
+    String typeStr = doc["type"];
+    DeviceType type = DeviceType::DELTA_3;
+    if (typeStr == "w2") type = DeviceType::WAVE_2;
+    else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
+    else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
+    DeviceManager::getInstance().forget(type);
+    request->send(200, "text/plain", "Forgotten");
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
