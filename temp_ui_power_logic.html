@@ -1,9 +1,4 @@
-#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
 
-#include <Arduino.h>
-
-const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,7 +188,43 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .intro { text-align: center; padding: 60px 20px; animation: fadeIn 1s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
-</head>
+
+    <script>
+    // State mock
+    window.mockState = {
+        w2_powerMode: 2 // Start OFF (2)
+    };
+
+    window.fetch = async (url, options) => {
+        console.log('Mock Fetch:', url);
+
+        if (url.includes('/api/status')) {
+            // Return current state
+            const pwr = (window.mockState.w2_powerMode === 1);
+            return {
+                json: async () => ({
+                    esp_temp: 42.0,
+                    d3: { connected: false },
+                    w2: { connected: true, sn: 'W2-MOCK', name: 'Wave 2', batt: 50, mode: 0, powerMode: window.mockState.w2_powerMode, set_temp: 22, pwr: pwr },
+                    d3p: { connected: false },
+                    ac: { connected: false }
+                })
+            };
+        }
+
+        if (url.includes('/api/control')) {
+             const body = JSON.parse(options.body);
+             console.log('Control:', body);
+             if (body.cmd === 'set_power') {
+                 // Backend logic simulation: val true -> 1, val false -> 2
+                 window.mockState.w2_powerMode = body.val ? 1 : 2;
+             }
+             return { ok: true };
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+    </script>
+    </head>
 <body>
     <canvas id="canvas-bg"></canvas>
     <div class="container">
@@ -918,6 +949,3 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </script>
 </body>
 </html>
-)rawliteral";
-
-#endif // WEB_ASSETS_H

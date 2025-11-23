@@ -120,31 +120,6 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         }
     }
 
-    // Wave 2
-    {
-        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
-        EcoflowESP32* d = s->instance;
-        if (s->isConnected || s->serialNumber.length() > 0) {
-            JsonObject obj = doc.createNestedObject("w2");
-            fillCommon(obj, s, d);
-            if (s->isConnected) {
-                const auto& data = d->getData().wave2;
-                obj["amb_temp"] = (int)data.envTemp;
-                obj["out_temp"] = (int)data.outLetTemp;
-                obj["set_temp"] = (int)data.setTemp;
-                obj["mode"] = (int)data.mode;
-                obj["sub_mode"] = (int)data.subMode;
-                obj["fan"] = (int)data.fanValue;
-                obj["pwr"] = (data.powerMode == 1);
-                obj["drain"] = (data.wteFthEn != 0);
-                obj["light"] = (data.rgbState != 0);
-                obj["beep"] = (data.beepEnable != 0);
-                obj["pwr_bat"] = (int)data.batPwrWatt;
-                obj["pwr_mppt"] = (int)data.mpptPwrWatt;
-                obj["pwr_psdr"] = (int)data.psdrPwrWatt;
-            }
-        }
-    }
 
     // Delta Pro 3
     {
