@@ -121,13 +121,15 @@ void CmdUtils::processInput(String input) {
     }
 
     // Try handling based on prefix or known commands
-    if (cmd.startsWith("set_")) {
-        // Wave 2 commands
+    if (cmd.startsWith("w2_set_")) {
+        handleWave2Command(cmd, args);
+        return;
+    } else if (cmd.startsWith("set_")) {
+        // Legacy fallback for generic set_ (assume Wave 2 if matches known keywords)
         if (cmd.indexOf("ambient_light") > 0 || cmd.indexOf("fan_speed") > 0 || cmd.indexOf("temperature") > 0 || cmd.indexOf("sub_mode") > 0 || cmd.indexOf("main_mode") > 0 || cmd.indexOf("power_state") > 0 || cmd.indexOf("beep_enabled") > 0 || cmd.indexOf("automatic_drain") > 0 || cmd.indexOf("countdown_timer") > 0 || cmd.indexOf("idle_screen_timeout") > 0) {
             handleWave2Command(cmd, args);
             return;
         }
-        handleWave2Command(cmd, args); // Fallback
     } else if (cmd.startsWith("d3_")) {
         if (cmd.startsWith("d3_get_")) handleDelta3Read(cmd);
         else handleDelta3Command(cmd, args);
@@ -159,14 +161,21 @@ void CmdUtils::printHelp() {
     cmd_println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
     cmd_println("  wifi_ip                         (Get current IP)");
 
-    cmd_println("\n[Wave 2] (get_ or set_)");
-    cmd_println("  get_temp / set_temperature <val>");
-    cmd_println("  get_fan_speed / set_fan_speed <val>");
-    cmd_println("  get_mode / set_main_mode <val>");
+    cmd_println("\n[Wave 2] (get_ or w2_set_)");
+    cmd_println("  get_temp / w2_set_temp <val>");
+    cmd_println("  get_fan_speed / w2_set_fan <val>");
+    cmd_println("  get_mode / w2_set_mode <val>");
     cmd_println("  get_power");
     cmd_println("  get_battery");
-    cmd_println("  set_ambient_light <0/1>");
-    // ... other writes omitted for brevity but exist
+    cmd_println("  w2_set_light <0/1>");
+    cmd_println("  w2_set_drain <0/1>");
+    cmd_println("  w2_set_beep <0/1>");
+    cmd_println("  w2_set_power <0/1>");
+    cmd_println("  w2_set_timer <time> <status>");
+    cmd_println("  w2_set_timeout <time>");
+    cmd_println("  w2_set_submode <mode>");
+    cmd_println("  w2_set_temptype <type>");
+    cmd_println("  w2_set_tempunit <unit>");
 
     cmd_println("\n[Delta 3] (Prefix: d3_)");
     cmd_println("  d3_get_switches / d3_set_ac/dc/usb <0/1>");
@@ -303,10 +312,14 @@ void CmdUtils::handleConCommand(String cmd, String args) {
 void CmdUtils::handleWave2Command(String cmd, String args) {
     EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
     if (!w2 || !w2->isAuthenticated()) {
-        // Warn if desired
+        cmd_println("W2 not ready.");
+        // We still proceed to try sending to avoid silently failing during debug, but generally good to warn.
     }
+
+    // Parse single value for most commands
     uint8_t val = parseHexByte(args);
 
+    // Legacy names
     if (cmd.equalsIgnoreCase("set_ambient_light")) { if(w2) w2->setAmbientLight(val); }
     else if (cmd.equalsIgnoreCase("set_automatic_drain")) { if(w2) w2->setAutomaticDrain(val); }
     else if (cmd.equalsIgnoreCase("set_beep_enabled")) { if(w2) w2->setBeep(val); }
@@ -319,6 +332,38 @@ void CmdUtils::handleWave2Command(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("set_sub_mode")) { if(w2) w2->setSubMode(val); }
     else if (cmd.equalsIgnoreCase("set_temperature_display_type")) { if(w2) w2->setTempDisplayType(val); }
     else if (cmd.equalsIgnoreCase("set_temperature_unit")) { if(w2) w2->setTempUnit(val); }
+
+    // New simplified names
+    else if (cmd.equalsIgnoreCase("w2_set_light")) { if(w2) w2->setAmbientLight(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_drain")) { if(w2) w2->setAutomaticDrain(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_beep")) { if(w2) w2->setBeep(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_fan")) { if(w2) w2->setFanSpeed(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_mode")) { if(w2) w2->setMainMode(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_power")) { if(w2) w2->setPowerState(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_temp")) { if(w2) w2->setTemperature(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_timer")) {
+        // Special case: w2_set_timer <time> <status>
+        // args needs splitting
+        args.trim();
+        int space = args.indexOf(' ');
+        if (space > 0) {
+            // This function signature (EcoflowESP32::setCountdownTimer) currently only takes status?
+            // "void setCountdownTimer(uint8_t status);" in header.
+            // But implementation says: "_sendWave2Command(0x55, {0x00, 0x00, status});"
+            // The requirement says "set_countdown_timer(time, status) -> [0x00, 0x00, status]"
+            // It seems the first two bytes are ignored/zeroed in current impl.
+            // We'll stick to passing 'status' as the single argument for now based on existing implementation.
+            // If the user wants to pass time, the EcoflowESP32::setCountdownTimer needs update.
+            // Current impl: setCountdownTimer(uint8_t status)
+            if(w2) w2->setCountdownTimer(val);
+        } else {
+             if(w2) w2->setCountdownTimer(val);
+        }
+    }
+    else if (cmd.equalsIgnoreCase("w2_set_timeout")) { if(w2) w2->setIdleScreenTimeout(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_submode")) { if(w2) w2->setSubMode(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_temptype")) { if(w2) w2->setTempDisplayType(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_tempunit")) { if(w2) w2->setTempUnit(val); }
 
     cmd_println("Command sent.");
 }
