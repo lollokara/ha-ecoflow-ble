@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include "Display.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -78,6 +79,8 @@ void WebServer::setupRoutes() {
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
+    server.on("/api/settings", HTTP_GET, handleSettingsGet);
+    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsPost);
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
@@ -393,4 +396,33 @@ void WebServer::handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, 
         }
     }
     request->send(400, "text/plain", "Invalid Command");
+}
+
+void WebServer::handleSettingsGet(AsyncWebServerRequest *request) {
+    int min, max;
+    getLightSensorLimits(min, max);
+    int current = getRawLightADC();
+
+    DynamicJsonDocument doc(512);
+    doc["min_adc"] = min;
+    doc["max_adc"] = max;
+    doc["current_adc"] = current;
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+}
+
+void WebServer::handleSettingsPost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    StaticJsonDocument<200> doc;
+    deserializeJson(doc, data, len);
+
+    if (doc.containsKey("min_adc") && doc.containsKey("max_adc")) {
+        int min = doc["min_adc"];
+        int max = doc["max_adc"];
+        setLightSensorLimits(min, max);
+        request->send(200, "text/plain", "OK");
+    } else {
+        request->send(400, "text/plain", "Missing Parameters");
+    }
 }

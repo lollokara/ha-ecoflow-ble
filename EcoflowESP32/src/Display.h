@@ -12,6 +12,16 @@ void updateDisplay(const EcoflowData& currentData, DeviceSlot* activeSlot, bool 
 DisplayAction handleDisplayInput(ButtonInput input);
 DisplayAction getPendingAction();
 
+// Power Management
+void initPowerLatch();
+void powerOff();
+
+// Settings & Light Sensor
+void loadSettings();
+void setLightSensorLimits(int min, int max);
+void getLightSensorLimits(int& min, int& max);
+int getRawLightADC();
+
 // Accessor for the new set value
 int getSetAcLimit();
 int getSetMaxChgSoc();

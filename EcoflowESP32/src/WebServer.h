@@ -31,6 +31,8 @@ private:
     static void handleLogs(AsyncWebServerRequest *request);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    static void handleSettingsGet(AsyncWebServerRequest *request);
+    static void handleSettingsPost(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 };
 
 #endif

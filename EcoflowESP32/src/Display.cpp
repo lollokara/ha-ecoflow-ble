@@ -1,6 +1,10 @@
 #include "Display.h"
 #include "Font.h"
 #include <math.h>
+#include <Preferences.h>
+
+#define PIN_POWER_LATCH 21
+#define PIN_LIGHT_SENSOR 1
 
 #define DATAPIN    14
 #define CLOCKPIN   13
@@ -47,7 +51,8 @@ enum class SelectionPage {
 
 enum class SettingsPage {
     CHG,
-    LIM
+    LIM,
+    OFF_PAGE
 };
 
 enum class LimitsPage {
@@ -96,6 +101,12 @@ int tempAcLimit = 400;
 int tempMaxChg = 100;
 int tempMinDsg = 0;
 
+// Settings
+int minLightADC = 0;
+int maxLightADC = 4095;
+float filteredADC = 0.0f;
+bool isNightMode = false;
+
 // --- Colors ---
 uint32_t cRed, cYellow, cGreen, cWhite, cOff, cBlue;
 uint32_t frameBuffer[9][20];
@@ -127,6 +138,47 @@ void setupDisplay() {
     cBlue = strip.Color(0, 0, 255);
 
     lastInteractionTime = millis();
+}
+
+void initPowerLatch() {
+    pinMode(PIN_POWER_LATCH, OUTPUT);
+    digitalWrite(PIN_POWER_LATCH, HIGH);
+    pinMode(PIN_LIGHT_SENSOR, INPUT);
+}
+
+void powerOff() {
+    // Pull GPIO 21 LOW to cut power
+    digitalWrite(PIN_POWER_LATCH, LOW);
+    delay(1000); // Wait for hardware to cut power
+    ESP.restart(); // Fallback
+}
+
+void loadSettings() {
+    Preferences prefs;
+    prefs.begin("ecoflow", true); // Read-only
+    minLightADC = prefs.getInt("min_adc", 0);
+    maxLightADC = prefs.getInt("max_adc", 4095);
+    prefs.end();
+}
+
+void setLightSensorLimits(int min, int max) {
+    minLightADC = min;
+    maxLightADC = max;
+
+    Preferences prefs;
+    prefs.begin("ecoflow", false); // Read-write
+    prefs.putInt("min_adc", min);
+    prefs.putInt("max_adc", max);
+    prefs.end();
+}
+
+void getLightSensorLimits(int& min, int& max) {
+    min = minLightADC;
+    max = maxLightADC;
+}
+
+int getRawLightADC() {
+    return analogRead(PIN_LIGHT_SENSOR);
 }
 
 void clearFrame() {
@@ -191,24 +243,53 @@ void drawNcScreen() {
     drawText(x, 1, text, cRed);
 }
 
+void readLightSensor() {
+    int raw = analogRead(PIN_LIGHT_SENSOR);
+    // Simple Exponential Moving Average
+    filteredADC = (0.1f * raw) + (0.9f * filteredADC);
+}
+
+int calculateBrightness() {
+    // Map filteredADC to 1-50 range based on min/max settings
+    // Ensure min < max
+    int min = minLightADC;
+    int max = maxLightADC;
+    if (min >= max) { min = 0; max = 4095; } // Fallback safety
+
+    int val = (int)filteredADC;
+    if (val < min) val = min;
+    if (val > max) val = max;
+
+    // Map: (val - min) * (out_max - out_min) / (in_max - in_min) + out_min
+    int bright = 1 + ((val - min) * (50 - 1) / (max - min));
+
+    // Safety Clamp
+    if (bright < 1) bright = 1;
+    if (bright > 50) bright = 50;
+
+    return bright;
+}
+
+bool isCharging(DeviceSlot* slotD3) {
+    if (currentDashboardView == DashboardView::D3_BATT && slotD3->isConnected) {
+        return slotD3->instance->getInputPower() > 0;
+    }
+    return false;
+}
+
 void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, DeviceSlot* slotAC) {
     // Basic dashboard logic: prioritize showing connected devices
     // For now, keep it simple: cycle through views. If a view's device is not connected, skip or show NC.
 
     uint32_t color = cGreen;
     String text = "";
-    int brightness = 25;
+    // Brightness is handled in updateDisplay now
 
     switch(currentDashboardView) {
         case DashboardView::D3_BATT:
             if (!slotD3->isConnected) { text = "NC"; color = cRed; }
             else {
                 int batt = slotD3->instance->getBatteryLevel();
-                if (slotD3->instance->getInputPower() > 0) {
-                     float t = (float)millis() / 2000.0f;
-                     float val = (sin(t) + 1.0f) / 2.0f;
-                     brightness = 7 + (int)(val * 44);
-                }
                 if (batt > 99) batt = 99;
                 text = String(batt) + "%";
             }
@@ -253,7 +334,6 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
             break;
     }
 
-    strip.setBrightness(brightness);
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, color);
@@ -393,7 +473,11 @@ void drawDetailMenu(DeviceType activeType) {
 }
 
 void drawSettingsSubmenu() {
-    String text = (currentSettingsPage == SettingsPage::CHG) ? "CHG" : "LIM";
+    String text = "";
+    if (currentSettingsPage == SettingsPage::CHG) text = "CHG";
+    else if (currentSettingsPage == SettingsPage::LIM) text = "LIM";
+    else if (currentSettingsPage == SettingsPage::OFF_PAGE) text = "OFF";
+
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, cWhite);
@@ -470,35 +554,62 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
         currentState = MenuState::DASHBOARD;
     }
 
+    // Update Light Sensor & Brightness
+    readLightSensor();
+    int baseBrightness = calculateBrightness();
+    int finalBrightness = baseBrightness;
+
+    // Hysteresis for Night Mode
+    if (isNightMode) {
+        if (baseBrightness > 12) isNightMode = false;
+    } else {
+        if (baseBrightness < 10) isNightMode = true;
+    }
+
+    if (isNightMode) {
+        // Night Mode: Static brightness, Blink pixel
+        finalBrightness = baseBrightness;
+        // Blink logic
+        if ((millis() / 1000) % 2 == 0) {
+            setPixel(19, 8, cGreen);
+        }
+    } else {
+        // Day Mode
+        if (isCharging(slotD3)) {
+            // Breathe +15%
+            float t = (float)millis() / 2000.0f;
+            float val = (sin(t) + 1.0f) / 2.0f;
+            finalBrightness = baseBrightness + (int)(val * 15.0f);
+        } else {
+            finalBrightness = baseBrightness;
+        }
+    }
+
+    // Hardware cap
+    if (finalBrightness > 255) finalBrightness = 255;
+    strip.setBrightness(finalBrightness);
+
+
     if (currentState == MenuState::DASHBOARD) {
         drawDashboard(slotD3, slotW2, slotD3P, slotAC);
     } else if (currentState == MenuState::SELECTION) {
-        strip.setBrightness(25);
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
-        strip.setBrightness(25);
         DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_3;
         drawDetailMenu(activeType);
     } else if (currentState == MenuState::SETTINGS_SUBMENU) {
-        strip.setBrightness(25);
         drawSettingsSubmenu();
     } else if (currentState == MenuState::LIMITS_SUBMENU) {
-        strip.setBrightness(25);
         drawLimitsSubmenu();
     } else if (currentState == MenuState::EDIT_CHG) {
-        strip.setBrightness(25);
         drawEditScreen("CHG", tempAcLimit, "");
     } else if (currentState == MenuState::EDIT_SOC_UP) {
-        strip.setBrightness(25);
         drawEditScreen("UP", tempMaxChg, "%");
     } else if (currentState == MenuState::EDIT_SOC_DN) {
-        strip.setBrightness(25);
         drawEditScreen("DN", tempMinDsg, "%");
     } else if (currentState == MenuState::DEVICE_SELECT) {
-        strip.setBrightness(25);
         drawDeviceSelectMenu(slotD3, slotW2, slotD3P, slotAC);
     } else if (currentState == MenuState::DEVICE_ACTION) {
-        strip.setBrightness(25);
         DeviceSlot* s = nullptr;
         if (currentDevicePage == DevicePage::D3) s = slotD3;
         else if (currentDevicePage == DevicePage::W2) s = slotW2;
@@ -582,6 +693,7 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             case ButtonInput::BTN_UP:
             case ButtonInput::BTN_DOWN:
                 if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
+                else if (currentSettingsPage == SettingsPage::LIM) currentSettingsPage = SettingsPage::OFF_PAGE;
                 else currentSettingsPage = SettingsPage::CHG;
                 break;
             case ButtonInput::BTN_ENTER_SHORT:
@@ -589,9 +701,12 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                     currentState = MenuState::EDIT_CHG;
                     tempAcLimit = currentData.delta3.acChargingSpeed;
                     if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
-                } else {
+                } else if (currentSettingsPage == SettingsPage::LIM) {
                     currentState = MenuState::LIMITS_SUBMENU;
                     currentLimitsPage = LimitsPage::UP;
+                } else if (currentSettingsPage == SettingsPage::OFF_PAGE) {
+                    // Execute Power Off immediately
+                    powerOff();
                 }
                 break;
              default: break;

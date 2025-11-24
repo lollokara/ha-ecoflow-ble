@@ -126,6 +126,8 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");
 
+    initPowerLatch();
+    loadSettings();
     setupDisplay();
     pinMode(BTN_UP_PIN, INPUT_PULLUP);
     pinMode(BTN_DOWN_PIN, INPUT_PULLUP);

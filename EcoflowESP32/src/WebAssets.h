@@ -31,6 +31,26 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
         .container { max-width: 850px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; position: relative; z-index: 1; }
 
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 1000; display: none; align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; animation: fadeIn 0.3s; }
+        .modal {
+            background: #1a1a1a; border: 1px solid var(--neon-cyan);
+            border-radius: 12px; padding: 25px; width: 90%; max-width: 400px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            position: relative;
+        }
+        .modal h3 { margin-bottom: 20px; color: var(--neon-cyan); }
+        .close-modal {
+            position: absolute; top: 15px; right: 15px; background: none; border: none;
+            color: #888; font-size: 1.5em; cursor: pointer; transition: 0.2s;
+        }
+        .close-modal:hover { color: #fff; }
+
         /* Glassmorphism Card */
         .card {
             background: var(--glass-bg);
@@ -64,6 +84,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer; user-select: none; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 10px; display: inline-block; box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: all 0.3s; }
         .status-dot.on { background: var(--neon-green); box-shadow: 0 0 12px var(--neon-green); }
+        .settings-btn { background: none; border: none; color: var(--text-sub); cursor: pointer; font-size: 1.5em; transition: 0.2s; }
+        .settings-btn:hover { color: var(--neon-cyan); transform: rotate(45deg); }
 
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px; }
         .grid-3 { grid-template-columns: repeat(3, 1fr); }
@@ -196,6 +218,33 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </head>
 <body>
     <canvas id="canvas-bg"></canvas>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal">
+            <button class="close-modal" onclick="toggleSettingsModal()">×</button>
+            <h3>⚙️ Settings</h3>
+
+            <div class="ctrl-row">
+                <span>Current Light (ADC)</span>
+                <b id="settings-current-adc" style="color:var(--neon-cyan)">...</b>
+            </div>
+
+            <hr style="border-color:rgba(255,255,255,0.1); margin: 15px 0;">
+
+            <div style="margin-bottom: 15px;">
+                <div class="ctrl-row"><span>Min Light ADC: <b id="val-min-adc">0</b></span></div>
+                <input type="range" id="rg-min-adc" min="0" max="4095" step="1" oninput="el('val-min-adc').innerText=this.value">
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <div class="ctrl-row"><span>Max Light ADC: <b id="val-max-adc">4095</b></span></div>
+                <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
+            </div>
+
+            <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">Save Configuration</button>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Main Header -->
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
@@ -204,6 +253,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div id="global-status" class="status-dot"></div>
             </div>
             <div style="display:flex; align-items:center; gap:15px; position: relative;">
+                <button class="settings-btn" onclick="toggleSettingsModal()">⚙️</button>
                 <button id="add-device-btn" onclick="toggleAddMenu()">
                     <span>+ DEVICE</span>
                 </button>
@@ -278,8 +328,55 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     let knownDevices = new Set();
     let logPollInterval = null;
     let lastLogCount = 0;
+    let settingsPollInterval = null;
 
     function el(id) { return document.getElementById(id); }
+
+    // --- Settings ---
+    function toggleSettingsModal() {
+        const m = el('settings-modal');
+        m.classList.toggle('open');
+        if (m.classList.contains('open')) {
+            loadSettings();
+            startSettingsPoll();
+        } else {
+            stopSettingsPoll();
+        }
+    }
+
+    function loadSettings() {
+        fetch(API + '/settings').then(r => r.json()).then(d => {
+            setVal('rg-min-adc', d.min_adc); setTxt('val-min-adc', d.min_adc);
+            setVal('rg-max-adc', d.max_adc); setTxt('val-max-adc', d.max_adc);
+            setTxt('settings-current-adc', d.current_adc);
+        });
+    }
+
+    function saveSettings() {
+        const min = parseInt(el('rg-min-adc').value);
+        const max = parseInt(el('rg-max-adc').value);
+        fetch(API + '/settings', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({min_adc: min, max_adc: max})
+        }).then(r => {
+            if(r.ok) {
+                toggleSettingsModal();
+                alert('Settings Saved');
+            }
+        });
+    }
+
+    function startSettingsPoll() {
+        if(settingsPollInterval) return;
+        settingsPollInterval = setInterval(() => {
+            fetch(API + '/settings').then(r => r.json()).then(d => {
+                setTxt('settings-current-adc', d.current_adc);
+            });
+        }, 1000);
+    }
+
+    function stopSettingsPoll() { clearInterval(settingsPollInterval); settingsPollInterval = null; }
 
     // --- Templates ---
     const renderCardMenu = (type, connected, paired) => `
