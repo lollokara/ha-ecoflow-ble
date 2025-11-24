@@ -1,5 +1,6 @@
 #include "Display.h"
 #include "Font.h"
+#include "LightSensor.h"
 #include <math.h>
 
 #define DATAPIN    14
@@ -60,7 +61,8 @@ enum class Wave2MenuPage {
 
 enum class SettingsPage {
     CHG,
-    LIM
+    LIM,
+    OFF
 };
 
 enum class LimitsPage {
@@ -161,6 +163,43 @@ void renderFrame() {
     strip.show();
 }
 
+// --- Brightness Control ---
+float currentBrightness = 25.0f;
+bool isNightMode = false;
+
+void updateBrightness() {
+    int adc = LightSensor::getInstance().getRaw();
+    int minAdc = LightSensor::getInstance().getMin();
+    int maxAdc = LightSensor::getInstance().getMax();
+
+    // Normalize ADC to 0.0 - 1.0
+    float norm = 0;
+    if (maxAdc > minAdc) {
+        norm = (float)(adc - minAdc) / (float)(maxAdc - minAdc);
+    }
+    if (norm < 0) norm = 0;
+    if (norm > 1) norm = 1;
+
+    // Map to 1% - 50% (2.55 - 127.5)
+    // strip.setBrightness takes 0-255
+    float target = 2.55f + (norm * (127.5f - 2.55f));
+
+    // Smooth transition
+    if (abs(target - currentBrightness) > 0.5f) {
+        currentBrightness += (target - currentBrightness) * 0.1f;
+    } else {
+        currentBrightness = target;
+    }
+
+    // Hysteresis for Night Mode (10% = 25.5)
+    float pct = (currentBrightness / 255.0f) * 100.0f;
+    if (isNightMode) {
+        if (pct > 12.0f) isNightMode = false;
+    } else {
+        if (pct < 10.0f) isNightMode = true;
+    }
+}
+
 int drawChar(int x, int y, char c, uint32_t color) {
     if (c < 32 || c > 95) c = '?';
     const uint8_t* bitmap = font5x7[c - 32];
@@ -208,18 +247,25 @@ void drawNcScreen() {
 void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, DeviceSlot* slotAC) {
     uint32_t color = cGreen;
     String text = "";
-    int brightness = 25;
+    int brightness = (int)currentBrightness; // Default to mediated brightness
 
     switch(currentDashboardView) {
         case DashboardView::D3_BATT:
             if (!slotD3->isConnected) { text = "NC"; color = cRed; }
             else {
                 int batt = slotD3->instance->getBatteryLevel();
-                if (slotD3->instance->getInputPower() > 0) {
+
+                // Charging Animation (Breathing)
+                // Only if not Night Mode and charging
+                if (!isNightMode && slotD3->instance->getInputPower() > 0) {
                      float t = (float)millis() / 2000.0f;
-                     float val = (sin(t) + 1.0f) / 2.0f;
-                     brightness = 7 + (int)(val * 44);
+                     float val = (sin(t) + 1.0f) / 2.0f; // 0.0 to 1.0
+                     // Breathe +15% brightness (approx +38 in 0-255 scale)
+                     // Base is currentBrightness
+                     brightness = (int)currentBrightness + (int)(val * 38.0f);
+                     if (brightness > 255) brightness = 255;
                 }
+
                 if (batt > 99) batt = 99;
                 text = String(batt) + "%";
             }
@@ -268,6 +314,17 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, color);
+
+    // Night Mode Indicator (Bottom Right)
+    if (isNightMode) {
+        // Brightness is already low, but we want the dot to be visible
+        // Since setBrightness applies globally, just setting the pixel is enough.
+        // x=19, y=8
+        // Blink: 1s ON, 1s OFF
+        if ((millis() / 1000) % 2 == 0) {
+            setPixel(19, 8, cGreen);
+        }
+    }
 }
 
 String getSelectionText(SelectionPage page) {
@@ -444,7 +501,10 @@ void drawWave2Menu() {
 }
 
 void drawSettingsSubmenu() {
-    String text = (currentSettingsPage == SettingsPage::CHG) ? "CHG" : "LIM";
+    String text = "CHG";
+    if (currentSettingsPage == SettingsPage::LIM) text = "LIM";
+    else if (currentSettingsPage == SettingsPage::OFF) text = "OFF";
+
     int width = getTextWidth(text) - 1;
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, cWhite);
@@ -506,6 +566,9 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
     DeviceSlot* slotD3P = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
     DeviceSlot* slotAC = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
+
+    // Update Brightness Logic first
+    updateBrightness();
 
     clearFrame();
 
@@ -734,17 +797,33 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             switch(input) {
                 case ButtonInput::BTN_UP:
                 case ButtonInput::BTN_DOWN:
-                    if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
-                    else currentSettingsPage = SettingsPage::CHG;
+                    {
+                        int idx = (int)currentSettingsPage;
+                        if (idx == 0) idx = 2; // Wrap
+                        else idx--;
+                        // Logic for down?
+                        // Let's just cycle: CHG -> LIM -> OFF
+                         if (input == ButtonInput::BTN_DOWN) {
+                             if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
+                             else if (currentSettingsPage == SettingsPage::LIM) currentSettingsPage = SettingsPage::OFF;
+                             else currentSettingsPage = SettingsPage::CHG;
+                         } else {
+                             if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::OFF;
+                             else if (currentSettingsPage == SettingsPage::LIM) currentSettingsPage = SettingsPage::CHG;
+                             else currentSettingsPage = SettingsPage::LIM;
+                         }
+                    }
                     break;
                 case ButtonInput::BTN_ENTER_SHORT:
                     if (currentSettingsPage == SettingsPage::CHG) {
                         currentState = MenuState::EDIT_CHG;
                         tempAcLimit = currentData.delta3.acChargingSpeed;
                         if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
-                    } else {
+                    } else if (currentSettingsPage == SettingsPage::LIM) {
                         currentState = MenuState::LIMITS_SUBMENU;
                         currentLimitsPage = LimitsPage::UP;
+                    } else if (currentSettingsPage == SettingsPage::OFF) {
+                        return DisplayAction::SYSTEM_OFF;
                     }
                     break;
                  default: break;

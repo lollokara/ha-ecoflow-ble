@@ -31,7 +31,8 @@ enum class DisplayAction {
     W2_SET_MODE,
     W2_SET_FAN,
     W2_SET_SUB_MODE,
-    W2_SET_PWR
+    W2_SET_PWR,
+    SYSTEM_OFF
 };
 
 #endif // TYPES_H

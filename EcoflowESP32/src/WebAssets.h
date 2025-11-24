@@ -47,6 +47,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             opacity: 0;
             transform: translateY(20px);
         }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal {
+            background: rgba(20, 20, 25, 0.95);
+            border: 1px solid var(--neon-cyan); border-radius: 16px;
+            padding: 25px; max-width: 400px; width: 90%;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            transform: scale(0.9); transition: transform 0.3s;
+        }
+        .modal-overlay.show .modal { transform: scale(1); }
         .card::before {
             content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
             background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
@@ -64,6 +81,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer; user-select: none; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 10px; display: inline-block; box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: all 0.3s; }
         .status-dot.on { background: var(--neon-green); box-shadow: 0 0 12px var(--neon-green); }
+        .settings-btn { cursor: pointer; font-size: 1.2em; color: var(--text-sub); transition: 0.2s; margin-left: 15px; }
+        .settings-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; }
 
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px; }
         .grid-3 { grid-template-columns: repeat(3, 1fr); }
@@ -214,6 +233,32 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <div class="menu-item" onclick="connectDevice('ac')">Alternator Charger</div>
                 </div>
                 <span id="esp-temp" style="font-size:0.85em; color:var(--text-sub)">--°C</span>
+                <div class="settings-btn" onclick="openSettings()">⚙️</div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay">
+            <div class="modal">
+                <h3 style="margin-bottom: 20px; color:#fff;">⚙️ Settings</h3>
+
+                <div class="ctrl-row">
+                    <span>Current Light Level (ADC)</span>
+                    <span id="set-curr-adc" style="font-family:monospace; color:var(--neon-cyan)">...</span>
+                </div>
+
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+
+                <div class="ctrl-row"><span>Min Light (ADC): <b id="val-min-adc" style="color:var(--neon-green)">0</b></span></div>
+                <input type="range" id="rg-min-adc" min="0" max="4095" step="1" oninput="el('val-min-adc').innerText=this.value">
+
+                <div class="ctrl-row"><span>Max Light (ADC): <b id="val-max-adc" style="color:var(--neon-green)">4095</b></span></div>
+                <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="btn" onclick="closeSettings()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+                </div>
             </div>
         </div>
 
@@ -550,6 +595,11 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             // Global Status: Green if any connected
             const anyConnected = types.some(t => data[t]?.connected);
             el('global-status').classList.toggle('on', anyConnected);
+
+            // Update settings modal if open
+            if(el('settings-modal').classList.contains('show') && data.light_adc !== undefined) {
+                el('set-curr-adc').innerText = data.light_adc;
+            }
         });
     }
 
@@ -708,6 +758,31 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         const menu = el('menu-'+type);
         document.querySelectorAll('.card-menu').forEach(m => { if(m!==menu) m.classList.remove('show'); });
         menu.classList.toggle('show');
+    }
+
+    function openSettings() {
+        fetch(API + '/settings').then(r => r.json()).then(d => {
+            el('rg-min-adc').value = d.min; el('val-min-adc').innerText = d.min;
+            el('rg-max-adc').value = d.max; el('val-max-adc').innerText = d.max;
+            el('settings-modal').classList.add('show');
+        });
+    }
+
+    function closeSettings() {
+        el('settings-modal').classList.remove('show');
+    }
+
+    function saveSettings() {
+        const min = parseInt(el('rg-min-adc').value);
+        const max = parseInt(el('rg-max-adc').value);
+        fetch(API + '/settings', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({min, max})
+        }).then(r => {
+            if(r.ok) closeSettings();
+            else alert('Error saving settings');
+        });
     }
 
     function toggleW2Power() {

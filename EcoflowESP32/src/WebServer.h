@@ -8,6 +8,7 @@
 #include "LogBuffer.h"
 #include "WebAssets.h"
 #include "CmdUtils.h"
+#include "LightSensor.h"
 
 class WebServer {
 public:
@@ -26,6 +27,10 @@ private:
 
     // Extended Data
     static void handleHistory(AsyncWebServerRequest *request);
+
+    // Settings
+    static void handleSettings(AsyncWebServerRequest *request);
+    static void handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
     // Log Handlers
     static void handleLogs(AsyncWebServerRequest *request);

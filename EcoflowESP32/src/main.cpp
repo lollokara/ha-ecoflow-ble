@@ -16,11 +16,13 @@
 #include "DeviceManager.h"
 #include "CmdUtils.h"
 #include "WebServer.h"
+#include "LightSensor.h"
 
 // Define GPIO pins for the buttons
 #define BTN_UP_PIN    4
 #define BTN_DOWN_PIN  5
 #define BTN_ENTER_PIN 6
+#define POWER_LATCH_PIN 21
 
 // Timings for button press detection (in milliseconds)
 #define DEBOUNCE_DELAY 50
@@ -117,6 +119,10 @@ void checkSerial() {
  * @brief Standard Arduino setup function. Initializes all components.
  */
 void setup() {
+    // Hold Power
+    pinMode(POWER_LATCH_PIN, OUTPUT);
+    digitalWrite(POWER_LATCH_PIN, HIGH);
+
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");
 
@@ -124,6 +130,8 @@ void setup() {
     pinMode(BTN_UP_PIN, INPUT_PULLUP);
     pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
     pinMode(BTN_ENTER_PIN, INPUT_PULLUP);
+
+    LightSensor::getInstance().begin();
     DeviceManager::getInstance().initialize();
 
     WebServer::begin();
@@ -135,6 +143,9 @@ void setup() {
 void loop() {
     static uint32_t last_display_update = 0;
     static uint32_t last_data_refresh = 0;
+
+    // Update hardware sensors
+    LightSensor::getInstance().update();
 
     // 1. Update the Device Manager (handles all BLE communication)
     DeviceManager::getInstance().update();
@@ -194,6 +205,15 @@ void handleAction(DisplayAction action) {
     }
     if (action == DisplayAction::DISCONNECT_DEVICE) {
         DeviceManager::getInstance().disconnect(getTargetDeviceType());
+        return;
+    }
+
+    // Handle System Power Off
+    if (action == DisplayAction::SYSTEM_OFF) {
+        Serial.println("Power Off Requested. Releasing latch...");
+        digitalWrite(POWER_LATCH_PIN, LOW);
+        delay(1000);
+        ESP.restart(); // Should lose power before this if latch works
         return;
     }
 

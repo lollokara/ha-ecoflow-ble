@@ -78,12 +78,16 @@ void WebServer::setupRoutes() {
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
+
+    server.on("/api/settings", HTTP_GET, handleSettings);
+    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(4096);
 
     doc["esp_temp"] = get_esp_temp();
+    doc["light_adc"] = LightSensor::getInstance().getRaw();
 
     auto fillCommon = [](JsonObject& obj, DeviceSlot* slot, EcoflowESP32* dev) {
         obj["connected"] = slot->isConnected;
@@ -393,4 +397,25 @@ void WebServer::handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, 
         }
     }
     request->send(400, "text/plain", "Invalid Command");
+}
+
+void WebServer::handleSettings(AsyncWebServerRequest *request) {
+    StaticJsonDocument<200> doc;
+    doc["min"] = LightSensor::getInstance().getMin();
+    doc["max"] = LightSensor::getInstance().getMax();
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+}
+
+void WebServer::handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    StaticJsonDocument<200> doc;
+    deserializeJson(doc, data, len);
+    if (doc.containsKey("min") && doc.containsKey("max")) {
+        LightSensor::getInstance().setCalibration(doc["min"], doc["max"]);
+        request->send(200, "text/plain", "Saved");
+    } else {
+        request->send(400, "text/plain", "Invalid Payload");
+    }
 }
