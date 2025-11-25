@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+message EmsDelta {
+  message Message {
+    message Params {
+      uint32 chg_remain = 1;
+      uint32 dsg_remain = 2;
+      uint32 chg_state = 3;
+      bool smart_chg_switch = 4;
+      uint32 chg_cur = 5;
+      uint32 chg_vol = 6;
+      uint32 chg_temp = 7;
+      uint32 input_watts = 8;
+      uint32 output_watts = 9;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}

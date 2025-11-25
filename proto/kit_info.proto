@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+message KitInfo {
+  message Message {
+    message Params {
+      string sn = 1;
+      string hw_version = 2;
+      string sw_version = 3;
+      string product_type = 4;
+      uint32 port_num = 5;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}

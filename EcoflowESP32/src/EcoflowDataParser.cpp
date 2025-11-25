@@ -260,6 +260,55 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             logWave2Data(w2);
         }
     }
+
+    // V2 Protobuf Packet (Delta 2)
+    else if (pkt.getCmdSet() == 0x01 && (pkt.getCmdId() == 0x02)) {
+        Delta2Data& d2 = data.delta2;
+        pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+
+        if (pkt.getSrc() == 0x04) { // BMS
+            BmsDelta msg = BmsDelta_init_zero;
+            if (pb_decode(&stream, BmsDelta_fields, &msg)) {
+                if(msg.has_message && msg.message.has_params) {
+                    d2.batteryLevel = msg.message.params.soc;
+                    d2.batteryVoltage = msg.message.params.vol;
+                    d2.batteryCurrent = msg.message.params.cur;
+                    d2.batteryTemperature = msg.message.params.temp;
+                }
+            }
+        } else if (pkt.getSrc() == 0x05) { // EMS
+            EmsDelta msg = EmsDelta_init_zero;
+            if (pb_decode(&stream, EmsDelta_fields, &msg)) {
+                 if(msg.has_message && msg.message.has_params) {
+                    d2.chargeTime = msg.message.params.chg_remain;
+                    d2.dischargeTime = msg.message.params.dsg_remain;
+                    d2.inputPower = msg.message.params.input_watts;
+                    d2.outputPower = msg.message.params.output_watts;
+                 }
+            }
+        } else if (pkt.getSrc() == 0x02) { // PD
+            PdDelta msg = PdDelta_init_zero;
+            if (pb_decode(&stream, PdDelta_fields, &msg)) {
+                 if(msg.has_message && msg.message.has_params) {
+                    d2.xt60InputPower = msg.message.params.xt60_in_watts;
+                    d2.xt60OutputPower = msg.message.params.xt60_out_watts;
+                    d2.acInputPower = msg.message.params.ac_in_watts;
+                    d2.acOutputPower = msg.message.params.inv_out_watts;
+                    d2.dc12vOutputPower = msg.message.params.car_out_watts;
+                    d2.usbc1OutputPower = msg.message.params.type_c_out_watts;
+                    d2.usbc2OutputPower = msg.message.params.pd_out_watts;
+                    d2.usba1OutputPower = msg.message.params.usb_qc_out_watts;
+                    d2.usba2OutputPower = msg.message.params.usb_qc_out_watts;
+                    d2.acOn = msg.message.params.ac_out_state;
+                    d2.dcOn = msg.message.params.car_out_state;
+                    d2.usbOn = msg.message.params.usb_out_state;
+                    d2.beep = msg.message.params.beep_state;
+                    d2.batteryChargeLimitMin = msg.message.params.dsg_limit;
+                    d2.batteryChargeLimitMax = msg.message.params.chg_limit;
+                 }
+            }
+        }
+    }
 }
 
 } // namespace EcoflowDataParser
