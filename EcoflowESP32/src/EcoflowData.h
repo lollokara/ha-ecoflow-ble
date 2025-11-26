@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include "proto/bms_delta.pb.h"
 #include "proto/ems_delta.pb.h"
@@ -10,6 +11,15 @@
 #include "proto/mppt_delta.pb.h"
 #include "proto/mppt_direct.pb.h"
 #include "proto/kit_info.pb.h"
+
+struct ExtraBatteryData {
+    float batteryLevel = 0;
+    float inputPower = 0;
+    float outputPower = 0;
+    float batteryTemperature = 0;
+    uint32_t cycles = 0;
+};
+
 
 struct Delta2Data {
     // Top Level
@@ -35,6 +45,7 @@ struct Delta2Data {
     bool beep = true;
     int acChargingSpeed = 0;
     int maxAcChargingPower = 1200;
+    bool pluggedInAc = false;
 
     // BMS
     float batteryVoltage = 0;
@@ -42,6 +53,9 @@ struct Delta2Data {
     float batteryTemperature = 0;
     int batteryChargeLimitMin = 0;
     int batteryChargeLimitMax = 100;
+
+    // Extra Batteries
+    std::vector<ExtraBatteryData> extraBatteries;
 };
 
 
