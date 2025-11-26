@@ -219,7 +219,7 @@ void CmdUtils::printHelp() {
     cmd_println("  d2_get_switches / d2_set_ac/dc/usb <0/1>");
     cmd_println("  d2_get_power");
     cmd_println("  d2_get_battery / d2_set_soc_max/min");
-    cmd_println("  d2_set_ac_limit <watts>");
+    cmd_println("  d2_set_chg_speed <watts>");
 }
 
 uint8_t CmdUtils::parseHexByte(String s) {
@@ -402,7 +402,7 @@ void CmdUtils::handleDelta2Command(String cmd, String args) {
     if (cmd.equalsIgnoreCase("d2_set_ac")) d2->setAC(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d2_set_dc")) d2->setDC(parseHexByte(args));
     else if (cmd.equalsIgnoreCase("d2_set_usb")) d2->setUSB(parseHexByte(args));
-    else if (cmd.equalsIgnoreCase("d2_set_ac_limit")) d2->setAcChargingLimit(args.toInt());
+    else if (cmd.equalsIgnoreCase("d2_set_chg_speed")) d2->setAcChargingSpeed(args.toInt());
     else if (cmd.equalsIgnoreCase("d2_set_soc_max")) d2->setBatterySOCLimits(args.toInt(), d2->getMinDsgSoc());
     else if (cmd.equalsIgnoreCase("d2_set_soc_min")) d2->setBatterySOCLimits(d2->getMaxChgSoc(), args.toInt());
 

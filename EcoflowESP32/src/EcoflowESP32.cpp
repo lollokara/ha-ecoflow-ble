@@ -865,6 +865,26 @@ void EcoflowESP32::setTempUnit(uint8_t unit) {
     _sendWave2Command(0x53, {unit});
 }
 
+//--------------------------------------------------------------------------
+//--- Delta 2 Specific Commands
+//--------------------------------------------------------------------------
+
+bool EcoflowESP32::setAcChargingSpeed(int watts) {
+    if (watts < 200 || watts > 2400) {
+        ESP_LOGW(TAG, "AC Charging speed %d W out of range for Delta 2", watts);
+        // Do not block, let the device handle potential errors.
+    }
+    // Round to nearest 100
+    watts = round(watts / 100.0) * 100;
+
+    std::vector<uint8_t> payload = {0xFF, 0xFF, (uint8_t)(watts & 0xFF), (uint8_t)(watts >> 8), 0xFF};
+    // Packet: src=0x21, dest=0x04, cmdSet=0x20, cmdId=0x45, version=2
+    Packet packet(0x21, 0x04, 0x20, 0x45, payload, 0x01, 0x01, 2, _txSeq++);
+    EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
+    return _sendCommand(enc_packet.toBytes(&_crypto));
+}
+
+
 bool EcoflowESP32::setDC(bool on) {
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;

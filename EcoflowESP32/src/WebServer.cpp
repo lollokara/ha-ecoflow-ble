@@ -164,13 +164,15 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             fillCommon(obj, s, d);
             if (s->isConnected) {
                 const auto& data = d->getData().delta2;
+                obj["batt"] = data.batteryLevel;
                 obj["in"] = data.inputPower;
                 obj["out"] = data.outputPower;
-                obj["solar"] = data.xt60InputPower;
+                obj["solar"] = data.solarInputPower;
                 obj["ac_on"] = data.acOn;
                 obj["dc_on"] = data.dcOn;
                 obj["usb_on"] = data.usbOn;
                 obj["cfg_ac_lim"] = data.acChargingSpeed;
+                obj["ac_chg_w"] = data.acChargingSpeed;
                 obj["cfg_max"] = data.batteryChargeLimitMax;
                 obj["cfg_min"] = data.batteryChargeLimitMin;
                 obj["cell_temp"] = data.batteryTemperature;
@@ -292,7 +294,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         if (cmd == "set_ac") success = dev->setAC(doc["val"]);
         else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
         else if (cmd == "set_usb") success = dev->setUSB(doc["val"]);
-        else if (cmd == "set_ac_lim") success = dev->setAcChargingLimit(doc["val"]);
+        else if (cmd == "set_ac_lim") success = dev->setAcChargingSpeed(doc["val"]);
         else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
         else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
         else success = false;

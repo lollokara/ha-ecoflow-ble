@@ -171,6 +171,9 @@ public:
     bool setAcHvPort(bool enabled);
     bool setAcLvPort(bool enabled);
 
+    // --- Delta 2 Specific Commands ---
+    bool setAcChargingSpeed(int watts);
+
     // Alternator Charger Specific Commands
     bool setChargerOpen(bool enabled);
     bool setChargerMode(int mode);
