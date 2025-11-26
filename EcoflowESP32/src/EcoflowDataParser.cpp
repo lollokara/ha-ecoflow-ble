@@ -260,6 +260,42 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             logWave2Data(w2);
         }
     }
+
+    // V2 Binary Packet (Delta 2)
+    else if (pkt.getCmdSet() == 0x03 && pkt.getCmdId() == 0x0e) {
+        const std::vector<uint8_t>& payload = pkt.getPayload();
+        const uint8_t* p = payload.data();
+        Delta2Data& d2 = data.delta2;
+
+        if (pkt.getSrc() == 0x04 && payload.size() >= 29) { // BMS
+            d2.batteryLevel = p[5];
+            d2.batteryVoltage = get_uint16_le(p + 9) / 100.0;
+            d2.batteryCurrent = swap_endian_and_parse_signed_int(p + 11) / 100.0;
+            d2.batteryTemperature = p[13];
+        } else if (pkt.getSrc() == 0x05 && payload.size() >= 36) { // EMS
+            d2.chargeTime = get_uint16_le(p + 7);
+            d2.dischargeTime = get_uint16_le(p + 9);
+            d2.inputPower = get_uint16_le(p + 20) / 10.0;
+            d2.outputPower = get_uint16_le(p + 22) / 10.0;
+        } else if (pkt.getSrc() == 0x02 && payload.size() >= 122) { // PD
+            d2.xt60InputPower = get_uint16_le(p + 16) / 10.0;
+            d2.acInputPower = swap_endian_and_parse_signed_int(p + 22) / 10.0;
+            d2.acOutputPower = get_uint16_le(p + 24) / 10.0;
+            d2.dc12vOutputPower = get_uint16_le(p + 26) / 10.0;
+            d2.usba1OutputPower = get_uint16_le(p + 30) / 10.0;
+            d2.usba2OutputPower = get_uint16_le(p + 32) / 10.0;
+            d2.usbc1OutputPower = get_uint16_le(p + 34) / 10.0;
+            d2.usbc2OutputPower = get_uint16_le(p + 36) / 10.0;
+
+            d2.acOn = p[43] != 0;
+            d2.dcOn = p[45] != 0;
+            d2.usbOn = (p[46] & 0x01) || (p[46] & 0x02) || (p[46] & 0x04);
+
+            d2.batteryChargeLimitMax = p[60];
+            d2.batteryChargeLimitMin = p[62];
+            d2.acChargingSpeed = get_uint16_le(p + 96);
+        }
+    }
 }
 
 } // namespace EcoflowDataParser
