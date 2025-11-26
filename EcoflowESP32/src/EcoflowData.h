@@ -4,6 +4,47 @@
 #include <stdint.h>
 #include <string>
 
+#include "proto/bms_delta.pb.h"
+#include "proto/ems_delta.pb.h"
+#include "proto/pd_delta.pb.h"
+#include "proto/mppt_delta.pb.h"
+#include "proto/mppt_direct.pb.h"
+#include "proto/kit_info.pb.h"
+
+struct Delta2Data {
+    // Top Level
+    float batteryLevel = 0;
+    float inputPower = 0;
+    float outputPower = 0;
+    int chargeTime = 0;
+    int dischargeTime = 0;
+
+    // PD
+    float acInputPower = 0;
+    float acOutputPower = 0;
+    float dc12vOutputPower = 0;
+    float xt60InputPower = 0;
+    float xt60OutputPower = 0;
+    float usbc1OutputPower = 0;
+    float usbc2OutputPower = 0;
+    float usba1OutputPower = 0;
+    float usba2OutputPower = 0;
+    bool acOn = false;
+    bool dcOn = false;
+    bool usbOn = false;
+    bool beep = true;
+    int acChargingSpeed = 0;
+    int maxAcChargingPower = 1200;
+
+    // BMS
+    float batteryVoltage = 0;
+    float batteryCurrent = 0;
+    float batteryTemperature = 0;
+    int batteryChargeLimitMin = 0;
+    int batteryChargeLimitMax = 100;
+};
+
+
 struct Delta3Data {
     // Fields from delta3_classic.py
     float batteryLevel = 0;
@@ -142,6 +183,7 @@ struct EcoflowData {
     Wave2Data wave2;
     DeltaPro3Data deltaPro3;
     AlternatorChargerData alternatorCharger;
+    Delta2Data delta2;
 };
 
 #endif // ECOFLOW_DATA_H
