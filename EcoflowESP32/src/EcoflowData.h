@@ -26,8 +26,8 @@ struct Delta2Data {
     float batteryLevel = 0;
     float inputPower = 0;
     float outputPower = 0;
-    int chargeTime = 0;
-    int dischargeTime = 0;
+    uint32_t chargeTime = 0;
+    uint32_t dischargeTime = 0;
 
     // PD
     float acInputPower = 0;

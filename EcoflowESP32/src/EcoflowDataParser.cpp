@@ -276,6 +276,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             d2.acOn = pd->cfg_ac_enabled;
             d2.dcOn = pd->car_state;
             d2.usbOn = pd->dc_out_state;
+            d2.batteryTemperature = pd->car_temp;
+            if (d2.batteryLevel == 0) {
+                d2.batteryLevel = pd->soc;
+            }
             d2.dischargeTime = pd->remain_time;
             d2.chargeTime = pd->remain_time;
             changed = true;
