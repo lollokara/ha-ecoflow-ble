@@ -54,6 +54,11 @@ struct Delta2Data {
     int batteryChargeLimitMin = 0;
     int batteryChargeLimitMax = 100;
 
+    // MPPT
+    float solarInputPower = 0;
+    float dc12vOutputVoltage = 0;
+    float dc12vOutputCurrent = 0;
+
     // Extra Batteries
     std::vector<ExtraBatteryData> extraBatteries;
 };

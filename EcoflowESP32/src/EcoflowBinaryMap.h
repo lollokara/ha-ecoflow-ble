@@ -171,6 +171,67 @@ struct Delta2BmsPacket {
     uint32_t remain_time;
 };
 
+struct Delta2MpptPacket {
+    uint32_t fault_code;
+    char sw_ver[4];
+    uint32_t in_vol;
+    uint32_t in_amp;
+    uint16_t in_watts;
+    uint32_t out_vol;
+    uint32_t out_amp;
+    uint16_t out_watts;
+    int16_t mppt_temp;
+    uint8_t xt60_chg_type;
+    uint8_t cfg_chg_type;
+    uint8_t chg_type;
+    uint8_t chg_state;
+    uint32_t dcdc_12v_vol;
+    uint32_t dcdc_12v_amp;
+    uint16_t dcdc_12v_watts;
+    uint32_t car_out_vol;
+    uint32_t car_out_amp;
+    uint16_t car_out_watts;
+    int16_t car_temp;
+    uint8_t car_state;
+    int16_t dc24v_temp;
+    uint8_t dc24v_state;
+    uint8_t chg_pause_flag;
+    uint32_t cfg_dc_chg_current;
+    uint8_t beep_state;
+    uint8_t cfg_ac_enabled;
+    uint8_t cfg_ac_xboost;
+    uint32_t cfg_ac_out_voltage;
+    uint8_t cfg_ac_out_freq;
+    uint16_t cfg_chg_watts;
+    uint16_t ac_standby_mins;
+    uint8_t discharge_type;
+    uint16_t car_standby_mins;
+    uint16_t power_standby_mins;
+    uint16_t screen_standby_mins;
+    uint16_t pay_flag;
+    uint8_t reserved[8];
+};
+
+struct KitBaseInfoPacket {
+    uint8_t avai_flag;
+    char sn[16];
+    uint16_t product_type;
+    uint16_t product_detail;
+    uint8_t procedure_state;
+    uint32_t app_version;
+    uint32_t loader_version;
+    uint32_t cur_real_power;
+    uint32_t f32_soc;
+    uint8_t soc;
+};
+
+struct AllKitDetailDataPacket {
+    uint8_t protocol_version;
+    uint16_t available_data_len;
+    uint16_t support_kit_max_num;
+    // Followed by `support_kit_max_num` instances of KitBaseInfoPacket
+};
+
 
 #pragma pack(pop)
 

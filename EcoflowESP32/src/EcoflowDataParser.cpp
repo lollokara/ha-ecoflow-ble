@@ -1,5 +1,6 @@
 #include "EcoflowDataParser.h"
 #include "EcoflowBinaryMap.h"
+#include "EcoflowConstants.h"
 #include "pb_utils.h"
 #include "pd335_sys.pb.h"
 #include "mr521.pb.h"
@@ -256,15 +257,18 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
         }
     }
     // V2 Binary Packet (Delta 2)
-    else if (pkt.getCmdSet() == 0x20) {
+    else if (pkt.getCmdSet() == Ecoflow::D2::CMDSET_PD) {
         Delta2Data& d2 = data.delta2;
-        if (pkt.getSrc() == 0x02 && pkt.getCmdId() == 0x02) { // PD Heartbeat
+        bool changed = false;
+        if (pkt.getSrc() == Ecoflow::D2::SRC_PD && pkt.getCmdId() == Ecoflow::D2::CMDID_PD_HEARTBEAT) { // PD Heartbeat
             if (payload.size() < sizeof(Delta2PdPacket)) return;
             const Delta2PdPacket* pd = reinterpret_cast<const Delta2PdPacket*>(p);
             d2.outputPower = pd->watts_out_sum;
             d2.inputPower = pd->watts_in_sum;
             d2.usba1OutputPower = pd->usb1_watt;
+            d2.usba2OutputPower = pd->usb2_watt;
             d2.usbc1OutputPower = pd->typec1_watts;
+            d2.usbc2OutputPower = pd->typec2_watts;
             d2.dc12vOutputPower = pd->car_watts;
             d2.pluggedInAc = pd->ac_charge_flag;
             d2.acInputPower = pd->ac_input_watts;
@@ -272,23 +276,26 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             d2.acOn = pd->cfg_ac_enabled;
             d2.dcOn = pd->car_state;
             d2.usbOn = pd->dc_out_state;
-            logDelta2Data(d2);
+            d2.dischargeTime = pd->remain_time;
+            d2.chargeTime = pd->remain_time;
+            changed = true;
         }
-        else if (pkt.getSrc() == 0x03 && pkt.getCmdId() == 0x02) { // EMS Heartbeat
+        else if (pkt.getSrc() == Ecoflow::D2::SRC_EMS && pkt.getCmdId() == Ecoflow::D2::CMDID_EMS_HEARTBEAT) { // EMS Heartbeat
             if (payload.size() < sizeof(Delta2EmsPacket)) return;
             const Delta2EmsPacket* ems = reinterpret_cast<const Delta2EmsPacket*>(p);
             d2.batteryChargeLimitMax = ems->max_charge_soc;
             d2.chargeTime = ems->chg_remain_time;
             d2.dischargeTime = ems->dsg_remain_time;
             d2.batteryChargeLimitMin = ems->min_dsg_soc;
-            logDelta2Data(d2);
+            d2.batteryLevel = ems->f32_lcd_show_soc > 0 ? ems->f32_lcd_show_soc : d2.batteryLevel;
+            changed = true;
         }
-        else if (pkt.getSrc() == 0x03 && pkt.getCmdId() == 0x32) { // BMS Heartbeat
+        else if (pkt.getSrc() == Ecoflow::D2::SRC_BMS && pkt.getCmdId() == Ecoflow::D2::CMDID_BMS_HEARTBEAT) { // BMS Heartbeat
             if (payload.size() < sizeof(Delta2BmsPacket)) return;
 
             int offset = 0;
             const Delta2BmsPacket* bms = reinterpret_cast<const Delta2BmsPacket*>(p + offset);
-            d2.batteryLevel = bms->f32_show_soc;
+            d2.batteryLevel = bms->f32_show_soc > 0 ? bms->f32_show_soc : d2.batteryLevel;
             d2.batteryTemperature = bms->temp;
             d2.batteryVoltage = bms->vol;
             d2.batteryCurrent = bms->amp;
@@ -307,8 +314,28 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
                 d2.extraBatteries.push_back(extra);
                 offset += sizeof(Delta2BmsPacket);
             }
-
+            changed = true;
+        } else if (pkt.getSrc() == Ecoflow::D2::SRC_MPPT && pkt.getCmdId() == Ecoflow::D2::CMDID_MPPT_HEARTBEAT) { // MPPT Heartbeat
+            if (payload.size() < sizeof(Delta2MpptPacket)) return;
+            const Delta2MpptPacket* mppt = reinterpret_cast<const Delta2MpptPacket*>(p);
+            d2.solarInputPower = mppt->in_watts;
+            d2.dc12vOutputVoltage = mppt->car_out_vol / 1000.0;
+            d2.dc12vOutputCurrent = mppt->car_out_amp / 1000.0;
+            changed = true;
+        }
+        if (changed) {
             logDelta2Data(d2);
+        }
+    } else if (pkt.getSrc() == Ecoflow::D2::SRC_KIT_INFO && pkt.getCmdSet() == 0x03 && pkt.getCmdId() == Ecoflow::D2::CMDID_KIT_INFO) {
+        if (payload.size() < sizeof(AllKitDetailDataPacket)) return;
+        const AllKitDetailDataPacket* kit_info = reinterpret_cast<const AllKitDetailDataPacket*>(p);
+
+        int offset = sizeof(AllKitDetailDataPacket);
+        for(int i=0; i<kit_info->support_kit_max_num; i++) {
+            if (offset + sizeof(KitBaseInfoPacket) > payload.size()) break;
+            const KitBaseInfoPacket* base_info = reinterpret_cast<const KitBaseInfoPacket*>(p + offset);
+            // We can add logic here to handle the kit info data if needed in the future
+            offset += sizeof(KitBaseInfoPacket);
         }
     }
 }
