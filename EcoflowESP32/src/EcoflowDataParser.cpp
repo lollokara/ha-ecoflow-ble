@@ -1,4 +1,5 @@
 #include "EcoflowDataParser.h"
+#include "EcoflowBinaryMap.h"
 #include "pb_utils.h"
 #include "pd335_sys.pb.h"
 #include "mr521.pb.h"
@@ -21,28 +22,6 @@ bool pb_decode_to_vector(pb_istream_t *stream, const pb_field_t *field, void **a
     std::vector<uint8_t> *vec = (std::vector<uint8_t> *)*arg;
     vec->resize(stream->bytes_left);
     return pb_read(stream, vec->data(), stream->bytes_left);
-}
-
-static uint16_t get_uint16_le(const uint8_t* data) {
-    return data[0] | (data[1] << 8);
-}
-
-static uint32_t get_uint32_le(const uint8_t* data) {
-    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-}
-
-static int16_t swap_endian_and_parse_signed_int(const uint8_t* data) {
-    // Little Endian Signed Short
-    int16_t val = (int16_t)(data[0] | (data[1] << 8));
-    return val;
-}
-
-static float get_float_le_safe(const uint8_t* data) {
-    uint32_t i = get_uint32_le(data);
-    float f;
-    memcpy(&f, &i, sizeof(f));
-    if (std::isnan(f) || std::isinf(f)) return 0.0f;
-    return f;
 }
 
 static bool is_flow_on(uint32_t x) {
@@ -71,9 +50,27 @@ static void logWave2Data(const Wave2Data& w) {
     ESP_LOGI(TAG, "Err: %u, BMS Err: %d", w.errCode, w.bmsErr);
 }
 
+static void logDelta2Data(const Delta2Data& d2) {
+    ESP_LOGI(TAG, "=== Delta 2 Data ===");
+    ESP_LOGI(TAG, "Batt: %.2f%%, In: %fW, Out: %fW", d2.batteryLevel, d2.inputPower, d2.outputPower);
+    ESP_LOGI(TAG, "Remain: %dmin Chg / %dmin Dsg", d2.chargeTime, d2.dischargeTime);
+    ESP_LOGI(TAG, "AC Out: %fW, AC In: %fW, Plugged: %d", d2.acOutputPower, d2.acInputPower, d2.pluggedInAc);
+    ESP_LOGI(TAG, "DC Out: %fW", d2.dc12vOutputPower);
+    ESP_LOGI(TAG, "USB-A Out: %fW, USB-C Out: %fW", d2.usba1OutputPower, d2.usbc1OutputPower);
+    ESP_LOGI(TAG, "Limits: %d%% - %d%%", d2.batteryChargeLimitMin, d2.batteryChargeLimitMax);
+    ESP_LOGI(TAG, "Temp: %.1fC", d2.batteryTemperature);
+    ESP_LOGI(TAG, "Ports: AC=%d, DC=%d, USB=%d", d2.acOn, d2.dcOn, d2.usbOn);
+    for(int i=0; i<d2.extraBatteries.size(); i++) {
+        ESP_LOGI(TAG, "Extra Batt %d: %.2f%%, In: %fW, Out: %fW, Temp: %.1fC, Cycles: %d", i+1, d2.extraBatteries[i].batteryLevel, d2.extraBatteries[i].inputPower, d2.extraBatteries[i].outputPower, d2.extraBatteries[i].batteryTemperature, d2.extraBatteries[i].cycles);
+    }
+}
+
+
 namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data) {
+    const std::vector<uint8_t>& payload = pkt.getPayload();
+    const uint8_t* p = payload.data();
 
     // V3 Protobuf Packet (Delta 3) - src 0x02
     if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
@@ -211,47 +208,45 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
 
     // V2 Binary Packet (Wave 2 / KT210)
     else if (pkt.getCmdSet() == 0x42 && pkt.getCmdId() == 0x50) {
-        const std::vector<uint8_t>& payload = pkt.getPayload();
-
-        if (payload.size() >= 108) {
-            const uint8_t* p = payload.data();
+        if (payload.size() >= sizeof(Wave2Packet)) {
             Wave2Data& w2 = data.wave2;
+            const Wave2Packet* p = reinterpret_cast<const Wave2Packet*>(payload.data());
 
-            w2.mode = p[0];
-            w2.subMode = p[1];
-            w2.setTemp = p[2];
-            w2.fanValue = p[3];
-            w2.envTemp = get_float_le_safe(p + 4);
-            w2.tempSys = p[8];
-            w2.displayIdleTime = get_uint16_le(p + 9);
-            w2.displayIdleMode = p[11];
-            w2.timeEn = p[12];
-            w2.timeSetVal = get_uint16_le(p + 13);
-            w2.timeRemainVal = get_uint16_le(p + 15);
-            w2.beepEnable = p[17];
-            w2.errCode = get_uint32_le(p + 18);
+            w2.mode = p->mode;
+            w2.subMode = p->sub_mode;
+            w2.setTemp = p->set_temp;
+            w2.fanValue = p->fan_value;
+            w2.envTemp = p->env_temp;
+            w2.tempSys = p->temp_sys;
+            w2.displayIdleTime = p->display_idle_time;
+            w2.displayIdleMode = p->display_idle_mode;
+            w2.timeEn = p->time_en;
+            w2.timeSetVal = p->time_set_val;
+            w2.timeRemainVal = p->time_remain_val;
+            w2.beepEnable = p->beep_enable;
+            w2.errCode = p->err_code;
 
-            w2.refEn = p[54];
-            w2.bmsPid = get_uint16_le(p + 55);
-            w2.wteFthEn = p[57];
-            w2.tempDisplay = p[58];
-            w2.powerMode = p[59];
-            w2.powerSrc = p[60];
-            w2.psdrPwrWatt = swap_endian_and_parse_signed_int(p + 61);
-            w2.batPwrWatt = swap_endian_and_parse_signed_int(p + 63);
-            w2.mpptPwrWatt = swap_endian_and_parse_signed_int(p + 65);
-            w2.batDsgRemainTime = get_uint32_le(p + 67);
-            w2.batChgRemainTime = get_uint32_le(p + 71);
-            w2.batSoc = p[75];
-            w2.batChgStatus = p[76];
-            w2.outLetTemp = get_float_le_safe(p + 77);
-            w2.mpptWork = p[81];
-            w2.bmsErr = p[82];
-            w2.rgbState = p[83];
-            w2.waterValue = p[84];
-            w2.bmsBoundFlag = p[85];
-            w2.bmsUndervoltage = p[86];
-            w2.ver = p[87];
+            w2.refEn = p->ref_en;
+            w2.bmsPid = p->bms_pid;
+            w2.wteFthEn = p->wte_fth_en;
+            w2.tempDisplay = p->temp_display;
+            w2.powerMode = p->power_mode;
+            w2.powerSrc = p->power_src;
+            w2.psdrPwrWatt = p->psdr_pwr_watt;
+            w2.batPwrWatt = p->bat_pwr_watt;
+            w2.mpptPwrWatt = p->mppt_pwr_watt;
+            w2.batDsgRemainTime = p->bat_dsg_remain_time;
+            w2.batChgRemainTime = p->bat_chg_remain_time;
+            w2.batSoc = p->bat_soc;
+            w2.batChgStatus = p->bat_chg_status;
+            w2.outLetTemp = p->out_let_temp;
+            w2.mpptWork = p->mppt_work;
+            w2.bmsErr = p->bms_err;
+            w2.rgbState = p->rgb_state;
+            w2.waterValue = p->water_value;
+            w2.bmsBoundFlag = p->bms_bound_flag;
+            w2.bmsUndervoltage = p->bms_undervoltage;
+            w2.ver = p->ver;
 
             if (w2.batChgRemainTime > 0 && w2.batChgRemainTime < 6000) w2.remainingTime = w2.batChgRemainTime;
             else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
@@ -260,53 +255,60 @@ void parsePacket(const Packet& pkt, EcoflowData& data) {
             logWave2Data(w2);
         }
     }
-
-    // V2 Protobuf Packet (Delta 2)
-    else if (pkt.getCmdSet() == 0x03 && (pkt.getCmdId() == 0x0e)) {
+    // V2 Binary Packet (Delta 2)
+    else if (pkt.getCmdSet() == 0x20) {
         Delta2Data& d2 = data.delta2;
-        pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
+        if (pkt.getSrc() == 0x02 && pkt.getCmdId() == 0x02) { // PD Heartbeat
+            if (payload.size() < sizeof(Delta2PdPacket)) return;
+            const Delta2PdPacket* pd = reinterpret_cast<const Delta2PdPacket*>(p);
+            d2.outputPower = pd->watts_out_sum;
+            d2.inputPower = pd->watts_in_sum;
+            d2.usba1OutputPower = pd->usb1_watt;
+            d2.usbc1OutputPower = pd->typec1_watts;
+            d2.dc12vOutputPower = pd->car_watts;
+            d2.pluggedInAc = pd->ac_charge_flag;
+            d2.acInputPower = pd->ac_input_watts;
+            d2.acOutputPower = pd->ac_output_watts;
+            d2.acOn = pd->cfg_ac_enabled;
+            d2.dcOn = pd->car_state;
+            d2.usbOn = pd->dc_out_state;
+            logDelta2Data(d2);
+        }
+        else if (pkt.getSrc() == 0x03 && pkt.getCmdId() == 0x02) { // EMS Heartbeat
+            if (payload.size() < sizeof(Delta2EmsPacket)) return;
+            const Delta2EmsPacket* ems = reinterpret_cast<const Delta2EmsPacket*>(p);
+            d2.batteryChargeLimitMax = ems->max_charge_soc;
+            d2.chargeTime = ems->chg_remain_time;
+            d2.dischargeTime = ems->dsg_remain_time;
+            d2.batteryChargeLimitMin = ems->min_dsg_soc;
+            logDelta2Data(d2);
+        }
+        else if (pkt.getSrc() == 0x03 && pkt.getCmdId() == 0x32) { // BMS Heartbeat
+            if (payload.size() < sizeof(Delta2BmsPacket)) return;
 
-        if (pkt.getSrc() == 0x04) { // BMS
-            BmsDelta msg = BmsDelta_init_zero;
-            if (pb_decode(&stream, BmsDelta_fields, &msg)) {
-                if(msg.has_message && msg.message.has_params) {
-                    d2.batteryLevel = msg.message.params.soc;
-                    d2.batteryVoltage = msg.message.params.vol;
-                    d2.batteryCurrent = msg.message.params.cur;
-                    d2.batteryTemperature = msg.message.params.temp;
-                }
+            int offset = 0;
+            const Delta2BmsPacket* bms = reinterpret_cast<const Delta2BmsPacket*>(p + offset);
+            d2.batteryLevel = bms->f32_show_soc;
+            d2.batteryTemperature = bms->temp;
+            d2.batteryVoltage = bms->vol;
+            d2.batteryCurrent = bms->amp;
+
+            offset += sizeof(Delta2BmsPacket);
+
+            d2.extraBatteries.clear();
+            while(offset + sizeof(Delta2BmsPacket) <= payload.size()){
+                const Delta2BmsPacket* extra_bms = reinterpret_cast<const Delta2BmsPacket*>(p + offset);
+                ExtraBatteryData extra;
+                extra.batteryLevel = extra_bms->f32_show_soc;
+                extra.inputPower = extra_bms->input_watts;
+                extra.outputPower = extra_bms->output_watts;
+                extra.batteryTemperature = extra_bms->temp;
+                extra.cycles = extra_bms->cycles;
+                d2.extraBatteries.push_back(extra);
+                offset += sizeof(Delta2BmsPacket);
             }
-        } else if (pkt.getSrc() == 0x05) { // EMS
-            EmsDelta msg = EmsDelta_init_zero;
-            if (pb_decode(&stream, EmsDelta_fields, &msg)) {
-                 if(msg.has_message && msg.message.has_params) {
-                    d2.chargeTime = msg.message.params.chg_remain;
-                    d2.dischargeTime = msg.message.params.dsg_remain;
-                    d2.inputPower = msg.message.params.input_watts;
-                    d2.outputPower = msg.message.params.output_watts;
-                 }
-            }
-        } else if (pkt.getSrc() == 0x02) { // PD
-            PdDelta msg = PdDelta_init_zero;
-            if (pb_decode(&stream, PdDelta_fields, &msg)) {
-                 if(msg.has_message && msg.message.has_params) {
-                    d2.xt60InputPower = msg.message.params.xt60_in_watts;
-                    d2.xt60OutputPower = msg.message.params.xt60_out_watts;
-                    d2.acInputPower = msg.message.params.ac_in_watts;
-                    d2.acOutputPower = msg.message.params.inv_out_watts;
-                    d2.dc12vOutputPower = msg.message.params.car_out_watts;
-                    d2.usbc1OutputPower = msg.message.params.type_c_out_watts;
-                    d2.usbc2OutputPower = msg.message.params.pd_out_watts;
-                    d2.usba1OutputPower = msg.message.params.usb_qc_out_watts;
-                    d2.usba2OutputPower = 0;
-                    d2.acOn = msg.message.params.ac_out_state;
-                    d2.dcOn = msg.message.params.car_out_state;
-                    d2.usbOn = msg.message.params.usb_out_state;
-                    d2.beep = msg.message.params.beep_state;
-                    d2.batteryChargeLimitMin = msg.message.params.dsg_limit;
-                    d2.batteryChargeLimitMax = msg.message.params.chg_limit;
-                 }
-            }
+
+            logDelta2Data(d2);
         }
     }
 }
