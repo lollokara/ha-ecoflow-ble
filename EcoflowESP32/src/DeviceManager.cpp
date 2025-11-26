@@ -58,6 +58,11 @@ DeviceManager::DeviceManager() {
     slotAC.type = DeviceType::ALTERNATOR_CHARGER;
     slotAC.isConnected = false;
 
+    slotD2.instance = &d2;
+    slotD2.name = "D2";
+    slotD2.type = DeviceType::DELTA_2;
+    slotD2.isConnected = false;
+
     _scanMutex = xSemaphoreCreateMutex();
 }
 
@@ -87,6 +92,10 @@ void DeviceManager::initialize() {
         ESP_LOGI("DeviceManager", "Restoring AC: %s", slotAC.serialNumber.c_str());
         slotAC.instance->begin(ECOFLOW_USER_ID, slotAC.serialNumber, slotAC.macAddress, 3);
     }
+    if (!slotD2.macAddress.empty()) {
+        ESP_LOGI("DeviceManager", "Restoring D2: %s", slotD2.serialNumber.c_str());
+        slotD2.instance->begin(ECOFLOW_USER_ID, slotD2.serialNumber, slotD2.macAddress, 2);
+    }
 }
 
 void DeviceManager::update() {
@@ -99,11 +108,13 @@ void DeviceManager::update() {
     slotW2.instance->update();
     slotD3P.instance->update();
     slotAC.instance->update();
+    slotD2.instance->update();
 
     slotD3.isConnected = slotD3.instance->isConnected();
     slotW2.isConnected = slotW2.instance->isConnected();
     slotD3P.isConnected = slotD3P.instance->isConnected();
     slotAC.isConnected = slotAC.instance->isConnected();
+    slotD2.isConnected = slotD2.instance->isConnected();
 
     // 3. Manage the scanning state (auto-reconnect or timeout).
     _manageScanning();
@@ -133,6 +144,9 @@ void DeviceManager::disconnect(DeviceType type) {
         } else if (type == DeviceType::ALTERNATOR_CHARGER) {
             prefs.remove("ac_mac");
             prefs.remove("ac_sn");
+        } else if (type == DeviceType::DELTA_2) {
+            prefs.remove("d2_mac");
+            prefs.remove("d2_sn");
         }
         slot->macAddress = "";
         slot->serialNumber = "";
@@ -140,15 +154,25 @@ void DeviceManager::disconnect(DeviceType type) {
 }
 
 EcoflowESP32* DeviceManager::getDevice(DeviceType type) {
-    if (type == DeviceType::DELTA_PRO_3) return &d3p;
-    if (type == DeviceType::ALTERNATOR_CHARGER) return &ac;
-    return (type == DeviceType::DELTA_3) ? &d3 : &w2;
+    switch (type) {
+        case DeviceType::DELTA_3: return &d3;
+        case DeviceType::WAVE_2: return &w2;
+        case DeviceType::DELTA_PRO_3: return &d3p;
+        case DeviceType::ALTERNATOR_CHARGER: return &ac;
+        case DeviceType::DELTA_2: return &d2;
+        default: return nullptr;
+    }
 }
 
 DeviceSlot* DeviceManager::getSlot(DeviceType type) {
-    if (type == DeviceType::DELTA_PRO_3) return &slotD3P;
-    if (type == DeviceType::ALTERNATOR_CHARGER) return &slotAC;
-    return (type == DeviceType::DELTA_3) ? &slotD3 : &slotW2;
+    switch (type) {
+        case DeviceType::DELTA_3: return &slotD3;
+        case DeviceType::WAVE_2: return &slotW2;
+        case DeviceType::DELTA_PRO_3: return &slotD3P;
+        case DeviceType::ALTERNATOR_CHARGER: return &slotAC;
+        case DeviceType::DELTA_2: return &slotD2;
+        default: return nullptr;
+    }
 }
 
 bool DeviceManager::isScanning() {
@@ -156,7 +180,7 @@ bool DeviceManager::isScanning() {
 }
 
 bool DeviceManager::isAnyConnecting() {
-    return d3.isConnecting() || w2.isConnecting() || d3p.isConnecting() || ac.isConnecting();
+    return d3.isConnecting() || w2.isConnecting() || d3p.isConnecting() || ac.isConnecting() || d2.isConnecting();
 }
 
 //--------------------------------------------------------------------------
@@ -179,6 +203,7 @@ void DeviceManager::printStatus() {
     printSlot(slotW2);
     printSlot(slotD3P);
     printSlot(slotAC);
+    printSlot(slotD2);
 }
 
 void DeviceManager::forget(DeviceType type) {
@@ -197,7 +222,8 @@ String DeviceManager::getDeviceStatusJson() {
     json += "\"d3\":{\"connected\":" + String(slotD3.isConnected) + ", \"sn\":\"" + String(slotD3.serialNumber.c_str()) + "\", \"batt\":" + String(d3.getBatteryLevel()) + "},";
     json += "\"w2\":{\"connected\":" + String(slotW2.isConnected) + ", \"sn\":\"" + String(slotW2.serialNumber.c_str()) + "\", \"batt\":" + String(w2.getBatteryLevel()) + "},";
     json += "\"d3p\":{\"connected\":" + String(slotD3P.isConnected) + ", \"sn\":\"" + String(slotD3P.serialNumber.c_str()) + "\", \"batt\":" + String((int)d3p.getData().deltaPro3.batteryLevel) + "},";
-    json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String((int)ac.getData().alternatorCharger.batteryLevel) + "}";
+    json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String((int)ac.getData().alternatorCharger.batteryLevel) + "},";
+    json += "\"d2\":{\"connected\":" + String(slotD2.isConnected) + ", \"sn\":\"" + String(slotD2.serialNumber.c_str()) + "\", \"batt\":" + String(d2.getBatteryLevel()) + "}";
     json += "}";
     return json;
 }
@@ -240,7 +266,7 @@ void DeviceManager::_handlePendingConnection() {
                 saveDevice(_targetScanType, _pendingDevice->getAddress().toString(), slot->serialNumber);
             }
 
-            uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
+            uint8_t version = (_targetScanType == DeviceType::WAVE_2 || _targetScanType == DeviceType::DELTA_2) ? 2 : 3;
             ESP_LOGI("DeviceManager", "Connecting to %s (Type %d) with Protocol Version %d", slot->name.c_str(), (int)_targetScanType, version);
             slot->instance->begin(ECOFLOW_USER_ID, slot->serialNumber, slot->macAddress, version);
             slot->instance->connectTo(_pendingDevice);
@@ -275,11 +301,13 @@ void DeviceManager::_manageScanning() {
         bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting();
         bool d3pNeedsConnect = !slotD3P.isConnected && !slotD3P.macAddress.empty() && !d3p.isConnecting();
         bool acNeedsConnect = !slotAC.isConnected && !slotAC.macAddress.empty() && !ac.isConnecting();
+        bool d2NeedsConnect = !slotD2.isConnected && !slotD2.macAddress.empty() && !d2.isConnecting();
 
         if (d3NeedsConnect) startScan(DeviceType::DELTA_3);
         else if (w2NeedsConnect) startScan(DeviceType::WAVE_2);
         else if (d3pNeedsConnect) startScan(DeviceType::DELTA_PRO_3);
         else if (acNeedsConnect) startScan(DeviceType::ALTERNATOR_CHARGER);
+        else if (d2NeedsConnect) startScan(DeviceType::DELTA_2);
     }
 }
 
@@ -311,6 +339,13 @@ void DeviceManager::loadDevices() {
         slotAC.macAddress = mac.c_str();
         slotAC.serialNumber = sn.c_str();
     }
+
+    mac = prefs.getString("d2_mac", "");
+    sn = prefs.getString("d2_sn", "");
+    if (!mac.isEmpty() && !sn.isEmpty()) {
+        slotD2.macAddress = mac.c_str();
+        slotD2.serialNumber = sn.c_str();
+    }
 }
 
 void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const std::string& sn) {
@@ -334,6 +369,11 @@ void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const st
         prefs.putString("ac_sn", sn.c_str());
         slotAC.macAddress = mac;
         slotAC.serialNumber = sn;
+    } else if (type == DeviceType::DELTA_2) {
+        prefs.putString("d2_mac", mac.c_str());
+        prefs.putString("d2_sn", sn.c_str());
+        slotD2.macAddress = mac;
+        slotD2.serialNumber = sn;
     }
 }
 
@@ -444,7 +484,9 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
         }
 
         DeviceSlot* targetSlot = nullptr;
-        if (isTargetDevice(sn, DeviceType::DELTA_3) && !slotD3.isConnected && !d3.isConnecting()) {
+        if (isTargetDevice(sn, DeviceType::DELTA_2) && !slotD2.isConnected && !d2.isConnecting()) {
+            targetSlot = &slotD2;
+        } else if (isTargetDevice(sn, DeviceType::DELTA_3) && !slotD3.isConnected && !d3.isConnecting()) {
             targetSlot = &slotD3;
         } else if (isTargetDevice(sn, DeviceType::WAVE_2) && !slotW2.isConnected && !w2.isConnecting()) {
             targetSlot = &slotW2;
@@ -480,6 +522,8 @@ bool DeviceManager::isTargetDevice(const std::string& sn, DeviceType type) {
         return (sn.rfind("MR51", 0) == 0);
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
         return (sn.rfind("F371", 0) == 0 || sn.rfind("F372", 0) == 0 || sn.rfind("DC01", 0) == 0);
+    } else if (type == DeviceType::DELTA_2) {
+        return (sn.rfind("R3", 0) == 0 || sn.rfind("R6", 0) == 0);
     }
     return false;
 }

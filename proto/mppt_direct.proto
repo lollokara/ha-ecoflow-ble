@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+message MpptDirect {
+  message Message {
+    message Params {
+      uint32 state = 1;
+      uint32 in_vol = 2;
+      uint32 in_cur = 3;
+      uint32 in_watts = 4;
+      uint32 out_vol = 5;
+      uint32 out_cur = 6;
+      uint32 out_watts = 7;
+      uint32 out_tmp = 8;
+      uint32 fault = 9;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}

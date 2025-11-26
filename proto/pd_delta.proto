@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+message PdDelta {
+  message Message {
+    message Params {
+      uint32 xt60_in_watts = 1;
+      uint32 xt60_out_watts = 2;
+      uint32 car_out_watts = 3;
+      uint32 ac_in_watts = 4;
+      uint32 inv_out_watts = 5;
+      uint32 pd_out_watts = 6;
+      uint32 usb_qc_out_watts = 7;
+      uint32 type_c_out_watts = 8;
+      uint32 dc_in_watts = 9;
+      uint32 dsg_remain = 10;
+      uint32 chg_remain = 11;
+      uint32 soc = 12;
+      uint32 ac_out_state = 13;
+      uint32 car_out_state = 14;
+      uint32 inv_out_freq = 15;
+      uint32 car_out_voltage = 16;
+      uint32 inv_out_voltage = 17;
+      uint32 ac_in_freq = 18;
+      uint32 ac_in_voltage = 19;
+      bool beep_state = 20;
+      uint32 usb_out_state = 21;
+      uint32 type_c_out_state = 22;
+      uint32 xt60_out_state = 23;
+      uint32 chg_limit = 24;
+      uint32 chg_type = 25;
+      uint32 dsg_limit = 26;
+      uint32 fan_state = 27;
+      uint32 in_type = 28;
+      uint32 err_code = 29;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}

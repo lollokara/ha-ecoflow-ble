@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+message MpptDelta {
+  message Message {
+    message Params {
+      uint32 chg_type = 1;
+      uint32 in_watts = 2;
+      uint32 vol = 3;
+      uint32 cur = 4;
+      uint32 chg_state = 5;
+      uint32 pv_chg_priority = 6;
+      uint32 chg_limit = 7;
+      uint32 dsg_limit = 8;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}
