@@ -4,6 +4,8 @@
 #include <Arduino.h>
 
 const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,6 +261,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
                 </div>
+
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+                <h4 style="margin-bottom: 10px; color:#fff;">WiFi Settings</h4>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button class="btn" onclick="scanWifi()" style="width:100%">Scan Networks</button>
+                </div>
+                <div id="wifi-list" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; display: none;"></div>
+
+                <div class="ctrl-row"><span>SSID</span></div>
+                <input type="text" id="wifi-ssid" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:#fff; border-radius:6px; margin-bottom:10px;">
+
+                <div class="ctrl-row"><span>Password</span></div>
+                <input type="password" id="wifi-pass" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:#fff; border-radius:6px; margin-bottom:10px;">
+
+                <div style="display:flex; justify-content:flex-end;">
+                     <button class="btn btn-primary" onclick="saveWifi()">Connect & Save</button>
+                </div>
             </div>
         </div>
 
@@ -345,34 +364,34 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 </div>
             </div>
             <div class="grid grid-3">
-                <div class="stat"><div class="stat-label">In</div><div class="stat-val" id="in-${d.type}">${d.in}W</div></div>
-                <div class="stat"><div class="stat-label">Out</div><div class="stat-val" id="out-${d.type}">${d.out}W</div></div>
-                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val" id="solar-${d.type}">${d.solar}W</div></div>
+                <div class="stat"><div class="stat-label">In</div><div class="stat-val" id="in-${d.type}">${d.in || 0}W</div></div>
+                <div class="stat"><div class="stat-label">Out</div><div class="stat-val" id="out-${d.type}">${d.out || 0}W</div></div>
+                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val" id="solar-${d.type}">${d.solar || 0}W</div></div>
             </div>
-            <div style="text-align:center; margin-bottom:15px; color:#888; font-size:0.8em;">Cell Temp: <span id="temp-${d.type}" style="color:#ccc">${d.cell_temp}</span>°C</div>
+            <div style="text-align:center; margin-bottom:15px; color:#888; font-size:0.8em;">Cell Temp: <span id="temp-${d.type}" style="color:#ccc">${d.cell_temp || 0}</span>°C</div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
-                    <span>AC Output (<span id="ac-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <span>AC Output (<span id="ac-pow-${d.type}" style="color:var(--neon-cyan)">${d.ac_out_pow || 0}</span>W)</span>
                     <label class="switch"><input type="checkbox" id="ac-${d.type}" onchange="cmd('${d.type}', 'set_ac', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
-                    <span>DC 12V (<span id="dc-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <span>DC 12V (<span id="dc-pow-${d.type}" style="color:var(--neon-cyan)">${d.dc_out_pow || 0}</span>W)</span>
                     <label class="switch"><input type="checkbox" id="dc-${d.type}" onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
-                    <span>USB (<span id="usb-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <span>USB (<span id="usb-pow-${d.type}" style="color:var(--neon-cyan)">${d.usb_out_pow || 0}</span>W)</span>
                     <label class="switch"><input type="checkbox" id="usb-${d.type}" onchange="cmd('${d.type}', 'set_usb', this.checked)"><span class="slider"></span></label>
                 </div>
                 <hr style="border-color:var(--glass-border); margin: 15px 0;">
 
-                <div class="ctrl-row"><span>AC Charge Limit: <b id="val-ac-${d.type}" style="color:var(--neon-cyan)">${d.cfg_ac_lim}</b>W</span></div>
-                <input type="range" id="rg-ac-${d.type}" min="400" max="1500" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>AC Charge Limit: <b id="val-ac-${d.type}" style="color:var(--neon-cyan)">${d.cfg_ac_lim || 400}</b>W</span></div>
+                <input type="range" id="rg-ac-${d.type}" min="400" max="1500" step="100" value="${d.cfg_ac_lim || 400}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
 
-                <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max}</b>%</span></div>
-                <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max || 100}</b>%</span></div>
+                <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max || 100}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
 
-                <div class="ctrl-row"><span>Min Discharge: <b id="val-min-${d.type}" style="color:var(--neon-cyan)">${d.cfg_min}</b>%</span></div>
-                <input type="range" id="rg-min-${d.type}" min="0" max="30" step="1" value="${d.cfg_min}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>Min Discharge: <b id="val-min-${d.type}" style="color:var(--neon-cyan)">${d.cfg_min || 0}</b>%</span></div>
+                <input type="range" id="rg-min-${d.type}" min="0" max="30" step="1" value="${d.cfg_min || 0}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
 
                 <div style="margin-top:20px">
                     <span style="font-size:0.8em; color:var(--text-sub); text-transform: uppercase; letter-spacing:1px;">Solar Input (1h)</span>
@@ -391,8 +410,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 </div>
             </div>
             <div class="grid">
-                <div class="stat"><div class="stat-label">Amb Temp</div><div class="stat-val"><span id="amb-${d.type}">${d.amb_temp}</span>°C</div></div>
-                <div class="stat"><div class="stat-label">Out Temp</div><div class="stat-val"><span id="out-${d.type}">${d.out_temp}</span>°C</div></div>
+                <div class="stat"><div class="stat-label">Amb Temp</div><div class="stat-val"><span id="amb-${d.type}">${d.amb_temp || 0}</span>°C</div></div>
+                <div class="stat"><div class="stat-label">Out Temp</div><div class="stat-val"><span id="out-${d.type}">${d.out_temp || 0}</span>°C</div></div>
             </div>
             <div class="controls" id="ctrl-${d.type}">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 30px; margin: 20px 0;">
@@ -407,7 +426,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                      <!-- Temp Control (Right) -->
                      <div class="dial-container" style="margin:0; flex-direction: column; gap: 5px;">
                         <button class="btn" style="font-size:1.2em; padding: 5px 20px;" onclick="optimisticUpdate('dial-${d.type}', 1); cmd('${d.type}', 'set_temp', parseInt(el('dial-${d.type}').innerText) + 1)">+</button>
-                        <div class="dial-val" style="color:var(--neon-cyan); font-size:2.2em; min-width:50px;"><span id="dial-${d.type}">${d.set_temp}</span>°C</div>
+                        <div class="dial-val" style="color:var(--neon-cyan); font-size:2.2em; min-width:50px;"><span id="dial-${d.type}">${d.set_temp || 20}</span>°C</div>
                         <button class="btn" style="font-size:1.2em; padding: 5px 20px;" onclick="optimisticUpdate('dial-${d.type}', -1); cmd('${d.type}', 'set_temp', parseInt(el('dial-${d.type}').innerText) - 1)">-</button>
                      </div>
                 </div>
@@ -471,38 +490,38 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 </div>
             </div>
             <div class="grid grid-3">
-                <div class="stat"><div class="stat-label">In</div><div class="stat-val" id="in-${d.type}">${d.in}W</div></div>
-                <div class="stat"><div class="stat-label">Out</div><div class="stat-val" id="out-${d.type}">${d.out}W</div></div>
-                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val" id="solar-${d.type}">${d.solar}W</div></div>
+                <div class="stat"><div class="stat-label">In</div><div class="stat-val" id="in-${d.type}">${d.in || 0}W</div></div>
+                <div class="stat"><div class="stat-label">Out</div><div class="stat-val" id="out-${d.type}">${d.out || 0}W</div></div>
+                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val" id="solar-${d.type}">${d.solar || 0}W</div></div>
             </div>
-            <div style="text-align:center; margin-bottom:15px; color:#888;">Cell Temp: <span id="temp-${d.type}">${d.cell_temp}</span>°C</div>
+            <div style="text-align:center; margin-bottom:15px; color:#888;">Cell Temp: <span id="temp-${d.type}">${d.cell_temp || 0}</span>°C</div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
                     <span>AC Low Volt</span>
-                    <label class="switch"><input type="checkbox" id="ac-lv-${d.type}" onchange="cmd('${d.type}', 'set_ac_lv', this.checked)"><span class="slider"></span></label>
+                    <label class="switch"><input type="checkbox" id="ac-lv-${d.type}" ${d.ac_lv_on?'checked':''} onchange="cmd('${d.type}', 'set_ac_lv', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
                     <span>AC High Volt</span>
-                    <label class="switch"><input type="checkbox" id="ac-hv-${d.type}" onchange="cmd('${d.type}', 'set_ac_hv', this.checked)"><span class="slider"></span></label>
+                    <label class="switch"><input type="checkbox" id="ac-hv-${d.type}" ${d.ac_hv_on?'checked':''} onchange="cmd('${d.type}', 'set_ac_hv', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
                     <span>DC (12V)</span>
-                    <label class="switch"><input type="checkbox" id="dc-${d.type}" onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
+                    <label class="switch"><input type="checkbox" id="dc-${d.type}" ${d.dc_on?'checked':''} onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
                 </div>
 
                 <hr style="border-color:var(--glass-border); margin:15px 0">
-                <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max}</b>%</span></div>
-                <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max || 100}</b>%</span></div>
+                <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max || 100}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
 
-                <div class="ctrl-row"><span>Min Discharge: <b id="val-min-${d.type}" style="color:var(--neon-cyan)">${d.cfg_min}</b>%</span></div>
-                <input type="range" id="rg-min-${d.type}" min="0" max="30" step="1" value="${d.cfg_min}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>Min Discharge: <b id="val-min-${d.type}" style="color:var(--neon-cyan)">${d.cfg_min || 0}</b>%</span></div>
+                <input type="range" id="rg-min-${d.type}" min="0" max="30" step="1" value="${d.cfg_min || 0}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
 
                 <div class="ctrl-row">
                     <span>Energy Backup</span>
-                    <label class="switch"><input type="checkbox" id="bkp-en-${d.type}" onchange="cmd('${d.type}', 'set_backup_en', this.checked)"><span class="slider"></span></label>
+                    <label class="switch"><input type="checkbox" id="bkp-en-${d.type}" ${d.backup_en?'checked':''} onchange="cmd('${d.type}', 'set_backup_en', this.checked)"><span class="slider"></span></label>
                 </div>
-                <div class="ctrl-row"><span>Backup Level: <b id="val-bkp-${d.type}" style="color:var(--neon-cyan)">${d.backup_lvl}</b>%</span></div>
-                <input type="range" id="rg-bkp-${d.type}" min="0" max="100" value="${d.backup_lvl}" onchange="cmd('${d.type}', 'set_backup_level', parseInt(this.value))" oninput="el('val-bkp-${d.type}').innerText=this.value">
+                <div class="ctrl-row"><span>Backup Level: <b id="val-bkp-${d.type}" style="color:var(--neon-cyan)">${d.backup_lvl || 0}</b>%</span></div>
+                <input type="range" id="rg-bkp-${d.type}" min="0" max="100" value="${d.backup_lvl || 0}" onchange="cmd('${d.type}', 'set_backup_level', parseInt(this.value))" oninput="el('val-bkp-${d.type}').innerText=this.value">
 
                 <div style="margin-top:20px">
                     <span style="font-size:0.8em; color:var(--text-sub); text-transform: uppercase;">Solar Input (1h)</span>
@@ -520,28 +539,29 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     ${renderCardMenu(d.type, d.connected, d.paired)}
                 </div>
             </div>
-            <div class="grid">
-                <div class="stat"><div class="stat-label">Car Batt</div><div class="stat-val"><span id="car-${d.type}">${d.car_volt.toFixed(1)}</span>V</div></div>
-                <div class="stat"><div class="stat-label">Limit</div><div class="stat-val"><span id="lim-${d.type}">${d.pow_lim}</span>W</div></div>
+            <div class="grid grid-3">
+                <div class="stat"><div class="stat-label">Car Batt</div><div class="stat-val"><span id="car-${d.type}">${(d.car_volt || 0).toFixed(1)}</span>V</div></div>
+                <div class="stat"><div class="stat-label">DC Out</div><div class="stat-val"><span id="dc-curr-${d.type}" style="color:${(d.dc_curr||0) > 0 ? 'var(--neon-green)' : ((d.dc_curr||0) < 0 ? 'var(--neon-pink)' : '#fff')}">${d.dc_curr || 0}</span>W</div></div>
+                <div class="stat"><div class="stat-label">Limit</div><div class="stat-val"><span id="lim-${d.type}">${d.pow_lim || 0}</span>W</div></div>
             </div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
                     <span>Charger Enabled</span>
-                    <label class="switch"><input type="checkbox" id="chg-${d.type}" onchange="cmd('${d.type}', 'set_open', this.checked)"><span class="slider"></span></label>
+                    <label class="switch"><input type="checkbox" id="chg-${d.type}" ${d.chg_open?'checked':''} onchange="cmd('${d.type}', 'set_open', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
                     <span>Mode</span>
                     <select id="mode-${d.type}" onchange="cmd('${d.type}', 'set_mode', parseInt(this.value))" style="width:120px">
-                        <option value="0">Idle</option>
-                        <option value="1">Charge</option>
-                        <option value="2">Maintenance</option>
-                        <option value="3">Reverse</option>
+                        <option value="0" ${d.mode===0?'selected':''}>Idle</option>
+                        <option value="1" ${d.mode===1?'selected':''}>Charge</option>
+                        <option value="2" ${d.mode===2?'selected':''}>Maintenance</option>
+                        <option value="3" ${d.mode===3?'selected':''}>Reverse</option>
                     </select>
                 </div>
                 <div class="ctrl-row">
-                    <span>Power Limit: <b id="val-ac-lim">${d.pow_lim}</b>W</span>
+                    <span>Power Limit: <b id="val-ac-lim">${d.pow_lim || 100}</b>W</span>
                 </div>
-                <input type="range" id="rg-lim-${d.type}" min="100" max="800" step="50" value="${d.pow_lim}" onchange="cmd('${d.type}', 'set_limit', parseInt(this.value))" oninput="el('val-ac-lim').innerText=this.value">
+                <input type="range" id="rg-lim-${d.type}" min="100" max="800" step="50" value="${d.pow_lim || 100}" onchange="cmd('${d.type}', 'set_limit', parseInt(this.value))" oninput="el('val-ac-lim').innerText=this.value">
             </div>
         </div>`;
 
@@ -705,6 +725,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         else if (type === 'ac') {
              setTxt('car-'+type, d.car_volt.toFixed(1));
              setTxt('lim-'+type, d.pow_lim);
+             setTxt('dc-curr-'+type, d.dc_curr);
+             const elDc = el('dc-curr-'+type);
+             if(elDc) elDc.style.color = d.dc_curr > 0 ? 'var(--neon-green)' : (d.dc_curr < 0 ? 'var(--neon-pink)' : '#fff');
+
              setCheck('chg-'+type, d.chg_open);
              setVal('mode-'+type, d.mode);
              setVal('rg-lim-'+type, d.pow_lim); setTxt('val-ac-lim', d.pow_lim);
@@ -782,6 +806,45 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         }).then(r => {
             if(r.ok) closeSettings();
             else alert('Error saving settings');
+        });
+    }
+
+    function scanWifi() {
+        el('wifi-list').style.display = 'block';
+        el('wifi-list').innerHTML = '<div style="padding:10px; color:#aaa; text-align:center;">Scanning...</div>';
+        fetch(API + '/scan_wifi').then(r => r.json()).then(nets => {
+            const list = el('wifi-list');
+            list.innerHTML = '';
+            if (nets.length === 0) {
+                 list.innerHTML = '<div style="padding:10px; color:#aaa; text-align:center;">No networks found</div>';
+            } else {
+                 nets.forEach(n => {
+                     const div = document.createElement('div');
+                     div.style.padding = '8px';
+                     div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                     div.style.cursor = 'pointer';
+                     div.style.display = 'flex'; div.style.justifyContent='space-between';
+                     div.innerHTML = `<span>${n.ssid}</span> <small style="color:#777">${n.rssi}dBm ${n.enc?'🔒':''}</small>`;
+                     div.onclick = () => { el('wifi-ssid').value = n.ssid; };
+                     div.onmouseover = () => div.style.background = 'rgba(255,255,255,0.1)';
+                     div.onmouseout = () => div.style.background = 'transparent';
+                     list.appendChild(div);
+                 });
+            }
+        });
+    }
+
+    function saveWifi() {
+        const ssid = el('wifi-ssid').value;
+        const pass = el('wifi-pass').value;
+        if(!ssid) { alert('SSID required'); return; }
+        fetch(API + '/save_wifi', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ssid, pass})
+        }).then(r => {
+             if(r.ok) { alert('Saved! Device will restart.'); location.reload(); }
+             else alert('Error saving WiFi');
         });
     }
 
