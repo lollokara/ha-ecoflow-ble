@@ -259,6 +259,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
                 </div>
+
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+                <h4 style="margin-bottom: 10px; color:#fff;">WiFi Settings</h4>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button class="btn" onclick="scanWifi()" style="width:100%">Scan Networks</button>
+                </div>
+                <div id="wifi-list" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; display: none;"></div>
+
+                <div class="ctrl-row"><span>SSID</span></div>
+                <input type="text" id="wifi-ssid" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:#fff; border-radius:6px; margin-bottom:10px;">
+
+                <div class="ctrl-row"><span>Password</span></div>
+                <input type="password" id="wifi-pass" style="width:100%; padding:8px; background:#222; border:1px solid #444; color:#fff; border-radius:6px; margin-bottom:10px;">
+
+                <div style="display:flex; justify-content:flex-end;">
+                     <button class="btn btn-primary" onclick="saveWifi()">Connect & Save</button>
+                </div>
             </div>
         </div>
 
@@ -520,8 +537,9 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     ${renderCardMenu(d.type, d.connected, d.paired)}
                 </div>
             </div>
-            <div class="grid">
+            <div class="grid grid-3">
                 <div class="stat"><div class="stat-label">Car Batt</div><div class="stat-val"><span id="car-${d.type}">${d.car_volt.toFixed(1)}</span>V</div></div>
+                <div class="stat"><div class="stat-label">DC Out</div><div class="stat-val"><span id="dc-curr-${d.type}" style="color:${d.dc_curr > 0 ? 'var(--neon-green)' : (d.dc_curr < 0 ? 'var(--neon-pink)' : '#fff')}">${d.dc_curr}</span>W</div></div>
                 <div class="stat"><div class="stat-label">Limit</div><div class="stat-val"><span id="lim-${d.type}">${d.pow_lim}</span>W</div></div>
             </div>
             <div class="controls" id="ctrl-${d.type}">
@@ -705,6 +723,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         else if (type === 'ac') {
              setTxt('car-'+type, d.car_volt.toFixed(1));
              setTxt('lim-'+type, d.pow_lim);
+             setTxt('dc-curr-'+type, d.dc_curr);
+             const elDc = el('dc-curr-'+type);
+             if(elDc) elDc.style.color = d.dc_curr > 0 ? 'var(--neon-green)' : (d.dc_curr < 0 ? 'var(--neon-pink)' : '#fff');
+
              setCheck('chg-'+type, d.chg_open);
              setVal('mode-'+type, d.mode);
              setVal('rg-lim-'+type, d.pow_lim); setTxt('val-ac-lim', d.pow_lim);
@@ -782,6 +804,45 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         }).then(r => {
             if(r.ok) closeSettings();
             else alert('Error saving settings');
+        });
+    }
+
+    function scanWifi() {
+        el('wifi-list').style.display = 'block';
+        el('wifi-list').innerHTML = '<div style="padding:10px; color:#aaa; text-align:center;">Scanning...</div>';
+        fetch(API + '/scan_wifi').then(r => r.json()).then(nets => {
+            const list = el('wifi-list');
+            list.innerHTML = '';
+            if (nets.length === 0) {
+                 list.innerHTML = '<div style="padding:10px; color:#aaa; text-align:center;">No networks found</div>';
+            } else {
+                 nets.forEach(n => {
+                     const div = document.createElement('div');
+                     div.style.padding = '8px';
+                     div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                     div.style.cursor = 'pointer';
+                     div.style.display = 'flex'; div.style.justifyContent='space-between';
+                     div.innerHTML = `<span>${n.ssid}</span> <small style="color:#777">${n.rssi}dBm ${n.enc?'🔒':''}</small>`;
+                     div.onclick = () => { el('wifi-ssid').value = n.ssid; };
+                     div.onmouseover = () => div.style.background = 'rgba(255,255,255,0.1)';
+                     div.onmouseout = () => div.style.background = 'transparent';
+                     list.appendChild(div);
+                 });
+            }
+        });
+    }
+
+    function saveWifi() {
+        const ssid = el('wifi-ssid').value;
+        const pass = el('wifi-pass').value;
+        if(!ssid) { alert('SSID required'); return; }
+        fetch(API + '/save_wifi', {
+            method: 'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ssid, pass})
+        }).then(r => {
+             if(r.ok) { alert('Saved! Device will restart.'); location.reload(); }
+             else alert('Error saving WiFi');
         });
     }
 
@@ -994,5 +1055,6 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
 
 #endif // WEB_ASSETS_H

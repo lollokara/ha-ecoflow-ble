@@ -32,6 +32,10 @@ private:
     static void handleSettings(AsyncWebServerRequest *request);
     static void handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
+    // WiFi Handlers
+    static void handleScanWifi(AsyncWebServerRequest *request);
+    static void handleSaveWifi(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+
     // Log Handlers
     static void handleLogs(AsyncWebServerRequest *request);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
