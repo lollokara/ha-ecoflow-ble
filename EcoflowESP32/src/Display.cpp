@@ -38,7 +38,9 @@ enum class DashboardView {
     W2_BATT,
     W2_TEMP,
     D3P_BATT,
-    AC_BATT // Alternator Charger
+    AC_BATT, // Alternator Charger Battery %
+    AC_VOLT, // Alternator Charger Input Voltage
+    AC_POWER // Alternator Charger Output Power
 };
 
 enum class SelectionPage {
@@ -226,6 +228,52 @@ void drawText(int x, int y, String text, uint32_t color) {
     }
 }
 
+void drawCompactFloat(float val, uint32_t color) {
+    // Format: "12.5" - tight packing for 3 digits + dot
+    int intPart = (int)val;
+    int decPart = (int)((val - intPart) * 10) % 10;
+
+    String sInt = String(intPart);
+    String sDec = String(decPart);
+
+    // Calculate total width
+    // Digits: 5px + 1px spacing = 6px
+    // Dot: 1px + 1px spacing = 2px
+    int width = (sInt.length() * 6) + 2 + 5;
+
+    // Remove last spacing for better centering?
+    // Let's assume standard spacing logic but tighter dot
+
+    int x = (NUM_COLS - width) / 2;
+    if (x < 0) x = 0;
+
+    // Draw Int part
+    for(int i=0; i<sInt.length(); i++) {
+        drawChar(x, 1, sInt[i], color);
+        x += 6;
+    }
+
+    // Draw Dot (Custom)
+    // Backtrack slightly if needed, but 6px spacing includes 1px gap.
+    // We want dot to take 2px total (pixel + gap).
+    // drawChar advanced x by 6. Last pixel of digit was at x-2.
+    // Let's place dot at x-1 (the gap) or just x?
+    // We want tight packing.
+    // Standard char: [P P P P P _] (6px)
+    // We want: [P P P P P] [.] [_] [P P P P P]
+    // So Int part printed normally. x is at start of next char slot.
+    // We overwrite the gap? No, gap is empty.
+
+    // Draw dot at bottom of the "gap" column, or shift?
+    // Let's shift back 1px to make it tighter
+    x -= 1;
+    setPixel(x, 7, color); // Dot at bottom
+    x += 2; // Advance 2px (dot + space)
+
+    // Draw Dec part
+    drawChar(x, 1, sDec[0], color);
+}
+
 int getTextWidth(String text) {
     return text.length() * 6;
 }
@@ -306,6 +354,26 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
                  int batt = (int)currentData.alternatorCharger.batteryLevel;
                  text = String(batt > 99 ? 99 : batt) + "%";
                  color = cYellow;
+            }
+            break;
+        case DashboardView::AC_VOLT:
+            // Input Voltage
+            {
+                float volts = currentData.alternatorCharger.carBatteryVoltage;
+                // Use compact drawing
+                drawCompactFloat(volts, cBlue);
+                // Return early to skip drawText
+                strip.setBrightness(brightness);
+                strip.show();
+                return;
+            }
+            break;
+        case DashboardView::AC_POWER:
+            // DC Output Power (Signed)
+            {
+                int pwr = (int)currentData.alternatorCharger.dcPower;
+                text = String(pwr);
+                color = (pwr > 0) ? cGreen : (pwr < 0 ? cRed : cWhite);
             }
             break;
     }
@@ -661,9 +729,25 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             if (input == ButtonInput::BTN_UP || input == ButtonInput::BTN_DOWN) {
                  int currentIdx = (int)currentDashboardView;
                  int dir = (input == ButtonInput::BTN_UP) ? 1 : -1;
-                 int nextIdx = currentIdx + dir;
-                 if (nextIdx > 5) nextIdx = 0;
-                 if (nextIdx < 0) nextIdx = 5;
+
+                 // Loop to find next valid view
+                 int nextIdx = currentIdx;
+                 for(int i=0; i<8; i++) { // Max 8 views
+                     nextIdx += dir;
+                     if (nextIdx > 7) nextIdx = 0;
+                     if (nextIdx < 0) nextIdx = 7;
+
+                     // Check validity
+                     DeviceSlot* slotAC = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
+                     bool acConnected = slotAC && slotAC->isConnected;
+
+                     if (nextIdx == (int)DashboardView::AC_VOLT || nextIdx == (int)DashboardView::AC_POWER) {
+                         if (acConnected) break; // Valid
+                         // Else continue loop
+                     } else {
+                         break; // Others always valid (show NC)
+                     }
+                 }
                  currentDashboardView = (DashboardView)nextIdx;
             } else if (input == ButtonInput::BTN_ENTER_SHORT) {
                 currentState = MenuState::SELECTION;

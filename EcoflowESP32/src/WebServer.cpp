@@ -53,9 +53,31 @@ void WebServer::begin() {
         WiFi.mode(WIFI_STA);
         WiFi.begin(ssid.c_str(), pass.c_str());
         ESP_LOGI(TAG, "Connecting to WiFi: %s", ssid.c_str());
+
+        // Wait for connection with timeout
+        unsigned long startAttemptTime = millis();
+        bool connected = false;
+        while (millis() - startAttemptTime < 10000) { // 10s timeout
+            if (WiFi.status() == WL_CONNECTED) {
+                connected = true;
+                ESP_LOGI(TAG, "WiFi Connected! IP: %s", WiFi.localIP().toString().c_str());
+                break;
+            }
+            delay(100);
+        }
+
+        if (!connected) {
+             ESP_LOGW(TAG, "WiFi Connection Failed. Starting Hotspot...");
+             WiFi.disconnect();
+             WiFi.mode(WIFI_AP);
+             WiFi.softAP("EspFlow", "aaaaaaab");
+             ESP_LOGI(TAG, "AP Started: EspFlow (aaaaaaab)");
+        }
     } else {
-        ESP_LOGW(TAG, "No WiFi credentials saved. Web UI disabled.");
-        return;
+        ESP_LOGW(TAG, "No WiFi credentials saved. Starting Hotspot...");
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP("EspFlow", "aaaaaaab");
+        ESP_LOGI(TAG, "AP Started: EspFlow (aaaaaaab)");
     }
 
     setupRoutes();
@@ -81,6 +103,9 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    server.on("/api/scan_wifi", HTTP_GET, handleScanWifi);
+    server.on("/api/save_wifi", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSaveWifi);
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
@@ -156,6 +181,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
                 obj["mode"] = data.chargerMode;
                 obj["pow_lim"] = data.powerLimit;
                 obj["car_volt"] = data.carBatteryVoltage;
+                obj["dc_curr"] = data.dcPower; // Add current output
             }
         }
     }
@@ -417,5 +443,37 @@ void WebServer::handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data
         request->send(200, "text/plain", "Saved");
     } else {
         request->send(400, "text/plain", "Invalid Payload");
+    }
+}
+
+void WebServer::handleScanWifi(AsyncWebServerRequest *request) {
+    int n = WiFi.scanNetworks();
+    DynamicJsonDocument doc(4096);
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n; ++i) {
+        JsonObject obj = arr.createNestedObject();
+        obj["ssid"] = WiFi.SSID(i);
+        obj["rssi"] = WiFi.RSSI(i);
+        obj["enc"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+    }
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+}
+
+void WebServer::handleSaveWifi(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    StaticJsonDocument<200> doc;
+    deserializeJson(doc, data, len);
+    if (doc.containsKey("ssid") && doc.containsKey("pass")) {
+        Preferences prefs;
+        prefs.begin("ecoflow", false);
+        prefs.putString("wifi_ssid", doc["ssid"].as<String>());
+        prefs.putString("wifi_pass", doc["pass"].as<String>());
+        prefs.end();
+        request->send(200, "text/plain", "Saved. Restarting...");
+        delay(1000);
+        ESP.restart();
+    } else {
+        request->send(400, "text/plain", "Missing Credentials");
     }
 }
