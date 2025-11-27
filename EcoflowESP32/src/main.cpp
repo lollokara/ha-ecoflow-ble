@@ -22,7 +22,7 @@
 #define BTN_UP_PIN    4
 #define BTN_DOWN_PIN  5
 #define BTN_ENTER_PIN 6
-#define POWER_LATCH_PIN 21
+#define POWER_LATCH_PIN 12
 
 // Timings for button press detection (in milliseconds)
 #define DEBOUNCE_DELAY 50

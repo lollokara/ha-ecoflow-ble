@@ -25,7 +25,7 @@ void LightSensor::begin() {
     //analogReadResolution(12); // Default is 12 for ESP32
     //analogSetAttenuation(ADC_11db); // Default
 
-    int initial = analogRead(_pin);
+    int initial = 4095 - analogRead(_pin);
     for (int i = 0; i < WINDOW_SIZE; i++) {
         _readings[i] = initial;
     }
@@ -40,7 +40,7 @@ void LightSensor::update() {
     if (now - _lastUpdate < 50) return; // 20Hz sampling
     _lastUpdate = now;
 
-    int val = analogRead(_pin);
+    int val = 4095 - analogRead(_pin);
 
     _total = _total - _readings[_readIndex];
     _readings[_readIndex] = val;

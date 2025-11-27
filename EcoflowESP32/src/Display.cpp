@@ -182,7 +182,7 @@ void updateBrightness() {
 
     // Map to 1% - 50% (2.55 - 127.5)
     // strip.setBrightness takes 0-255
-    float target = 2.55f + (norm * (127.5f - 2.55f));
+    float target = 2.55f + (norm * (177.5f - 2.55f));
 
     // Smooth transition
     if (abs(target - currentBrightness) > 0.5f) {
@@ -587,32 +587,23 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     if (currentState == MenuState::DASHBOARD) {
         drawDashboard(slotD3, slotW2, slotD3P, slotAC);
     } else if (currentState == MenuState::SELECTION) {
-        strip.setBrightness(25);
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
-        strip.setBrightness(25);
         DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_3;
         drawDetailMenu(activeType);
     } else if (currentState == MenuState::SETTINGS_SUBMENU) {
-        strip.setBrightness(25);
         drawSettingsSubmenu();
     } else if (currentState == MenuState::LIMITS_SUBMENU) {
-        strip.setBrightness(25);
         drawLimitsSubmenu();
     } else if (currentState == MenuState::EDIT_CHG) {
-        strip.setBrightness(25);
         drawEditScreen("CHG", tempAcLimit, "");
     } else if (currentState == MenuState::EDIT_SOC_UP) {
-        strip.setBrightness(25);
         drawEditScreen("UP", tempMaxChg, "%");
     } else if (currentState == MenuState::EDIT_SOC_DN) {
-        strip.setBrightness(25);
         drawEditScreen("DN", tempMinDsg, "%");
     } else if (currentState == MenuState::DEVICE_SELECT) {
-        strip.setBrightness(25);
         drawDeviceSelectMenu(slotD3, slotW2, slotD3P, slotAC);
     } else if (currentState == MenuState::DEVICE_ACTION) {
-        strip.setBrightness(25);
         DeviceSlot* s = nullptr;
         if (currentDevicePage == DevicePage::D3) s = slotD3;
         else if (currentDevicePage == DevicePage::W2) s = slotW2;
@@ -620,7 +611,6 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
         else if (currentDevicePage == DevicePage::CHG) s = slotAC;
         drawDeviceActionMenu(s);
     } else if (currentState == MenuState::WAVE2_MENU || currentState == MenuState::EDIT_W2_PWR || currentState == MenuState::EDIT_W2_MOD || currentState == MenuState::EDIT_W2_SPD || currentState == MenuState::EDIT_W2_SMD) {
-        strip.setBrightness(25);
         drawWave2Menu();
     }
 
