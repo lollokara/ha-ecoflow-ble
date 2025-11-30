@@ -137,6 +137,9 @@ void CmdUtils::processInput(String input) {
     } else if (cmd.startsWith("ac_")) {
         if (cmd.startsWith("ac_get_")) handleAltChargerRead(cmd);
         else handleAltChargerCommand(cmd, args);
+    } else if (cmd.startsWith("d2_")) {
+        if (cmd.startsWith("d2_get_")) handleDelta2Read(cmd);
+        else handleDelta2Command(cmd, args);
     } else if (cmd.startsWith("get_")) {
         // Generic Wave 2 gets
         handleWave2Read(cmd);
@@ -171,9 +174,9 @@ void CmdUtils::printHelp() {
     cmd_println("  sys_temp                        (Read internal ESP32 temp)");
     cmd_println("  sys_reset                       (Factory reset & reboot)");
     cmd_println("  con_status                      (List connections)");
-    cmd_println("  con_connect <d3/w2/d3p/ac>      (Connect)");
-    cmd_println("  con_disconnect <d3/w2/d3p/ac>   (Disconnect)");
-    cmd_println("  con_forget <d3/w2/d3p/ac>       (Forget)");
+    cmd_println("  con_connect <d3/w2/d3p/ac/d2>      (Connect)");
+    cmd_println("  con_disconnect <d3/w2/d3p/ac/d2>   (Disconnect)");
+    cmd_println("  con_forget <d3/w2/d3p/ac/d2>       (Forget)");
     cmd_println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
     cmd_println("  wifi_ip                         (Get current IP)");
 
@@ -211,6 +214,12 @@ void CmdUtils::printHelp() {
     cmd_println("  ac_get_battery");
     cmd_println("  ac_set_mode <val>");
     cmd_println("  ac_set_power_limit <watts>");
+
+    cmd_println("\n[Delta 2] (Prefix: d2_)");
+    cmd_println("  d2_get_switches / d2_set_ac/dc/usb <0/1>");
+    cmd_println("  d2_get_power");
+    cmd_println("  d2_get_battery / d2_set_soc_max/min");
+    cmd_println("  d2_set_ac_limit <watts>");
 }
 
 uint8_t CmdUtils::parseHexByte(String s) {
@@ -270,6 +279,7 @@ void CmdUtils::handleConCommand(String cmd, String args) {
         printSlot(dm.getSlot(DeviceType::WAVE_2));
         printSlot(dm.getSlot(DeviceType::DELTA_PRO_3));
         printSlot(dm.getSlot(DeviceType::ALTERNATOR_CHARGER));
+        printSlot(dm.getSlot(DeviceType::DELTA_2));
         return;
     }
 
@@ -312,8 +322,9 @@ void CmdUtils::handleConCommand(String cmd, String args) {
     else if (args.equalsIgnoreCase("w2")) type = DeviceType::WAVE_2;
     else if (args.equalsIgnoreCase("d3p")) type = DeviceType::DELTA_PRO_3;
     else if (args.equalsIgnoreCase("ac") || args.equalsIgnoreCase("chg")) type = DeviceType::ALTERNATOR_CHARGER;
+    else if (args.equalsIgnoreCase("d2")) type = DeviceType::DELTA_2;
     else {
-        cmd_println("Invalid device type. Use d3, w2, d3p, or ac.");
+        cmd_println("Invalid device type. Use d3, w2, d3p, ac, or d2.");
         return;
     }
 
@@ -380,6 +391,20 @@ void CmdUtils::handleWave2Command(String cmd, String args) {
     else if (cmd.equalsIgnoreCase("w2_set_submode")) { if(w2) w2->setSubMode(val); }
     else if (cmd.equalsIgnoreCase("w2_set_temptype")) { if(w2) w2->setTempDisplayType(val); }
     else if (cmd.equalsIgnoreCase("w2_set_tempunit")) { if(w2) w2->setTempUnit(val); }
+
+    cmd_println("Command sent.");
+}
+
+void CmdUtils::handleDelta2Command(String cmd, String args) {
+    EcoflowESP32* d2 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_2);
+    if (!d2 || !d2->isAuthenticated()) { cmd_println("D2 not ready."); return; }
+
+    if (cmd.equalsIgnoreCase("d2_set_ac")) d2->setAC(parseHexByte(args));
+    else if (cmd.equalsIgnoreCase("d2_set_dc")) d2->setDC(parseHexByte(args));
+    else if (cmd.equalsIgnoreCase("d2_set_usb")) d2->setUSB(parseHexByte(args));
+    else if (cmd.equalsIgnoreCase("d2_set_ac_limit")) d2->setAcChargingLimit(args.toInt());
+    else if (cmd.equalsIgnoreCase("d2_set_soc_max")) d2->setBatterySOCLimits(args.toInt(), d2->getMinDsgSoc());
+    else if (cmd.equalsIgnoreCase("d2_set_soc_min")) d2->setBatterySOCLimits(d2->getMaxChgSoc(), args.toInt());
 
     cmd_println("Command sent.");
 }
@@ -473,4 +498,16 @@ void CmdUtils::handleAltChargerRead(String cmd) {
     else if (cmd.equalsIgnoreCase("ac_get_power")) cmd_printf("DC Power: %.1fW, Limit: %dW\n", d.dcPower, d.powerLimit);
     else if (cmd.equalsIgnoreCase("ac_get_battery")) cmd_printf("Dev Batt: %.1f%%, Car Batt: %.2fV\n", d.batteryLevel, d.carBatteryVoltage);
     else cmd_println("Unknown get command for Alternator Charger");
+}
+
+void CmdUtils::handleDelta2Read(String cmd) {
+    EcoflowESP32* d2 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_2);
+    if (!d2) return;
+    const Delta2Data& d = d2->getData().delta2;
+
+    if (cmd.equalsIgnoreCase("d2_get_switches")) cmd_printf("AC: %d, DC: %d, USB: %d\n", d.acOn, d.dcOn, d.usbOn);
+    else if (cmd.equalsIgnoreCase("d2_get_power")) cmd_printf("In: %.1fW, Out: %.1fW, AC In: %.1fW, AC Out: %.1fW, Solar: %.1fW\n", d.inputPower, d.outputPower, d.acInputPower, d.acOutputPower, d.xt60InputPower);
+    else if (cmd.equalsIgnoreCase("d2_get_battery")) cmd_printf("Batt: %.1f%%, Limits: %d%%-%d%%\n", d.batteryLevel, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
+    else if (cmd.equalsIgnoreCase("d2_get_settings")) cmd_printf("AC Limit: %dW\n", d.acChargingSpeed);
+    else cmd_println("Unknown get command for Delta 2");
 }

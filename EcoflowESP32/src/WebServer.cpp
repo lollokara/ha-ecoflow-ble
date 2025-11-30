@@ -159,6 +159,31 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
             }
         }
     }
+    // Delta 2
+    {
+        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::DELTA_2);
+        EcoflowESP32* d = s->instance;
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("d2");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().delta2;
+                obj["in"] = data.inputPower;
+                obj["out"] = data.outputPower;
+                obj["solar"] = data.xt60InputPower;
+                obj["ac_on"] = data.acOn;
+                obj["dc_on"] = data.dcOn;
+                obj["usb_on"] = data.usbOn;
+                obj["cfg_ac_lim"] = data.acChargingSpeed;
+                obj["cfg_max"] = data.batteryChargeLimitMax;
+                obj["cfg_min"] = data.batteryChargeLimitMin;
+                obj["cell_temp"] = data.batteryTemperature;
+                obj["ac_out_pow"] = (int)abs(data.acOutputPower);
+                obj["dc_out_pow"] = (int)abs(data.dc12vOutputPower);
+                obj["usb_out_pow"] = (int)(abs(data.usbc1OutputPower) + abs(data.usbc2OutputPower) + abs(data.usba1OutputPower) + abs(data.usba2OutputPower));
+            }
+        }
+    }
     {
         DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
         EcoflowESP32* d = s->instance;
@@ -257,6 +282,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
+    else if (typeStr == "d2") type = DeviceType::DELTA_2;
 
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
     if (!dev || !dev->isConnected()) {
@@ -302,6 +328,15 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_mode") success = dev->setChargerMode((int)doc["val"]);
         else success = false;
     }
+    else if (type == DeviceType::DELTA_2) {
+        if (cmd == "set_ac") success = dev->setAC(doc["val"]);
+        else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
+        else if (cmd == "set_usb") success = dev->setUSB(doc["val"]);
+        else if (cmd == "set_ac_lim") success = dev->setAcChargingLimit(doc["val"]);
+        else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
+        else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
+        else success = false;
+    }
 
     if (success) request->send(200, "text/plain", "OK");
     else request->send(400, "text/plain", "Invalid Command or Value");
@@ -315,6 +350,7 @@ void WebServer::handleConnect(AsyncWebServerRequest *request, uint8_t *data, siz
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
+    else if (typeStr == "d2") type = DeviceType::DELTA_2;
     DeviceManager::getInstance().scanAndConnect(type);
     request->send(200, "text/plain", "Scanning...");
 }
@@ -327,6 +363,7 @@ void WebServer::handleDisconnect(AsyncWebServerRequest *request, uint8_t *data, 
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
+    else if (typeStr == "d2") type = DeviceType::DELTA_2;
     DeviceManager::getInstance().disconnect(type);
     request->send(200, "text/plain", "Disconnected");
 }
@@ -339,6 +376,7 @@ void WebServer::handleForget(AsyncWebServerRequest *request, uint8_t *data, size
     if (typeStr == "w2") type = DeviceType::WAVE_2;
     else if (typeStr == "d3p") type = DeviceType::DELTA_PRO_3;
     else if (typeStr == "ac") type = DeviceType::ALTERNATOR_CHARGER;
+    else if (typeStr == "d2") type = DeviceType::DELTA_2;
     DeviceManager::getInstance().forget(type);
     request->send(200, "text/plain", "Forgotten");
 }

@@ -103,11 +103,13 @@ private:
     EcoflowESP32 w2;
     EcoflowESP32 d3p;
     EcoflowESP32 ac;
+    EcoflowESP32 d2;
 
     DeviceSlot slotD3;
     DeviceSlot slotW2;
     DeviceSlot slotD3P;
     DeviceSlot slotAC;
+    DeviceSlot slotD2;
 
     Preferences prefs;
 

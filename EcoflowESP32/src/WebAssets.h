@@ -231,6 +231,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <div class="menu-item" onclick="connectDevice('w2')">Wave 2</div>
                     <div class="menu-item" onclick="connectDevice('d3p')">Delta Pro 3</div>
                     <div class="menu-item" onclick="connectDevice('ac')">Alternator Charger</div>
+                    <div class="menu-item" onclick="connectDevice('d2')">Delta 2</div>
                 </div>
                 <span id="esp-temp" style="font-size:0.85em; color:var(--text-sub)">--°C</span>
                 <div class="settings-btn" onclick="openSettings()">⚙️</div>
@@ -377,6 +378,52 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div style="margin-top:20px">
                     <span style="font-size:0.8em; color:var(--text-sub); text-transform: uppercase; letter-spacing:1px;">Solar Input (1h)</span>
                     <canvas id="graph-d3" class="graph" width="300" height="100"></canvas>
+                </div>
+            </div>
+        </div>`;
+
+    const renderD2 = (d) => `
+        <div class="card ${d.connected?'':'offline'}" id="card-${d.type}">
+            <div class="header" onclick="toggleCtrl('${d.type}')">
+                <h3><span class="status-dot ${d.connected?'on':''}" id="dot-${d.type}"></span>Delta 2 <span style="font-size:0.7em; color:#666">(${d.sn})</span></h3>
+                <div style="display:flex; align-items:center; gap:15px">
+                    <span class="stat-val" id="batt-${d.type}" style="color:${d.connected?'var(--neon-green)':'#666'}">${d.batt}%</span>
+                    ${renderCardMenu(d.type, d.connected, d.paired)}
+                </div>
+            </div>
+            <div class="grid grid-3">
+                <div class="stat"><div class="stat-label">In</div><div class="stat-val" id="in-${d.type}">${d.in}W</div></div>
+                <div class="stat"><div class="stat-label">Out</div><div class="stat-val" id="out-${d.type}">${d.out}W</div></div>
+                <div class="stat"><div class="stat-label">Solar</div><div class="stat-val" id="solar-${d.type}">${d.solar || 0}W</div></div>
+            </div>
+            <div style="text-align:center; margin-bottom:15px; color:#888; font-size:0.8em;">Cell Temp: <span id="temp-${d.type}" style="color:#ccc">${d.cell_temp}</span>°C</div>
+            <div class="controls" id="ctrl-${d.type}">
+                <div class="ctrl-row">
+                    <span>AC Output (<span id="ac-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <label class="switch"><input type="checkbox" id="ac-${d.type}" onchange="cmd('${d.type}', 'set_ac', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="ctrl-row">
+                    <span>DC 12V (<span id="dc-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <label class="switch"><input type="checkbox" id="dc-${d.type}" onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="ctrl-row">
+                    <span>USB (<span id="usb-pow-${d.type}" style="color:var(--neon-cyan)">0</span>W)</span>
+                    <label class="switch"><input type="checkbox" id="usb-${d.type}" onchange="cmd('${d.type}', 'set_usb', this.checked)"><span class="slider"></span></label>
+                </div>
+                <hr style="border-color:var(--glass-border); margin: 15px 0;">
+
+                <div class="ctrl-row"><span>AC Charge Limit: <b id="val-ac-${d.type}" style="color:var(--neon-cyan)">${d.cfg_ac_lim}</b>W</span></div>
+                <input type="range" id="rg-ac-${d.type}" min="400" max="1200" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
+
+                <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max}</b>%</span></div>
+                <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
+
+                <div class="ctrl-row"><span>Min Discharge: <b id="val-min-${d.type}" style="color:var(--neon-cyan)">${d.cfg_min}</b>%</span></div>
+                <input type="range" id="rg-min-${d.type}" min="0" max="30" step="1" value="${d.cfg_min}" onchange="cmd('${d.type}', 'set_min_soc', parseInt(this.value))" oninput="el('val-min-${d.type}').innerText=this.value">
+
+                <div style="margin-top:20px">
+                    <span style="font-size:0.8em; color:var(--text-sub); text-transform: uppercase; letter-spacing:1px;">Solar Input (1h)</span>
+                    <canvas id="graph-d2" class="graph" width="300" height="100"></canvas>
                 </div>
             </div>
         </div>`;
@@ -552,7 +599,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             if(data.esp_temp) el('esp-temp').innerText = data.esp_temp.toFixed(1) + '°C';
 
             let anyKnown = false;
-            const types = ['d3', 'w2', 'd3p', 'ac'];
+            const types = ['d3', 'w2', 'd3p', 'ac', 'd2'];
 
             types.forEach(type => {
                 const d = data[type];
@@ -565,13 +612,14 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                         const list = el('device-list');
                         const div = document.createElement('div');
                         if (type === 'd3') div.innerHTML = renderD3(d);
+                        else if (type === 'd2') div.innerHTML = renderD2(d);
                         else if (type === 'w2') div.innerHTML = renderW2(d);
                         else if (type === 'd3p') div.innerHTML = renderD3P(d);
                         else if (type === 'ac') div.innerHTML = renderAC(d);
                         list.appendChild(div);
                         knownDevices.add(type);
 
-                        if ((type === 'w2' || type === 'd3' || type === 'd3p') && d.connected) setTimeout(() => loadGraph(type), 500);
+                        if ((type === 'w2' || type === 'd3' || type === 'd3p' || type === 'd2') && d.connected) setTimeout(() => loadGraph(type), 500);
 
                         // Open ctrl panel if connected
                         if (d.connected) setTimeout(() => el('ctrl-'+type).classList.add('open'), 100);
@@ -634,10 +682,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
         if (!d.connected) return; // Skip updating dynamic values if offline
 
-        if (type === 'd3') {
+        if (type === 'd3' || type === 'd2') {
             setTxt('in-'+type, d.in + 'W');
             setTxt('out-'+type, d.out + 'W');
-            setTxt('solar-'+type, d.solar + 'W');
+            setTxt('solar-'+type, (d.solar || 0) + 'W');
             setTxt('temp-'+type, d.cell_temp);
             setTxt('ac-pow-'+type, d.ac_out_pow);
             setTxt('dc-pow-'+type, d.dc_out_pow);
@@ -798,7 +846,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     function toggleCtrl(id) {
         const e = el('ctrl-'+id);
         e.classList.toggle('open');
-        if((id === 'w2' || id === 'd3' || id === 'd3p') && e.classList.contains('open')) loadGraph(id);
+        if((id === 'w2' || id === 'd3' || id === 'd3p' || id === 'd2') && e.classList.contains('open')) loadGraph(id);
     }
 
     function loadGraph(type) {

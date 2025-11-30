@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+message BmsDelta {
+  message Message {
+    message Params {
+      uint32 bms_fault = 1;
+      uint32 soc = 2;
+      uint32 version = 3;
+      uint32 remain_cap = 4;
+      uint32 vol = 5;
+      uint32 cur = 6;
+      uint32 temp = 7;
+      uint32 max_cell_vol = 8;
+      uint32 min_cell_vol = 9;
+      uint32 max_cell_temp = 10;
+      uint32 min_cell_temp = 11;
+      uint32 max_mos_temp = 12;
+      uint32 min_mos_temp = 13;
+    }
+    Params params = 1;
+  }
+  Message message = 1;
+}
