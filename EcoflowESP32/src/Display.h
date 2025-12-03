@@ -18,5 +18,6 @@ int getSetMaxChgSoc();
 int getSetMinDsgSoc();
 DeviceType getTargetDeviceType();
 int getSetW2Val();
+DeviceType getActiveDeviceType();
 
 #endif
