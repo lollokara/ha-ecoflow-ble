@@ -20,6 +20,7 @@
 #include "pd335_sys.pb.h"
 #include "mr521.pb.h"
 #include "dc009_apl_comm.pb.h"
+#include "types.h"
 
 #define MAX_CONNECT_ATTEMPTS 5
 
@@ -100,10 +101,10 @@ public:
      * @param userId Your EcoFlow user ID.
      * @param deviceSn The serial number of your EcoFlow device.
      * @param ble_address The BLE MAC address of your device.
-     * @param protocolVersion The protocol version to use (default is 3).
+     * @param type The type of device (used to infer protocol version).
      * @return True if initialization was successful, false otherwise.
      */
-    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion = 3);
+    bool begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, DeviceType type = DeviceType::DELTA_3);
 
     /**
      * @brief Main loop function, should be called repeatedly in your sketch's loop().
@@ -170,6 +171,7 @@ public:
     bool setEnergyBackupLevel(int level);
     bool setAcHvPort(bool enabled);
     bool setAcLvPort(bool enabled);
+    bool setGfi(bool enabled);
 
     // Alternator Charger Specific Commands
     bool setChargerOpen(bool enabled);
@@ -237,6 +239,7 @@ private:
     std::string _deviceSn;
     std::string _ble_address;
     uint8_t _protocolVersion = 3;
+    DeviceType _deviceType = DeviceType::DELTA_3;
     uint32_t _txSeq = 0;
 
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;

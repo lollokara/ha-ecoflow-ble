@@ -1,6 +1,7 @@
 #include "Display.h"
 #include "Font.h"
 #include "LightSensor.h"
+#include "DeviceManager.h"
 #include <math.h>
 
 #define DATAPIN    14
@@ -295,8 +296,18 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
         case DashboardView::D3P_BATT:
             if (!slotD3P->isConnected) { text = "NC"; color = cRed; }
             else {
-                 int batt = (int)currentData.deltaPro3.batteryLevel; // Directly access data or add getter in EcoflowESP32
-                 text = String(batt > 99 ? 99 : batt) + "%";
+                 int batt = (int)currentData.deltaPro3.batteryLevel;
+
+                 // Charging Animation for D3P
+                 if (!isNightMode && slotD3P->instance->getInputPower() > 0) {
+                     float t = (float)millis() / 2000.0f;
+                     float val = (sin(t) + 1.0f) / 2.0f;
+                     brightness = (int)currentBrightness + (int)(val * 38.0f);
+                     if (brightness > 255) brightness = 255;
+                 }
+
+                 if (batt > 99) batt = 99;
+                 text = String(batt) + "%";
                  color = cGreen;
             }
             break;
@@ -558,6 +569,23 @@ void drawDeviceActionMenu(DeviceSlot* slot) {
     drawText(x, 1, text, color);
 }
 
+// --- Helper to determine Active Device Type for Logic ---
+DeviceType getActiveDeviceType() {
+    DeviceSlot* slotD3 = DeviceManager::getInstance().getSlot(DeviceType::DELTA_3);
+    DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
+    DeviceSlot* slotD3P = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
+    DeviceSlot* slotAC = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
+
+    // If manual selection (from DEV menu logic, but here we simplify)
+    // Priority: D3P > D3 > W2 > AC if connected
+    // This function returns the device the UI *should* control in context-less scenarios
+    if (slotD3P->isConnected) return DeviceType::DELTA_PRO_3;
+    if (slotD3->isConnected) return DeviceType::DELTA_3;
+    if (slotW2->isConnected) return DeviceType::WAVE_2;
+    if (slotAC->isConnected) return DeviceType::ALTERNATOR_CHARGER;
+    return DeviceType::DELTA_3; // Default
+}
+
 // --- State Machine & Logic ---
 
 void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScanning) {
@@ -566,6 +594,33 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     DeviceSlot* slotW2 = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
     DeviceSlot* slotD3P = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
     DeviceSlot* slotAC = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
+
+    // Auto-switch dashboard based on priority (D3P > D3 > W2 > AC) if current view is not connected
+    if (currentState == MenuState::DASHBOARD) {
+        // Helper to check if current view's device is connected
+        bool currentConnected = false;
+        if (currentDashboardView == DashboardView::D3_BATT || currentDashboardView == DashboardView::D3_SOLAR) currentConnected = slotD3->isConnected;
+        else if (currentDashboardView == DashboardView::W2_BATT || currentDashboardView == DashboardView::W2_TEMP) currentConnected = slotW2->isConnected;
+        else if (currentDashboardView == DashboardView::D3P_BATT) currentConnected = slotD3P->isConnected;
+        else if (currentDashboardView == DashboardView::AC_BATT) currentConnected = slotAC->isConnected;
+
+        // If not connected (or even if connected, we might want to force priority on connect? No, user might navigate away)
+        // Let's enforce: If D3P connects, switch to it?
+        // Simpler: If the current view is NOT valid, switch to highest priority valid.
+        // User requested: "Delta 3 Pro first"
+
+        // Only switch if current is invalid OR we just want to default to priority on startup/connect?
+        // Let's stick to "If connected, show it".
+        // Priority logic:
+        if (slotD3P->isConnected && currentDashboardView != DashboardView::D3P_BATT) {
+             // If we are not looking at D3P, but D3P is connected...
+             // Should we force switch? Maybe only if we were looking at "NC" screen?
+             if (!currentConnected) currentDashboardView = DashboardView::D3P_BATT;
+        } else if (slotD3->isConnected && !slotD3P->isConnected && !currentConnected) {
+             currentDashboardView = DashboardView::D3_BATT;
+        }
+        // This is passive. Active selection overrides.
+    }
 
     // Update Brightness Logic first
     updateBrightness();
@@ -589,8 +644,8 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     } else if (currentState == MenuState::SELECTION) {
         drawSelectionMenu();
     } else if (currentState == MenuState::DETAIL) {
-        DeviceType activeType = activeSlot ? activeSlot->type : DeviceType::DELTA_3;
-        drawDetailMenu(activeType);
+        DeviceType type = getActiveDeviceType(); // Prioritized
+        drawDetailMenu(type);
     } else if (currentState == MenuState::SETTINGS_SUBMENU) {
         drawSettingsSubmenu();
     } else if (currentState == MenuState::LIMITS_SUBMENU) {
@@ -620,6 +675,8 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
 
 DisplayAction handleDisplayInput(ButtonInput input) {
     lastInteractionTime = millis();
+
+    DeviceType activeType = getActiveDeviceType();
 
     // Global Back Logic (Hold > 1s)
     if (input == ButtonInput::BTN_ENTER_HOLD) {
@@ -807,8 +864,11 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 case ButtonInput::BTN_ENTER_SHORT:
                     if (currentSettingsPage == SettingsPage::CHG) {
                         currentState = MenuState::EDIT_CHG;
-                        tempAcLimit = currentData.delta3.acChargingSpeed;
-                        if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
+                        // Initial values
+                        if (activeType == DeviceType::DELTA_PRO_3) tempAcLimit = currentData.deltaPro3.acChargingSpeed;
+                        else tempAcLimit = currentData.delta3.acChargingSpeed;
+
+                        if (tempAcLimit == 0) tempAcLimit = 400; // Default if 0
                     } else if (currentSettingsPage == SettingsPage::LIM) {
                         currentState = MenuState::LIMITS_SUBMENU;
                         currentLimitsPage = LimitsPage::UP;
@@ -828,10 +888,15 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                     else currentLimitsPage = LimitsPage::UP;
                     break;
                 case ButtonInput::BTN_ENTER_SHORT:
-                    tempMaxChg = currentData.delta3.batteryChargeLimitMax;
-                    if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100;
+                    if (activeType == DeviceType::DELTA_PRO_3) {
+                        tempMaxChg = currentData.deltaPro3.batteryChargeLimitMax;
+                        tempMinDsg = currentData.deltaPro3.batteryChargeLimitMin;
+                    } else {
+                        tempMaxChg = currentData.delta3.batteryChargeLimitMax;
+                        tempMinDsg = currentData.delta3.batteryChargeLimitMin;
+                    }
 
-                    tempMinDsg = currentData.delta3.batteryChargeLimitMin;
+                    if (tempMaxChg < 50 || tempMaxChg > 100) tempMaxChg = 100;
                     if (tempMinDsg < 0 || tempMinDsg > 30) tempMinDsg = 0;
 
                     if (currentLimitsPage == LimitsPage::UP) {
@@ -848,11 +913,18 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             switch(input) {
                 case ButtonInput::BTN_UP:
                     tempAcLimit += 100;
-                    if (tempAcLimit > 1500) tempAcLimit = 1500;
+                    if (activeType == DeviceType::DELTA_PRO_3) {
+                        if (tempAcLimit > 2900) tempAcLimit = 2900;
+                    } else {
+                        if (tempAcLimit > 1500) tempAcLimit = 1500;
+                    }
                     break;
                 case ButtonInput::BTN_DOWN:
                     tempAcLimit -= 100;
-                    if (tempAcLimit < 400) tempAcLimit = 400;
+                    {
+                        int minLimit = (activeType == DeviceType::DELTA_PRO_3) ? 400 : 100;
+                        if (tempAcLimit < minLimit) tempAcLimit = minLimit;
+                    }
                     break;
                 case ButtonInput::BTN_ENTER_SHORT: // Confirm
                     flashScreen(cWhite);
