@@ -366,7 +366,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <hr style="border-color:var(--glass-border); margin: 15px 0;">
 
                 <div class="ctrl-row"><span>AC Charge Limit: <b id="val-ac-${d.type}" style="color:var(--neon-cyan)">${d.cfg_ac_lim}</b>W</span></div>
-                <input type="range" id="rg-ac-${d.type}" min="400" max="1500" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
+                <input type="range" id="rg-ac-${d.type}" min="100" max="1500" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
 
                 <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max}</b>%</span></div>
                 <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
@@ -478,19 +478,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             <div style="text-align:center; margin-bottom:15px; color:#888;">Cell Temp: <span id="temp-${d.type}">${d.cell_temp}</span>°C</div>
             <div class="controls" id="ctrl-${d.type}">
                 <div class="ctrl-row">
-                    <span>AC Low Volt</span>
-                    <label class="switch"><input type="checkbox" id="ac-lv-${d.type}" onchange="cmd('${d.type}', 'set_ac_lv', this.checked)"><span class="slider"></span></label>
-                </div>
-                <div class="ctrl-row">
-                    <span>AC High Volt</span>
-                    <label class="switch"><input type="checkbox" id="ac-hv-${d.type}" onchange="cmd('${d.type}', 'set_ac_hv', this.checked)"><span class="slider"></span></label>
+                    <span>AC Output</span>
+                    <label class="switch"><input type="checkbox" id="ac-${d.type}" onchange="cmd('${d.type}', 'set_ac', this.checked)"><span class="slider"></span></label>
                 </div>
                 <div class="ctrl-row">
                     <span>DC (12V)</span>
                     <label class="switch"><input type="checkbox" id="dc-${d.type}" onchange="cmd('${d.type}', 'set_dc', this.checked)"><span class="slider"></span></label>
                 </div>
+                <div class="ctrl-row">
+                    <span>GFI Isle Mode</span>
+                    <label class="switch"><input type="checkbox" id="gfi-${d.type}" onchange="cmd('${d.type}', 'set_gfi', this.checked)"><span class="slider"></span></label>
+                </div>
 
                 <hr style="border-color:var(--glass-border); margin:15px 0">
+
+                <div class="ctrl-row"><span>AC Charge Limit: <b id="val-ac-${d.type}" style="color:var(--neon-cyan)">${d.cfg_ac_lim}</b>W</span></div>
+                <input type="range" id="rg-ac-${d.type}" min="400" max="2900" step="100" value="${d.cfg_ac_lim}" onchange="cmd('${d.type}', 'set_ac_lim', parseInt(this.value))" oninput="el('val-ac-${d.type}').innerText=this.value">
+
                 <div class="ctrl-row"><span>Max Charge: <b id="val-max-${d.type}" style="color:var(--neon-cyan)">${d.cfg_max}</b>%</span></div>
                 <input type="range" id="rg-max-${d.type}" min="50" max="100" step="1" value="${d.cfg_max}" onchange="cmd('${d.type}', 'set_max_soc', parseInt(this.value))" oninput="el('val-max-${d.type}').innerText=this.value">
 
@@ -694,13 +698,14 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             setTxt('out-'+type, d.out + 'W');
             setTxt('solar-'+type, d.solar + 'W');
             setTxt('temp-'+type, d.cell_temp);
-            setCheck('ac-lv-'+type, d.ac_lv_on);
-            setCheck('ac-hv-'+type, d.ac_hv_on);
+            setCheck('ac-'+type, d.ac_on);
             setCheck('dc-'+type, d.dc_on);
             setCheck('bkp-en-'+type, d.backup_en);
+            setCheck('gfi-'+type, d.gfi_mode);
             setVal('rg-max-'+type, d.cfg_max); setTxt('val-max-'+type, d.cfg_max);
             setVal('rg-min-'+type, d.cfg_min); setTxt('val-min-'+type, d.cfg_min);
             setVal('rg-bkp-'+type, d.backup_lvl); setTxt('val-bkp-'+type, d.backup_lvl);
+            setVal('rg-ac-'+type, d.cfg_ac_lim); setTxt('val-ac-'+type, d.cfg_ac_lim);
         }
         else if (type === 'ac') {
              setTxt('car-'+type, d.car_volt.toFixed(1));
