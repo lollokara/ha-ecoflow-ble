@@ -241,9 +241,6 @@ void drawCompactFloat(float val, uint32_t color) {
     // Dot: 1px + 1px spacing = 2px
     int width = (sInt.length() * 6) + 2 + 5;
 
-    // Remove last spacing for better centering?
-    // Let's assume standard spacing logic but tighter dot
-
     int x = (NUM_COLS - width) / 2;
     if (x < 0) x = 0;
 
@@ -254,18 +251,6 @@ void drawCompactFloat(float val, uint32_t color) {
     }
 
     // Draw Dot (Custom)
-    // Backtrack slightly if needed, but 6px spacing includes 1px gap.
-    // We want dot to take 2px total (pixel + gap).
-    // drawChar advanced x by 6. Last pixel of digit was at x-2.
-    // Let's place dot at x-1 (the gap) or just x?
-    // We want tight packing.
-    // Standard char: [P P P P P _] (6px)
-    // We want: [P P P P P] [.] [_] [P P P P P]
-    // So Int part printed normally. x is at start of next char slot.
-    // We overwrite the gap? No, gap is empty.
-
-    // Draw dot at bottom of the "gap" column, or shift?
-    // Let's shift back 1px to make it tighter
     x -= 1;
     setPixel(x, 7, color); // Dot at bottom
     x += 2; // Advance 2px (dot + space)
@@ -285,11 +270,10 @@ void flashScreen(uint32_t color) {
     strip.fill(0);
 }
 
-void drawNcScreen() {
-    String text = "NC";
-    int width = getTextWidth(text) - 1;
-    int x = (NUM_COLS - width) / 2;
-    drawText(x, 1, text, cRed);
+DeviceType getActiveDeviceType() {
+    if (DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3)->isConnected) return DeviceType::DELTA_PRO_3;
+    if (DeviceManager::getInstance().getSlot(DeviceType::DELTA_3)->isConnected) return DeviceType::DELTA_3;
+    return DeviceType::DELTA_3;
 }
 
 void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, DeviceSlot* slotAC) {
@@ -343,8 +327,18 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
         case DashboardView::D3P_BATT:
             if (!slotD3P->isConnected) { text = "NC"; color = cRed; }
             else {
-                 int batt = (int)currentData.deltaPro3.batteryLevel; // Directly access data or add getter in EcoflowESP32
-                 text = String(batt > 99 ? 99 : batt) + "%";
+                 int batt = (int)currentData.deltaPro3.batteryLevel;
+
+                 // Charging Animation for D3P
+                 if (!isNightMode && currentData.deltaPro3.inputPower > 0) {
+                     float t = (float)millis() / 2000.0f;
+                     float val = (sin(t) + 1.0f) / 2.0f;
+                     brightness = (int)currentBrightness + (int)(val * 38.0f);
+                     if (brightness > 255) brightness = 255;
+                 }
+
+                 if (batt > 99) batt = 99;
+                 text = String(batt) + "%";
                  color = cGreen;
             }
             break;
@@ -360,9 +354,7 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
             // Input Voltage
             {
                 float volts = currentData.alternatorCharger.carBatteryVoltage;
-                // Use compact drawing
                 drawCompactFloat(volts, cBlue);
-                // Return early to skip drawText
                 strip.setBrightness(brightness);
                 strip.show();
                 return;
@@ -383,12 +375,7 @@ void drawDashboard(DeviceSlot* slotD3, DeviceSlot* slotW2, DeviceSlot* slotD3P, 
     int x = (NUM_COLS - width) / 2;
     drawText(x, 1, text, color);
 
-    // Night Mode Indicator (Bottom Right)
     if (isNightMode) {
-        // Brightness is already low, but we want the dot to be visible
-        // Since setBrightness applies globally, just setting the pixel is enough.
-        // x=19, y=8
-        // Blink: 1s ON, 1s OFF
         if ((millis() / 1000) % 2 == 0) {
             setPixel(19, 8, cGreen);
         }
@@ -484,7 +471,6 @@ void drawDetailMenu(DeviceType activeType) {
             totIn = 0;
             break;
         default:
-            // Fallback for unknown devices
             acOn = false;
             acOut = 0;
             dcOn = false;
@@ -529,7 +515,6 @@ void drawWave2Menu() {
     bool showSmd = (currentData.wave2.mode == 0 || currentData.wave2.mode == 1);
 
     if (currentState == MenuState::WAVE2_MENU) {
-        // In the main menu, show the Labels
         switch(currentWave2Page) {
             case Wave2MenuPage::PWR: text = "PWR"; break;
             case Wave2MenuPage::MOD: text = "MOD"; break;
@@ -540,7 +525,6 @@ void drawWave2Menu() {
                  break;
         }
     } else {
-        // In Edit/Detail states, show the Values
         if (currentState == MenuState::EDIT_W2_PWR) {
             text = (tempW2Val == 1) ? "ON" : "OFF";
             color = (tempW2Val == 1) ? cGreen : cRed;
@@ -635,9 +619,23 @@ void updateDisplay(const EcoflowData& data, DeviceSlot* activeSlot, bool isScann
     DeviceSlot* slotD3P = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
     DeviceSlot* slotAC = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
 
-    // Update Brightness Logic first
-    updateBrightness();
+    // Auto-switch Dashboard View based on priority
+    if (currentState == MenuState::DASHBOARD) {
+        // If D3P is connected and D3 is NOT, and we are looking at D3 BATT, switch to D3P BATT
+        if (slotD3P->isConnected && !slotD3->isConnected && currentDashboardView == DashboardView::D3_BATT) {
+            currentDashboardView = DashboardView::D3P_BATT;
+        }
+        // If D3 is connected and D3P is NOT, and we are looking at D3P BATT, switch to D3 BATT
+        if (slotD3->isConnected && !slotD3P->isConnected && currentDashboardView == DashboardView::D3P_BATT) {
+            currentDashboardView = DashboardView::D3_BATT;
+        }
+        // Priority D3P if both connected? User said "Delta 3 Pro first"
+        if (slotD3->isConnected && slotD3P->isConnected) {
+             if (currentDashboardView == DashboardView::D3_BATT) currentDashboardView = DashboardView::D3P_BATT;
+        }
+    }
 
+    updateBrightness();
     clearFrame();
 
     unsigned long now = millis();
@@ -875,8 +873,6 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                         int idx = (int)currentSettingsPage;
                         if (idx == 0) idx = 2; // Wrap
                         else idx--;
-                        // Logic for down?
-                        // Let's just cycle: CHG -> LIM -> OFF
                          if (input == ButtonInput::BTN_DOWN) {
                              if (currentSettingsPage == SettingsPage::CHG) currentSettingsPage = SettingsPage::LIM;
                              else if (currentSettingsPage == SettingsPage::LIM) currentSettingsPage = SettingsPage::OFF;
@@ -891,8 +887,15 @@ DisplayAction handleDisplayInput(ButtonInput input) {
                 case ButtonInput::BTN_ENTER_SHORT:
                     if (currentSettingsPage == SettingsPage::CHG) {
                         currentState = MenuState::EDIT_CHG;
-                        tempAcLimit = currentData.delta3.acChargingSpeed;
-                        if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400;
+                        DeviceType active = getActiveDeviceType();
+                        targetDeviceType = active; // Set global target for main loop
+                        if (active == DeviceType::DELTA_PRO_3) {
+                             tempAcLimit = currentData.deltaPro3.acChargingSpeed;
+                             if (tempAcLimit < 400 || tempAcLimit > 2900) tempAcLimit = 400;
+                        } else {
+                             tempAcLimit = currentData.delta3.acChargingSpeed;
+                             if (tempAcLimit < 200 || tempAcLimit > 2900) tempAcLimit = 400; // D3 is 100-1500 but 200 is default min
+                        }
                     } else if (currentSettingsPage == SettingsPage::LIM) {
                         currentState = MenuState::LIMITS_SUBMENU;
                         currentLimitsPage = LimitsPage::UP;
@@ -932,11 +935,19 @@ DisplayAction handleDisplayInput(ButtonInput input) {
             switch(input) {
                 case ButtonInput::BTN_UP:
                     tempAcLimit += 100;
-                    if (tempAcLimit > 1500) tempAcLimit = 1500;
+                    {
+                        DeviceType active = targetDeviceType;
+                        int max = (active == DeviceType::DELTA_PRO_3) ? 2900 : 1500;
+                        if (tempAcLimit > max) tempAcLimit = max;
+                    }
                     break;
                 case ButtonInput::BTN_DOWN:
                     tempAcLimit -= 100;
-                    if (tempAcLimit < 400) tempAcLimit = 400;
+                    {
+                        DeviceType active = targetDeviceType;
+                        int min = (active == DeviceType::DELTA_PRO_3) ? 400 : 100;
+                        if (tempAcLimit < min) tempAcLimit = min;
+                    }
                     break;
                 case ButtonInput::BTN_ENTER_SHORT: // Confirm
                     flashScreen(cWhite);
