@@ -95,8 +95,12 @@ EcoflowESP32::~EcoflowESP32() {
 //--- Public API
 //--------------------------------------------------------------------------
 
-bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, uint8_t protocolVersion) {
-    ESP_LOGI(TAG, "begin: Initializing device %s with protocol version %d", deviceSn.c_str(), protocolVersion);
+bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn, const std::string& ble_address, DeviceType type) {
+    _deviceType = type;
+    // Infer protocol version
+    uint8_t protocolVersion = (type == DeviceType::WAVE_2) ? 2 : 3;
+
+    ESP_LOGI(TAG, "begin: Initializing device %s (Type %d) with protocol version %d", deviceSn.c_str(), (int)type, protocolVersion);
     _userId = userId;
     _deviceSn = deviceSn;
     _ble_address = ble_address;
@@ -223,60 +227,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     break;
             }
         }
-        /*
-        // --- Process Incoming Notifications ---
-        BleNotification* notification;
-        if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
-            self->_lastAuthActivity = millis();
-            if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
-                auto parsed_payload = EncPacket::parseSimple(notification->data, notification->length);
-                if (!parsed_payload.empty() && parsed_payload.size() >= 43 && parsed_payload[0] == 0x01) {
-                    uint8_t peer_pub_key[41];
-                    peer_pub_key[0] = 0x04; // Add the 0x04 prefix for mbedtls
-                    memcpy(peer_pub_key + 1, parsed_payload.data() + 3, 40);
-                    if (self->_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
-                        self->_state = ConnectionState::REQUESTING_SESSION_KEY;
-                        ESP_LOGD(TAG, "Shared secret computed, requesting session key");
-                        std::vector<uint8_t> req_payload = {0x02};
-                        EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-                        self->_sendCommand(enc_packet.toBytes());
-                    } else {
-                        ESP_LOGE(TAG, "Failed to compute shared secret");
-                        self->_pClient->disconnect();
-                    }
-                }
-            } else if (self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-                auto parsed_payload = EncPacket::parseSimple(notification->data, notification->length);
-                if (!parsed_payload.empty() && parsed_payload.size() > 1 && parsed_payload[0] == 0x02) {
-                    std::vector<uint8_t> decrypted_payload(parsed_payload.size() - 1);
-                    self->_crypto.decrypt_shared(parsed_payload.data() + 1, parsed_payload.size() - 1, decrypted_payload.data());
 
-                    if (!decrypted_payload.empty()) {
-                        uint8_t padding = decrypted_payload.back();
-                        if (padding > 0 && padding <= 16 && decrypted_payload.size() >= padding) {
-                            decrypted_payload.resize(decrypted_payload.size() - padding);
-                        }
-                    }
-
-                    if (decrypted_payload.size() >= 18) {
-                        self->_crypto.generate_session_key(decrypted_payload.data() + 16, decrypted_payload.data());
-                        self->_state = ConnectionState::REQUESTING_AUTH_STATUS;
-                        ESP_LOGD(TAG, "Session key generated, requesting auth status");
-                        uint8_t dest = self->_getDeviceDest();
-                        Packet auth_status_pkt(0x21, dest, 0x35, 0x89, {}, 0x01, 0x01, self->_protocolVersion, self->_txSeq++, 0x0d);
-                        EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
-                        self->_sendCommand(enc_auth_status.toBytes(&self->_crypto));
-                    }
-                }
-            } else {
-                 std::vector<Packet> packets = EncPacket::parsePackets(notification->data, notification->length, self->_crypto, self->_rxBuffer, self->isAuthenticated());
-                for (auto &packet : packets) {
-                    self->_handlePacket(&packet);
-                }
-            }
-            delete[] notification->data;
-            delete notification;
-        }*/
         BleNotification *notification;
         if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
           if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE ||
@@ -425,7 +376,7 @@ void EcoflowESP32::_startAuthentication() {
 void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: cmdId=0x%02x", pkt->getCmdId());
     if (isAuthenticated()) {
-        EcoflowDataParser::parsePacket(*pkt, _data);
+        EcoflowDataParser::parsePacket(*pkt, _data, _deviceType);
 
         // For Protocol V2 (Wave 2), prevent infinite loops by NOT replying to Control/Status commands (0x51-0x5E)
         // These packets are likely notifications that share the same ID as the Set command.
@@ -552,14 +503,18 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
 
 // --- Data Getters ---
 int EcoflowESP32::getBatteryLevel() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)_data.deltaPro3.batteryLevel;
+    if (_deviceType == DeviceType::ALTERNATOR_CHARGER) return (int)_data.alternatorCharger.batteryLevel;
     if (_protocolVersion == 2) return _data.wave2.batSoc;
     return (int)_data.delta3.batteryLevel;
 }
 int EcoflowESP32::getInputPower() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)_data.deltaPro3.inputPower;
     if (_protocolVersion == 2) return (_data.wave2.batPwrWatt > 0) ? _data.wave2.batPwrWatt : 0;
     return (int)_data.delta3.inputPower;
 }
 int EcoflowESP32::getOutputPower() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)_data.deltaPro3.outputPower;
     if (_protocolVersion == 2) return (_data.wave2.batPwrWatt < 0) ? abs(_data.wave2.batPwrWatt) : 0;
     return (int)_data.delta3.outputPower;
 }
@@ -567,18 +522,22 @@ int EcoflowESP32::getBatteryVoltage() { return 0; } // Not available in current 
 int EcoflowESP32::getACVoltage() { return 0; } // Not available
 int EcoflowESP32::getACFrequency() { return 0; } // Not available
 int EcoflowESP32::getSolarInputPower() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)(_data.deltaPro3.solarLvPower + _data.deltaPro3.solarHvPower);
     if (_protocolVersion == 2) return _data.wave2.mpptPwrWatt;
     return (int)_data.delta3.solarInputPower;
 }
 int EcoflowESP32::getAcOutputPower() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)(_data.deltaPro3.acLvOutputPower + _data.deltaPro3.acHvOutputPower);
     if (_protocolVersion == 2) return 0; // Wave 2 is typically DC
     return (int)abs(_data.delta3.acOutputPower);
 }
 int EcoflowESP32::getDcOutputPower() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return (int)abs(_data.deltaPro3.dc12vOutputPower);
     if (_protocolVersion == 2) return _data.wave2.psdrPwrWatt;
     return (int)abs(_data.delta3.dc12vOutputPower);
 }
 int EcoflowESP32::getCellTemperature() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.cellTemperature;
     if (_protocolVersion == 2) return (int)_data.wave2.outLetTemp;
     return _data.delta3.cellTemperature;
 }
@@ -587,28 +546,34 @@ int EcoflowESP32::getAmbientTemperature() {
     return 0; // Not available for Delta 3
 }
 int EcoflowESP32::getMaxChgSoc() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.batteryChargeLimitMax;
     if (_protocolVersion == 2) return 100; // Not configurable on Wave 2
     return _data.delta3.batteryChargeLimitMax;
 }
 int EcoflowESP32::getMinDsgSoc() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.batteryChargeLimitMin;
     if (_protocolVersion == 2) return 0; // Not configurable on Wave 2
     return _data.delta3.batteryChargeLimitMin;
 }
 int EcoflowESP32::getAcChgLimit() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.acChargingSpeed;
     if (_protocolVersion == 2) return 0; // Not applicable
     return _data.delta3.acChargingSpeed;
 }
 
 // --- State Getters ---
 bool EcoflowESP32::isAcOn() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.acHvPort;
     if (_protocolVersion == 2) return (_data.wave2.mode != 0);
     return _data.delta3.acOn;
 }
 bool EcoflowESP32::isDcOn() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return _data.deltaPro3.dc12vPort;
     if (_protocolVersion == 2) return (_data.wave2.powerMode != 0);
     return _data.delta3.dcOn;
 }
 bool EcoflowESP32::isUsbOn() {
+    if (_deviceType == DeviceType::DELTA_PRO_3) return false; // TODO: Map for D3P if needed
     if (_protocolVersion == 2) return false; // Not applicable to Wave 2
     return _data.delta3.usbOn;
 }
@@ -620,35 +585,12 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
 
-    // Determine destination and version based on device type is tricky if we don't track it explicitly in EcoflowESP32
-    // But we have _protocolVersion.
-    // D3: src=0x02, dest=0x20 (or 0x20->0x02)
-    // Wave 2: src=0x21, dest=0x42
-    // D3P: src=0x02, dest=0x20
-    // AltChg: src=0x14, dest=0x20
-
     // Default to Delta 3 behavior (0x02) if version 3
     uint8_t dest = 0x02;
     if (_protocolVersion == 2) dest = 0x42;
-    // We might need to differentiate D3P and AltChg.
-    // Ideally pass DeviceType to begin() or infer from SN.
 
-    if (_deviceSn.rfind("MR51", 0) == 0) dest = 0x02; // D3P
-    else if (_deviceSn.rfind("F371", 0) == 0 || _deviceSn.rfind("F372", 0) == 0 || _deviceSn.rfind("DC01", 0) == 0) dest = 0x14; // AltChg
-
-    // For D3/D3P/AltChg, src is 0x20 (app), dest is device ID.
-    // Packet(src, dest, cmdSet, cmdId, ...)
-    // Wait, Packet constructor: Packet(src, dest, ...)
-    // D3P: Packet(0x20, 0x02, 0xFE, 0x11, ...)
-    // AltChg: Packet(0x20, 0x14, 0xFE, 0x11, ...)
-
-    // Wait, requestData() sends a request for data.
-    // Delta 3: Packet(0x01, 0x02, 0xFE, 0x11...) ?
-    // In original code: Packet(0x01, 0x02, 0xFE, 0x11, ...)
-    // 0x01 is src? No, src is usually 0x20 or 0x21 (Android/iOS).
-    // Original code: Packet(0x01, 0x02, ...)
-    // Let's stick to what worked for D3 and Wave 2 first.
-    // For Wave 2, it seems handled by not calling this or using V2 logic.
+    if (_deviceType == DeviceType::DELTA_PRO_3) dest = 0x02; // D3P
+    else if (_deviceType == DeviceType::ALTERNATOR_CHARGER) dest = 0x14; // AltChg
 
     Packet packet(0x20, dest, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
@@ -656,14 +598,9 @@ bool EcoflowESP32::requestData() {
 }
 
 bool EcoflowESP32::setAC(bool on) {
-    if (_deviceSn.rfind("MR51", 0) == 0) {
-        // Delta Pro 3 AC is complicated (HV/LV), but maybe main AC toggle?
-        // D3P doesn't seem to have a single AC toggle in python file, it has AC_HV and AC_LV.
-        // Assuming setAcHvPort for now or generic if available.
-        // Python code: enable_ac_hv_port and enable_ac_lv_port.
-        // Let's default to LV for "AC" toggle or ignore if ambiguous.
-        // For now, let's use LV.
-        return setAcLvPort(on);
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        // Delta Pro 3 AC: Default to HV port as requested (EU model)
+        return setAcHvPort(on);
     }
 
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
@@ -722,9 +659,10 @@ bool EcoflowESP32::setEnergyBackup(bool enabled) {
 bool EcoflowESP32::setEnergyBackupLevel(int level) {
     mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
     config.has_cfg_energy_backup = true;
-    config.cfg_energy_backup.has_energy_backup_start_soc = true; // Verify if this field exists or is implied
+    config.cfg_energy_backup.has_energy_backup_start_soc = true;
     config.cfg_energy_backup.energy_backup_start_soc = level;
-    config.cfg_energy_backup.energy_backup_en = true; // Usually need to enable to set level
+    // We typically don't force enable here, just set the level, but some devices require it
+    // Leaving enabling separate as per typical behavior
     _sendConfigPacket(config);
     return true;
 }
@@ -741,6 +679,15 @@ bool EcoflowESP32::setAcLvPort(bool enabled) {
     mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
     config.has_cfg_lv_ac_out_open = true;
     config.cfg_lv_ac_out_open = enabled;
+    _sendConfigPacket(config);
+    return true;
+}
+
+bool EcoflowESP32::setGfi(bool enabled) {
+    if (_deviceType != DeviceType::DELTA_PRO_3) return false;
+    mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+    config.has_cfg_llc_GFCI_flag = true;
+    config.cfg_llc_GFCI_flag = enabled;
     _sendConfigPacket(config);
     return true;
 }
@@ -866,6 +813,14 @@ void EcoflowESP32::setTempUnit(uint8_t unit) {
 }
 
 bool EcoflowESP32::setDC(bool on) {
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        config.has_cfg_dc_12v_out_open = true;
+        config.cfg_dc_12v_out_open = on;
+        _sendConfigPacket(config);
+        return true;
+    }
+
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_dc_12v_out_open = true;
     config.cfg_dc_12v_out_open = on;
@@ -874,6 +829,14 @@ bool EcoflowESP32::setDC(bool on) {
 }
 
 bool EcoflowESP32::setUSB(bool on) {
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        config.has_cfg_usb_open = true;
+        config.cfg_usb_open = on;
+        _sendConfigPacket(config);
+        return true;
+    }
+
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     config.has_cfg_usb_open = true;
     config.cfg_usb_open = on;
@@ -882,7 +845,20 @@ bool EcoflowESP32::setUSB(bool on) {
 }
 
 bool EcoflowESP32::setAcChargingLimit(int watts) {
-    if (watts < 200 || watts > 2900) {
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        if (watts < 400 || watts > 2900) {
+            ESP_LOGW(TAG, "AC Charging limit %d W out of range for D3P", watts);
+        }
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        config.has_cfg_ac_in_chg_mode = true;
+        config.cfg_ac_in_chg_mode = mr521_AC_IN_CHG_MODE_AC_IN_CHG_MODE_SELF_DEF_POW;
+        config.has_cfg_plug_in_info_ac_in_chg_pow_max = true;
+        config.cfg_plug_in_info_ac_in_chg_pow_max = watts;
+        _sendConfigPacket(config);
+        return true;
+    }
+
+    if (watts < 100 || watts > 2900) { // Updated min to 100 as per user
         ESP_LOGW(TAG, "AC Charging limit %d W out of range", watts);
     }
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
@@ -895,6 +871,20 @@ bool EcoflowESP32::setAcChargingLimit(int watts) {
 }
 
 bool EcoflowESP32::setBatterySOCLimits(int maxChg, int minDsg) {
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        if (maxChg >= 50 && maxChg <= 100) {
+            config.has_cfg_max_chg_soc = true;
+            config.cfg_max_chg_soc = maxChg;
+        }
+        if (minDsg >= 0 && minDsg <= 30) {
+            config.has_cfg_min_dsg_soc = true;
+            config.cfg_min_dsg_soc = minDsg;
+        }
+        _sendConfigPacket(config);
+        return true;
+    }
+
     pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
     if (maxChg >= 50 && maxChg <= 100) {
         config.has_cfg_max_chg_soc = true;
