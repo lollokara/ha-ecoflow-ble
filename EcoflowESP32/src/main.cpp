@@ -182,6 +182,14 @@ void loop() {
     // 6. Update the display at a regular framerate
     if (millis() - last_display_update > 20) {
         last_display_update = millis();
+
+        // Sync currentViewDevice with Display's priority logic unless user is manually overriding (TODO)
+        // For now, let Display logic drive the view if we are in Dashboard state
+        // But Display.cpp handles state.
+        // We need to know what device is *actually* being displayed to send commands to it.
+        // Display::getActiveDeviceType() returns the prioritized device.
+        currentViewDevice = getActiveDeviceType();
+
         EcoflowESP32* activeDev = DeviceManager::getInstance().getDevice(currentViewDevice);
         DeviceSlot* activeSlot = DeviceManager::getInstance().getSlot(currentViewDevice);
         bool scanning = DeviceManager::getInstance().isScanning();

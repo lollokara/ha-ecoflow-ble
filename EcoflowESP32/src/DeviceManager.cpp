@@ -73,19 +73,19 @@ void DeviceManager::initialize() {
     // Initialize instances for any saved devices
     if (!slotD3.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring D3: %s", slotD3.serialNumber.c_str());
-        slotD3.instance->begin(ECOFLOW_USER_ID, slotD3.serialNumber, slotD3.macAddress, 3);
+        slotD3.instance->begin(ECOFLOW_USER_ID, slotD3.serialNumber, slotD3.macAddress, DeviceType::DELTA_3);
     }
     if (!slotW2.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring W2: %s", slotW2.serialNumber.c_str());
-        slotW2.instance->begin(ECOFLOW_USER_ID, slotW2.serialNumber, slotW2.macAddress, 2);
+        slotW2.instance->begin(ECOFLOW_USER_ID, slotW2.serialNumber, slotW2.macAddress, DeviceType::WAVE_2);
     }
     if (!slotD3P.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring D3P: %s", slotD3P.serialNumber.c_str());
-        slotD3P.instance->begin(ECOFLOW_USER_ID, slotD3P.serialNumber, slotD3P.macAddress, 3);
+        slotD3P.instance->begin(ECOFLOW_USER_ID, slotD3P.serialNumber, slotD3P.macAddress, DeviceType::DELTA_PRO_3);
     }
     if (!slotAC.macAddress.empty()) {
         ESP_LOGI("DeviceManager", "Restoring AC: %s", slotAC.serialNumber.c_str());
-        slotAC.instance->begin(ECOFLOW_USER_ID, slotAC.serialNumber, slotAC.macAddress, 3);
+        slotAC.instance->begin(ECOFLOW_USER_ID, slotAC.serialNumber, slotAC.macAddress, DeviceType::ALTERNATOR_CHARGER);
     }
 }
 
@@ -196,8 +196,8 @@ String DeviceManager::getDeviceStatusJson() {
     String json = "{";
     json += "\"d3\":{\"connected\":" + String(slotD3.isConnected) + ", \"sn\":\"" + String(slotD3.serialNumber.c_str()) + "\", \"batt\":" + String(d3.getBatteryLevel()) + "},";
     json += "\"w2\":{\"connected\":" + String(slotW2.isConnected) + ", \"sn\":\"" + String(slotW2.serialNumber.c_str()) + "\", \"batt\":" + String(w2.getBatteryLevel()) + "},";
-    json += "\"d3p\":{\"connected\":" + String(slotD3P.isConnected) + ", \"sn\":\"" + String(slotD3P.serialNumber.c_str()) + "\", \"batt\":" + String((int)d3p.getData().deltaPro3.batteryLevel) + "},";
-    json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String((int)ac.getData().alternatorCharger.batteryLevel) + "}";
+    json += "\"d3p\":{\"connected\":" + String(slotD3P.isConnected) + ", \"sn\":\"" + String(slotD3P.serialNumber.c_str()) + "\", \"batt\":" + String(d3p.getBatteryLevel()) + "},";
+    json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String(ac.getBatteryLevel()) + "}";
     json += "}";
     return json;
 }
@@ -240,9 +240,9 @@ void DeviceManager::_handlePendingConnection() {
                 saveDevice(_targetScanType, _pendingDevice->getAddress().toString(), slot->serialNumber);
             }
 
-            uint8_t version = (_targetScanType == DeviceType::WAVE_2) ? 2 : 3;
-            ESP_LOGI("DeviceManager", "Connecting to %s (Type %d) with Protocol Version %d", slot->name.c_str(), (int)_targetScanType, version);
-            slot->instance->begin(ECOFLOW_USER_ID, slot->serialNumber, slot->macAddress, version);
+            ESP_LOGI("DeviceManager", "Connecting to %s (Type %d)", slot->name.c_str(), (int)_targetScanType);
+            // Pass _targetScanType directly
+            slot->instance->begin(ECOFLOW_USER_ID, slot->serialNumber, slot->macAddress, _targetScanType);
             slot->instance->connectTo(_pendingDevice);
 
             // Clean up
@@ -357,8 +357,7 @@ void DeviceManager::_updateHistory() {
 
         // Delta Pro 3 Solar Input
         if (slotD3P.isConnected) {
-            const DeltaPro3Data& data = d3p.getData().deltaPro3;
-            int solar = (int)(data.solarLvPower + data.solarHvPower);
+            int solar = d3p.getSolarInputPower();
             _d3pSolarHistory.push_back((int16_t)solar);
             if (_d3pSolarHistory.size() > 60) _d3pSolarHistory.pop_front();
         }
