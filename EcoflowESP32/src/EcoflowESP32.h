@@ -170,6 +170,7 @@ public:
     bool setEnergyBackupLevel(int level);
     bool setAcHvPort(bool enabled);
     bool setAcLvPort(bool enabled);
+    bool setGfiIsleMode(bool enabled);
 
     // Alternator Charger Specific Commands
     bool setChargerOpen(bool enabled);

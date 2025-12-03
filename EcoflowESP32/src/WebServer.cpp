@@ -149,7 +149,6 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
         }
     }
 
-
     // Delta Pro 3
     {
         DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
@@ -164,6 +163,20 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
                 obj["backup_en"] = data.energyBackup;
                 obj["backup_lvl"] = data.energyBackupBatteryLevel;
                 obj["cell_temp"] = data.cellTemperature;
+                obj["gfi_isle"] = data.gfiIsleMode;
+                obj["cfg_ac_lim"] = data.acChargingSpeed;
+
+                obj["in"] = (int)data.inputPower;
+                obj["out"] = (int)data.outputPower;
+                obj["ac_in"] = (int)data.acInputPower;
+                obj["ac_lv_out"] = (int)data.acLvOutputPower;
+                obj["ac_hv_out"] = (int)data.acHvOutputPower;
+                obj["dc_out"] = (int)data.dc12vOutputPower;
+                obj["solar_lv"] = (int)data.solarLvPower;
+                obj["solar_hv"] = (int)data.solarHvPower;
+                obj["solar"] = (int)(data.solarLvPower + data.solarHvPower);
+                obj["cfg_max"] = data.batteryChargeLimitMax;
+                obj["cfg_min"] = data.batteryChargeLimitMin;
             }
         }
     }
@@ -181,62 +194,34 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
                 obj["mode"] = data.chargerMode;
                 obj["pow_lim"] = data.powerLimit;
                 obj["car_volt"] = data.carBatteryVoltage;
-                obj["dc_curr"] = data.dcPower; // Add current output
+                obj["dc_curr"] = data.dcPower;
             }
         }
     }
+
+    // Wave 2
     {
         DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::WAVE_2);
         EcoflowESP32* d = s->instance;
-        JsonObject obj = doc.createNestedObject("w2");
-        fillCommon(obj, s, d);
-        if (s->isConnected) {
-            const auto& data = d->getData().wave2;
-            obj["amb_temp"] = (int)data.envTemp;
-            obj["out_temp"] = (int)data.outLetTemp;
-            obj["set_temp"] = (int)data.setTemp;
-            obj["mode"] = (int)data.mode;
-            obj["sub_mode"] = (int)data.subMode;
-            obj["fan"] = (int)data.fanValue;
-            obj["pwr"] = (data.powerMode == 1);
-            obj["drain"] = (data.wteFthEn != 0);
-            obj["light"] = (data.rgbState != 0); // Assuming rgbState > 0 is ON
-            obj["beep"] = (data.beepEnable != 0);
-            // Power readings for dynamic display
-            obj["pwr_bat"] = (int)data.batPwrWatt;
-            obj["pwr_mppt"] = (int)data.mpptPwrWatt;
-            obj["pwr_psdr"] = (int)data.psdrPwrWatt;
-        }
-    }
-
-    // Delta Pro 3
-    {
-        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3);
-        EcoflowESP32* d = s->instance;
-        JsonObject obj = doc.createNestedObject("d3p");
-        fillCommon(obj, s, d);
-        if (s->isConnected) {
-             const auto& data = d->getData().deltaPro3;
-             obj["ac_hv_on"] = data.acHvPort;
-             obj["ac_lv_on"] = data.acLvPort;
-             obj["backup_en"] = data.energyBackup;
-             obj["backup_lvl"] = data.energyBackupBatteryLevel;
-             obj["cell_temp"] = data.cellTemperature;
-        }
-    }
-
-    // Alternator Charger
-    {
-        DeviceSlot* s = DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER);
-        EcoflowESP32* d = s->instance;
-        JsonObject obj = doc.createNestedObject("ac");
-        fillCommon(obj, s, d);
-        if (s->isConnected) {
-             const auto& data = d->getData().alternatorCharger;
-             obj["chg_open"] = data.chargerOpen;
-             obj["mode"] = data.chargerMode;
-             obj["pow_lim"] = data.powerLimit;
-             obj["car_volt"] = data.carBatteryVoltage;
+        if (s->isConnected || s->serialNumber.length() > 0) {
+            JsonObject obj = doc.createNestedObject("w2");
+            fillCommon(obj, s, d);
+            if (s->isConnected) {
+                const auto& data = d->getData().wave2;
+                obj["amb_temp"] = (int)data.envTemp;
+                obj["out_temp"] = (int)data.outLetTemp;
+                obj["set_temp"] = (int)data.setTemp;
+                obj["mode"] = (int)data.mode;
+                obj["sub_mode"] = (int)data.subMode;
+                obj["fan"] = (int)data.fanValue;
+                obj["pwr"] = (data.powerMode == 1);
+                obj["drain"] = (data.wteFthEn != 0);
+                obj["light"] = (data.rgbState != 0);
+                obj["beep"] = (data.beepEnable != 0);
+                obj["pwr_bat"] = (int)data.batPwrWatt;
+                obj["pwr_mppt"] = (int)data.mpptPwrWatt;
+                obj["pwr_psdr"] = (int)data.psdrPwrWatt;
+            }
         }
     }
 
@@ -291,7 +276,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
     }
 
     bool success = true;
-    // (Controls logic same as before)
+
     if (type == DeviceType::DELTA_3) {
         if (cmd == "set_ac") success = dev->setAC(doc["val"]);
         else if (cmd == "set_dc") success = dev->setDC(doc["val"]);
@@ -308,7 +293,7 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_sub_mode") dev->setSubMode((uint8_t)(int)doc["val"]);
         else if (cmd == "set_fan") dev->setFanSpeed((uint8_t)(int)doc["val"]);
         else if (cmd == "set_drain") dev->setAutomaticDrain(doc["val"] ? 1 : 0);
-        else if (cmd == "set_light") dev->setAmbientLight(doc["val"] ? 1 : 2); // 1=on, 2=off as per notes
+        else if (cmd == "set_light") dev->setAmbientLight(doc["val"] ? 1 : 2);
         else if (cmd == "set_beep") dev->setBeep(doc["val"] ? 1 : 0);
         else success = false;
     }
@@ -320,6 +305,8 @@ void WebServer::handleControl(AsyncWebServerRequest *request, uint8_t *data, siz
         else if (cmd == "set_backup_level") success = dev->setEnergyBackupLevel(doc["val"]);
         else if (cmd == "set_max_soc") success = dev->setBatterySOCLimits(doc["val"], -1);
         else if (cmd == "set_min_soc") success = dev->setBatterySOCLimits(101, doc["val"]);
+        else if (cmd == "set_ac_lim") success = dev->setAcChargingLimit(doc["val"]);
+        else if (cmd == "set_gfi") success = dev->setGfiIsleMode(doc["val"]);
         else success = false;
     }
     else if (type == DeviceType::ALTERNATOR_CHARGER) {
@@ -370,13 +357,12 @@ void WebServer::handleForget(AsyncWebServerRequest *request, uint8_t *data, size
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
-    // Check for index param
     size_t index = 0;
     if (request->hasParam("index")) {
         index = request->getParam("index")->value().toInt();
     }
 
-    DynamicJsonDocument doc(8192); // Increased buffer
+    DynamicJsonDocument doc(8192);
     JsonArray arr = doc.to<JsonArray>();
 
     std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(index);
