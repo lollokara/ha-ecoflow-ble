@@ -13,6 +13,7 @@
 #include <NimBLEDevice.h>
 #include "EcoflowData.h"
 #include "EcoflowCrypto.h"
+#include "types.h"
 #include <vector>
 #include <string>
 #include "freertos/task.h"
@@ -170,6 +171,7 @@ public:
     bool setEnergyBackupLevel(int level);
     bool setAcHvPort(bool enabled);
     bool setAcLvPort(bool enabled);
+    bool setGfiIsleMode(bool enabled);
 
     // Alternator Charger Specific Commands
     bool setChargerOpen(bool enabled);
@@ -238,6 +240,7 @@ private:
     std::string _ble_address;
     uint8_t _protocolVersion = 3;
     uint32_t _txSeq = 0;
+    DeviceType _deviceType = DeviceType::DELTA_3;
 
     NimBLERemoteCharacteristic* _pWriteChr = nullptr;
     NimBLERemoteCharacteristic* _pReadChr = nullptr;

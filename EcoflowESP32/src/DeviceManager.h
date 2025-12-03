@@ -1,7 +1,9 @@
 #ifndef DEVICE_MANAGER_H
 #define DEVICE_MANAGER_H
 
+#include <NimBLEDevice.h>
 #include "EcoflowESP32.h"
+#include "EcoflowData.h"
 #include "types.h"
 #include <vector>
 #include <deque>
@@ -144,7 +146,7 @@ private:
     void _manageScanning();
     void _updateHistory();
 
-    // Connection queue members (not currently used but kept for potential future use)
+    // Connection queue members
     bool _hasPendingConnection = false;
     std::string _pendingSN;
     NimBLEAdvertisedDevice* _pendingDevice = nullptr;
