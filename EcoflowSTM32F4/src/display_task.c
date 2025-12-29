@@ -208,12 +208,11 @@ void StartDisplayTask(void * argument) {
 
     DisplayEvent event;
     TS_StateTypeDef tsState;
+    bool needs_redraw = false;
 
     uint32_t last_touch_poll = 0;
 
     for (;;) {
-        bool needs_redraw = false;
-
         // Handle Data Updates
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
@@ -263,6 +262,7 @@ void StartDisplayTask(void * argument) {
 
         if (needs_redraw) {
             RenderFrame();
+            needs_redraw = false;
         }
     }
 }

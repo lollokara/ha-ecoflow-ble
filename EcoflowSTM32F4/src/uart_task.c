@@ -85,7 +85,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                     }
                 }
             } else {
-                printf("UART: CRC Fail. Rx: 0x%02X, Calc: 0x%02X\n", received_crc, calcd_crc);
+                printf("UART: CRC Fail. Cmd: 0x%02X, Len: %d, Rx: 0x%02X, Calc: 0x%02X\n", rx_buffer[1], rx_msg_len, received_crc, calcd_crc);
             }
             rx_index = 0;
         }
