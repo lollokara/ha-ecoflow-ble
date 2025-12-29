@@ -21,6 +21,7 @@
 // Timings for button press detection (in milliseconds)
 #define DEBOUNCE_DELAY 50
 #define HOLD_PRESS_TIME 1000
+static const char* TAG = "Main";
 
 class Button {
     int pin;
@@ -88,7 +89,7 @@ void checkSerial() {
         char c = (char)Serial.read();
         if (c == '\n') {
             CmdUtils::processInput(inputBuffer);
-            inputBuffer = "";
+            inputBuffer = "";   
         } else if (c >= 32 && c <= 126) {
             inputBuffer += c;
         }
@@ -112,12 +113,12 @@ void setup() {
 
     WebServer::begin();
 
-    // User reported wiring: F4 PG14 (TX) -> ESP 17, F4 PG9 (RX) -> ESP 16
+    // User reported wiring: F4 PG14 (TX) -> ESP 16, F4 PG9 (RX) -> ESP 17
     // Standard ESP32 Serial1: RX=16, TX=17.
     // If connected directly (TX->TX, RX->RX), we need to swap pins in software.
     // RX Pin = 17 (connected to F4 TX)
     // TX Pin = 16 (connected to F4 RX)
-    Serial1.begin(115200, SERIAL_8N1, 17, 16);
+    Serial1.begin(115200, SERIAL_8N1, 16, 17);
 }
 
 // ... (sendBatteryStatus deprecated but kept for compatibility if needed, replaced by new functions)
@@ -185,6 +186,7 @@ void checkUart() {
 
     while (Serial1.available()) {
         uint8_t b = Serial1.peek();
+        ESP_LOGI(TAG, "Received UART byte: 0x%02X", b);
         // Simple logging for debugging connection
         if (collecting && rx_idx < 10) {
              // Serial.printf("%02X ", b);
