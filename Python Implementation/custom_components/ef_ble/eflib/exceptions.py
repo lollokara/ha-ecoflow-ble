@@ -14,6 +14,13 @@ class AuthFailedError(Exception):
     """Error during authentificating"""
 
 
+class AuthHandshakeError(AuthFailedError):
+    """Error during authentication handshake step"""
+    def __init__(self, message: str, payload: bytes):
+        super().__init__(message)
+        self.payload = payload
+
+
 class FailedToAuthenticate(Exception):
     """Failed to connect"""
 

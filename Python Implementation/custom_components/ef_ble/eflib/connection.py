@@ -25,6 +25,7 @@ from .crc import crc16
 from .encpacket import EncPacket
 from .exceptions import (
     AuthFailedError,
+    AuthHandshakeError,
     ConnectionTimeout,
     EncPacketParseError,
     FailedToAuthenticate,
@@ -829,11 +830,14 @@ class Connection:
             # Handling autoAuthentication response
             if packet.src == 0x35 and packet.cmdSet == 0x35 and packet.cmdId == 0x86:
                 if packet.payload != b"\x00":
-                    # TODO: Most probably we need to follow some other way for auth, but
-                    # happens rarely
-                    error_msg = "Auth failed with response: %r"
-                    self._logger.error(error_msg, packet)
-                    exc = AuthFailedError(error_msg % packet)
+                    payload_hex = packet.payload.hex()
+                    error_msg = f"Auth failed with response payload: {payload_hex} (packet: {packet!r})"
+
+                    # Log the full packet for debugging "rare cases"
+                    self._logger.error(error_msg)
+
+                    # Create specific exception with payload info
+                    exc = AuthHandshakeError(error_msg, packet.payload)
                     self._set_state(ConnectionState.ERROR_AUTH_FAILED, exc)
 
                     if self._client is not None and self._client.is_connected:
