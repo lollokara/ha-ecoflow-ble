@@ -197,7 +197,8 @@ void StartDisplayTask(void * argument) {
     BSP_LCD_DisplayOn();
 
     // Init Touch
-    BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
+    uint8_t ts_status = BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
+    printf("DISPLAY: TS Init Status: %d\n", ts_status);
 
     Backlight_Init();
 
@@ -211,8 +212,14 @@ void StartDisplayTask(void * argument) {
     bool needs_redraw = false;
 
     uint32_t last_touch_poll = 0;
+    uint32_t last_heartbeat = 0;
 
     for (;;) {
+        if (xTaskGetTickCount() - last_heartbeat > pdMS_TO_TICKS(2000)) {
+            printf("DISPLAY: Heartbeat (Needs Redraw: %d)\n", needs_redraw);
+            last_heartbeat = xTaskGetTickCount();
+        }
+
         // Handle Data Updates
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
