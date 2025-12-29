@@ -137,18 +137,53 @@ static void UpdateStatusPanel(BatteryStatus* batt) {
 }
 
 static void RenderFrame() {
+    // 1. Set the pending buffer as the drawing target (but don't make it visible yet)
+    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+
+    // 2. Draw everything
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
     DrawButton(&testBtn);
     InitStatusPanel();
     UpdateStatusPanel(&currentBattStatus);
+
+    // 3. Request buffer swap
+    // Set the layer configuration to point to the pending buffer
+    HAL_LTDC_SetAddress(&hltdc_eval, pending_buffer, LTDC_ACTIVE_LAYER_BACKGROUND);
+
+    // Trigger reload during Vertical Blanking to prevent tearing
+    HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);
+
+    // 4. Wait for the reload to complete (poll the VBR bit)
+    // The VBR bit is cleared when the reload has happened (at VSYNC)
+    // Actually, check datasheet: LTDC_SRCR_VBR is set to 1 to request reload, cleared by hardware when done?
+    // Reference manuals usually say: "This bit is set by software and cleared by hardware when the shadow registers reload has been performed."
+    // So we wait while it is still set.
+    while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
+        // Busy wait (short duration usually)
+    }
+
+    // 5. Swap buffer tracking variables
+    uint32_t temp = current_buffer;
+    current_buffer = pending_buffer;
+    pending_buffer = temp;
+
+    // Ensure the BSP drawing functions target the new pending buffer for next time?
+    // No, BSP_LCD functions usually use the "ActiveLayer" settings.
+    // BSP_LCD_SetLayerAddress modifies the handle's config, which we just did.
+    // But importantly, we want the next draw commands to go to the *new* pending buffer (which is the old current buffer).
+    // The BSP functions implicitly write to whatever address is configured in hltdc_eval.LayerCfg[ActiveLayer].FBStartAdress.
+    // However, we just updated that to the *visible* buffer for the swap.
+    // So immediately after swap, we must point the handle back to the *hidden* buffer so drawing happens there.
+
+    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
 }
 
 void StartDisplayTask(void * argument) {
     // Init Hardware
     BSP_SDRAM_Init();
     BSP_LCD_Init();
-    BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER_BACKGROUND, LCD_FRAME_BUFFER_1);
+    BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER_BACKGROUND, current_buffer);
     BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER_BACKGROUND);
 
     BSP_LCD_Clear(GUI_COLOR_BG);
@@ -164,10 +199,7 @@ void StartDisplayTask(void * argument) {
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
 
     // Initial Draw
-    DrawHeader();
-    DrawButton(&testBtn);
-    InitStatusPanel();
-    UpdateStatusPanel(&currentBattStatus);
+    RenderFrame();
 
     DisplayEvent event;
     TS_StateTypeDef tsState;
@@ -175,13 +207,15 @@ void StartDisplayTask(void * argument) {
     uint32_t last_touch_poll = 0;
 
     for (;;) {
+        bool needs_redraw = false;
+
         // Handle Data Updates
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
                 // Check if changed
                 if (memcmp(&currentBattStatus, &event.data.battery, sizeof(BatteryStatus)) != 0) {
                      currentBattStatus = event.data.battery;
-                     UpdateStatusPanel(&currentBattStatus);
+                     needs_redraw = true;
                 }
             }
         }
@@ -218,8 +252,12 @@ void StartDisplayTask(void * argument) {
             }
 
             if (stateChanged) {
-                DrawButton(&testBtn);
+                needs_redraw = true;
             }
+        }
+
+        if (needs_redraw) {
+            RenderFrame();
         }
     }
 }

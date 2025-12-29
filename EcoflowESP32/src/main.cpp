@@ -185,54 +185,59 @@ void checkUart() {
     static bool collecting = false;
 
     while (Serial1.available()) {
-        uint8_t b = Serial1.peek();
-        ESP_LOGI(TAG, "Received UART byte: 0x%02X", b);
-        // Simple logging for debugging connection
-        if (collecting && rx_idx < 10) {
-             // Serial.printf("%02X ", b);
-        }
+        uint8_t b = Serial1.read();
+
+        // Debug only - can be verbose
+        // ESP_LOGI(TAG, "UART: %02X", b);
 
         if (!collecting) {
             if (b == START_BYTE) {
-                Serial.println("UART RX: Start Byte");
+                // Serial.println("UART RX: Start Byte");
                 collecting = true;
                 rx_idx = 0;
-                rx_buf[rx_idx++] = Serial1.read();
-            } else {
-                Serial1.read(); // Discard garbage
+                rx_buf[rx_idx++] = b;
             }
         } else {
-            // We are collecting, just read everything
-            rx_buf[rx_idx++] = Serial1.read();
+            rx_buf[rx_idx++] = b;
 
             if (rx_idx == 3) { // We have START, CMD, LEN
                 expected_len = rx_buf[2];
-            }
-
-            if (rx_idx >= 3 && rx_idx == (4 + expected_len)) {
-                // Packet complete
-                uint8_t received_crc = rx_buf[rx_idx - 1];
-                uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
-
-                if (received_crc == calculated_crc) {
-                    uint8_t cmd = rx_buf[1];
-                    if (cmd == CMD_HANDSHAKE) {
-                            uint8_t ack[4];
-                            int len = pack_handshake_ack_message(ack);
-                            Serial1.write(ack, len);
-                            sendDeviceList();
-                    } else if (cmd == CMD_GET_DEVICE_STATUS) {
-                            uint8_t dev_id;
-                            if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
-                                sendDeviceStatus(dev_id);
-                            }
-                    }
+                // Sanity check length
+                if (expected_len > 250) {
+                    collecting = false;
+                    rx_idx = 0;
                 }
-                collecting = false; // Reset for next packet
+            } else if (rx_idx > 3) {
+                 if (rx_idx == (4 + expected_len)) {
+                    // Packet complete
+                    uint8_t received_crc = rx_buf[rx_idx - 1];
+                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+
+                    if (received_crc == calculated_crc) {
+                        uint8_t cmd = rx_buf[1];
+                        // Serial.printf("UART CMD: 0x%02X\n", cmd);
+                        if (cmd == CMD_HANDSHAKE) {
+                                uint8_t ack[4];
+                                int len = pack_handshake_ack_message(ack);
+                                Serial1.write(ack, len);
+                                sendDeviceList();
+                        } else if (cmd == CMD_GET_DEVICE_STATUS) {
+                                uint8_t dev_id;
+                                if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
+                                    sendDeviceStatus(dev_id);
+                                }
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
+                    }
+                    collecting = false; // Reset for next packet
+                    rx_idx = 0;
+                }
             }
 
             if (rx_idx >= sizeof(rx_buf)) {
                 collecting = false; // Overflow protection, reset
+                rx_idx = 0;
             }
         }
     }
