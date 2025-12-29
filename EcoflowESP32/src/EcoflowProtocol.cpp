@@ -1,6 +1,7 @@
 #include "EcoflowProtocol.h"
 #include <Arduino.h>
 #include <cstring>
+#include <vector>
 #include "esp_log.h"
 
 static const char* TAG = "EcoflowProtocol";
@@ -209,34 +210,70 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
     std::vector<Packet> packets;
 
     ESP_LOGD(TAG, "parsePackets: Received %d bytes", len);
-    print_hex_protocol(data, len, "Received Data");
+    // print_hex_protocol(data, len, "Received Data"); // Too verbose for high throughput
 
     rxBuffer.insert(rxBuffer.end(), data, data + len);
 
-    while (rxBuffer.size() >= 8) { // Minimum size of an EncPacket
-        if (rxBuffer[0] != (PREFIX & 0xFF) || rxBuffer[1] != ((PREFIX >> 8) & 0xFF)) {
-            ESP_LOGE(TAG, "parsePackets: Invalid prefix, discarding byte");
-            rxBuffer.erase(rxBuffer.begin());
-            continue;
+    while (rxBuffer.size() >= 2) {
+        // Search for prefix 0x5A5A
+        bool prefix_found = false;
+        size_t prefix_idx = 0;
+
+        for (size_t i = 0; i < rxBuffer.size() - 1; i++) {
+            if (rxBuffer[i] == (PREFIX & 0xFF) && rxBuffer[i+1] == ((PREFIX >> 8) & 0xFF)) {
+                prefix_idx = i;
+                prefix_found = true;
+                break;
+            }
+        }
+
+        if (!prefix_found) {
+            // Check if the last byte is 0x5A (possible start of prefix)
+            if (!rxBuffer.empty() && rxBuffer.back() == (PREFIX & 0xFF)) {
+                // Keep only the last byte
+                uint8_t last = rxBuffer.back();
+                rxBuffer.clear();
+                rxBuffer.push_back(last);
+            } else {
+                // No valid data, clear everything
+                rxBuffer.clear();
+            }
+            break;
+        }
+
+        // Remove garbage before prefix
+        if (prefix_idx > 0) {
+            ESP_LOGW(TAG, "Discarding %d garbage bytes", prefix_idx);
+            rxBuffer.erase(rxBuffer.begin(), rxBuffer.begin() + prefix_idx);
+        }
+
+        // Now rxBuffer[0] starts with 0x5A, rxBuffer[1] is 0x5A
+        if (rxBuffer.size() < 6) {
+            break; // Wait for header
         }
 
         uint16_t frame_len = rxBuffer[4] | (rxBuffer[5] << 8);
         size_t total_len = 6 + frame_len;
+
         if (rxBuffer.size() < total_len) {
-            break;
+            break; // Wait for full packet
         }
 
-        if (frame_len < 2) { // Must include 2 bytes for CRC
-            rxBuffer.erase(rxBuffer.begin());
-            continue;
+        // Validate Header (Sanity check on frame length)
+        if (frame_len < 2 || frame_len > 1024) { // 1024 is arbitrary sanity limit
+             ESP_LOGW(TAG, "Invalid frame length %d, discarding prefix", frame_len);
+             rxBuffer.erase(rxBuffer.begin()); // Advance by 1 to search for next 0x5A5A
+             continue;
         }
 
         uint16_t crc_from_packet = rxBuffer[total_len - 2] | (rxBuffer[total_len - 1] << 8);
         if (crc_from_packet != crc16(rxBuffer.data(), total_len - 2)) {
-            rxBuffer.erase(rxBuffer.begin());
+            ESP_LOGW(TAG, "CRC Mismatch, discarding prefix");
+            rxBuffer.erase(rxBuffer.begin()); // Advance by 1
             continue;
         }
 
+        // Valid packet found
         size_t payload_len = frame_len - 2;
         std::vector<uint8_t> encrypted_payload(rxBuffer.begin() + 6, rxBuffer.begin() + 6 + payload_len);
 
@@ -251,9 +288,6 @@ std::vector<Packet> EncPacket::parsePackets(const uint8_t* data, size_t len, Eco
             }
         }
 
-        // Re-enable XOR check based on isAuthenticated status.
-        // The observed payload corruption (repeating patterns) suggests missing XOR masking
-        // when seq[0] != 0, which is standard for Protocol V3/19.
         Packet* packet = Packet::fromBytes(decrypted_payload.data(), decrypted_payload.size(), isAuthenticated);
         if (packet) {
             packets.push_back(*packet);
