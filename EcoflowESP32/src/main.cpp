@@ -17,6 +17,7 @@
 #include "CmdUtils.h"
 #include "WebServer.h"
 #include "LightSensor.h"
+#include "ecoflow_protocol.h"
 
 // Define GPIO pins for the buttons
 #define BTN_UP_PIN    4
@@ -135,7 +136,54 @@ void setup() {
     DeviceManager::getInstance().initialize();
 
     WebServer::begin();
+
+    // Initialize UART1 for communication with STM32F4
+    // RX on GPIO16, TX on GPIO17
+    Serial1.begin(460800, SERIAL_8N1, 16, 17);
 }
+
+void sendBatteryStatus() {
+    EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+    if (!d3->isAuthenticated()) {
+        return; // Don't send if not connected
+    }
+
+    BatteryStatus status = {0};
+    status.soc = d3->getData().delta3.batteryLevel;
+    status.power_w = d3->getData().delta3.inputPower - d3->getData().delta3.outputPower;
+    status.voltage_v = 0; // This data is not available in the current struct
+    status.connected = 1;
+    strncpy(status.device_name, "Delta 3", sizeof(status.device_name) - 1);
+
+    uint8_t buffer[sizeof(BatteryStatus) + 4];
+    int len = pack_battery_status_message(buffer, &status);
+    Serial1.write(buffer, len);
+}
+
+void checkUart() {
+    while (Serial1.available() >= 4) { // Wait for a complete header + CRC
+        if (Serial1.read() == START_BYTE) {
+            uint8_t buffer[3];
+            buffer[0] = Serial1.read(); // CMD
+            buffer[1] = Serial1.read(); // LEN
+            uint8_t received_crc = Serial1.read();
+
+            uint8_t calculated_crc = calculate_crc8(buffer, 2);
+
+            if (received_crc == calculated_crc) {
+                if (buffer[0] == CMD_REQUEST_STATUS_UPDATE) {
+                    sendBatteryStatus();
+                } else {
+                    // If we get an unexpected command, read the payload to clear the buffer
+                    for(int i = 0; i < buffer[1]; i++) {
+                        if(Serial1.available()) Serial1.read();
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 /**
  * @brief Standard Arduino loop function. Runs the main application logic.
@@ -152,6 +200,9 @@ void loop() {
 
     // Check Serial for CLI commands
     checkSerial();
+
+    // Check UART for commands from STM32F4
+    checkUart();
 
     // 2. Check for button inputs and translate them to display actions
     DisplayAction action = DisplayAction::NONE;
@@ -173,6 +224,10 @@ void loop() {
     // 5. Periodically request fresh data from all connected devices
     if (millis() - last_data_refresh > 2000) {
         last_data_refresh = millis();
+
+        // Send battery status to STM32F4
+        sendBatteryStatus();
+
         EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
         if (d3->isAuthenticated()) d3->requestData();
         EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
