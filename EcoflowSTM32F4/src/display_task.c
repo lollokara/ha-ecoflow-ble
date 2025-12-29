@@ -137,8 +137,9 @@ static void UpdateStatusPanel(BatteryStatus* batt) {
 }
 
 static void RenderFrame() {
-    // 1. Set the pending buffer as the drawing target (but don't make it visible yet)
-    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+    // 1. Set the pending buffer as the drawing target manually to avoid immediate reload
+    // BSP_LCD_SetLayerAddress triggers a reload which can hang if called at the wrong time or if hardware is busy
+    hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 
     // 2. Draw everything
     BSP_LCD_Clear(GUI_COLOR_BG);
@@ -156,9 +157,6 @@ static void RenderFrame() {
 
     // 4. Wait for the reload to complete (poll the VBR bit)
     // The VBR bit is cleared when the reload has happened (at VSYNC)
-    // Actually, check datasheet: LTDC_SRCR_VBR is set to 1 to request reload, cleared by hardware when done?
-    // Reference manuals usually say: "This bit is set by software and cleared by hardware when the shadow registers reload has been performed."
-    // So we wait while it is still set.
     uint32_t tickstart = HAL_GetTick();
     while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
         // Busy wait (short duration usually)
@@ -173,15 +171,8 @@ static void RenderFrame() {
     current_buffer = pending_buffer;
     pending_buffer = temp;
 
-    // Ensure the BSP drawing functions target the new pending buffer for next time?
-    // No, BSP_LCD functions usually use the "ActiveLayer" settings.
-    // BSP_LCD_SetLayerAddress modifies the handle's config, which we just did.
-    // But importantly, we want the next draw commands to go to the *new* pending buffer (which is the old current buffer).
-    // The BSP functions implicitly write to whatever address is configured in hltdc_eval.LayerCfg[ActiveLayer].FBStartAdress.
-    // However, we just updated that to the *visible* buffer for the swap.
-    // So immediately after swap, we must point the handle back to the *hidden* buffer so drawing happens there.
-
-    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+    // Update the handle for the next frame's drawing operations
+    hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 }
 
 void StartDisplayTask(void * argument) {

@@ -146,6 +146,11 @@ static void UART_Init(void) {
 void StartUARTTask(void * argument) {
     UART_Init();
 
+    // Self-Test CRC
+    uint8_t test_data[] = {0x21, 0x00};
+    uint8_t test_crc = calculate_crc8(test_data, 2);
+    printf("UART: Self-Test CRC(21 00) = 0x%02X\n", test_crc);
+
     // Initial Handshake
     uint8_t tx_buf[32];
     int len;
