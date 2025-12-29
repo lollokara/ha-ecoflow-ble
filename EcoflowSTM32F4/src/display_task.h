@@ -4,6 +4,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include <stdint.h>
+#include "ecoflow_protocol.h"
 
 // Events that can be sent to the display task
 typedef enum {
@@ -15,12 +17,7 @@ typedef enum {
 typedef struct {
     DisplayEventType type;
     union {
-        struct {
-            uint8_t soc;
-            int16_t power_w;
-            uint16_t voltage_v;
-            uint8_t connected;
-        } battery;
+        BatteryStatus battery; // Use the shared protocol struct
         // Add other event data structs here
     } data;
 } DisplayEvent;

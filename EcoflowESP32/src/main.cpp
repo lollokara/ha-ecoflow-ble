@@ -173,86 +173,54 @@ void sendDeviceStatus(uint8_t device_id) {
 }
 
 void checkUart() {
+    static uint8_t rx_buf[260];
+    static uint8_t rx_idx = 0;
+    static uint8_t expected_len = 0;
+    static bool collecting = false;
+
     while (Serial1.available()) {
-        if (Serial1.peek() != START_BYTE) {
-            Serial1.read(); // Consume garbage
-            continue;
-        }
+        uint8_t b = Serial1.peek();
 
-        if (Serial1.available() < 4) return; // Wait for header
-
-        // We have at least 4 bytes, let's peek to see length
-        // Can't easily peek offset with Arduino Serial, so we must read carefully or use a buffer.
-        // For simplicity, let's assume we can read the header if we verified START_BYTE.
-        // NOTE: This simple parser is fragile if bytes come in chunks.
-        // A better approach is a state machine or circular buffer, but for this task I will stick to the existing pattern
-        // but try to be a bit safer.
-
-        // Actually, let's use the pattern from the previous code but updated.
-        // We need to read CMD and LEN.
-
-        // Let's implement a small state machine or just a blocking read with timeout if we are sure?
-        // No, blocking is bad.
-        // Let's just check if we have enough bytes for the header + payload based on what we see.
-
-        // Since we can't peek ahead easily without a buffer, let's buffer it.
-        // But Serial1.available() tells us how many.
-
-        // START(1) CMD(1) LEN(1) CRC(1) is min 4 bytes.
-        // If LEN > 0, we need 4 + LEN bytes.
-
-        // We need to read bytes to inspect them.
-        // Let's rely on the fact that if we saw START_BYTE, we expect the rest soon.
-
-        // A robust way without a persistent buffer in `checkUart` is tricky if packets are fragmented.
-        // Assuming high baudrate and small packets, we might be okay.
-
-        // Let's use a static buffer for assembly.
-        static uint8_t rx_buf[260];
-        static uint8_t rx_idx = 0;
-        static uint8_t expected_len = 0;
-        static bool collecting = false;
-
-        while (Serial1.available()) {
-            uint8_t b = Serial1.read();
-
-            if (!collecting) {
-                if (b == START_BYTE) {
-                    collecting = true;
-                    rx_idx = 0;
-                    rx_buf[rx_idx++] = b;
-                }
+        if (!collecting) {
+            if (b == START_BYTE) {
+                collecting = true;
+                rx_idx = 0;
+                rx_buf[rx_idx++] = Serial1.read();
             } else {
-                rx_buf[rx_idx++] = b;
-                if (rx_idx == 3) { // We have START, CMD, LEN
-                    expected_len = rx_buf[2];
-                }
+                Serial1.read(); // Discard garbage
+            }
+        } else {
+            // We are collecting, just read everything
+            rx_buf[rx_idx++] = Serial1.read();
 
-                if (rx_idx >= 3 && rx_idx == (4 + expected_len)) {
-                    // Packet complete
-                    uint8_t received_crc = rx_buf[rx_idx - 1];
-                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+            if (rx_idx == 3) { // We have START, CMD, LEN
+                expected_len = rx_buf[2];
+            }
 
-                    if (received_crc == calculated_crc) {
-                        uint8_t cmd = rx_buf[1];
-                        if (cmd == CMD_HANDSHAKE) {
-                             uint8_t ack[4];
-                             int len = pack_handshake_ack_message(ack);
-                             Serial1.write(ack, len);
-                             sendDeviceList();
-                        } else if (cmd == CMD_GET_DEVICE_STATUS) {
-                             uint8_t dev_id;
-                             if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
-                                 sendDeviceStatus(dev_id);
-                             }
-                        }
+            if (rx_idx >= 3 && rx_idx == (4 + expected_len)) {
+                // Packet complete
+                uint8_t received_crc = rx_buf[rx_idx - 1];
+                uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+
+                if (received_crc == calculated_crc) {
+                    uint8_t cmd = rx_buf[1];
+                    if (cmd == CMD_HANDSHAKE) {
+                            uint8_t ack[4];
+                            int len = pack_handshake_ack_message(ack);
+                            Serial1.write(ack, len);
+                            sendDeviceList();
+                    } else if (cmd == CMD_GET_DEVICE_STATUS) {
+                            uint8_t dev_id;
+                            if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
+                                sendDeviceStatus(dev_id);
+                            }
                     }
-                    collecting = false; // Reset
                 }
+                collecting = false; // Reset for next packet
+            }
 
-                if (rx_idx >= sizeof(rx_buf)) {
-                    collecting = false; // Overflow protection
-                }
+            if (rx_idx >= sizeof(rx_buf)) {
+                collecting = false; // Overflow protection, reset
             }
         }
     }
