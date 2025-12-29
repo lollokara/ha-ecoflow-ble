@@ -3,6 +3,7 @@
 #include "task.h"
 #include "display_task.h"
 #include "uart_task.h"
+#include <stdio.h>
 
 extern UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3;
@@ -90,8 +91,8 @@ int main(void) {
     MX_USART3_UART_Init();
 
     // Create Tasks
-    xTaskCreate(StartDisplayTask, "Display", 1024, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 256, NULL, 3, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 2048, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 1024, NULL, 3, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
@@ -107,10 +108,32 @@ void vApplicationTickHook(void) {
 
 // Stack Overflow Hook
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    printf("Stack Overflow in task: %s\n", pcTaskName);
     while(1);
 }
 
 // Malloc Failed Hook
 void vApplicationMallocFailedHook(void) {
+    printf("Malloc Failed!\n");
+    while(1);
+}
+
+void HardFault_Handler(void) {
+    printf("HardFault_Handler\n");
+    while(1);
+}
+
+void MemManage_Handler(void) {
+    printf("MemManage_Handler\n");
+    while(1);
+}
+
+void BusFault_Handler(void) {
+    printf("BusFault_Handler\n");
+    while(1);
+}
+
+void UsageFault_Handler(void) {
+    printf("UsageFault_Handler\n");
     while(1);
 }

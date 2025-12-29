@@ -212,6 +212,10 @@ void StartDisplayTask(void * argument) {
     Backlight_Init();
 
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
+    if (displayQueue == NULL) {
+        printf("Display Queue Creation Failed!\n");
+        vTaskSuspend(NULL);
+    }
 
     // Initial Draw
     RenderFrame();
