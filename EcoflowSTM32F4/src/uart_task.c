@@ -45,11 +45,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
         // Check for complete packet
         if (rx_index > 3 && rx_index == (4 + rx_msg_len)) {
             uint8_t received_crc = rx_buffer[rx_index - 1];
-            uint8_t calcd_crc = calculate_crc8(rx_buffer, rx_index - 1);
+            // CRC is calculated over CMD, LEN, PAYLOAD (Start Byte and CRC byte excluded)
+            // rx_buffer[0] is Start Byte. So start at &rx_buffer[1].
+            // Length is total bytes minus Start(1) and CRC(1) = rx_index - 2.
+            uint8_t calcd_crc = calculate_crc8(&rx_buffer[1], rx_index - 2);
 
             if (received_crc == calcd_crc) {
                 uint8_t cmd = rx_buffer[1];
-                printf("UART: Pkt OK. Cmd: 0x%02X, Len: %d\n", cmd, rx_msg_len);
+                // printf("UART: Pkt OK. Cmd: 0x%02X, Len: %d\n", cmd, rx_msg_len);
 
                 if (cmd == CMD_HANDSHAKE_ACK) {
                     if (currentState == STATE_WAIT_HANDSHAKE_ACK) {
@@ -85,7 +88,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                     }
                 }
             } else {
-                printf("UART: CRC Fail. Cmd: 0x%02X, Len: %d, Rx: 0x%02X, Calc: 0x%02X\n", rx_buffer[1], rx_msg_len, received_crc, calcd_crc);
+                // printf("UART: CRC Fail. Cmd: 0x%02X, Len: %d, Rx: 0x%02X, Calc: 0x%02X\n", rx_buffer[1], rx_msg_len, received_crc, calcd_crc);
             }
             rx_index = 0;
         }

@@ -138,7 +138,9 @@ static void UpdateStatusPanel(BatteryStatus* batt) {
 
 static void RenderFrame() {
     // 1. Set the pending buffer as the drawing target (but don't make it visible yet)
-    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+    // We update the handle's config so BSP functions draw to pending_buffer,
+    // but we DO NOT call HAL_LTDC_SetAddress which would make it visible immediately.
+    hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 
     // 2. Draw everything
     BSP_LCD_Clear(GUI_COLOR_BG);
@@ -160,11 +162,17 @@ static void RenderFrame() {
     // Reference manuals usually say: "This bit is set by software and cleared by hardware when the shadow registers reload has been performed."
     // So we wait while it is still set.
     uint32_t tickstart = HAL_GetTick();
+    int safety_count = 0;
     while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
         // Busy wait (short duration usually)
         if((HAL_GetTick() - tickstart) > 50) {
             printf("DISPLAY: VSYNC Timeout!\n");
             break;
+        }
+        safety_count++;
+        if (safety_count > 1000000) {
+             printf("DISPLAY: VSYNC Loop Stuck! Force break.\n");
+             break;
         }
     }
 
@@ -181,7 +189,9 @@ static void RenderFrame() {
     // However, we just updated that to the *visible* buffer for the swap.
     // So immediately after swap, we must point the handle back to the *hidden* buffer so drawing happens there.
 
-    BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+    // BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
+    // Again, don't call the BSP function which updates hardware. Just update the handle for the next draw cycle.
+    hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 }
 
 void StartDisplayTask(void * argument) {
