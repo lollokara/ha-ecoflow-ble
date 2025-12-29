@@ -209,6 +209,7 @@
                 "STM32F4",
                 "STM32F469xx",
                 "DATA_IN_ExtSDRAM",
+                "HSE_VALUE=8000000",
                 "USE_HAL_DRIVER",
                 "F_CPU=180000000L",
                 ""
