@@ -158,9 +158,10 @@ void sendDeviceStatus(uint8_t device_id) {
 
     // Fill BatteryStatus part
     if (type == DeviceType::DELTA_3) {
-        status.status.soc = dev->getData().delta3.batteryLevel;
+        status.status.soc = (uint8_t)dev->getData().delta3.batteryLevel;
         status.status.power_w = dev->getData().delta3.inputPower - dev->getData().delta3.outputPower;
         status.status.voltage_v = 0;
+    } else if (type == DeviceType::WAVE_2) {
         status.status.connected = 1;
         strncpy(status.status.device_name, "Delta 3", 15);
     } else if (type == DeviceType::WAVE_2) {
