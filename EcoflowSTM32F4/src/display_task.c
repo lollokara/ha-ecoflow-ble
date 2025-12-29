@@ -58,6 +58,17 @@ static void SetDrawTarget(uint32_t address) {
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = address;
 }
 
+// Helper: Wait for Reload to complete (VSync)
+static void WaitForReload() {
+    // Wait until the VBR bit is cleared by hardware (meaning reload happened)
+    // Add a timeout to prevent infinite blocking
+    uint32_t timeout = 100; // ~100ms
+    while ((hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) && timeout > 0) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+        timeout--;
+    }
+}
+
 // Helper: Draw Button
 static void DrawButton(SimpleButton* btn) {
     if (!btn->visible) return;
@@ -151,7 +162,7 @@ void StartDisplayTask(void * argument) {
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
 
-    // Reset target to visible for safety (though loop sets it anyway)
+    // Reset target to visible for safety
     SetDrawTarget(LCD_FRAME_BUFFER_1);
 
     BSP_LCD_DisplayOn();
@@ -208,13 +219,16 @@ void StartDisplayTask(void * argument) {
         if (needs_redraw) {
             // Draw to back buffer
             SetDrawTarget(current_draw_buffer);
-            RedrawFrame(); // Full redraw to back buffer (clears BG, draws header/panels)
+            RedrawFrame();
 
-            // Swap visible buffer
+            // Swap visible buffer request
             BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, current_draw_buffer);
 
-            // IMPORTANT: Trigger reload to apply address change at next VBlank
+            // Trigger reload at VSync
             HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);
+
+            // Wait for reload to happen before reusing buffers!
+            WaitForReload();
 
             // Swap pointers
             uint32_t temp = current_visible_buffer;
