@@ -7,6 +7,22 @@
 extern UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3;
 
+// FreeRTOS Handler Declarations
+extern void vPortSVCHandler(void);
+extern void xPortPendSVHandler(void);
+extern void xPortSysTickHandler(void);
+
+// Map FreeRTOS Handlers to CMSIS Names explicitly
+void SVC_Handler(void) { vPortSVCHandler(); }
+void PendSV_Handler(void) { xPortPendSVHandler(); }
+void SysTick_Handler(void) { xPortSysTickHandler(); }
+
+// WWDG Handler to catch watchdog resets
+void WWDG_IRQHandler(void) {
+    printf("ERROR: WWDG IRQ Triggered! System Halted.\n");
+    while(1);
+}
+
 // System Clock Configuration
 void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
