@@ -54,14 +54,11 @@ static void Backlight_Init(void) {
 
 // Helper: Set Drawing Target
 static void SetDrawTarget(uint32_t address) {
-    // This updates the handle used by BSP functions, redirecting drawing
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = address;
 }
 
 // Helper: Wait for Reload to complete (VSync)
 static void WaitForReload() {
-    // Wait until the VBR bit is cleared by hardware (meaning reload happened)
-    // Add a timeout to prevent infinite blocking
     uint32_t timeout = 100; // ~100ms
     while ((hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) && timeout > 0) {
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -134,8 +131,14 @@ static void DrawStatusPanel(BatteryStatus* batt) {
 }
 
 static void RedrawFrame() {
-    BSP_LCD_Clear(GUI_COLOR_BG);
-    DrawHeader();
+    // Optimization: Do NOT clear the full screen background.
+    // The background is static (Black). The back buffer already has the previous frame (mostly black).
+    // We only need to redraw the dynamic parts which are the Button and Panels.
+    // The Header is static, so we don't need to redraw it unless we suspect it was corrupted.
+
+    // BSP_LCD_Clear(GUI_COLOR_BG); // <--- REMOVED TO SAVE BANDWIDTH
+
+    // Draw Dynamic Elements (they clear their own background via FillRect)
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
 }
@@ -150,12 +153,13 @@ void StartDisplayTask(void * argument) {
     BSP_LCD_SetBackColor(GUI_COLOR_BG);
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
 
+    // Setup Buffer 1 (Full Draw)
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
 
-    // Init Buffer 2 (Back)
+    // Init Buffer 2 (Back) - Setup Full Draw initially
     SetDrawTarget(LCD_FRAME_BUFFER_2);
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
@@ -219,15 +223,15 @@ void StartDisplayTask(void * argument) {
         if (needs_redraw) {
             // Draw to back buffer
             SetDrawTarget(current_draw_buffer);
-            RedrawFrame();
+            RedrawFrame(); // Only redraws dynamic parts
 
-            // Swap visible buffer request
+            // Swap visible buffer
             BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, current_draw_buffer);
 
             // Trigger reload at VSync
             HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);
 
-            // Wait for reload to happen before reusing buffers!
+            // Wait for reload
             WaitForReload();
 
             // Swap pointers
@@ -236,6 +240,6 @@ void StartDisplayTask(void * argument) {
             current_draw_buffer = temp;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(50)); // Slow down update loop to reduce bus contention
     }
 }
