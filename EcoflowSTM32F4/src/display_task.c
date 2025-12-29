@@ -159,8 +159,13 @@ static void RenderFrame() {
     // Actually, check datasheet: LTDC_SRCR_VBR is set to 1 to request reload, cleared by hardware when done?
     // Reference manuals usually say: "This bit is set by software and cleared by hardware when the shadow registers reload has been performed."
     // So we wait while it is still set.
+    uint32_t tickstart = HAL_GetTick();
     while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
         // Busy wait (short duration usually)
+        if((HAL_GetTick() - tickstart) > 50) {
+            printf("DISPLAY: VSYNC Timeout!\n");
+            break;
+        }
     }
 
     // 5. Swap buffer tracking variables
