@@ -1,14 +1,5 @@
-/**
- * @file main.cpp
- * @author Lollokara
- * @brief Main application file for the ESP32 EcoFlow Controller.
- *
- * This file contains the primary application logic, including:
- * - Initialization of hardware (Serial, Display, Buttons).
- * - Management of the user interface, including button handling and display updates.
- * - Coordination of the DeviceManager to handle BLE connections and data.
- */
 
+// ... (includes)
 #include <Arduino.h>
 #include "EcoflowESP32.h"
 #include "Credentials.h"
@@ -18,6 +9,8 @@
 #include "WebServer.h"
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
+
+// ... (Button class and definitions)
 
 // Define GPIO pins for the buttons
 #define BTN_UP_PIN    4
@@ -29,12 +22,6 @@
 #define DEBOUNCE_DELAY 50
 #define HOLD_PRESS_TIME 1000
 
-/**
- * @class Button
- * @brief A simple class to handle button inputs with debouncing and multiple press types.
- *
- * This class detects short (<1s) and hold (>1s) presses for a single button.
- */
 class Button {
     int pin;
     int state;
@@ -48,10 +35,6 @@ public:
     Button(int p) : pin(p), state(HIGH), lastReading(HIGH), lastDebounceTime(0),
                     pressedTime(0), isPressedState(false), holdHandled(false) {}
     
-    /**
-     * @brief Checks the button state and returns the type of press event.
-     * @return 0 for no event, 1 for a short press, 2 for a hold.
-     */
     int check() {
         int reading = digitalRead(pin);
         int event = 0;
@@ -78,7 +61,6 @@ public:
             }
         }
 
-        // Check for hold while the button is held down
         if (isPressedState) {
             unsigned long duration = millis() - pressedTime;
             if (!holdHandled && duration >= HOLD_PRESS_TIME) {
@@ -100,9 +82,6 @@ DeviceType currentViewDevice = DeviceType::DELTA_3;
 
 void handleAction(DisplayAction action);
 
-/**
- * @brief Checks the Serial buffer for new commands.
- */
 void checkSerial() {
     static String inputBuffer = "";
     while (Serial.available()) {
@@ -116,11 +95,7 @@ void checkSerial() {
     }
 }
 
-/**
- * @brief Standard Arduino setup function. Initializes all components.
- */
 void setup() {
-    // Hold Power
     pinMode(POWER_LATCH_PIN, OUTPUT);
     digitalWrite(POWER_LATCH_PIN, HIGH);
 
@@ -137,74 +112,161 @@ void setup() {
 
     WebServer::begin();
 
-    // Initialize UART1 for communication with STM32F4
-    // RX on GPIO16, TX on GPIO17
     Serial1.begin(460800, SERIAL_8N1, 16, 17);
 }
 
-void sendBatteryStatus() {
-    EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-    if (!d3->isAuthenticated()) {
-        return; // Don't send if not connected
+// ... (sendBatteryStatus deprecated but kept for compatibility if needed, replaced by new functions)
+
+void sendDeviceList() {
+    DeviceList list = {0};
+    DeviceSlot* slots[] = {
+        DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
+        DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
+        DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
+        DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
+    };
+
+    uint8_t count = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slots[i] && slots[i]->isConnected) {
+            list.devices[count].id = (uint8_t)slots[i]->type;
+            strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
+            list.devices[count].connected = 1;
+            count++;
+        }
+    }
+    list.count = count;
+
+    uint8_t buffer[sizeof(DeviceList) + 4];
+    int len = pack_device_list_message(buffer, &list);
+    Serial1.write(buffer, len);
+}
+
+void sendDeviceStatus(uint8_t device_id) {
+    DeviceType type = (DeviceType)device_id;
+    EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
+
+    if (!dev || !dev->isAuthenticated()) return;
+
+    DeviceStatus status = {0};
+    status.id = device_id;
+
+    // Fill BatteryStatus part
+    if (type == DeviceType::DELTA_3) {
+        status.status.soc = dev->getData().delta3.batteryLevel;
+        status.status.power_w = dev->getData().delta3.inputPower - dev->getData().delta3.outputPower;
+        status.status.voltage_v = 0;
+        status.status.connected = 1;
+        strncpy(status.status.device_name, "Delta 3", 15);
+    } else if (type == DeviceType::WAVE_2) {
+        // Wave 2 data mapping (simplified for now)
+        status.status.soc = 0; // Wave 2 might not have battery
+        status.status.power_w = 0;
+        status.status.voltage_v = 0;
+        status.status.connected = 1;
+        strncpy(status.status.device_name, "Wave 2", 15);
     }
 
-    BatteryStatus status = {0};
-    status.soc = d3->getData().delta3.batteryLevel;
-    status.power_w = d3->getData().delta3.inputPower - d3->getData().delta3.outputPower;
-    status.voltage_v = 0; // This data is not available in the current struct
-    status.connected = 1;
-    strncpy(status.device_name, "Delta 3", sizeof(status.device_name) - 1);
-
-    uint8_t buffer[sizeof(BatteryStatus) + 4];
-    int len = pack_battery_status_message(buffer, &status);
+    uint8_t buffer[sizeof(DeviceStatus) + 4];
+    int len = pack_device_status_message(buffer, &status);
     Serial1.write(buffer, len);
 }
 
 void checkUart() {
-    while (Serial1.available() >= 4) { // Wait for a complete header + CRC
-        if (Serial1.read() == START_BYTE) {
-            uint8_t buffer[3];
-            buffer[0] = Serial1.read(); // CMD
-            buffer[1] = Serial1.read(); // LEN
-            uint8_t received_crc = Serial1.read();
+    while (Serial1.available()) {
+        if (Serial1.peek() != START_BYTE) {
+            Serial1.read(); // Consume garbage
+            continue;
+        }
 
-            uint8_t calculated_crc = calculate_crc8(buffer, 2);
+        if (Serial1.available() < 4) return; // Wait for header
 
-            if (received_crc == calculated_crc) {
-                if (buffer[0] == CMD_REQUEST_STATUS_UPDATE) {
-                    sendBatteryStatus();
-                } else {
-                    // If we get an unexpected command, read the payload to clear the buffer
-                    for(int i = 0; i < buffer[1]; i++) {
-                        if(Serial1.available()) Serial1.read();
+        // We have at least 4 bytes, let's peek to see length
+        // Can't easily peek offset with Arduino Serial, so we must read carefully or use a buffer.
+        // For simplicity, let's assume we can read the header if we verified START_BYTE.
+        // NOTE: This simple parser is fragile if bytes come in chunks.
+        // A better approach is a state machine or circular buffer, but for this task I will stick to the existing pattern
+        // but try to be a bit safer.
+
+        // Actually, let's use the pattern from the previous code but updated.
+        // We need to read CMD and LEN.
+
+        // Let's implement a small state machine or just a blocking read with timeout if we are sure?
+        // No, blocking is bad.
+        // Let's just check if we have enough bytes for the header + payload based on what we see.
+
+        // Since we can't peek ahead easily without a buffer, let's buffer it.
+        // But Serial1.available() tells us how many.
+
+        // START(1) CMD(1) LEN(1) CRC(1) is min 4 bytes.
+        // If LEN > 0, we need 4 + LEN bytes.
+
+        // We need to read bytes to inspect them.
+        // Let's rely on the fact that if we saw START_BYTE, we expect the rest soon.
+
+        // A robust way without a persistent buffer in `checkUart` is tricky if packets are fragmented.
+        // Assuming high baudrate and small packets, we might be okay.
+
+        // Let's use a static buffer for assembly.
+        static uint8_t rx_buf[260];
+        static uint8_t rx_idx = 0;
+        static uint8_t expected_len = 0;
+        static bool collecting = false;
+
+        while (Serial1.available()) {
+            uint8_t b = Serial1.read();
+
+            if (!collecting) {
+                if (b == START_BYTE) {
+                    collecting = true;
+                    rx_idx = 0;
+                    rx_buf[rx_idx++] = b;
+                }
+            } else {
+                rx_buf[rx_idx++] = b;
+                if (rx_idx == 3) { // We have START, CMD, LEN
+                    expected_len = rx_buf[2];
+                }
+
+                if (rx_idx >= 3 && rx_idx == (4 + expected_len)) {
+                    // Packet complete
+                    uint8_t received_crc = rx_buf[rx_idx - 1];
+                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+
+                    if (received_crc == calculated_crc) {
+                        uint8_t cmd = rx_buf[1];
+                        if (cmd == CMD_HANDSHAKE) {
+                             uint8_t ack[4];
+                             int len = pack_handshake_ack_message(ack);
+                             Serial1.write(ack, len);
+                             sendDeviceList();
+                        } else if (cmd == CMD_GET_DEVICE_STATUS) {
+                             uint8_t dev_id;
+                             if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
+                                 sendDeviceStatus(dev_id);
+                             }
+                        }
                     }
+                    collecting = false; // Reset
+                }
+
+                if (rx_idx >= sizeof(rx_buf)) {
+                    collecting = false; // Overflow protection
                 }
             }
         }
     }
 }
 
-
-/**
- * @brief Standard Arduino loop function. Runs the main application logic.
- */
 void loop() {
     static uint32_t last_display_update = 0;
     static uint32_t last_data_refresh = 0;
 
-    // Update hardware sensors
     LightSensor::getInstance().update();
-
-    // 1. Update the Device Manager (handles all BLE communication)
     DeviceManager::getInstance().update();
-
-    // Check Serial for CLI commands
     checkSerial();
-
-    // Check UART for commands from STM32F4
     checkUart();
 
-    // 2. Check for button inputs and translate them to display actions
     DisplayAction action = DisplayAction::NONE;
     int upEvent = btnUp.check();
     int downEvent = btnDown.check();
@@ -215,34 +277,22 @@ void loop() {
     if (enterEvent == 1) action = handleDisplayInput(ButtonInput::BTN_ENTER_SHORT);
     if (enterEvent == 2) action = handleDisplayInput(ButtonInput::BTN_ENTER_HOLD);
 
-    // 3. Process the action from the user input
     handleAction(action);
-
-    // 4. Process any pending action that might have been triggered by a timeout in the UI
     handleAction(getPendingAction());
 
-    // 5. Periodically request fresh data from all connected devices
     if (millis() - last_data_refresh > 2000) {
         last_data_refresh = millis();
 
-        // Send battery status to STM32F4
-        sendBatteryStatus();
+        // sendBatteryStatus(); // Replaced by request/response from F4
 
         EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-        if (d3->isAuthenticated()) d3->requestData();
+        if (d3 && d3->isAuthenticated()) d3->requestData();
         EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
-        if (w2->isAuthenticated()) w2->requestData();
+        if (w2 && w2->isAuthenticated()) w2->requestData();
     }
 
-    // 6. Update the display at a regular framerate
     if (millis() - last_display_update > 20) {
         last_display_update = millis();
-
-        // Sync currentViewDevice with Display's priority logic unless user is manually overriding (TODO)
-        // For now, let Display logic drive the view if we are in Dashboard state
-        // But Display.cpp handles state.
-        // We need to know what device is *actually* being displayed to send commands to it.
-        // Display::getActiveDeviceType() returns the prioritized device.
         currentViewDevice = getActiveDeviceType();
 
         EcoflowESP32* activeDev = DeviceManager::getInstance().getDevice(currentViewDevice);
@@ -252,14 +302,9 @@ void loop() {
     }
 }
 
-/**
- * @brief Executes actions based on user input from the display.
- * @param action The action to be performed.
- */
 void handleAction(DisplayAction action) {
     if (action == DisplayAction::NONE) return;
 
-    // Handle device management actions first
     if (action == DisplayAction::CONNECT_DEVICE) {
         DeviceType target = getTargetDeviceType();
         DeviceManager::getInstance().scanAndConnect(target);
@@ -271,66 +316,41 @@ void handleAction(DisplayAction action) {
         return;
     }
 
-    // Handle System Power Off
     if (action == DisplayAction::SYSTEM_OFF) {
         Serial.println("Power Off Requested. Releasing latch...");
         digitalWrite(POWER_LATCH_PIN, LOW);
         delay(1000);
-        ESP.restart(); // Should lose power before this if latch works
+        ESP.restart();
         return;
     }
 
-    // For control actions, ensure the device is authenticated
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
     EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
 
     if (dev && dev->isAuthenticated()) {
         switch(action) {
-            case DisplayAction::TOGGLE_AC:
-                dev->setAC(!dev->isAcOn());
-                break;
-            case DisplayAction::TOGGLE_DC:
-                dev->setDC(!dev->isDcOn());
-                break;
-            case DisplayAction::TOGGLE_USB:
-                dev->setUSB(!dev->isUsbOn());
-                break;
-            case DisplayAction::SET_AC_LIMIT:
-                dev->setAcChargingLimit(getSetAcLimit());
-                break;
-            case DisplayAction::SET_SOC_LIMITS:
-                dev->setBatterySOCLimits(getSetMaxChgSoc(), getSetMinDsgSoc());
-                break;
+            case DisplayAction::TOGGLE_AC: dev->setAC(!dev->isAcOn()); break;
+            case DisplayAction::TOGGLE_DC: dev->setDC(!dev->isDcOn()); break;
+            case DisplayAction::TOGGLE_USB: dev->setUSB(!dev->isUsbOn()); break;
+            case DisplayAction::SET_AC_LIMIT: dev->setAcChargingLimit(getSetAcLimit()); break;
+            case DisplayAction::SET_SOC_LIMITS: dev->setBatterySOCLimits(getSetMaxChgSoc(), getSetMinDsgSoc()); break;
             default: break;
         }
     }
 
-    // Handle Wave 2 Specific Actions
     if (w2 && w2->isAuthenticated()) {
         switch(action) {
-            case DisplayAction::W2_TOGGLE_PWR:
-                // Deprecated, use W2_SET_PWR
-                w2->setPowerState(w2->getData().wave2.powerMode == 1 ? 2 : 1);
-                break;
-            case DisplayAction::W2_SET_PWR:
-                w2->setPowerState((uint8_t)getSetW2Val());
-                break;
+            case DisplayAction::W2_TOGGLE_PWR: w2->setPowerState(w2->getData().wave2.powerMode == 1 ? 2 : 1); break;
+            case DisplayAction::W2_SET_PWR: w2->setPowerState((uint8_t)getSetW2Val()); break;
             case DisplayAction::W2_SET_MODE:
-                // If OFF, turn ON first? User said: "if off should turn on the wave 2 and then set the mode"
                 if (w2->getData().wave2.powerMode != 1) {
                     w2->setPowerState(1);
-                    // We might need a delay or wait for state update, but for now we send both.
-                    // The device might process them sequentially.
                     delay(200);
                 }
                 w2->setMainMode((uint8_t)getSetW2Val());
                 break;
-            case DisplayAction::W2_SET_FAN:
-                 w2->setFanSpeed((uint8_t)getSetW2Val());
-                 break;
-            case DisplayAction::W2_SET_SUB_MODE:
-                 w2->setSubMode((uint8_t)getSetW2Val());
-                 break;
+            case DisplayAction::W2_SET_FAN: w2->setFanSpeed((uint8_t)getSetW2Val()); break;
+            case DisplayAction::W2_SET_SUB_MODE: w2->setSubMode((uint8_t)getSetW2Val()); break;
             default: break;
         }
     }

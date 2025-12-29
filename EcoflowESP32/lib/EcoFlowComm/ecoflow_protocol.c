@@ -69,3 +69,93 @@ int pack_request_status_message(uint8_t *buffer) {
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
 }
+
+int pack_handshake_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_HANDSHAKE;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_handshake_ack_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_HANDSHAKE_ACK;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_device_list_message(uint8_t *buffer, const DeviceList *list) {
+    uint8_t len = sizeof(DeviceList);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_DEVICE_LIST;
+    buffer[2] = len;
+    memcpy(&buffer[3], list, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(DeviceList)) return -2; // Size mismatch
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    memcpy(list, &buffer[3], len);
+    return 0;
+}
+
+int pack_device_list_ack_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_DEVICE_LIST_ACK;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_GET_DEVICE_STATUS;
+    buffer[2] = len;
+    buffer[3] = device_id;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    *device_id = buffer[3];
+    return 0;
+}
+
+int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status) {
+    uint8_t len = sizeof(DeviceStatus);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_DEVICE_STATUS;
+    buffer[2] = len;
+    memcpy(&buffer[3], status, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(DeviceStatus)) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    memcpy(status, &buffer[3], len);
+    return 0;
+}
