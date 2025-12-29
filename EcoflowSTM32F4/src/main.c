@@ -7,6 +7,7 @@
 
 extern UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3;
+QueueHandle_t displayQueue;
 
 // System Clock Configuration
 void SystemClock_Config(void) {
@@ -91,6 +92,12 @@ int main(void) {
     MX_USART3_UART_Init();
 
     // Create Tasks
+    displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
+    if (displayQueue == NULL) {
+        printf("Display Queue Creation Failed!\n");
+        while(1);
+    }
+
     xTaskCreate(StartDisplayTask, "Display", 2048, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 1024, NULL, 3, NULL);
 
@@ -135,5 +142,15 @@ void BusFault_Handler(void) {
 
 void UsageFault_Handler(void) {
     printf("UsageFault_Handler\n");
+    while(1);
+}
+
+void WWDG_IRQHandler(void) {
+    printf("WWDG_IRQHandler (IRQ 0) Triggered!\n");
+    while(1);
+}
+
+void NMI_Handler(void) {
+    printf("NMI_Handler\n");
     while(1);
 }

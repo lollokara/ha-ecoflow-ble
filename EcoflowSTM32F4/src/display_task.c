@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-QueueHandle_t displayQueue;
+// QueueHandle_t displayQueue; // Defined in main.c
 
 // Backlight Control Pin: PA3
 #define BACKLIGHT_PIN GPIO_PIN_3
@@ -211,11 +211,7 @@ void StartDisplayTask(void * argument) {
 
     Backlight_Init();
 
-    displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
-    if (displayQueue == NULL) {
-        printf("Display Queue Creation Failed!\n");
-        vTaskSuspend(NULL);
-    }
+    // displayQueue creation moved to main.c to avoid race condition with UART Task
 
     // Initial Draw
     RenderFrame();
@@ -228,7 +224,9 @@ void StartDisplayTask(void * argument) {
 
     for (;;) {
         // Handle Data Updates
+        // printf("Display: Wait Queue...\n");
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
+            // printf("Display: Queue Rx!\n");
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
                 // Check if changed
                 if (memcmp(&currentBattStatus, &event.data.battery, sizeof(BatteryStatus)) != 0) {
