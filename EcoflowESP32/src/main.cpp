@@ -188,7 +188,7 @@ void checkUart() {
         uint8_t b = Serial1.read();
 
         // Debug only - can be verbose
-        ESP_LOGI(TAG, "UART: %02X", b);
+        // ESP_LOGI(TAG, "UART: %02X", b);
 
         if (!collecting) {
             if (b == START_BYTE) {

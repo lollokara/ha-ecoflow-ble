@@ -256,11 +256,13 @@ void StartDisplayTask(void * argument) {
             }
 
             if (stateChanged) {
+                printf("DISPLAY: Touch event detected, redrawing.\n");
                 needs_redraw = true;
             }
         }
 
         if (needs_redraw) {
+            printf("DISPLAY: RenderFrame called.\n");
             RenderFrame();
             needs_redraw = false;
         }

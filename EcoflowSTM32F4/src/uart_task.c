@@ -45,7 +45,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
         // Check for complete packet
         if (rx_index > 3 && rx_index == (4 + rx_msg_len)) {
             uint8_t received_crc = rx_buffer[rx_index - 1];
-            uint8_t calcd_crc = calculate_crc8(rx_buffer, rx_index - 1);
+            uint8_t calcd_crc = calculate_crc8(&rx_buffer[1], rx_index - 2);
 
             if (received_crc == calcd_crc) {
                 uint8_t cmd = rx_buffer[1];
