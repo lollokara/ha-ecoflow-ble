@@ -39,6 +39,16 @@ void SystemClock_Config(void) {
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
         // Error_Handler();
     }
+
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
+    PeriphClkInitStruct.PLLSAI.PLLSAIN = 384;
+    PeriphClkInitStruct.PLLSAI.PLLSAIP = RCC_PLLSAIP_DIV2;
+    PeriphClkInitStruct.PLLSAI.PLLSAIR = 7;
+    PeriphClkInitStruct.PLLSAIDivR = RCC_PLLSAIDIVR_2;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
+       // Error_Handler();
+    }
 }
 
 void USART6_IRQHandler(void) {

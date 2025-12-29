@@ -117,7 +117,7 @@ void setup() {
     // If connected directly (TX->TX, RX->RX), we need to swap pins in software.
     // RX Pin = 17 (connected to F4 TX)
     // TX Pin = 16 (connected to F4 RX)
-    Serial1.begin(460800, SERIAL_8N1, 17, 16);
+    Serial1.begin(115200, SERIAL_8N1, 17, 16);
 }
 
 // ... (sendBatteryStatus deprecated but kept for compatibility if needed, replaced by new functions)
@@ -161,7 +161,6 @@ void sendDeviceStatus(uint8_t device_id) {
         status.status.soc = (uint8_t)dev->getData().delta3.batteryLevel;
         status.status.power_w = dev->getData().delta3.inputPower - dev->getData().delta3.outputPower;
         status.status.voltage_v = 0;
-    } else if (type == DeviceType::WAVE_2) {
         status.status.connected = 1;
         strncpy(status.status.device_name, "Delta 3", 15);
     } else if (type == DeviceType::WAVE_2) {
@@ -186,9 +185,14 @@ void checkUart() {
 
     while (Serial1.available()) {
         uint8_t b = Serial1.peek();
+        // Simple logging for debugging connection
+        if (collecting && rx_idx < 10) {
+             // Serial.printf("%02X ", b);
+        }
 
         if (!collecting) {
             if (b == START_BYTE) {
+                Serial.println("UART RX: Start Byte");
                 collecting = true;
                 rx_idx = 0;
                 rx_buf[rx_idx++] = Serial1.read();
