@@ -61,11 +61,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
         if (rx_index > 3 && rx_index == (4 + rx_msg_len)) {
             uint8_t received_crc = rx_buffer[rx_index - 1];
             uint8_t calcd_crc = calculate_crc8(&rx_buffer[1], rx_index - 2);
-            uint8_t debug_calc = debug_crc8(&rx_buffer[1], rx_index - 2);
-
-            printf("UART: Rx Packet: ");
-            for(int i=0; i<rx_index; i++) printf("%02X ", rx_buffer[i]);
-            printf("| Index: %d | CalcCRC: %02X | DbgCRC: %02X\n", rx_index, calcd_crc, debug_calc);
 
             if (received_crc == calcd_crc) {
                 uint8_t cmd = rx_buffer[1];

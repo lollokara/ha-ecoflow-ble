@@ -139,6 +139,7 @@ static void UpdateStatusPanel(BatteryStatus* batt) {
 static void RenderFrame() {
     // 1. Set the pending buffer as the drawing target manually to avoid immediate reload
     // BSP_LCD_SetLayerAddress triggers a reload which can hang if called at the wrong time or if hardware is busy
+    // Note: Do NOT use BSP_LCD_SetLayerAddress here as it calls Reload.
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 
     // 2. Draw everything

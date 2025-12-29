@@ -89,9 +89,12 @@ int main(void) {
 
     MX_USART3_UART_Init();
 
+    // Initialize Queue before tasks (and interrupts) start
+    displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
+
     // Create Tasks
-    xTaskCreate(StartDisplayTask, "Display", 1024, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 256, NULL, 3, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 2048, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 1024, NULL, 3, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
