@@ -89,126 +89,36 @@ static void DrawHeader(void) {
 
 static void DrawStatusPanel(BatteryStatus* batt) {
     char buf[32];
-    BSP_LCD_SetFont(&Font20);
+    BSP_LCD_SetFont(&Font24);
     BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
 
     // Panel 1: SOC
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(20, 70, 200, 100);
+    // We do NOT clear the rect to avoid flicker.
+    // We rely on the font drawing the background color.
 
     BSP_LCD_SetTextColor(GUI_COLOR_ACCENT);
+    BSP_LCD_SetFont(&Font20);
     BSP_LCD_DisplayStringAt(40, 80, (uint8_t*)"Battery", LEFT_MODE);
 
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    snprintf(buf, sizeof(buf), "%d %%", batt->soc);
+    // Pad with spaces to overwrite previous values
+    snprintf(buf, sizeof(buf), "%3d %% ", batt->soc);
     BSP_LCD_SetFont(&Font24);
     BSP_LCD_DisplayStringAt(40, 110, (uint8_t*)buf, LEFT_MODE);
 
     // Panel 2: Power
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(240, 70, 200, 100);
 
     BSP_LCD_SetTextColor(GUI_COLOR_ACCENT);
     BSP_LCD_SetFont(&Font20);
-    BSP_LCD_DisplayStringAt(260, 80, (uint8_t*)"Power", LEFT_MODE);
+    BSP_LCD_DisplayStringAt(260, 80, (uint8_t*)"Power  ", LEFT_MODE);
 
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    snprintf(buf, sizeof(buf), "%d W", batt->power_w);
+    snprintf(buf, sizeof(buf), "%4d W ", batt->power_w);
     BSP_LCD_SetFont(&Font24);
     BSP_LCD_DisplayStringAt(260, 110, (uint8_t*)buf, LEFT_MODE);
 }
 
 static void RenderFrame() {
-    // 1. Draw to Pending Buffer
-    BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER_BACKGROUND);
-
-    // We are drawing to the memory currently set as Layer Address?
-    // Wait, BSP_LCD_SelectLayer just sets the register index for subsequent calls.
-    // We need to tell the drawing primitives WHERE to write.
-    // The BSP drivers usually write to the address of the selected layer.
-    // So we must update the layer address BEFORE drawing?
-    // No, if we update layer address, the LCD controller will scan from there immediately (or at Vsync).
-    // Double buffering means:
-    // A. LCD scans Buffer 1.
-    // B. CPU writes to Buffer 2.
-    // C. Swap: LCD scans Buffer 2.
-
-    // The BSP functions `BSP_LCD_Draw...` write to the address configured in the handle `hltdc_eval.LayerCfg[LayerIndex].FBStartAdress`.
-    // But `BSP_LCD_SetLayerAddress` updates the LTDC register AND likely the handle handle.
-    // If we call SetLayerAddress, we change what is ON SCREEN.
-    // We want to change what we DRAW TO, without changing screen yet.
-
-    // The standard BSP doesn't separate "Draw Buffer" and "Display Buffer".
-    // We have to manually hack it or use a simpler approach:
-    // 1. Set Layer Address to PENDING (this shows garbage for a split second if not careful).
-    // Actually, normally you write to memory manually, or you trick the library.
-
-    // Let's rely on the fact that if we update the address, it takes effect at next reload.
-    // But we need to write to the pending buffer.
-    // `BSP_LCD_SetLayerAddress` usually calls `HAL_LTDC_SetAddress`.
-
-    // To implement true double buffering with this BSP:
-    // It is complex without modifying BSP.
-    // Simple fix for tearing: Just rely on the fact that we are drawing fast and Vsync might handle it?
-    // No, user said "glitchy".
-
-    // Let's try this:
-    // We can't easily re-target the BSP drawing functions to an off-screen buffer without changing what's displayed
-    // because the BSP tracks "Current Layer" and uses its address.
-
-    // Workaround:
-    // We can't do true double buffering easily with this BSP API without flicker.
-    // BUT, we can minimize tearing by waiting for VSync (Reload).
-    // `HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);`
-
-    // Re-reading usage: `BSP_LCD_Init` sets Layer 0 to `LCD_FB_START_ADDRESS`.
-
-    // Let's just try to redraw only what changed, which we are doing.
-    // Maybe the glitch is because we clear rects.
-    // Filling rect is fast.
-
-    // If the user persists with "glitchy", let's assume it IS tearing.
-    // Let's just draw to the SAME buffer but carefully.
-
-    // Actually, I can update the BSP handle's address pointer manually?
-    // extern LTDC_HandleTypeDef  hltdc_discovery; (in bsp.c)
-    // It's hidden.
-
-    // OK, let's stick to the current plan but ensure we clear background only once or use the "Modern" full redraw.
-    // Wait, I will attempt to switch the layer address.
-    // If I set the Layer Address to the *other* buffer, the screen *switches* to it.
-    // So I must have *already* drawn to it.
-    // But how do I draw to it if it's not the active layer?
-
-    // The BSP has `BSP_LCD_SelectLayer`. This sets `ActiveLayer`.
-    // And drawing uses `hltdc_eval.LayerCfg[ActiveLayer].FBStartAdress`.
-    // So if I call `BSP_LCD_SetLayerAddress(Active, PENDING)`, the screen updates to PENDING.
-
-    // CORRECT SEQUENCE for this BSP:
-    // 1. Initialize with Buffer 1 on Screen.
-    // 2. We want to draw to Buffer 2.
-    //    We need to "Select" Buffer 2 as target, but NOT show it.
-    //    The BSP doesn't support "Select Target but don't Show".
-    //    When you select layer, you select the index (0 or 1).
-    //    This board has 2 layers (Background/Foreground) used for blending.
-    //    We are using Layer 0.
-
-    //    Maybe we can use Layer 1 as the back buffer?
-    //    No, Layer 1 is for blending on top.
-
-    //    We need to write to RAM `LCD_FRAME_BUFFER_2` directly?
-    //    We can't use BSP functions then.
-
-    //    Okay, let's look at `BSP_LCD_SetLayerAddress`.
-    //    It sets the address for the layer.
-
-    //    Revised Plan for Double Buffering:
-    //    Actually, we can't easily do it without low-level hacks.
-    //    Let's focus on "glitchy". Maybe it's just the massive flickering of `FillRect`.
-    //    The current code redraws the button and status panels constantly.
-
-    //    Refactor to REDRAW ONLY ON CHANGE.
-
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
     DrawButton(&testBtn);
@@ -235,6 +145,11 @@ void StartDisplayTask(void * argument) {
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
 
     // Initial Draw
+    // Draw backgrounds for panels once
+    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
+    BSP_LCD_FillRect(20, 70, 200, 100);
+    BSP_LCD_FillRect(240, 70, 200, 100);
+
     DrawHeader();
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
