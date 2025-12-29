@@ -53,8 +53,8 @@ static void Backlight_Init(void) {
 }
 
 // Helper: Set Drawing Target
-// This hacks the BSP to draw to a specific address without changing what is visible (yet)
 static void SetDrawTarget(uint32_t address) {
+    // This updates the handle used by BSP functions, redirecting drawing
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = address;
 }
 
@@ -62,7 +62,6 @@ static void SetDrawTarget(uint32_t address) {
 static void DrawButton(SimpleButton* btn) {
     if (!btn->visible) return;
 
-    // Use FillRect now, since we are double buffering!
     if (btn->pressed) {
         BSP_LCD_SetTextColor(GUI_COLOR_BTN_PRESS);
     } else {
@@ -98,7 +97,6 @@ static void DrawStatusPanel(BatteryStatus* batt) {
     BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
 
     // Panel 1: SOC
-    // With double buffering, we can safely FillRect to clear old text without flicker
     BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
     BSP_LCD_FillRect(20, 70, 200, 100);
 
@@ -125,52 +123,39 @@ static void DrawStatusPanel(BatteryStatus* batt) {
 }
 
 static void RedrawFrame() {
-    // Assumes SetDrawTarget is already called for the back buffer
-    // Only clear if we need to? Or just redraw panels?
-    // Drawing Header is slow? No, simple rects.
-    // To be safe against artifacts, we might want to Draw Header too, or ensure it's preserved.
-    // If we only draw Panels and Button, the rest of the screen needs to be valid.
-    // Strategy: We draw Header to BOTH buffers at INIT.
-    // In Loop: We only redraw Panels and Button. The background (Black) remains valid.
-    // EXCEPT if a button or panel changes size or position. They don't.
-    // So we just redraw the dynamic widgets.
-
-    DrawStatusPanel(&currentBattStatus);
+    BSP_LCD_Clear(GUI_COLOR_BG);
+    DrawHeader();
     DrawButton(&testBtn);
+    DrawStatusPanel(&currentBattStatus);
 }
 
 void StartDisplayTask(void * argument) {
-    // Init Hardware
     BSP_SDRAM_Init();
     BSP_LCD_Init();
 
-    // Init Buffer 1
+    // Init Buffer 1 (Visible)
     BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER_BACKGROUND, LCD_FRAME_BUFFER_1);
     BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER_BACKGROUND);
     BSP_LCD_SetBackColor(GUI_COLOR_BG);
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
 
-    // Clear and Setup Buffer 1
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
 
-    // Init Buffer 2 content
-    // We hack the draw target to Buffer 2
+    // Init Buffer 2 (Back)
     SetDrawTarget(LCD_FRAME_BUFFER_2);
-    // We must manually clear it as BSP_LCD_Clear uses the target
     BSP_LCD_Clear(GUI_COLOR_BG);
     DrawHeader();
     DrawButton(&testBtn);
     DrawStatusPanel(&currentBattStatus);
 
-    // Restore Target to Buffer 1 (Visible)
+    // Reset target to visible for safety (though loop sets it anyway)
     SetDrawTarget(LCD_FRAME_BUFFER_1);
 
     BSP_LCD_DisplayOn();
 
-    // Init Touch
     BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
     Backlight_Init();
 
@@ -183,10 +168,8 @@ void StartDisplayTask(void * argument) {
     for (;;) {
         bool needs_redraw = false;
 
-        // Process Queue
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
-                // Update cached state
                 if (memcmp(&currentBattStatus, &event.data.battery, sizeof(BatteryStatus)) != 0) {
                     currentBattStatus = event.data.battery;
                     needs_redraw = true;
@@ -194,7 +177,6 @@ void StartDisplayTask(void * argument) {
             }
         }
 
-        // Process Touch
         if (xTaskGetTickCount() - last_touch_poll > pdMS_TO_TICKS(30)) {
             last_touch_poll = xTaskGetTickCount();
             BSP_TS_GetState(&tsState);
@@ -224,24 +206,22 @@ void StartDisplayTask(void * argument) {
         }
 
         if (needs_redraw) {
-            // Draw to Back Buffer
+            // Draw to back buffer
             SetDrawTarget(current_draw_buffer);
+            RedrawFrame(); // Full redraw to back buffer (clears BG, draws header/panels)
 
-            // We MUST Redraw everything that might have changed or been cleared?
-            // Since we are double buffering, the back buffer has "Old" state (from 2 frames ago).
-            // We just overwrite the dynamic parts.
-            RedrawFrame();
-
-            // Swap!
+            // Swap visible buffer
             BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, current_draw_buffer);
 
-            // Swap indices
+            // IMPORTANT: Trigger reload to apply address change at next VBlank
+            HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);
+
+            // Swap pointers
             uint32_t temp = current_visible_buffer;
             current_visible_buffer = current_draw_buffer;
             current_draw_buffer = temp;
         }
 
-        // Limit FPS
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
