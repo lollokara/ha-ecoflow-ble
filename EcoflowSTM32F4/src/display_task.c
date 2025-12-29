@@ -25,6 +25,7 @@ static void Backlight_Init(void) {
 
 void StartDisplayTask(void * argument) {
     // Initialize Hardware
+    BSP_SDRAM_Init();
     BSP_LCD_Init();
     BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER_BACKGROUND, LCD_FB_START_ADDRESS);
     BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER_BACKGROUND);

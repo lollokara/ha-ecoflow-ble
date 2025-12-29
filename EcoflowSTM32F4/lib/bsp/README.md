@@ -1,6 +1,6 @@
-# STM32CubeF4 HAL Driver MCU Component
+# BSP STM32469I-DISCOVERY Component
 
-![latest tag](https://img.shields.io/github/v/tag/STMicroelectronics/stm32f4xx_hal_driver.svg?color=brightgreen)
+![latest tag](https://img.shields.io/github/v/tag/STMicroelectronics/stm32469i-discovery.svg?color=brightgreen)
 
 ## Overview
 
@@ -19,20 +19,23 @@ Two models of publication are proposed for the STM32Cube embedded software:
 
 ## Description
 
-This **stm32f4xx_hal_driver** MCU component repository is one element of the STM32CubeF4 MCU embedded software package, providing the **HAL-LL Drivers** part.
+This **stm32469i-discovery** MCU component repository is one element of the **STM32CubeF4** MCU embedded software package, providing the **STM32469I-DISCOVERY** BSP BOARD component part.
 
 ## Release note
 
-Details about the content of this release are available in the release note [here](https://htmlpreview.github.io/?https://github.com/STMicroelectronics/stm32f4xx_hal_driver/blob/master/Release_Notes.html).
+Details about the content of this release are available in the release note [here](https://htmlpreview.github.io/?https://github.com/STMicroelectronics/stm32469i-discovery/blob/main/Release_Notes.html).
 
 ## Compatibility information
 
-It is **crucial** that you use a consistent set of versions for the CMSIS Core - CMSIS Device - HAL, as mentioned in [this](https://htmlpreview.github.io/?https://github.com/STMicroelectronics/STM32CubeF4/blob/master/Release_Notes.html) release note.
+Below is the list of the BSP *component* drivers to be used with this BSP *board* driver. It is **crucial** that you use a consistent set of CMSIS - HAL - BSP versions, as mentioned in [this](https://htmlpreview.github.io/?https://github.com/STMicroelectronics/STM32CubeF4/blob/master/Release_Notes.html) release note.
 
-The full **STM32CubeF4** MCU package is available [here](https://github.com/STMicroelectronics/STM32CubeF4).
+* [stm32-bsp-common](https://github.com/STMicroelectronics/stm32-bsp-common)
+* [stm32-cs43l22](https://github.com/STMicroelectronics/stm32-cs43l22)
+* [stm32-ft6x06](https://github.com/STMicroelectronics/stm32-ft6x06)
+* [stm32-n25q128a](https://github.com/STMicroelectronics/stm32-n25q128a)
+* [stm32-nt35510](https://github.com/STMicroelectronics/stm32-nt35510)
+* [stm32-otm8009a](https://github.com/STMicroelectronics/stm32-otm8009a)
 
 ## Troubleshooting
 
-If you have any issue with the **software content** of this repository, you can file an issue [here](https://github.com/STMicroelectronics/stm32f4xx_hal_driver/issues/new/choose).
-
-For any other question related to the product, the tools, the environment, you can submit a topic on the [ST Community/STM32 MCUs forum](https://community.st.com/s/group/0F90X000000AXsASAW/stm32-mcus).
+Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
