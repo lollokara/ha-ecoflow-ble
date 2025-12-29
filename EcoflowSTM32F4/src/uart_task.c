@@ -4,7 +4,7 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
 
-UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart6;
 #define RX_BUFFER_SIZE 256
 uint8_t rx_byte;
 uint8_t rx_buffer[RX_BUFFER_SIZE];
@@ -24,7 +24,7 @@ static DeviceList knownDevices = {0};
 static uint8_t currentDeviceIndex = 0;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance != USART1) return;
+    if (huart->Instance != USART6) return;
 
     if (rx_index == 0) {
         if (rx_byte == START_BYTE) {
@@ -61,7 +61,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                         // Send Ack
                         uint8_t ack[4];
                         int len = pack_device_list_ack_message(ack);
-                        HAL_UART_Transmit(&huart1, ack, len, 100);
+                        HAL_UART_Transmit(&huart6, ack, len, 100);
 
                         currentState = STATE_POLLING;
                     }
@@ -71,13 +71,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                     if (unpack_device_status_message(rx_buffer, &status) == 0) {
                          DisplayEvent event;
                          event.type = DISPLAY_EVENT_UPDATE_BATTERY;
-                         // Map protocol struct to display struct
-                         // Note: Assuming display_task handles generic battery status or we might need to extend it later
-                         // For now, we update the battery status. If multiple devices, this will flicker between them unless
-                         // display task handles IDs.
-
-                         // The user said "Screen kinda works".
-                         // We will just push the data for now.
                          event.data.battery.soc = status.status.soc;
                          event.data.battery.power_w = status.status.power_w;
                          event.data.battery.voltage_v = status.status.voltage_v;
@@ -92,35 +85,35 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 
     // Re-arm interrupt
-    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+    HAL_UART_Receive_IT(&huart6, &rx_byte, 1);
 }
 
 static void UART_Init(void) {
-    __HAL_RCC_USART1_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_USART6_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_10;
+    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-    huart1.Instance = USART1;
-    huart1.Init.BaudRate = 460800;
-    huart1.Init.WordLength = UART_WORDLENGTH_8B;
-    huart1.Init.StopBits = UART_STOPBITS_1;
-    huart1.Init.Parity = UART_PARITY_NONE;
-    huart1.Init.Mode = UART_MODE_TX_RX;
-    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-    HAL_UART_Init(&huart1);
+    huart6.Instance = USART6;
+    huart6.Init.BaudRate = 460800;
+    huart6.Init.WordLength = UART_WORDLENGTH_8B;
+    huart6.Init.StopBits = UART_STOPBITS_1;
+    huart6.Init.Parity = UART_PARITY_NONE;
+    huart6.Init.Mode = UART_MODE_TX_RX;
+    huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart6);
 
-    HAL_NVIC_SetPriority(USART1_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(USART1_IRQn);
+    HAL_NVIC_SetPriority(USART6_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(USART6_IRQn);
 
-    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+    HAL_UART_Receive_IT(&huart6, &rx_byte, 1);
 }
 
 void StartUARTTask(void * argument) {
@@ -134,7 +127,7 @@ void StartUARTTask(void * argument) {
         switch (currentState) {
             case STATE_HANDSHAKE:
                 len = pack_handshake_message(tx_buf);
-                HAL_UART_Transmit(&huart1, tx_buf, len, 100);
+                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                 currentState = STATE_WAIT_HANDSHAKE_ACK;
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 break;
@@ -142,7 +135,7 @@ void StartUARTTask(void * argument) {
             case STATE_WAIT_HANDSHAKE_ACK:
                 // Retransmit if stuck
                 len = pack_handshake_message(tx_buf);
-                HAL_UART_Transmit(&huart1, tx_buf, len, 100);
+                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 break;
 
@@ -155,7 +148,7 @@ void StartUARTTask(void * argument) {
                 if (knownDevices.count > 0) {
                     uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
                     len = pack_get_device_status_message(tx_buf, dev_id);
-                    HAL_UART_Transmit(&huart1, tx_buf, len, 100);
+                    HAL_UART_Transmit(&huart6, tx_buf, len, 100);
 
                     currentDeviceIndex++;
                     if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;

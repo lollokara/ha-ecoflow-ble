@@ -4,7 +4,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 
-extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart6;
 
 // System Clock Configuration
 void SystemClock_Config(void) {
@@ -40,54 +40,9 @@ void SystemClock_Config(void) {
     }
 }
 
-void USART1_IRQHandler(void) {
-    HAL_UART_IRQHandler(&huart1);
+void USART6_IRQHandler(void) {
+    HAL_UART_IRQHandler(&huart6);
 }
-
-// Map FreeRTOS interrupts
-// SysTick_Handler is mapped in FreeRTOSConfig.h to xPortSysTickHandler
-// We need to implement SysTick_Handler to call HAL_IncTick if we want HAL delay to work,
-// but FreeRTOS xPortSysTickHandler does not call HAL_IncTick.
-// The BOJIT library might handle this differently, but standard practice:
-// Define xPortSysTickHandler in FreeRTOSConfig.h as SysTick_Handler
-// and then implementing it to call both is tricky because xPortSysTickHandler is defined in port.c.
-//
-// Actually, usually we define configOVERRIDE_DEFAULT_TICK_CONFIGURATION and provide vPortSetupTimerInterrupt.
-// Or simpler: Use a different timer for HAL.
-//
-// BUT, looking at BOJIT repo, it seems to wrap standard FreeRTOS.
-// If I defined `#define xPortSysTickHandler SysTick_Handler` in FreeRTOSConfig.h,
-// then the function `SysTick_Handler` will be provided by FreeRTOS port.c.
-// So I cannot define `SysTick_Handler` here in main.c, otherwise: multiple definition.
-//
-// If I don't define it in main.c, HAL_IncTick won't be called. HAL_Delay will hang.
-//
-// Solution:
-// 1. Don't use HAL_Delay in tasks (use vTaskDelay).
-// 2. For initialization before scheduler, HAL_Delay is needed.
-//    But before scheduler, SysTick is not hooked by FreeRTOS yet (vTaskStartScheduler configures it).
-//    So HAL_Delay works fine during init.
-//    Once scheduler starts, SysTick calls xPortSysTickHandler. HAL_Tick stops incrementing.
-//    HAL functions with timeout called FROM tasks might fail if they rely on uwTick.
-//    (e.g. HAL_UART_Transmit with timeout).
-//
-//    To fix this properly, we should use a hook or modify FreeRTOSConfig.h to NOT map SysTick_Handler,
-//    and instead call xPortSysTickHandler FROM our own SysTick_Handler.
-//
-//    Let's modify FreeRTOSConfig.h in a separate step if needed.
-//    For now, I'll rely on the fact that `xPortSysTickHandler` is likely `SysTick_Handler` in the library.
-//    Wait, I added `#define xPortSysTickHandler SysTick_Handler` in my config.
-//    So `port.c` will define `SysTick_Handler`.
-//    I must NOT define `SysTick_Handler` here.
-//
-//    However, I need HAL_IncTick to be called.
-//    FreeRTOS often provides `vApplicationTickHook`.
-//    I can enable `configUSE_TICK_HOOK` and call `HAL_IncTick()` there.
-//
-//    Let's check my config: `#define configUSE_TICK_HOOK 0`.
-//    I should change that to 1.
-//
-//    Let's update main.c to NOT include SysTick_Handler, and assume I will fix the hook.
 
 int main(void) {
     HAL_Init();

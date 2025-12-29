@@ -112,7 +112,12 @@ void setup() {
 
     WebServer::begin();
 
-    Serial1.begin(460800, SERIAL_8N1, 16, 17);
+    // User reported wiring: F4 PG14 (TX) -> ESP 17, F4 PG9 (RX) -> ESP 16
+    // Standard ESP32 Serial1: RX=16, TX=17.
+    // If connected directly (TX->TX, RX->RX), we need to swap pins in software.
+    // RX Pin = 17 (connected to F4 TX)
+    // TX Pin = 16 (connected to F4 RX)
+    Serial1.begin(460800, SERIAL_8N1, 17, 16);
 }
 
 // ... (sendBatteryStatus deprecated but kept for compatibility if needed, replaced by new functions)
