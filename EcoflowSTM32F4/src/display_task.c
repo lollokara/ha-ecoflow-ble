@@ -111,6 +111,7 @@ static void InitStatusPanel(void) {
 // Updates only the dynamic values in the status panels
 static void UpdateStatusPanel(BatteryStatus* batt) {
     char buf[32];
+    printf("DISPLAY: Updating Panel. SOC=%d, Pwr=%d\n", batt->soc, batt->power_w);
 
     // Panel 1: SOC Value
     // Clear only the text area to prevent flicker

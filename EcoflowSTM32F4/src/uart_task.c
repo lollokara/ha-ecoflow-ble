@@ -3,6 +3,7 @@
 #include "display_task.h"
 #include "stm32f4xx_hal.h"
 #include <string.h>
+#include <stdio.h>
 
 UART_HandleTypeDef huart6;
 #define RX_BUFFER_SIZE 256
@@ -48,15 +49,18 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
             if (received_crc == calcd_crc) {
                 uint8_t cmd = rx_buffer[1];
+                printf("UART: Pkt OK. Cmd: 0x%02X, Len: %d\n", cmd, rx_msg_len);
 
                 if (cmd == CMD_HANDSHAKE_ACK) {
                     if (currentState == STATE_WAIT_HANDSHAKE_ACK) {
+                        printf("UART: Handshake ACK received. State -> WAIT_DEVICE_LIST\n");
                         currentState = STATE_WAIT_DEVICE_LIST;
                     }
                 }
                 else if (cmd == CMD_DEVICE_LIST) {
                     if (currentState == STATE_WAIT_DEVICE_LIST || currentState == STATE_POLLING) {
                         unpack_device_list_message(rx_buffer, &knownDevices);
+                        printf("UART: Device List received. Count: %d\n", knownDevices.count);
 
                         // Send Ack
                         uint8_t ack[4];
@@ -69,6 +73,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                 else if (cmd == CMD_DEVICE_STATUS) {
                     DeviceStatus status;
                     if (unpack_device_status_message(rx_buffer, &status) == 0) {
+                         printf("UART: Status Update. SOC: %d, Pwr: %d\n", status.status.soc, status.status.power_w);
                          DisplayEvent event;
                          event.type = DISPLAY_EVENT_UPDATE_BATTERY;
                          event.data.battery.soc = status.status.soc;
@@ -79,6 +84,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                          xQueueSendFromISR(displayQueue, &event, NULL);
                     }
                 }
+            } else {
+                printf("UART: CRC Fail. Rx: 0x%02X, Calc: 0x%02X\n", received_crc, calcd_crc);
             }
             rx_index = 0;
         }
@@ -126,6 +133,7 @@ void StartUARTTask(void * argument) {
     for(;;) {
         switch (currentState) {
             case STATE_HANDSHAKE:
+                printf("UART: Sending Handshake...\n");
                 len = pack_handshake_message(tx_buf);
                 HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                 currentState = STATE_WAIT_HANDSHAKE_ACK;
@@ -133,6 +141,7 @@ void StartUARTTask(void * argument) {
                 break;
 
             case STATE_WAIT_HANDSHAKE_ACK:
+                printf("UART: Waiting for ACK, resending handshake...\n");
                 // Retransmit if stuck
                 len = pack_handshake_message(tx_buf);
                 HAL_UART_Transmit(&huart6, tx_buf, len, 100);
