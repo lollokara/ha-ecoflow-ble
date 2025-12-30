@@ -9,10 +9,11 @@ static int safe_float_to_int(float f) {
     return (int)f;
 }
 
-// --- State Variables (Settings) ---
+// --- State Variables ---
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
 static int lim_charge_p = 100;      // 50 - 100 %
+bool w2_is_on_state = false;        // Shared state for toggle
 
 // --- Styles ---
 static lv_style_t style_scr;
@@ -157,32 +158,8 @@ static void event_toggle_dc(lv_event_t * e) {
 
 // --- Wave 2 Callbacks ---
 static void event_w2_pwr(lv_event_t * e) {
-    lv_obj_t * btn = lv_event_get_target(e);
-    // Determine target state (toggle)
-    // We send logic 1/0 or specific power command. Protocol uses 1=Main, 2=Standby/Off? Or 0/1.
-    // ESP32 code: w2->setPowerState((uint8_t)getSetW2Val());
-    // Let's send 1 (On) or 0 (Off). ESP32 will map if needed, or we check protocol.
-    // Existing ESP32 logic: W2_TOGGLE_PWR toggles 1 <-> 2.
-    // SET_CMD_W2_POWER sends raw value.
-    // Let's assume we want to toggle. But we need to know state.
-    // For now, let's send 1 if we want ON, 0 if OFF.
-    // We can check button color to guess state?
-    // Simpler: Just send "1" always? No.
-    // Let's just implement toggle logic in ESP32 if value is special, OR track it here.
-    // UI_LVGL_Update tracks `last_w2_pwr`.
-    // But we are in callback.
-    // Let's assume "Click" means Toggle.
-    // If we send SET_CMD_W2_POWER with value 255 (Toggle)? No.
-    // Let's just send 1 for now, assuming user wants ON. But OFF?
-    // Let's use `lv_obj_has_state(btn, LV_STATE_CHECKED)` if it was a toggle btn.
-    // It is a normal btn.
-    // Let's use USER_DATA or just send a special "Toggle" command if defined, or rely on UI state.
-    // I will read the style. If green -> send Off (0). If default -> send On (1).
-    if (lv_obj_has_style(btn, &style_btn_green, 0)) {
-         send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_POWER, 0);
-    } else {
-         send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_POWER, 1);
-    }
+    extern bool w2_is_on_state; // Defined in file scope
+    send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_POWER, w2_is_on_state ? 0 : 1);
 }
 
 static void event_w2_temp(lv_event_t * e) {
@@ -486,7 +463,7 @@ static void create_settings(void) {
 
     // 1. AC Input Limit (400 - 3000)
     lv_obj_t * p1 = lv_obj_create(cont);
-    lv_obj_set_size(p1, 650, 80);
+    lv_obj_set_size(p1, 650, 100);
     lv_obj_set_style_bg_opa(p1, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p1, 0, 0);
 
@@ -494,24 +471,24 @@ static void create_settings(void) {
     lv_label_set_text(l1, "Max AC Input");
     lv_obj_set_style_text_color(l1, lv_color_white(), 0);
     lv_obj_set_style_text_font(l1, &lv_font_montserrat_32, 0);
-    lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, 10);
 
     label_lim_in_val = lv_label_create(p1);
     lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
     lv_obj_set_style_text_color(label_lim_in_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_in_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, 10);
 
     lv_obj_t * s1 = lv_slider_create(p1);
     lv_slider_set_range(s1, 400, 3000);
     lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
     lv_obj_set_width(s1, 600);
-    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
 
     // 2. Min Discharge (0 - 30)
     lv_obj_t * p2 = lv_obj_create(cont);
-    lv_obj_set_size(p2, 650, 80);
+    lv_obj_set_size(p2, 650, 100);
     lv_obj_set_style_bg_opa(p2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p2, 0, 0);
 
@@ -519,24 +496,24 @@ static void create_settings(void) {
     lv_label_set_text(l2, "Min Discharge Limit (Red)");
     lv_obj_set_style_text_color(l2, lv_color_white(), 0);
     lv_obj_set_style_text_font(l2, &lv_font_montserrat_32, 0);
-    lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, 10);
 
     label_lim_out_val = lv_label_create(p2);
     lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
     lv_obj_set_style_text_color(label_lim_out_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_out_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, 10);
 
     lv_obj_t * s2 = lv_slider_create(p2);
     lv_slider_set_range(s2, 0, 30);
     lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
     lv_obj_set_width(s2, 600);
-    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
 
     // 3. Max Charge (50 - 100)
     lv_obj_t * p3 = lv_obj_create(cont);
-    lv_obj_set_size(p3, 650, 80);
+    lv_obj_set_size(p3, 650, 100);
     lv_obj_set_style_bg_opa(p3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p3, 0, 0);
 
@@ -544,19 +521,19 @@ static void create_settings(void) {
     lv_label_set_text(l3, "Max Charge Limit (Blue)");
     lv_obj_set_style_text_color(l3, lv_color_white(), 0);
     lv_obj_set_style_text_font(l3, &lv_font_montserrat_32, 0);
-    lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, 10);
 
     label_lim_chg_val = lv_label_create(p3);
     lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
     lv_obj_set_style_text_color(label_lim_chg_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_chg_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, 10);
 
     lv_obj_t * s3 = lv_slider_create(p3);
     lv_slider_set_range(s3, 50, 100);
     lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
     lv_obj_set_width(s3, 600);
-    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
@@ -687,6 +664,7 @@ static void create_dashboard(void) {
     lv_obj_t * lbl_msg = lv_label_create(popup_panel);
     lv_label_set_text(lbl_msg, "Really Power Off?");
     lv_obj_set_style_text_font(lbl_msg, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(lbl_msg, lv_color_white(), 0);
     lv_obj_align(lbl_msg, LV_ALIGN_TOP_MID, 0, 30);
 
     lv_obj_t * btn_yes = lv_btn_create(popup_panel);
@@ -849,14 +827,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         static bool last_w2_pwr = false;
 
         if (first_run || w2_pwr != last_w2_pwr) {
+            w2_is_on_state = w2_pwr; // Update shared state
             if (w2_pwr) {
                 lv_obj_add_style(w2_btn_pwr, &style_btn_green, 0);
                 lv_obj_remove_style(w2_btn_pwr, &style_btn_default, 0);
-                // Also enable other controls
             } else {
                 lv_obj_add_style(w2_btn_pwr, &style_btn_default, 0);
                 lv_obj_remove_style(w2_btn_pwr, &style_btn_green, 0);
-                // Maybe disable controls?
             }
             last_w2_pwr = w2_pwr;
         }

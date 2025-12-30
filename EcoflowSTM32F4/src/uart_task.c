@@ -4,8 +4,15 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdio.h>
+#include "queue.h"
 
 UART_HandleTypeDef huart6;
+static QueueHandle_t uartTxQueue;
+
+typedef struct {
+    uint8_t buffer[64];
+    uint8_t len;
+} UartPacket;
 
 // Ring Buffer Implementation
 #define RING_BUFFER_SIZE 1024
@@ -104,8 +111,19 @@ static void UART_Init(void) {
     // Initialize Ring Buffer
     rb_init(&rx_ring_buffer);
 
+    // Create TX Queue
+    uartTxQueue = xQueueCreate(10, sizeof(UartPacket));
+
     // Start Reception
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+}
+
+void UART_SendPacket(uint8_t *buffer, uint8_t len) {
+    if (len > 64) return;
+    UartPacket packet;
+    memcpy(packet.buffer, buffer, len);
+    packet.len = len;
+    if (uartTxQueue) xQueueSend(uartTxQueue, &packet, 0);
 }
 
 static void process_packet(uint8_t *packet, uint16_t total_len) {
@@ -221,7 +239,13 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Handle State Machine (Non-blocking)
+        // 2. Handle TX Queue
+        UartPacket txPacket;
+        if (uartTxQueue && xQueueReceive(uartTxQueue, &txPacket, 0) == pdTRUE) {
+            HAL_UART_Transmit(&huart6, txPacket.buffer, txPacket.len, 100);
+        }
+
+        // 3. Handle State Machine (Non-blocking)
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
 
