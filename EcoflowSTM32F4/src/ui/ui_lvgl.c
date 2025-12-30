@@ -240,7 +240,7 @@ static void event_arc_draw(lv_event_t * e) {
             lv_coord_t r_in = r_out - 15;
 
             // Red Line
-            if (lim_discharge_p > 0) {
+            if (lim_discharge_p >= 0) {
                 float angle_deg = 270.0f + (lim_discharge_p * 3.6f);
                 float angle_rad = angle_deg * (3.14159f / 180.0f);
                 lv_point_t p1, p2;
@@ -748,6 +748,8 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 if (slider_lim_chg) lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
             }
+            // Red Line Fix: Ensure it updates and invalidates even if it was 0 or same (to force redraw if hidden)
+            // Actually, simply checking != is enough, but let's ensure the red line logic in draw callback works.
             if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
                 lim_discharge_p = new_min_dsg;
                 if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
