@@ -30,6 +30,7 @@ extern "C" {
 #define CMD_HANDSHAKE 0x20
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
+#define CMD_GET_DEVICE_LIST 0x26
 
 
 #pragma pack(push, 1)
@@ -82,6 +83,7 @@ int pack_handshake_ack_message(uint8_t *buffer);
 int pack_device_list_message(uint8_t *buffer, const DeviceList *list);
 int unpack_device_list_message(const uint8_t *buffer, DeviceList *list);
 int pack_device_list_ack_message(uint8_t *buffer);
+int pack_get_device_list_message(uint8_t *buffer);
 int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id);
 int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id);
 int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status);

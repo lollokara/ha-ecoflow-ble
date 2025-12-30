@@ -16,6 +16,7 @@ uint8_t rx_msg_len = 0;
 typedef enum {
     STATE_HANDSHAKE,
     STATE_WAIT_HANDSHAKE_ACK,
+    STATE_REQUEST_DEVICE_LIST,
     STATE_WAIT_DEVICE_LIST,
     STATE_POLLING
 } UartState;
@@ -55,7 +56,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
                 if (cmd == CMD_HANDSHAKE_ACK) {
                     if (currentState == STATE_WAIT_HANDSHAKE_ACK) {
-                        currentState = STATE_WAIT_DEVICE_LIST;
+                        currentState = STATE_REQUEST_DEVICE_LIST;
                     }
                 }
                 else if (cmd == CMD_DEVICE_LIST) {
@@ -163,6 +164,13 @@ void StartUARTTask(void * argument) {
                 len = pack_handshake_message(tx_buf);
                 HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                 vTaskDelay(pdMS_TO_TICKS(1000));
+                break;
+
+            case STATE_REQUEST_DEVICE_LIST:
+                printf("UART: Requesting Device List...\n");
+                len = pack_get_device_list_message(tx_buf);
+                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                currentState = STATE_WAIT_DEVICE_LIST;
                 break;
 
             case STATE_WAIT_DEVICE_LIST:

@@ -116,6 +116,14 @@ int pack_device_list_ack_message(uint8_t *buffer) {
     return 4;
 }
 
+int pack_get_device_list_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_GET_DEVICE_LIST;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
 int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
