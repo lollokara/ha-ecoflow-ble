@@ -9,6 +9,7 @@ extern "C" {
 
 void UI_LVGL_Init(void);
 void UI_LVGL_Update(DeviceStatus* dev);
+void UI_LVGL_CheckConnection(void);
 void UI_LVGL_ShowDashboard(void);
 void UI_LVGL_ShowWave2(void);
 

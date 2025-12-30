@@ -11,5 +11,6 @@ void StartUARTTask(void * argument);
 void UART_SendWave2Set(Wave2SetMsg *msg);
 void UART_SendACSet(uint8_t enable);
 void UART_SendDCSet(uint8_t enable);
+void UART_SendSettings(uint8_t type, uint32_t value);
 
 #endif // UART_TASK_H

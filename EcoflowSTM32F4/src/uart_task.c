@@ -23,7 +23,8 @@ static RingBuffer rx_ring_buffer;
 typedef enum {
     MSG_WAVE2_SET,
     MSG_AC_SET,
-    MSG_DC_SET
+    MSG_DC_SET,
+    MSG_SET_VALUE
 } TxMsgType;
 
 typedef struct {
@@ -31,6 +32,7 @@ typedef struct {
     union {
         Wave2SetMsg w2;
         uint8_t enable;
+        SetValueMsg val;
     } data;
 } TxMessage;
 
@@ -198,6 +200,16 @@ void UART_SendDCSet(uint8_t enable) {
     }
 }
 
+void UART_SendSettings(uint8_t type, uint32_t value) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_SET_VALUE;
+        tx.data.val.type = type;
+        tx.data.val.value = value;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
 
 void StartUARTTask(void * argument) {
     UART_Init();
@@ -280,6 +292,8 @@ void StartUARTTask(void * argument) {
                 len = pack_set_ac_message(buf, tx.data.enable);
             } else if (tx.type == MSG_DC_SET) {
                 len = pack_set_dc_message(buf, tx.data.enable);
+            } else if (tx.type == MSG_SET_VALUE) {
+                len = pack_set_value_message(buf, tx.data.val.type, tx.data.val.value);
             }
             if (len > 0) {
                 HAL_UART_Transmit(&huart6, buf, len, 100);

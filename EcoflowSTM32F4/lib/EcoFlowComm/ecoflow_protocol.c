@@ -187,3 +187,33 @@ int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
     *enable = buffer[3];
     return 0;
 }
+
+int pack_set_value_message(uint8_t *buffer, uint8_t type, uint32_t value) {
+    uint8_t len = sizeof(SetValueMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_SET_VALUE;
+    buffer[2] = len;
+
+    SetValueMsg msg;
+    msg.type = type;
+    msg.value = value;
+
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, uint32_t *value) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(SetValueMsg)) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    SetValueMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    *type = msg.type;
+    *value = msg.value;
+    return 0;
+}

@@ -9,7 +9,7 @@ import os
 def generate_font():
     # Requirements: nodejs, lv_font_conv
     # MDI font file path (assumed to be in fonts/)
-    font_path = "fonts/materialdesignicons-webfont.ttf"
+    font_path = "EcoflowSTM32F4/fonts/materialdesignicons-webfont.ttf"
 
     if not os.path.exists(font_path):
         print(f"Error: Font file not found at {font_path}")
@@ -24,15 +24,29 @@ def generate_font():
             print("Could not find materialdesignicons-webfont.ttf. Please ensure it exists.")
             return
 
-    # Icons to include (Hex codes from ui_icons.h)
-    # F0A72, F06A5, F010C, F1CBF, F0493, F004D, F0079, F1107
-    # New: F0210 (Fan), F050F (Thermometer), F023E (Fire), F0494 (Snowflake), F030D (Leaf), F0594 (Moon), F0425 (Power)
+    # Icons to include (Hex codes from ui_icons.h and Memory)
+    # Solar: F0A72
+    # Plug: F06A5
+    # Car: F010C
+    # USB: F1CBF
+    # Settings: F0493
+    # Back: F004D
+    # Battery: F0079
+    # AC: F1107
+    # Fan: F0210
+    # Thermometer: F050F
+    # Fire: F0237 (Memory) / F023E (Old) - Memory says F0237
+    # Snowflake: F04AE (Memory) / F0494 (Old) - Memory says F04AE
+    # Leaf: F030D
+    # Moon: F0586 (Memory) / F0594 (Old) - Memory says F0586
+    # Power: F0425
+    # Sun: F0599 (Memory)
 
     icons = [
         "0xF0A72", "0xF06A5", "0xF010C", "0xF1CBF",
         "0xF0493", "0xF004D", "0xF0079", "0xF1107",
-        "0xF0210", "0xF050F", "0xF023E", "0xF0494",
-        "0xF030D", "0xF0594", "0xF0425"
+        "0xF0210", "0xF050F", "0xF0237", "0xF04AE",
+        "0xF030D", "0xF0586", "0xF0425", "0xF0599"
     ]
 
     range_arg = ",".join(icons)

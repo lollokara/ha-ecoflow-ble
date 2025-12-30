@@ -46,6 +46,9 @@ void StartDisplayTask(void * argument) {
             printf("Free Heap: %d\n", xPortGetFreeHeapSize());
         }
 
+        // Check Connection Status
+        UI_LVGL_CheckConnection();
+
         // LVGL Task Handler
         lv_timer_handler();
 
