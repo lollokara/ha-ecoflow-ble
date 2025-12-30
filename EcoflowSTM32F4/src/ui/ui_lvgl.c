@@ -549,35 +549,86 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         temp = (float)dev->data.d3.cellTemperature; // Int to Float
     }
 
-    lv_label_set_text_fmt(label_temp, "%d C", safe_float_to_int(temp));
-    lv_arc_set_value(arc_batt, soc);
-    lv_label_set_text_fmt(label_soc, "%d%%", soc);
+    // Static variables to track state
+    static int last_soc = -1;
+    static int last_temp = -999;
+    static int last_solar = -1;
+    static int last_grid = -1;
+    static int last_car = -1;
+    static int last_usb = -1;
+    static int last_12v = -1;
+    static int last_ac = -1;
 
-    lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
-    lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
-    lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
-    lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
-    lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
-    lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
+    static bool last_ac_on = false; // Assuming default off
+    static bool last_dc_on = false; // Assuming default off
+    static bool first_run = true;
+
+    int temp_int = safe_float_to_int(temp);
+
+    if (first_run || temp_int != last_temp) {
+        lv_label_set_text_fmt(label_temp, "%d C", temp_int);
+        last_temp = temp_int;
+    }
+
+    if (first_run || soc != last_soc) {
+        lv_arc_set_value(arc_batt, soc);
+        lv_label_set_text_fmt(label_soc, "%d%%", soc);
+        last_soc = soc;
+    }
+
+    if (first_run || in_solar != last_solar) {
+        lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
+        last_solar = in_solar;
+    }
+    if (first_run || in_ac != last_grid) {
+        lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
+        last_grid = in_ac;
+    }
+    if (first_run || in_alt != last_car) {
+        lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
+        last_car = in_alt;
+    }
+    if (first_run || out_usb != last_usb) {
+        lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
+        last_usb = out_usb;
+    }
+    if (first_run || out_12v != last_12v) {
+        lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
+        last_12v = out_12v;
+    }
+    if (first_run || out_ac != last_ac) {
+        lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
+        last_ac = out_ac;
+    }
 
     // Toggle Styles
-    if (out_ac > 0) {
-        lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-        lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
-        lv_label_set_text(lbl_ac_t, "AC\nON");
-    } else {
-        lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
-        lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
-        lv_label_set_text(lbl_ac_t, "AC\nOFF");
+    bool ac_on = (out_ac > 0);
+    if (first_run || ac_on != last_ac_on) {
+        if (ac_on) {
+            lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
+            lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
+            lv_label_set_text(lbl_ac_t, "AC\nON");
+        } else {
+            lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+            lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
+            lv_label_set_text(lbl_ac_t, "AC\nOFF");
+        }
+        last_ac_on = ac_on;
     }
 
-    if (out_12v > 0) {
-        lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-        lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
-        lv_label_set_text(lbl_dc_t, "12V\nON");
-    } else {
-        lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-        lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
-        lv_label_set_text(lbl_dc_t, "12V\nOFF");
+    bool dc_on = (out_12v > 0);
+    if (first_run || dc_on != last_dc_on) {
+        if (dc_on) {
+            lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
+            lv_label_set_text(lbl_dc_t, "12V\nON");
+        } else {
+            lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
+            lv_label_set_text(lbl_dc_t, "12V\nOFF");
+        }
+        last_dc_on = dc_on;
     }
+
+    first_run = false;
 }
