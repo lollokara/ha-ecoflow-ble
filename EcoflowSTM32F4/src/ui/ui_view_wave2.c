@@ -253,7 +253,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
 
     dd_sub_mode = lv_dropdown_create(cont_sub_mode);
     lv_dropdown_set_options(dd_sub_mode, "Max\nSleep\nEco\nAuto");
-    lv_obj_set_width(dd_sub_mode, 180);
+    lv_obj_set_width(dd_sub_mode, 150);
     lv_obj_align(dd_sub_mode, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_add_event_cb(dd_sub_mode, event_sub_mode_change, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -265,7 +265,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     // Center alignment relative to the 3 mode buttons
     // The buttons start at start_x (300) and span 3*btn_size + 2*spacing = 3*80 + 2*20 = 280px
     // So aligning to start_x will center it under them.
-    lv_obj_align(slider_fan, LV_ALIGN_TOP_LEFT, start_x, start_y + btn_size + 30 + 30);
+    lv_obj_align(slider_fan, LV_ALIGN_TOP_LEFT, start_x, start_y + btn_size + 30 + 30 + 80);
     lv_obj_add_event_cb(slider_fan, event_fan_change, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_fan, event_fan_change, LV_EVENT_RELEASED, NULL);
 

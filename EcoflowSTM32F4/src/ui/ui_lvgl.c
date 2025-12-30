@@ -531,7 +531,7 @@ static void create_dashboard(void) {
     // Wave 2 (Left of Settings)
     lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
-    lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, -5);
+    lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 210, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
