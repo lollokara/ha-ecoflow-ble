@@ -108,9 +108,32 @@ int main(void) {
     while (1) {}
 }
 
+// FreeRTOS Handlers Forwarding
+extern void vPortSVCHandler(void);
+extern void xPortPendSVHandler(void);
+extern void xPortSysTickHandler(void);
+
+void SVC_Handler(void) __attribute__ ((naked));
+void SVC_Handler(void) {
+    __asm volatile ("b vPortSVCHandler");
+}
+
+void PendSV_Handler(void) __attribute__ ((naked));
+void PendSV_Handler(void) {
+    __asm volatile ("b xPortPendSVHandler");
+}
+
+void SysTick_Handler(void) {
+    HAL_IncTick();
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        xPortSysTickHandler();
+    }
+}
+
 // Tick Hook to keep HAL happy
 void vApplicationTickHook(void) {
-    HAL_IncTick();
+    // Moved HAL_IncTick to SysTick_Handler to avoid double counting
+    // and ensure it runs even if scheduler is not started (in SysTick_Handler)
 }
 
 // Stack Overflow Hook
