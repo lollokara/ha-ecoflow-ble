@@ -97,9 +97,6 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     uint32_t dest_addr = hltdc_eval.LayerCfg[0].FBStartAdress;
 
     // DMA2D Copy
-    // Calculate destination address offset
-    uint32_t dest_offset = dest_addr + 4 * (area->y1 * DISP_HOR_RES + area->x1);
-
     // Configure DMA2D
     // Width: area->x2 - area->x1 + 1
     // Height: area->y2 - area->y1 + 1

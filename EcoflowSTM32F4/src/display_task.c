@@ -14,8 +14,8 @@ void StartDisplayTask(void * argument) {
     // Init Hardware
     BSP_SDRAM_Init();
 
-    // Init Touch
-    BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
+    // Init Touch (Hardcoded size to avoid dependency on LCD init state)
+    BSP_TS_Init(800, 480);
 
     printf("Display Task Started\n");
 
