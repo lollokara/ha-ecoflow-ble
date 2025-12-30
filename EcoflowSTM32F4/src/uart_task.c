@@ -4,6 +4,7 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdio.h>
+#include "queue.h"
 
 UART_HandleTypeDef huart6;
 
@@ -16,6 +17,24 @@ typedef struct {
 } RingBuffer;
 
 static RingBuffer rx_ring_buffer;
+
+// TX Queue for sending commands from UI Task to UART Task
+// Simple generic struct for TX messages
+typedef enum {
+    MSG_WAVE2_SET,
+    MSG_AC_SET,
+    MSG_DC_SET
+} TxMsgType;
+
+typedef struct {
+    TxMsgType type;
+    union {
+        Wave2SetMsg w2;
+        uint8_t enable;
+    } data;
+} TxMessage;
+
+static QueueHandle_t uartTxQueue;
 
 static void rb_init(RingBuffer *rb) {
     rb->head = 0;
@@ -132,7 +151,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
     }
     else if (cmd == CMD_DEVICE_STATUS) {
-        printf("UART: Parsing Status...\n");
+        // printf("UART: Parsing Status...\n");
         DeviceStatus status;
         if (unpack_device_status_message(packet, &status) == 0) {
              DisplayEvent event;
@@ -141,7 +160,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
              memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatus));
 
              if(xQueueSend(displayQueue, &event, 0) == pdTRUE) {
-                 printf("UART: Status Queued\n");
+                 // printf("UART: Status Queued\n");
              } else {
                  printf("UART: Queue Full!\n");
              }
@@ -151,8 +170,40 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     }
 }
 
+// Public function to queue a Wave 2 command
+void UART_SendWave2Set(Wave2SetMsg *msg) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_WAVE2_SET;
+        tx.data.w2 = *msg;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+void UART_SendACSet(uint8_t enable) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_AC_SET;
+        tx.data.enable = enable;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+void UART_SendDCSet(uint8_t enable) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_DC_SET;
+        tx.data.enable = enable;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+
 void StartUARTTask(void * argument) {
     UART_Init();
+
+    // Create TX Queue
+    uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
 
     uint8_t tx_buf[32];
     int len;
@@ -180,7 +231,7 @@ void StartUARTTask(void * argument) {
                 case PARSE_LEN:
                     parseBuffer[parseIndex++] = b;
                     expectedPayloadLen = b;
-                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) { // Note: If DeviceStatus > 255 this logic needs protocol change. Protocol says LEN is 1 byte, so max 255. DeviceStatus is ~180 bytes. Safe.
+                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) {
                         parseState = PARSE_START; // Invalid length, reset
                         parseIndex = 0;
                     } else {
@@ -203,9 +254,6 @@ void StartUARTTask(void * argument) {
                     // Last byte is CRC
                     {
                         uint8_t received_crc = b;
-                        // Calculate CRC over CMD, LEN, PAYLOAD
-                        // Data starts at parseBuffer[1]
-                        // Length is parseIndex - 1 (Total bytes so far minus START byte)
                         uint8_t calcd_crc = calculate_crc8(&parseBuffer[1], parseIndex - 1);
 
                         if (received_crc == calcd_crc) {
@@ -221,7 +269,24 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Handle State Machine (Non-blocking)
+        // 2. Check for Outgoing Commands (Priority)
+        TxMessage tx;
+        if (xQueueReceive(uartTxQueue, &tx, 0) == pdTRUE) {
+            uint8_t buf[32];
+            int len = 0;
+            if (tx.type == MSG_WAVE2_SET) {
+                len = pack_set_wave2_message(buf, tx.data.w2.type, tx.data.w2.value);
+            } else if (tx.type == MSG_AC_SET) {
+                len = pack_set_ac_message(buf, tx.data.enable);
+            } else if (tx.type == MSG_DC_SET) {
+                len = pack_set_dc_message(buf, tx.data.enable);
+            }
+            if (len > 0) {
+                HAL_UART_Transmit(&huart6, buf, len, 100);
+            }
+        }
+
+        // 3. Handle State Machine (Non-blocking)
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
 

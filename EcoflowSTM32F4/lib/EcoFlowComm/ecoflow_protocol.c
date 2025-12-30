@@ -58,10 +58,11 @@ int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
 
     memcpy(list, &buffer[3], len);
 
-    // Safety clamp
+    // Safety check: Clamp device count
     if (list->count > MAX_DEVICES) {
         list->count = MAX_DEVICES;
     }
+
     return 0;
 }
 
@@ -114,5 +115,75 @@ int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
     if (received_crc != calculated_crc) return -1;
 
     memcpy(status, &buffer[3], len);
+    return 0;
+}
+
+int pack_set_wave2_message(uint8_t *buffer, uint8_t type, uint8_t value) {
+    uint8_t len = sizeof(Wave2SetMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_SET_WAVE2;
+    buffer[2] = len;
+
+    Wave2SetMsg msg;
+    msg.type = type;
+    msg.value = value;
+
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *value) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(Wave2SetMsg)) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    Wave2SetMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    *type = msg.type;
+    *value = msg.value;
+    return 0;
+}
+
+int pack_set_ac_message(uint8_t *buffer, uint8_t enable) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_SET_AC;
+    buffer[2] = len;
+    buffer[3] = enable;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    *enable = buffer[3];
+    return 0;
+}
+
+int pack_set_dc_message(uint8_t *buffer, uint8_t enable) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_SET_DC;
+    buffer[2] = len;
+    buffer[3] = enable;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    *enable = buffer[3];
     return 0;
 }

@@ -1,6 +1,8 @@
 #include "ui_lvgl.h"
 #include "ui_icons.h"
+#include "ui_view_wave2.h"
 #include "lvgl.h"
+#include "uart_task.h" // Added for UART commands
 #include <stdio.h>
 #include <math.h>
 
@@ -40,6 +42,7 @@ static lv_obj_t * scr_settings;
 static lv_obj_t * label_lim_in_val;
 static lv_obj_t * label_lim_out_val;
 static lv_obj_t * label_lim_chg_val;
+static lv_obj_t * label_calib_debug; // For touch calibration
 
 // Flow Data Labels
 static lv_obj_t * label_solar_val;
@@ -101,6 +104,22 @@ static void event_to_dash(lv_event_t * e) {
     lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
 }
 
+static void event_to_wave2(lv_event_t * e) {
+    if (!ui_view_wave2_get_screen()) {
+        ui_view_wave2_init(NULL);
+    }
+    lv_scr_load_anim(ui_view_wave2_get_screen(), LV_SCR_LOAD_ANIM_MOVE_LEFT, 300, 0, false);
+}
+
+// Exposed Navigation
+void UI_LVGL_ShowDashboard(void) {
+    lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
+}
+void UI_LVGL_ShowWave2(void) {
+    event_to_wave2(NULL);
+}
+
+
 // --- Popup Handlers ---
 static void event_power_off_click(lv_event_t * e) {
     lv_obj_clear_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
@@ -111,21 +130,35 @@ static void event_popup_hide(lv_event_t * e) {
 
 // --- Toggle Callbacks ---
 static void event_toggle_ac(lv_event_t * e) {
-    // Placeholder for sending AC toggle command
     lv_obj_t * btn = lv_event_get_target(e);
-    // Visual toggle is handled by update function, but we can force state here if needed
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    UART_SendACSet(state ? 1 : 0);
 }
 
 static void event_toggle_dc(lv_event_t * e) {
-    // Placeholder for sending DC toggle command
     lv_obj_t * btn = lv_event_get_target(e);
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    UART_SendDCSet(state ? 1 : 0);
+}
+
+// --- Calibration Debug ---
+static void event_calib_touch(lv_event_t * e) {
+    lv_indev_t * indev = lv_indev_get_act();
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+
+    // Print to Serial (printf redirected to SWV or UART)
+    // Also update a label on screen
+    if (label_calib_debug) {
+        lv_label_set_text_fmt(label_calib_debug, "X: %d, Y: %d", p.x, p.y);
+        printf("CALIB: Click at X=%d, Y=%d\n", p.x, p.y);
+    }
 }
 
 // --- Slider Callbacks ---
 static void event_slider_input(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
-    // Snap to 100W increments
     val = (val + 50) / 100 * 100;
     if (val != lim_input_w) {
         lv_slider_set_value(slider, val, LV_ANIM_OFF);
@@ -136,25 +169,23 @@ static void event_slider_input(lv_event_t * e) {
 static void event_slider_discharge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
-    // Snap to 5% increments
     val = (val + 2) / 5 * 5;
     if (val != lim_discharge_p) {
         lv_slider_set_value(slider, val, LV_ANIM_OFF);
         lim_discharge_p = val;
         lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
-        lv_obj_invalidate(arc_batt); // Redraw arc
+        lv_obj_invalidate(arc_batt);
     }
 }
 static void event_slider_charge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
-    // Snap to 5% increments
     val = (val + 2) / 5 * 5;
     if (val != lim_charge_p) {
         lv_slider_set_value(slider, val, LV_ANIM_OFF);
         lim_charge_p = val;
         lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
-        lv_obj_invalidate(arc_batt); // Redraw arc
+        lv_obj_invalidate(arc_batt);
     }
 }
 
@@ -163,40 +194,27 @@ static void event_arc_draw(lv_event_t * e) {
     lv_event_code_t code = lv_event_get_code(e);
     if(code == LV_EVENT_DRAW_PART_END) {
         lv_obj_draw_part_dsc_t * dsc = lv_event_get_draw_part_dsc(e);
-        // Draw on the main background part or indicator?
-        // Indicator moves, Main is static full circle. Let's draw on MAIN or wrapping object.
-        // Actually, we want lines at specific angles.
         if(dsc->part == LV_PART_MAIN) {
             lv_obj_t * obj = lv_event_get_target(e);
             lv_draw_ctx_t * draw_ctx = dsc->draw_ctx;
             const lv_area_t * coords = &obj->coords;
 
-            // Calculate center and radius
             lv_point_t center;
             center.x = coords->x1 + lv_area_get_width(coords) / 2;
             center.y = coords->y1 + lv_area_get_height(coords) / 2;
 
-            // Radius: assuming square arc object, slightly less than half width
-            // Arc width is 15. Inner radius approx w/2 - 15.
             lv_coord_t r_out = lv_area_get_width(coords) / 2;
-            lv_coord_t r_in = r_out - 15; // Arc thickness
+            lv_coord_t r_in = r_out - 15;
 
-            // Rotation 270 means 0 value is at top.
-            // 0 value -> 270 deg physical.
-            // Angle increases clockwise.
-            // Physical Angle = 270 + (Value * 3.6)
-
-            // Draw Red Line (Discharge Limit)
+            // Red Line
             if (lim_discharge_p > 0) {
                 float angle_deg = 270.0f + (lim_discharge_p * 3.6f);
                 float angle_rad = angle_deg * (3.14159f / 180.0f);
-
                 lv_point_t p1, p2;
                 p1.x = center.x + (lv_coord_t)((r_in - 5) * cos(angle_rad));
                 p1.y = center.y + (lv_coord_t)((r_in - 5) * sin(angle_rad));
                 p2.x = center.x + (lv_coord_t)((r_out + 5) * cos(angle_rad));
                 p2.y = center.y + (lv_coord_t)((r_out + 5) * sin(angle_rad));
-
                 lv_draw_line_dsc_t line_dsc;
                 lv_draw_line_dsc_init(&line_dsc);
                 line_dsc.color = lv_palette_main(LV_PALETTE_RED);
@@ -206,17 +224,15 @@ static void event_arc_draw(lv_event_t * e) {
                 lv_draw_line(draw_ctx, &line_dsc, &p1, &p2);
             }
 
-            // Draw Blue Line (Charge Limit)
+            // Blue Line
             if (lim_charge_p < 100) {
                 float angle_deg = 270.0f + (lim_charge_p * 3.6f);
                 float angle_rad = angle_deg * (3.14159f / 180.0f);
-
                 lv_point_t p1, p2;
                 p1.x = center.x + (lv_coord_t)((r_in - 5) * cos(angle_rad));
                 p1.y = center.y + (lv_coord_t)((r_in - 5) * sin(angle_rad));
                 p2.x = center.x + (lv_coord_t)((r_out + 5) * cos(angle_rad));
                 p2.y = center.y + (lv_coord_t)((r_out + 5) * sin(angle_rad));
-
                 lv_draw_line_dsc_t line_dsc;
                 lv_draw_line_dsc_init(&line_dsc);
                 line_dsc.color = lv_palette_main(LV_PALETTE_BLUE);
@@ -241,7 +257,7 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
     ui_set_icon(icon, icon_code);
     lv_obj_align(icon, LV_ALIGN_LEFT_MID, -5, 0);
     lv_obj_set_style_text_font(icon, &ui_font_mdi, 0);
-    lv_obj_set_style_text_color(icon, lv_palette_main(LV_PALETTE_TEAL), 0); // Explicit Color
+    lv_obj_set_style_text_color(icon, lv_palette_main(LV_PALETTE_TEAL), 0);
 
     lv_obj_t * name = lv_label_create(card);
     lv_label_set_text(name, label_text);
@@ -258,6 +274,13 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
 static void create_settings(void) {
     scr_settings = lv_obj_create(NULL);
     lv_obj_add_style(scr_settings, &style_scr, 0);
+
+    // Debug Touch Area for Calibration
+    label_calib_debug = lv_label_create(scr_settings);
+    lv_label_set_text(label_calib_debug, "Touch Debug: --, --");
+    lv_obj_align(label_calib_debug, LV_ALIGN_BOTTOM_MID, 0, -10);
+    // Add event to screen to capture clicks on background
+    lv_obj_add_event_cb(scr_settings, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // Header
     lv_obj_t * btn_back = lv_btn_create(scr_settings);
@@ -284,7 +307,7 @@ static void create_settings(void) {
 
     // 1. AC Input Limit (400 - 3000)
     lv_obj_t * p1 = lv_obj_create(cont);
-    lv_obj_set_size(p1, 650, 80);
+    lv_obj_set_size(p1, 650, 90); // Increased height to prevent overlap
     lv_obj_set_style_bg_opa(p1, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p1, 0, 0);
 
@@ -304,12 +327,13 @@ static void create_settings(void) {
     lv_slider_set_range(s1, 400, 3000);
     lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
     lv_obj_set_width(s1, 600);
-    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -10); // Moved up slightly
     lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s1, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
 
     // 2. Min Discharge (0 - 30)
     lv_obj_t * p2 = lv_obj_create(cont);
-    lv_obj_set_size(p2, 650, 80);
+    lv_obj_set_size(p2, 650, 90);
     lv_obj_set_style_bg_opa(p2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p2, 0, 0);
 
@@ -329,12 +353,13 @@ static void create_settings(void) {
     lv_slider_set_range(s2, 0, 30);
     lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
     lv_obj_set_width(s2, 600);
-    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s2, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // 3. Max Charge (50 - 100)
     lv_obj_t * p3 = lv_obj_create(cont);
-    lv_obj_set_size(p3, 650, 80);
+    lv_obj_set_size(p3, 650, 90);
     lv_obj_set_style_bg_opa(p3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p3, 0, 0);
 
@@ -354,8 +379,9 @@ static void create_settings(void) {
     lv_slider_set_range(s3, 50, 100);
     lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
     lv_obj_set_width(s3, 600);
-    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s3, event_calib_touch, LV_EVENT_CLICKED, NULL);
 }
 
 
@@ -396,7 +422,6 @@ static void create_dashboard(void) {
     lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_TEAL), LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(arc_batt, 15, LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(arc_batt, 15, LV_PART_MAIN);
-    // Add draw event for limits
     lv_obj_add_event_cb(arc_batt, event_arc_draw, LV_EVENT_DRAW_PART_END, NULL);
 
     lv_obj_t * icon_bat = lv_label_create(scr_dash);
@@ -427,7 +452,7 @@ static void create_dashboard(void) {
 
     // Settings (Bottom Right)
     lv_obj_t * btn_settings = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_settings, 80, 60); // As per plan
+    lv_obj_set_size(btn_settings, 80, 60);
     lv_obj_align(btn_settings, LV_ALIGN_BOTTOM_RIGHT, -20, btn_y - 5);
     lv_obj_add_style(btn_settings, &style_btn_default, 0);
     lv_obj_add_event_cb(btn_settings, event_to_settings, LV_EVENT_CLICKED, NULL);
@@ -440,6 +465,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_wave2, 120, 60);
     lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, 0);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave, "Wave 2");
     lv_obj_center(lbl_wave);
@@ -474,7 +500,7 @@ static void create_dashboard(void) {
     lv_obj_center(cont_popup);
     lv_obj_set_style_bg_color(cont_popup, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(cont_popup, LV_OPA_70, 0);
-    lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN); // Initially hidden
+    lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t * popup_panel = lv_obj_create(cont_popup);
     lv_obj_set_size(popup_panel, 400, 200);
@@ -484,6 +510,7 @@ static void create_dashboard(void) {
     lv_obj_t * lbl_msg = lv_label_create(popup_panel);
     lv_label_set_text(lbl_msg, "Really Power Off?");
     lv_obj_set_style_text_font(lbl_msg, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(lbl_msg, lv_color_white(), 0); // Explicit White Color
     lv_obj_align(lbl_msg, LV_ALIGN_TOP_MID, 0, 30);
 
     lv_obj_t * btn_yes = lv_btn_create(popup_panel);
@@ -514,14 +541,20 @@ void UI_LVGL_Init(void) {
     lv_port_indev_init();
 
     create_styles();
-    create_settings(); // Create first so we can load it
+    create_settings();
     create_dashboard();
+    ui_view_wave2_init(NULL); // Pre-init Wave 2 to ensure styles
 
     lv_scr_load(scr_dash);
 }
 
 void UI_LVGL_Update(DeviceStatus* dev) {
     if (!dev) return;
+
+    if (dev->id == DEV_TYPE_WAVE_2) {
+        ui_view_wave2_update(&dev->data.w2);
+        return; // Don't update dashboard with Wave 2 data
+    }
 
     // Map data
     int soc = 0;
@@ -537,7 +570,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
         out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
         out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
-        temp = (float)dev->data.d3p.cellTemperature; // Int to Float
+        temp = (float)dev->data.d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         soc = safe_float_to_int(dev->data.d3.batteryLevel);
         in_ac = safe_float_to_int(dev->data.d3.acInputPower);
@@ -546,7 +579,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_ac = safe_float_to_int(dev->data.d3.acOutputPower);
         out_12v = safe_float_to_int(dev->data.d3.dc12vOutputPower);
         out_usb = safe_float_to_int(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
-        temp = (float)dev->data.d3.cellTemperature; // Int to Float
+        temp = (float)dev->data.d3.cellTemperature;
     }
 
     // Static variables to track state
@@ -559,8 +592,8 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     static int last_12v = -1;
     static int last_ac = -1;
 
-    static bool last_ac_on = false; // Assuming default off
-    static bool last_dc_on = false; // Assuming default off
+    static bool last_ac_on = false;
+    static bool last_dc_on = false;
     static bool first_run = true;
 
     int temp_int = safe_float_to_int(temp);
@@ -608,10 +641,12 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
             lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
             lv_label_set_text(lbl_ac_t, "AC\nON");
+            lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
         } else {
             lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
             lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
             lv_label_set_text(lbl_ac_t, "AC\nOFF");
+            lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
         }
         last_ac_on = ac_on;
     }
@@ -622,10 +657,12 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
             lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
             lv_label_set_text(lbl_dc_t, "12V\nON");
+            lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
         } else {
             lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
             lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
             lv_label_set_text(lbl_dc_t, "12V\nOFF");
+            lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
         }
         last_dc_on = dc_on;
     }

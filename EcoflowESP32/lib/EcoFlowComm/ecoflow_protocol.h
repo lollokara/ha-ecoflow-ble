@@ -32,6 +32,18 @@ extern "C" {
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
 
+// New Commands
+#define CMD_SET_WAVE2 0x30
+#define CMD_SET_AC 0x31
+#define CMD_SET_DC 0x32
+
+// Wave 2 Set Types
+#define W2_SET_TEMP 1
+#define W2_SET_MODE 2
+#define W2_SET_SUB_MODE 3
+#define W2_SET_FAN 4
+#define W2_SET_POWER 5
+
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
 #define DEV_TYPE_DELTA_PRO_3 2
@@ -198,6 +210,11 @@ typedef struct {
     } devices[MAX_DEVICES];
 } DeviceList;
 
+typedef struct {
+    uint8_t type;  // W2_SET_TEMP, etc.
+    uint8_t value;
+} Wave2SetMsg;
+
 #pragma pack(pop)
 
 // API Functions
@@ -215,6 +232,15 @@ int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id);
 
 int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status);
 int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status);
+
+int pack_set_wave2_message(uint8_t *buffer, uint8_t type, uint8_t value);
+int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *value);
+
+int pack_set_ac_message(uint8_t *buffer, uint8_t enable);
+int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable);
+
+int pack_set_dc_message(uint8_t *buffer, uint8_t enable);
+int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable);
 
 
 #ifdef __cplusplus

@@ -308,6 +308,37 @@ void checkUart() {
                                 if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
                                     sendDeviceStatus(dev_id);
                                 }
+                        } else if (cmd == CMD_SET_WAVE2) {
+                                uint8_t type, value;
+                                if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
+                                    EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+                                    if (w2 && w2->isAuthenticated()) {
+                                        // W2_SET_TEMP 1, MODE 2, SUB 3, FAN 4, POWER 5
+                                        switch(type) {
+                                            case 1: w2->setTemperature(value); break;
+                                            case 2: w2->setMainMode(value); break;
+                                            case 3: w2->setSubMode(value); break;
+                                            case 4: w2->setFanSpeed(value); break;
+                                            case 5: w2->setPowerState(value); break;
+                                        }
+                                    }
+                                }
+                        } else if (cmd == CMD_SET_AC) {
+                                uint8_t enable;
+                                if (unpack_set_ac_message(rx_buf, &enable) == 0) {
+                                    EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
+                                    if (dev && dev->isAuthenticated()) {
+                                        dev->setAC(enable ? true : false);
+                                    }
+                                }
+                        } else if (cmd == CMD_SET_DC) {
+                                uint8_t enable;
+                                if (unpack_set_dc_message(rx_buf, &enable) == 0) {
+                                    EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
+                                    if (dev && dev->isAuthenticated()) {
+                                        dev->setDC(enable ? true : false);
+                                    }
+                                }
                         }
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
