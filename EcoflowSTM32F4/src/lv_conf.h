@@ -37,6 +37,8 @@
 
 #define LV_DRAW_COMPLEX 1
 #define LV_USE_DRAW_DMA2D 1
+// Explicitly include STM32F4 HAL instead of default H7
+#define LV_DRAW_DMA2D_HAL_INCLUDE "stm32f4xx_hal.h"
 
 /*-------------
  * Others
