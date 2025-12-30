@@ -60,23 +60,6 @@ void lv_port_disp_init(void)
     lv_disp_drv_register(&disp_drv);
 }
 
-// Backlight Control Pin: PA3
-#define BACKLIGHT_PIN GPIO_PIN_3
-#define BACKLIGHT_PORT GPIOA
-
-static void Backlight_Init(void) {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-
-    GPIO_InitStruct.Pin = BACKLIGHT_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(BACKLIGHT_PORT, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(BACKLIGHT_PORT, BACKLIGHT_PIN, GPIO_PIN_SET);
-}
-
 static void disp_init(void)
 {
     BSP_LCD_Init();
@@ -84,7 +67,7 @@ static void disp_init(void)
     BSP_LCD_SelectLayer(0);
     BSP_LCD_Clear(LCD_COLOR_BLACK);
     BSP_LCD_DisplayOn();
-    Backlight_Init();
+    // Backlight (PA3) Init handled in main.c (TIM2 PWM)
 
     // Initialize DMA2D once
     hdma2d_eval.Init.Mode = DMA2D_M2M;
