@@ -57,6 +57,22 @@ void USART6_IRQHandler(void) {
     HAL_UART_IRQHandler(&huart6);
 }
 
+extern LTDC_HandleTypeDef hltdc_eval;
+extern DSI_HandleTypeDef hdsi_eval;
+extern DMA2D_HandleTypeDef hdma2d_eval;
+
+void LTDC_IRQHandler(void) {
+    HAL_LTDC_IRQHandler(&hltdc_eval);
+}
+
+void DSI_IRQHandler(void) {
+    HAL_DSI_IRQHandler(&hdsi_eval);
+}
+
+void DMA2D_IRQHandler(void) {
+    HAL_DMA2D_IRQHandler(&hdma2d_eval);
+}
+
 static void MX_USART3_UART_Init(void) {
     huart3.Instance = USART3;
     huart3.Init.BaudRate = 115200;
