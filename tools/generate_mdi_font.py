@@ -9,8 +9,7 @@ OUTPUT_PATH_H = "EcoflowSTM32F4/src/ui/font_mdi.h"
 FONT_SIZE = 32  # Pixel size
 FONT_NAME = "font_mdi"
 
-# Icons Mapping: Name -> MDI Codepoint (Input)
-# Checked against TTF using inspection script.
+# Icons Mapping
 ICONS_INPUT = {
     "battery_100": 0xF0079,
     "battery_50": 0xF0079,
@@ -26,7 +25,6 @@ ICONS_INPUT = {
     "cog": 0xF0493,
 }
 
-# Remap to 0xF000 .. 0xF000 + N
 MAPPED_ICONS = {}
 START_CODE = 0xF000
 
@@ -61,12 +59,6 @@ def generate_font():
     current_bitmap_offset = 0
     unicode_list = []
 
-    # Reset lists for just Icons
-    unicode_list = []
-    glyph_dsc = []
-    bitmaps = []
-    current_bitmap_offset = 0
-
     sorted_names = sorted(MAPPED_ICONS.keys(), key=lambda k: MAPPED_ICONS[k]["output"])
 
     for name in sorted_names:
@@ -76,9 +68,9 @@ def generate_font():
 
         unicode_list.append(output_code)
 
-        # Load by Char Code
+        # Force Monochrome Load
         try:
-            face.load_char(input_code, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_TARGET_MONO)
+            face.load_char(input_code, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_MONOCHROME | freetype.FT_LOAD_TARGET_MONO)
         except Exception as e:
             print(f"Error loading char {name} (0x{input_code:X}): {e}")
             pass
@@ -89,15 +81,23 @@ def generate_font():
         pitch = bitmap.pitch
         buffer = bitmap.buffer
 
-        if width == 0 or rows == 0:
-            print(f"Warning: Glyph {name} (0x{input_code:X}) has 0 size.")
+        print(f"Glyph {name}: Width={width}, Rows={rows}, Pitch={pitch}")
 
         # Extract bits
         char_bitmap_bytes = []
         for i in range(rows):
-            for j in range((width + 7) // 8):
-                if i * pitch + j < len(buffer):
-                    char_bitmap_bytes.append(buffer[i * pitch + j])
+            target_bytes = (width + 7) // 8
+            for j in range(target_bytes):
+                # For 1bpp, FreeType pitch is bytes per row.
+                # buffer is flat.
+                if j < abs(pitch):
+                    # Handle negative pitch (top-down vs bottom-up)
+                    # For bitmaps, usually top-down (positive).
+                    idx = i * pitch + j
+                    if idx < len(buffer):
+                        char_bitmap_bytes.append(buffer[idx])
+                    else:
+                        char_bitmap_bytes.append(0)
                 else:
                     char_bitmap_bytes.append(0)
 
@@ -122,10 +122,7 @@ def generate_font():
     c_content += ",\n".join(glyph_dsc)
     c_content += "\n};\n\n"
 
-    # Write CMap (Format0 Tiny)
-    # Range Start: 0xF000
-    # Range Length: len(unicode_list)
-    # Glyph ID Start: 0
+    # Write CMap
     c_content += """
 static const lv_font_fmt_txt_cmap_t cmaps[] = {
     {
@@ -161,28 +158,9 @@ const lv_font_t {FONT_NAME} = {{
     with open(OUTPUT_PATH_C, "w") as f:
         f.write(c_content)
 
-    with open(OUTPUT_PATH_H, "w") as f:
-        f.write(f"""#ifndef {FONT_NAME.upper()}_H
-#define {FONT_NAME.upper()}_H
+    # Header is static, no change needed (assumed correct from previous step)
 
-#include "lvgl.h"
-
-extern const lv_font_t {FONT_NAME};
-
-// Icon Definitions (Mapped to 0xF000+)
-""")
-        for name in sorted_names:
-            code = MAPPED_ICONS[name]["output"]
-            b1 = 0xE0 | (code >> 12)
-            b2 = 0x80 | ((code >> 6) & 0x3F)
-            b3 = 0x80 | (code & 0x3F)
-            utf8 = f"\\x{b1:02x}\\x{b2:02x}\\x{b3:02x}"
-
-            f.write(f"#define MDI_{name.upper()} \"{utf8}\" // 0x{code:X}\n")
-
-        f.write("\n#endif\n")
-
-    print(f"Generated {OUTPUT_PATH_C} and {OUTPUT_PATH_H}")
+    print(f"Generated {OUTPUT_PATH_C}")
 
 if __name__ == "__main__":
     generate_font()
