@@ -1,33 +1,35 @@
 #ifndef UI_ICONS_H
 #define UI_ICONS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "lvgl.h"
+#include "font_mdi.h"
+#include "ui_core.h" // Use shared UIIconType
 
-// Icon Types
-typedef enum {
-    UI_ICON_SOLAR,
-    UI_ICON_GRID,
-    UI_ICON_CAR,
-    UI_ICON_USB,
-    UI_ICON_12V,
-    UI_ICON_AC_OUT,
-    UI_ICON_BATTERY,
-    UI_ICON_SETTINGS
-} ui_icon_type_t;
+// Map UI_ICON types to MDI font strings
+#define UI_ICON_SOLAR_STR MDI_SOLAR
+#define UI_ICON_GRID_STR MDI_PLUG
+#define UI_ICON_CAR_STR MDI_USB
+#define UI_ICON_USB_STR MDI_USB
+#define UI_ICON_AC_OUT_STR MDI_PLUG
+#define UI_ICON_BATTERY_STR MDI_BATTERY_100
+#define UI_ICON_FLASH_STR MDI_FLASH
 
-// Draw an icon into a canvas or object event context
-// If canvas is NULL, assumes drawing in an event callback (LV_EVENT_DRAW_MAIN)
-void ui_draw_icon(lv_obj_t * obj, lv_draw_ctx_t * draw_ctx, ui_icon_type_t type, const lv_area_t * area, lv_color_t color);
+// Backwards compatibility alias if needed, or just use UIIconType
+typedef UIIconType ui_icon_type_t;
 
-// Helper to create a canvas with the icon drawn (static allocation)
-lv_obj_t * ui_create_icon_canvas(lv_obj_t * parent, ui_icon_type_t type, lv_coord_t size, lv_color_t color);
+/**
+ * @brief Creates an icon object using the MDI font
+ * @param parent Parent object
+ * @param type Icon type enum
+ * @param size Font size (height)
+ * @param color Text color
+ * @return lv_obj_t* Pointer to the label object
+ */
+lv_obj_t * ui_create_icon(lv_obj_t * parent, UIIconType type, lv_coord_t size, lv_color_t color);
 
-#ifdef __cplusplus
-}
+/**
+ * @brief Helper to get the MDI string for a type
+ */
+const char * ui_get_icon_str(UIIconType type);
+
 #endif
-
-#endif /* UI_ICONS_H */
