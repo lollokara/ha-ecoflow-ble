@@ -62,6 +62,17 @@ int LightSensor::getMax() const {
     return _maxADC;
 }
 
+uint8_t LightSensor::getBrightness() const {
+    // Map raw value (_minADC to _maxADC) to 0-100
+    if (_average <= _minADC) return 0;
+    if (_average >= _maxADC) return 100;
+
+    long range = _maxADC - _minADC;
+    if (range <= 0) return 0; // Prevent div by zero
+
+    return (uint8_t)(((_average - _minADC) * 100) / range);
+}
+
 void LightSensor::setCalibration(int min, int max) {
     if (min < 0) min = 0;
     if (max > 4095) max = 4095;
