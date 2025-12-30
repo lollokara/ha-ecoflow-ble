@@ -17,7 +17,7 @@ typedef enum {
 typedef struct {
     DisplayEventType type;
     union {
-        BatteryStatus battery; // Use the shared protocol struct
+        DeviceStatus deviceStatus; // Includes id and BatteryStatus
         // Add other event data structs here
     } data;
 } DisplayEvent;

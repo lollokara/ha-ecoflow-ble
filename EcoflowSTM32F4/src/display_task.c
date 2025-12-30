@@ -37,8 +37,10 @@ typedef struct {
 
 // Global UI State
 SimpleButton testBtn = {250, 200, 200, 60, "TOGGLE", false, true};
+
 // Cache data to redraw full frame
-BatteryStatus currentBattStatus = {0};
+// Use DeviceStatus to store ID + Data
+DeviceStatus currentDevStatus = {0};
 
 // Helper: Init Backlight
 static void Backlight_Init(void) {
@@ -84,7 +86,7 @@ static void DrawHeader(void) {
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
     BSP_LCD_SetBackColor(GUI_COLOR_HEADER);
     BSP_LCD_SetFont(&Font24);
-    BSP_LCD_DisplayStringAt(20, 13, (uint8_t*)"EcoFlow Controller", LEFT_MODE);
+    BSP_LCD_DisplayStringAt(20, 13, (uint8_t*)"Ecoflow Controller", LEFT_MODE);
 }
 
 // Draws the static background of the status panels
@@ -109,9 +111,24 @@ static void InitStatusPanel(void) {
 }
 
 // Updates only the dynamic values in the status panels
-static void UpdateStatusPanel(BatteryStatus* batt) {
+static void UpdateStatusPanel(DeviceStatus* dev) {
     char buf[32];
-    printf("DISPLAY: Updating Panel. SOC=%d, Pwr=%d\n", batt->soc, batt->power_w);
+    BatteryStatus* batt = &dev->status;
+
+    printf("DISPLAY: Updating Panel. Device=%d, SOC=%d\n", dev->id, batt->soc);
+
+    // Update Header with Device Name if available
+    if (batt->device_name[0] != 0) {
+        BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
+        BSP_LCD_SetBackColor(GUI_COLOR_HEADER);
+        BSP_LCD_SetFont(&Font24);
+        // Clear previous name area? Assuming simple overwrite for now or header redraw handles it.
+        // Actually RenderFrame redraws header every time, so just draw name.
+        // But DrawHeader is called before this.
+        // Let's just overlay name.
+        BSP_LCD_DisplayStringAt(300, 13, (uint8_t*)batt->device_name, LEFT_MODE);
+    }
+
 
     // Panel 1: SOC Value
     // Clear only the text area to prevent flicker
@@ -147,7 +164,7 @@ static void RenderFrame() {
     DrawHeader();
     DrawButton(&testBtn);
     InitStatusPanel();
-    UpdateStatusPanel(&currentBattStatus);
+    UpdateStatusPanel(&currentDevStatus);
 
     // 3. Request buffer swap
     // Set the layer configuration to point to the pending buffer
@@ -158,9 +175,6 @@ static void RenderFrame() {
 
     // 4. Wait for the reload to complete (poll the VBR bit)
     // The VBR bit is cleared when the reload has happened (at VSYNC)
-    // Actually, check datasheet: LTDC_SRCR_VBR is set to 1 to request reload, cleared by hardware when done?
-    // Reference manuals usually say: "This bit is set by software and cleared by hardware when the shadow registers reload has been performed."
-    // So we wait while it is still set.
     uint32_t tickstart = HAL_GetTick();
     int safety_count = 0;
     while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
@@ -181,16 +195,7 @@ static void RenderFrame() {
     current_buffer = pending_buffer;
     pending_buffer = temp;
 
-    // Ensure the BSP drawing functions target the new pending buffer for next time?
-    // No, BSP_LCD functions usually use the "ActiveLayer" settings.
-    // BSP_LCD_SetLayerAddress modifies the handle's config, which we just did.
-    // But importantly, we want the next draw commands to go to the *new* pending buffer (which is the old current buffer).
-    // The BSP functions implicitly write to whatever address is configured in hltdc_eval.LayerCfg[ActiveLayer].FBStartAdress.
-    // However, we just updated that to the *visible* buffer for the swap.
-    // So immediately after swap, we must point the handle back to the *hidden* buffer so drawing happens there.
-
-    // BSP_LCD_SetLayerAddress(LTDC_ACTIVE_LAYER_BACKGROUND, pending_buffer);
-    // Again, don't call the BSP function which updates hardware. Just update the handle for the next draw cycle.
+    // Ensure the BSP drawing functions target the new pending buffer for next time
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 }
 
@@ -211,8 +216,6 @@ void StartDisplayTask(void * argument) {
 
     Backlight_Init();
 
-    // displayQueue creation moved to main.c to avoid race condition with UART Task
-
     // Initial Draw
     RenderFrame();
 
@@ -224,13 +227,11 @@ void StartDisplayTask(void * argument) {
 
     for (;;) {
         // Handle Data Updates
-        // printf("Display: Wait Queue...\n");
         if (xQueueReceive(displayQueue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
-            // printf("Display: Queue Rx!\n");
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
                 // Check if changed
-                if (memcmp(&currentBattStatus, &event.data.battery, sizeof(BatteryStatus)) != 0) {
-                     currentBattStatus = event.data.battery;
+                if (memcmp(&currentDevStatus, &event.data.deviceStatus, sizeof(DeviceStatus)) != 0) {
+                     currentDevStatus = event.data.deviceStatus;
                      needs_redraw = true;
                 }
             }
