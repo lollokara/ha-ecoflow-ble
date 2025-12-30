@@ -97,6 +97,9 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     uint32_t dest_addr = hltdc_eval.LayerCfg[0].FBStartAdress;
 
     // DMA2D Copy
+    // Calculate destination address
+    uint32_t dest_address = dest_addr + 4 * (area->y1 * DISP_HOR_RES + area->x1);
+
     // Configure DMA2D
     // Width: area->x2 - area->x1 + 1
     // Height: area->y2 - area->y1 + 1
@@ -115,7 +118,7 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
             hdma2d_eval.LayerCfg[1].InputOffset = 0; // Source is dense
             hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
 
-            if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_addr + 4*(area->y1*DISP_HOR_RES + area->x1), width, height) == HAL_OK)
+            if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
             {
                 HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
             }

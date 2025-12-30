@@ -2,6 +2,12 @@
 #include "ui_icons.h"
 #include "lvgl.h"
 #include <stdio.h>
+#include <math.h>
+
+// --- State Variables (Settings) ---
+static int lim_input_w = 600;       // 400 - 3000
+static int lim_discharge_p = 5;     // 0 - 30 %
+static int lim_charge_p = 100;      // 50 - 100 %
 
 // --- Styles ---
 static lv_style_t style_scr;
@@ -11,14 +17,24 @@ static lv_style_t style_text_small;
 static lv_style_t style_icon_label;
 static lv_style_t style_btn_red;
 static lv_style_t style_btn_default;
-static lv_style_t style_btn_toggle_off;
-static lv_style_t style_btn_toggle_on;
+static lv_style_t style_btn_green;
 
 // --- Dashboard Widgets ---
 static lv_obj_t * scr_dash;
 static lv_obj_t * label_temp;
 static lv_obj_t * arc_batt;
 static lv_obj_t * label_soc;
+
+static lv_obj_t * btn_ac_toggle;
+static lv_obj_t * lbl_ac_t;
+static lv_obj_t * btn_dc_toggle;
+static lv_obj_t * lbl_dc_t;
+
+// --- Settings Widgets ---
+static lv_obj_t * scr_settings;
+static lv_obj_t * label_lim_in_val;
+static lv_obj_t * label_lim_out_val;
+static lv_obj_t * label_lim_chg_val;
 
 // Flow Data Labels
 static lv_obj_t * label_solar_val;
@@ -65,27 +81,129 @@ static void create_styles(void) {
     lv_style_set_text_color(&style_btn_default, lv_color_white());
     lv_style_set_radius(&style_btn_default, 8);
 
-    lv_style_init(&style_btn_toggle_off);
-    lv_style_set_bg_color(&style_btn_toggle_off, lv_palette_darken(LV_PALETTE_GREY, 3));
-    lv_style_set_text_color(&style_btn_toggle_off, lv_palette_main(LV_PALETTE_GREY));
+    lv_style_init(&style_btn_green);
+    lv_style_set_bg_color(&style_btn_green, lv_palette_main(LV_PALETTE_GREEN));
+    lv_style_set_text_color(&style_btn_green, lv_color_white());
+    lv_style_set_radius(&style_btn_green, 8);
+}
 
-    lv_style_init(&style_btn_toggle_on);
-    lv_style_set_bg_color(&style_btn_toggle_on, lv_palette_main(LV_PALETTE_GREEN));
-    lv_style_set_text_color(&style_btn_toggle_on, lv_color_white());
+// --- Navigation Callbacks ---
+static void event_to_settings(lv_event_t * e) {
+    lv_scr_load_anim(scr_settings, LV_SCR_LOAD_ANIM_MOVE_LEFT, 300, 0, false);
+}
+
+static void event_to_dash(lv_event_t * e) {
+    lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
 }
 
 // --- Popup Handlers ---
 static void event_power_off_click(lv_event_t * e) {
     lv_obj_clear_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
 }
-
-static void event_popup_no(lv_event_t * e) {
+static void event_popup_hide(lv_event_t * e) {
     lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void event_popup_yes(lv_event_t * e) {
-    // For now, just close popup as requested
-    lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
+// --- Toggle Callbacks ---
+static void event_toggle_ac(lv_event_t * e) {
+    // Placeholder for sending AC toggle command
+    lv_obj_t * btn = lv_event_get_target(e);
+    // Visual toggle is handled by update function, but we can force state here if needed
+}
+
+static void event_toggle_dc(lv_event_t * e) {
+    // Placeholder for sending DC toggle command
+    lv_obj_t * btn = lv_event_get_target(e);
+}
+
+// --- Slider Callbacks ---
+static void event_slider_input(lv_event_t * e) {
+    lv_obj_t * slider = lv_event_get_target(e);
+    lim_input_w = (int)lv_slider_get_value(slider);
+    lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+}
+static void event_slider_discharge(lv_event_t * e) {
+    lv_obj_t * slider = lv_event_get_target(e);
+    lim_discharge_p = (int)lv_slider_get_value(slider);
+    lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
+    lv_obj_invalidate(arc_batt); // Redraw arc
+}
+static void event_slider_charge(lv_event_t * e) {
+    lv_obj_t * slider = lv_event_get_target(e);
+    lim_charge_p = (int)lv_slider_get_value(slider);
+    lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
+    lv_obj_invalidate(arc_batt); // Redraw arc
+}
+
+// --- Arc Draw Callback for Limits ---
+static void event_arc_draw(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_DRAW_PART_END) {
+        lv_obj_draw_part_dsc_t * dsc = lv_event_get_draw_part_dsc(e);
+        // Draw on the main background part or indicator?
+        // Indicator moves, Main is static full circle. Let's draw on MAIN or wrapping object.
+        // Actually, we want lines at specific angles.
+        if(dsc->part == LV_PART_MAIN) {
+            lv_obj_t * obj = lv_event_get_target(e);
+            lv_draw_ctx_t * draw_ctx = dsc->draw_ctx;
+            const lv_area_t * coords = &obj->coords;
+
+            // Calculate center and radius
+            lv_point_t center;
+            center.x = coords->x1 + lv_area_get_width(coords) / 2;
+            center.y = coords->y1 + lv_area_get_height(coords) / 2;
+
+            // Radius: assuming square arc object, slightly less than half width
+            // Arc width is 15. Inner radius approx w/2 - 15.
+            lv_coord_t r_out = lv_area_get_width(coords) / 2;
+            lv_coord_t r_in = r_out - 15; // Arc thickness
+
+            // Rotation 270 means 0 value is at top.
+            // 0 value -> 270 deg physical.
+            // Angle increases clockwise.
+            // Physical Angle = 270 + (Value * 3.6)
+
+            // Draw Red Line (Discharge Limit)
+            if (lim_discharge_p > 0) {
+                float angle_deg = 270.0f + (lim_discharge_p * 3.6f);
+                float angle_rad = angle_deg * (3.14159f / 180.0f);
+
+                lv_point_t p1, p2;
+                p1.x = center.x + (lv_coord_t)((r_in - 5) * cos(angle_rad));
+                p1.y = center.y + (lv_coord_t)((r_in - 5) * sin(angle_rad));
+                p2.x = center.x + (lv_coord_t)((r_out + 5) * cos(angle_rad));
+                p2.y = center.y + (lv_coord_t)((r_out + 5) * sin(angle_rad));
+
+                lv_draw_line_dsc_t line_dsc;
+                lv_draw_line_dsc_init(&line_dsc);
+                line_dsc.color = lv_palette_main(LV_PALETTE_RED);
+                line_dsc.width = 4;
+                line_dsc.round_start = 1;
+                line_dsc.round_end = 1;
+                lv_draw_line(draw_ctx, &line_dsc, &p1, &p2);
+            }
+
+            // Draw Blue Line (Charge Limit)
+            if (lim_charge_p < 100) {
+                float angle_deg = 270.0f + (lim_charge_p * 3.6f);
+                float angle_rad = angle_deg * (3.14159f / 180.0f);
+
+                lv_point_t p1, p2;
+                p1.x = center.x + (lv_coord_t)((r_in - 5) * cos(angle_rad));
+                p1.y = center.y + (lv_coord_t)((r_in - 5) * sin(angle_rad));
+                p2.x = center.x + (lv_coord_t)((r_out + 5) * cos(angle_rad));
+                p2.y = center.y + (lv_coord_t)((r_out + 5) * sin(angle_rad));
+
+                lv_draw_line_dsc_t line_dsc;
+                lv_draw_line_dsc_init(&line_dsc);
+                line_dsc.color = lv_palette_main(LV_PALETTE_BLUE);
+                line_dsc.width = 4;
+                line_dsc.round_start = 1;
+                line_dsc.round_end = 1;
+                lv_draw_line(draw_ctx, &line_dsc, &p1, &p2);
+            }
+        }
+    }
 }
 
 // --- Helper to create Info Card ---
@@ -99,9 +217,8 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
     lv_obj_t * icon = lv_label_create(card);
     ui_set_icon(icon, icon_code);
     lv_obj_align(icon, LV_ALIGN_LEFT_MID, -5, 0);
-    lv_obj_set_style_text_font(icon, &ui_font_mdi, 0); // Re-apply if helper fails context? No, helper is fine.
-    // Override font size? The font is generated at 28px.
-    // ui_font_mdi size is 28.
+    lv_obj_set_style_text_font(icon, &ui_font_mdi, 0);
+    lv_obj_set_style_text_color(icon, lv_palette_main(LV_PALETTE_TEAL), 0); // Explicit Color
 
     lv_obj_t * name = lv_label_create(card);
     lv_label_set_text(name, label_text);
@@ -111,10 +228,101 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
     *val_label_ptr = lv_label_create(card);
     lv_label_set_text(*val_label_ptr, "0 W");
     lv_obj_add_style(*val_label_ptr, &style_text_large, 0);
-    // Scale down text large for card
     lv_obj_set_style_text_font(*val_label_ptr, &lv_font_montserrat_20, 0);
     lv_obj_align(*val_label_ptr, LV_ALIGN_BOTTOM_RIGHT, 0, 5);
 }
+
+static void create_settings(void) {
+    scr_settings = lv_obj_create(NULL);
+    lv_obj_add_style(scr_settings, &style_scr, 0);
+
+    // Header
+    lv_obj_t * btn_back = lv_btn_create(scr_settings);
+    lv_obj_set_size(btn_back, 100, 50);
+    lv_obj_align(btn_back, LV_ALIGN_TOP_LEFT, 20, 20);
+    lv_obj_add_style(btn_back, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_back, event_to_dash, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_back = lv_label_create(btn_back);
+    ui_set_icon(lbl_back, MDI_ICON_BACK);
+    lv_obj_center(lbl_back);
+
+    lv_obj_t * title = lv_label_create(scr_settings);
+    lv_label_set_text(title, "Settings");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 25);
+
+    // Container
+    lv_obj_t * cont = lv_obj_create(scr_settings);
+    lv_obj_set_size(cont, 700, 350);
+    lv_obj_align(cont, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont, 0, 0);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+
+    // 1. AC Input Limit (400 - 3000)
+    lv_obj_t * p1 = lv_obj_create(cont);
+    lv_obj_set_size(p1, 650, 80);
+    lv_obj_set_style_bg_opa(p1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(p1, 0, 0);
+
+    lv_obj_t * l1 = lv_label_create(p1);
+    lv_label_set_text(l1, "Max AC Input");
+    lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    label_lim_in_val = lv_label_create(p1);
+    lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+    lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t * s1 = lv_slider_create(p1);
+    lv_slider_set_range(s1, 400, 3000);
+    lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
+    lv_obj_set_width(s1, 600);
+    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // 2. Min Discharge (0 - 30)
+    lv_obj_t * p2 = lv_obj_create(cont);
+    lv_obj_set_size(p2, 650, 80);
+    lv_obj_set_style_bg_opa(p2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(p2, 0, 0);
+
+    lv_obj_t * l2 = lv_label_create(p2);
+    lv_label_set_text(l2, "Min Discharge Limit (Red)");
+    lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    label_lim_out_val = lv_label_create(p2);
+    lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
+    lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t * s2 = lv_slider_create(p2);
+    lv_slider_set_range(s2, 0, 30);
+    lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
+    lv_obj_set_width(s2, 600);
+    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // 3. Max Charge (50 - 100)
+    lv_obj_t * p3 = lv_obj_create(cont);
+    lv_obj_set_size(p3, 650, 80);
+    lv_obj_set_style_bg_opa(p3, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(p3, 0, 0);
+
+    lv_obj_t * l3 = lv_label_create(p3);
+    lv_label_set_text(l3, "Max Charge Limit (Blue)");
+    lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    label_lim_chg_val = lv_label_create(p3);
+    lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
+    lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t * s3 = lv_slider_create(p3);
+    lv_slider_set_range(s3, 50, 100);
+    lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
+    lv_obj_set_width(s3, 600);
+    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
 
 static void create_dashboard(void) {
     scr_dash = lv_obj_create(NULL);
@@ -139,7 +347,7 @@ static void create_dashboard(void) {
     // --- Right Column (Outputs) ---
     create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &label_usb_val);
     create_info_card(scr_dash, MDI_ICON_AC, "12V DC", 620, 160, &label_12v_val);
-    create_info_card(scr_dash, MDI_ICON_AC, "AC Out", 620, 260, &label_ac_val); // Reusing AC icon for AC Out
+    create_info_card(scr_dash, MDI_ICON_AC, "AC Out", 620, 260, &label_ac_val);
 
     // --- Center (Battery) ---
     arc_batt = lv_arc_create(scr_dash);
@@ -148,46 +356,53 @@ static void create_dashboard(void) {
     lv_arc_set_bg_angles(arc_batt, 0, 360);
     lv_arc_set_value(arc_batt, 50);
     lv_obj_align(arc_batt, LV_ALIGN_TOP_MID, 0, 80);
-    lv_obj_remove_style(arc_batt, NULL, LV_PART_KNOB);   /*Be sure the knob is not displayed*/
-    lv_obj_clear_flag(arc_batt, LV_OBJ_FLAG_CLICKABLE);  /*To not allow adjusting by click*/
+    lv_obj_remove_style(arc_batt, NULL, LV_PART_KNOB);
+    lv_obj_clear_flag(arc_batt, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_TEAL), LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(arc_batt, 15, LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(arc_batt, 15, LV_PART_MAIN);
+    // Add draw event for limits
+    lv_obj_add_event_cb(arc_batt, event_arc_draw, LV_EVENT_DRAW_PART_END, NULL);
 
     lv_obj_t * icon_bat = lv_label_create(scr_dash);
     ui_set_icon(icon_bat, MDI_ICON_BATTERY);
     lv_obj_set_style_text_font(icon_bat, &ui_font_mdi, 0);
-    lv_obj_align(icon_bat, LV_ALIGN_CENTER, 0, -80); // Inside arc, top
+    lv_obj_set_style_text_color(icon_bat, lv_palette_main(LV_PALETTE_TEAL), 0);
+    lv_obj_align(icon_bat, LV_ALIGN_CENTER, 0, -80);
 
     label_soc = lv_label_create(scr_dash);
     lv_label_set_text(label_soc, "50%");
-    lv_obj_set_style_text_font(label_soc, &lv_font_montserrat_32, 0); // Bigger font if avail
+    lv_obj_set_style_text_font(label_soc, &lv_font_montserrat_32, 0);
     lv_obj_align(label_soc, LV_ALIGN_CENTER, 0, -30);
 
     // --- Footer Controls ---
+    int btn_h = 70;
+    int btn_w = 120;
+    int btn_y = -10;
 
     // Power Off (Bottom Left)
     lv_obj_t * btn_pwr = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_pwr, 100, 50);
-    lv_obj_align(btn_pwr, LV_ALIGN_BOTTOM_LEFT, 20, -20);
+    lv_obj_set_size(btn_pwr, btn_w, btn_h);
+    lv_obj_align(btn_pwr, LV_ALIGN_BOTTOM_LEFT, 20, btn_y);
     lv_obj_add_style(btn_pwr, &style_btn_red, 0);
     lv_obj_add_event_cb(btn_pwr, event_power_off_click, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_pwr = lv_label_create(btn_pwr);
     lv_label_set_text(lbl_pwr, "OFF");
     lv_obj_center(lbl_pwr);
 
-    // Wave 2 (Bottom Left of Settings - Assuming Settings is Bottom Right)
-    // "Bottom left of settings button" -> If Settings is at (700, 430), Wave 2 is at (580, 430)
+    // Settings (Bottom Right)
     lv_obj_t * btn_settings = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_settings, 60, 50);
-    lv_obj_align(btn_settings, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+    lv_obj_set_size(btn_settings, 80, 60); // As per plan
+    lv_obj_align(btn_settings, LV_ALIGN_BOTTOM_RIGHT, -20, btn_y - 5);
     lv_obj_add_style(btn_settings, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_settings, event_to_settings, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_set = lv_label_create(btn_settings);
     ui_set_icon(lbl_set, MDI_ICON_SETTINGS);
     lv_obj_center(lbl_set);
 
+    // Wave 2 (Left of Settings)
     lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_wave2, 100, 50);
+    lv_obj_set_size(btn_wave2, 120, 60);
     lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, 0);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
@@ -195,22 +410,24 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_wave);
 
     // Toggles (Center Bottom)
-    lv_obj_t * btn_ac_toggle = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_ac_toggle, 100, 60);
-    lv_obj_align(btn_ac_toggle, LV_ALIGN_BOTTOM_MID, -60, -20);
+    btn_ac_toggle = lv_btn_create(scr_dash);
+    lv_obj_set_size(btn_ac_toggle, btn_w, btn_h);
+    lv_obj_align(btn_ac_toggle, LV_ALIGN_BOTTOM_MID, -70, btn_y);
     lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
     lv_obj_add_flag(btn_ac_toggle, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_t * lbl_ac_t = lv_label_create(btn_ac_toggle);
+    lv_obj_add_event_cb(btn_ac_toggle, event_toggle_ac, LV_EVENT_CLICKED, NULL);
+    lbl_ac_t = lv_label_create(btn_ac_toggle);
     lv_label_set_text(lbl_ac_t, "AC\nOFF");
     lv_obj_set_style_text_align(lbl_ac_t, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(lbl_ac_t);
 
-    lv_obj_t * btn_dc_toggle = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_dc_toggle, 100, 60);
-    lv_obj_align(btn_dc_toggle, LV_ALIGN_BOTTOM_MID, 60, -20);
+    btn_dc_toggle = lv_btn_create(scr_dash);
+    lv_obj_set_size(btn_dc_toggle, btn_w, btn_h);
+    lv_obj_align(btn_dc_toggle, LV_ALIGN_BOTTOM_MID, 70, btn_y);
     lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
     lv_obj_add_flag(btn_dc_toggle, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_t * lbl_dc_t = lv_label_create(btn_dc_toggle);
+    lv_obj_add_event_cb(btn_dc_toggle, event_toggle_dc, LV_EVENT_CLICKED, NULL);
+    lbl_dc_t = lv_label_create(btn_dc_toggle);
     lv_label_set_text(lbl_dc_t, "12V\nOFF");
     lv_obj_set_style_text_align(lbl_dc_t, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(lbl_dc_t);
@@ -228,7 +445,6 @@ static void create_dashboard(void) {
     lv_obj_set_size(popup_panel, 400, 200);
     lv_obj_center(popup_panel);
     lv_obj_add_style(popup_panel, &style_panel, 0);
-    // Blur simulation: not easy on F4. Just opacity.
 
     lv_obj_t * lbl_msg = lv_label_create(popup_panel);
     lv_label_set_text(lbl_msg, "Really Power Off?");
@@ -239,7 +455,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_yes, 100, 50);
     lv_obj_align(btn_yes, LV_ALIGN_BOTTOM_LEFT, 40, -20);
     lv_obj_add_style(btn_yes, &style_btn_red, 0);
-    lv_obj_add_event_cb(btn_yes, event_popup_yes, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(btn_yes, event_popup_hide, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_yes = lv_label_create(btn_yes);
     lv_label_set_text(lbl_yes, "YES");
     lv_obj_center(lbl_yes);
@@ -248,7 +464,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_no, 100, 50);
     lv_obj_align(btn_no, LV_ALIGN_BOTTOM_RIGHT, -40, -20);
     lv_obj_add_style(btn_no, &style_btn_default, 0);
-    lv_obj_add_event_cb(btn_no, event_popup_no, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(btn_no, event_popup_hide, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_no = lv_label_create(btn_no);
     lv_label_set_text(lbl_no, "NO");
     lv_obj_center(lbl_no);
@@ -263,6 +479,7 @@ void UI_LVGL_Init(void) {
     lv_port_indev_init();
 
     create_styles();
+    create_settings(); // Create first so we can load it
     create_dashboard();
 
     lv_scr_load(scr_dash);
@@ -271,18 +488,17 @@ void UI_LVGL_Init(void) {
 void UI_LVGL_Update(DeviceStatus* dev) {
     if (!dev) return;
 
-    // Map data (Simplified)
+    // Map data
     int soc = 0;
     int in_solar=0, in_ac=0, in_alt=0;
     int out_usb=0, out_12v=0, out_ac=0;
     float temp = 25.0f;
 
-    // Mapping logic
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         soc = (int)dev->data.d3p.batteryLevel;
         in_ac = (int)dev->data.d3p.acInputPower;
         in_solar = (int)(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = (int)dev->data.d3p.dcLvInputPower; // Approx
+        in_alt = (int)dev->data.d3p.dcLvInputPower;
         out_ac = (int)(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
         out_12v = (int)dev->data.d3p.dc12vOutputPower;
         out_usb = (int)(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
@@ -298,7 +514,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         temp = dev->data.d3.cellTemperature;
     }
 
-    lv_label_set_text_fmt(label_temp, "%.1f C", temp);
+    lv_label_set_text_fmt(label_temp, "%d C", (int)temp);
     lv_arc_set_value(arc_batt, soc);
     lv_label_set_text_fmt(label_soc, "%d%%", soc);
 
@@ -308,4 +524,25 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
     lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
     lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
+
+    // Toggle Styles
+    if (out_ac > 0) {
+        lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
+        lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
+        lv_label_set_text(lbl_ac_t, "AC\nON");
+    } else {
+        lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+        lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
+        lv_label_set_text(lbl_ac_t, "AC\nOFF");
+    }
+
+    if (out_12v > 0) {
+        lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
+        lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
+        lv_label_set_text(lbl_dc_t, "12V\nON");
+    } else {
+        lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+        lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
+        lv_label_set_text(lbl_dc_t, "12V\nOFF");
+    }
 }
