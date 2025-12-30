@@ -31,11 +31,13 @@ static lv_obj_t * scr_dash;
 static lv_obj_t * label_temp;
 static lv_obj_t * arc_batt;
 static lv_obj_t * label_soc;
+static lv_obj_t * obj_status_dot; // Status LED
 
 static lv_obj_t * btn_ac_toggle;
 static lv_obj_t * lbl_ac_t;
 static lv_obj_t * btn_dc_toggle;
 static lv_obj_t * lbl_dc_t;
+static lv_obj_t * label_disconnected;
 
 // --- Settings Widgets ---
 static lv_obj_t * scr_settings;
@@ -66,6 +68,7 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_panel, lv_color_hex(0xFF282828)); // Dark Grey
     lv_style_set_radius(&style_panel, 12);
     lv_style_set_border_width(&style_panel, 0);
+    lv_style_set_text_color(&style_panel, lv_color_white());
 
     lv_style_init(&style_text_large);
     lv_style_set_text_font(&style_text_large, &lv_font_montserrat_32);
@@ -164,6 +167,9 @@ static void event_slider_input(lv_event_t * e) {
         lv_slider_set_value(slider, val, LV_ANIM_OFF);
         lim_input_w = val;
         lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+        if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+            UART_SendSettings(SET_MAX_INPUT_WATTS, (uint32_t)lim_input_w);
+        }
     }
 }
 static void event_slider_discharge(lv_event_t * e) {
@@ -175,6 +181,9 @@ static void event_slider_discharge(lv_event_t * e) {
         lim_discharge_p = val;
         lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
         lv_obj_invalidate(arc_batt);
+        if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+             UART_SendSettings(SET_DISCHARGE_LIMIT, (uint32_t)lim_discharge_p);
+        }
     }
 }
 static void event_slider_charge(lv_event_t * e) {
@@ -186,6 +195,9 @@ static void event_slider_charge(lv_event_t * e) {
         lim_charge_p = val;
         lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
         lv_obj_invalidate(arc_batt);
+        if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+             UART_SendSettings(SET_CHARGE_LIMIT, (uint32_t)lim_charge_p);
+        }
     }
 }
 
@@ -307,7 +319,7 @@ static void create_settings(void) {
 
     // 1. AC Input Limit (400 - 3000)
     lv_obj_t * p1 = lv_obj_create(cont);
-    lv_obj_set_size(p1, 650, 90); // Increased height to prevent overlap
+    lv_obj_set_size(p1, 650, 100); // Increased height to prevent overlap (90 -> 100)
     lv_obj_set_style_bg_opa(p1, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p1, 0, 0);
 
@@ -327,13 +339,14 @@ static void create_settings(void) {
     lv_slider_set_range(s1, 400, 3000);
     lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
     lv_obj_set_width(s1, 600);
-    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -10); // Moved up slightly
+    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, 0); // Moved to very bottom
     lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(s1, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
+    lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_RELEASED, NULL); // Send on release
+    lv_obj_add_event_cb(s1, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // 2. Min Discharge (0 - 30)
     lv_obj_t * p2 = lv_obj_create(cont);
-    lv_obj_set_size(p2, 650, 90);
+    lv_obj_set_size(p2, 650, 100); // 100px
     lv_obj_set_style_bg_opa(p2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p2, 0, 0);
 
@@ -353,13 +366,14 @@ static void create_settings(void) {
     lv_slider_set_range(s2, 0, 30);
     lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
     lv_obj_set_width(s2, 600);
-    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(s2, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // 3. Max Charge (50 - 100)
     lv_obj_t * p3 = lv_obj_create(cont);
-    lv_obj_set_size(p3, 650, 90);
+    lv_obj_set_size(p3, 650, 100); // 100px
     lv_obj_set_style_bg_opa(p3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p3, 0, 0);
 
@@ -379,8 +393,9 @@ static void create_settings(void) {
     lv_slider_set_range(s3, 50, 100);
     lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
     lv_obj_set_width(s3, 600);
-    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(s3, event_calib_touch, LV_EVENT_CLICKED, NULL);
 }
 
@@ -398,7 +413,15 @@ static void create_dashboard(void) {
     label_temp = lv_label_create(scr_dash);
     lv_label_set_text(label_temp, "25 C");
     lv_obj_set_style_text_font(label_temp, &lv_font_montserrat_20, 0);
-    lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
+    lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -40, 10); // Moved left to make room for dot
+
+    // Status Dot (Top Right)
+    obj_status_dot = lv_obj_create(scr_dash);
+    lv_obj_set_size(obj_status_dot, 12, 12);
+    lv_obj_set_style_radius(obj_status_dot, 6, 0);
+    lv_obj_set_style_bg_color(obj_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_border_width(obj_status_dot, 0, 0);
+    lv_obj_align(obj_status_dot, LV_ALIGN_TOP_RIGHT, -15, 15);
 
     // --- Left Column (Inputs) ---
     create_info_card(scr_dash, MDI_ICON_SOLAR, "Solar", 20, 60, &label_solar_val);
@@ -435,6 +458,14 @@ static void create_dashboard(void) {
     lv_obj_set_style_text_font(label_soc, &lv_font_montserrat_32, 0);
     lv_obj_align(label_soc, LV_ALIGN_CENTER, 0, -30);
 
+    // Disconnected Label
+    label_disconnected = lv_label_create(scr_dash);
+    lv_label_set_text(label_disconnected, "DISCONNECTED");
+    lv_obj_set_style_text_color(label_disconnected, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_text_font(label_disconnected, &lv_font_montserrat_24, 0);
+    lv_obj_align(label_disconnected, LV_ALIGN_CENTER, 0, 50);
+    lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+
     // --- Footer Controls ---
     int btn_h = 70;
     int btn_w = 120;
@@ -462,8 +493,8 @@ static void create_dashboard(void) {
 
     // Wave 2 (Left of Settings)
     lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_wave2, 120, 60);
-    lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, 0);
+    lv_obj_set_size(btn_wave2, 120, 70); // Fixed size to match others (Was 60)
+    lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, -5); // Re-align center
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
@@ -548,7 +579,27 @@ void UI_LVGL_Init(void) {
     lv_scr_load(scr_dash);
 }
 
+// Timer callback to revert status dot color
+static void status_dot_timer_cb(lv_timer_t * timer) {
+    lv_obj_set_style_bg_color(obj_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+}
+
+static uint32_t last_update_time = 0;
+
 void UI_LVGL_Update(DeviceStatus* dev) {
+    // Reset timer
+    last_update_time = lv_tick_get();
+
+    // Show dot green
+    lv_obj_set_style_bg_color(obj_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+    static lv_timer_t * dot_timer = NULL;
+    if (dot_timer) lv_timer_del(dot_timer);
+    dot_timer = lv_timer_create(status_dot_timer_cb, 200, NULL);
+    lv_timer_set_repeat_count(dot_timer, 1);
+
+    // Hide Disconnected Label
+    lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+
     if (!dev) return;
 
     if (dev->id == DEV_TYPE_WAVE_2) {
@@ -571,6 +622,20 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
         out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
         temp = (float)dev->data.d3p.cellTemperature;
+
+        // Update Limits sliders if they haven't been touched yet (simple logic)
+        // or just once on connect
+        static bool limits_init = false;
+        if (!limits_init) {
+            lim_input_w = dev->data.d3p.acChargingSpeed;
+            lim_charge_p = dev->data.d3p.batteryChargeLimitMax;
+            lim_discharge_p = dev->data.d3p.batteryChargeLimitMin;
+            // Since we can't easily access the objects here (scope issue or brittle lookup),
+            // we rely on the next user interaction or refresh to update the UI labels if they are drawn from these static vars.
+            // For now, updating the static vars is sufficient to prevent jumping to defaults on first touch.
+            limits_init = true;
+        }
+
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         soc = safe_float_to_int(dev->data.d3.batteryLevel);
         in_ac = safe_float_to_int(dev->data.d3.acInputPower);
@@ -635,37 +700,52 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Toggle Styles
-    bool ac_on = (out_ac > 0);
-    if (first_run || ac_on != last_ac_on) {
-        if (ac_on) {
-            lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-            lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
-            lv_label_set_text(lbl_ac_t, "AC\nON");
-            lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
-        } else {
-            lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+    if (dev->id == DEV_TYPE_DELTA_3 || dev->id == DEV_TYPE_DELTA_PRO_3) {
+        // AC
+        bool ac_on = (dev->id == DEV_TYPE_DELTA_PRO_3) ? dev->data.d3p.acHvPort : dev->data.d3.acOn;
+        if (first_run || ac_on != last_ac_on) {
+            // Explicitly clear all custom styles first to be safe
             lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
-            lv_label_set_text(lbl_ac_t, "AC\nOFF");
-            lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
-        }
-        last_ac_on = ac_on;
-    }
+            lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
 
-    bool dc_on = (out_12v > 0);
-    if (first_run || dc_on != last_dc_on) {
-        if (dc_on) {
-            lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-            lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
-            lv_label_set_text(lbl_dc_t, "12V\nON");
-            lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
-        } else {
-            lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-            lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
-            lv_label_set_text(lbl_dc_t, "12V\nOFF");
-            lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
+            if (ac_on) {
+                lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
+                lv_label_set_text(lbl_ac_t, "AC\nON");
+                lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
+            } else {
+                lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+                lv_label_set_text(lbl_ac_t, "AC\nOFF");
+                lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
+            }
+            last_ac_on = ac_on;
         }
-        last_dc_on = dc_on;
+
+        // DC
+        bool dc_on = (dev->id == DEV_TYPE_DELTA_PRO_3) ? dev->data.d3p.dc12vPort : dev->data.d3.dc12vPort;
+        if (first_run || dc_on != last_dc_on) {
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
+
+            if (dc_on) {
+                lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
+                lv_label_set_text(lbl_dc_t, "12V\nON");
+                lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
+            } else {
+                lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+                lv_label_set_text(lbl_dc_t, "12V\nOFF");
+                lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
+            }
+            last_dc_on = dc_on;
+        }
     }
 
     first_run = false;
+}
+
+// Called periodically (e.g. from display task loop) to check for timeout
+void UI_LVGL_CheckConnection(void) {
+    if (lv_tick_get() - last_update_time > 3000) { // 3 seconds timeout
+        lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(obj_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    }
 }

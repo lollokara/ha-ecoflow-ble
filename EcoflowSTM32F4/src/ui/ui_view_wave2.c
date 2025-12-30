@@ -37,6 +37,7 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_panel, lv_color_hex(0xFF282828));
     lv_style_set_radius(&style_panel, 20);
     lv_style_set_border_width(&style_panel, 0);
+    lv_style_set_text_color(&style_panel, lv_color_white()); // Ensure white text on panel
 
     lv_style_init(&style_text_large);
     lv_style_set_text_font(&style_text_large, &lv_font_montserrat_32);
