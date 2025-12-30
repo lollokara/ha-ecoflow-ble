@@ -1,6 +1,7 @@
 #include "lv_port_disp.h"
 #include "stm32469i_discovery_lcd.h"
 #include "stm32469i_discovery_sdram.h"
+#include "backlight.h"
 
 // Define screen size
 #define DISP_HOR_RES 800
@@ -45,12 +46,7 @@ void lv_port_disp_init(void)
     // Wait, if we use direct mode, 'flush' doesn't copy, it just swaps.
     // But BSP_LCD functions expect a specific address.
     // For now, let's use standard partial/full buffering and copy in flush.
-    // Actually, full double buffering (2 buffers of full screen size) allows direct swap if supported.
-    // BSP_LCD_SetLayerAddress can swap.
-
-    // Let's stick to simple copy first to ensure stability.
-    // Double buffer full screen means flush is called with full area?
-    // If we give 2 buffers of full size, LVGL treats them as "render targets".
+    // Actually, full double buffering (2 buffers of full size, LVGL treats them as "render targets".
     // Flush just needs to put the content on screen.
     // If we use "full_refresh = 1", LVGL redraws everything.
 
@@ -60,23 +56,6 @@ void lv_port_disp_init(void)
     lv_disp_drv_register(&disp_drv);
 }
 
-// Backlight Control Pin: PA3
-#define BACKLIGHT_PIN GPIO_PIN_3
-#define BACKLIGHT_PORT GPIOA
-
-static void Backlight_Init(void) {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-
-    GPIO_InitStruct.Pin = BACKLIGHT_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(BACKLIGHT_PORT, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(BACKLIGHT_PORT, BACKLIGHT_PIN, GPIO_PIN_SET);
-}
-
 static void disp_init(void)
 {
     BSP_LCD_Init();
@@ -84,7 +63,7 @@ static void disp_init(void)
     BSP_LCD_SelectLayer(0);
     BSP_LCD_Clear(LCD_COLOR_BLACK);
     BSP_LCD_DisplayOn();
-    Backlight_Init();
+    Backlight_Init(); // Use PWM Backlight
 
     // Initialize DMA2D once
     hdma2d_eval.Init.Mode = DMA2D_M2M;

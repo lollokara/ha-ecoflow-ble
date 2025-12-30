@@ -204,6 +204,7 @@ typedef struct {
     uint8_t id;          // DeviceType enum
     uint8_t connected;
     char name[16];
+    uint8_t brightness; // 0-100%
     DeviceSpecificData data;
 } DeviceStatus;
 

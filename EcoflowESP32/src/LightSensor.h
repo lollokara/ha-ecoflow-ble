@@ -14,6 +14,7 @@ public:
     int getRaw() const; // Current filtered value
     int getMin() const;
     int getMax() const;
+    uint8_t getBrightness() const; // Returns 0-100% mapped from raw range
 
     void setCalibration(int min, int max);
 
