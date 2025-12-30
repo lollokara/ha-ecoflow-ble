@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include <math.h>
 
+// --- Helpers ---
+static int safe_float_to_int(float f) {
+    if (isnan(f) || isinf(f)) return 0;
+    return (int)f;
+}
+
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
@@ -518,26 +524,26 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         DeltaPro3DataStruct d3p;
         memcpy(&d3p, &dev->data.d3p, sizeof(d3p));
 
-        soc = (int)d3p.batteryLevel;
-        in_ac = (int)d3p.acInputPower;
-        in_solar = (int)(d3p.solarLvPower + d3p.solarHvPower);
-        in_alt = (int)d3p.dcLvInputPower;
-        out_ac = (int)(d3p.acLvOutputPower + d3p.acHvOutputPower);
-        out_12v = (int)d3p.dc12vOutputPower;
-        out_usb = (int)(d3p.usbaOutputPower + d3p.usbcOutputPower);
-        temp = d3p.cellTemperature;
+        soc = safe_float_to_int(d3p.batteryLevel);
+        in_ac = safe_float_to_int(d3p.acInputPower);
+        in_solar = safe_float_to_int(d3p.solarLvPower + d3p.solarHvPower);
+        in_alt = safe_float_to_int(d3p.dcLvInputPower);
+        out_ac = safe_float_to_int(d3p.acLvOutputPower + d3p.acHvOutputPower);
+        out_12v = safe_float_to_int(d3p.dc12vOutputPower);
+        out_usb = safe_float_to_int(d3p.usbaOutputPower + d3p.usbcOutputPower);
+        temp = (float)d3p.cellTemperature; // Integer in struct
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         Delta3DataStruct d3;
         memcpy(&d3, &dev->data.d3, sizeof(d3));
 
-        soc = (int)d3.batteryLevel;
-        in_ac = (int)d3.acInputPower;
-        in_solar = (int)d3.solarInputPower;
-        in_alt = (int)d3.dcPortInputPower;
-        out_ac = (int)d3.acOutputPower;
-        out_12v = (int)d3.dc12vOutputPower;
-        out_usb = (int)(d3.usbaOutputPower + d3.usbcOutputPower);
-        temp = d3.cellTemperature;
+        soc = safe_float_to_int(d3.batteryLevel);
+        in_ac = safe_float_to_int(d3.acInputPower);
+        in_solar = safe_float_to_int(d3.solarInputPower);
+        in_alt = safe_float_to_int(d3.dcPortInputPower);
+        out_ac = safe_float_to_int(d3.acOutputPower);
+        out_12v = safe_float_to_int(d3.dc12vOutputPower);
+        out_usb = safe_float_to_int(d3.usbaOutputPower + d3.usbcOutputPower);
+        temp = (float)d3.cellTemperature;
     }
 
     lv_label_set_text_fmt(label_temp, "%d C", (int)temp);
