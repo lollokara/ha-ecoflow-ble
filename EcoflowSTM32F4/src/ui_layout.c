@@ -91,7 +91,10 @@ void UI_DrawBatteryStatus(DeviceStatus *status) {
 
     // 3. Time Remaining
     int mins = 0;
-    if (status->id == DEV_TYPE_DELTA_PRO_3) mins = (int)status->data.d3p.remainingTime;
+    if (status->id == DEV_TYPE_DELTA_PRO_3) {
+        // mins = (int)status->data.d3p.remainingTime; // Field not available
+        mins = 0;
+    }
     snprintf(pwrBuf, sizeof(pwrBuf), "%dh %dm left", mins/60, mins%60);
     BSP_LCD_DisplayStringAt(600, 115, (uint8_t *)pwrBuf, LEFT_MODE);
 
@@ -113,24 +116,29 @@ void UI_DrawEnergyFlow(DeviceStatus *status) {
     // Left Column (Inputs)
     int solarW = 0;
     int acW = 0;
-    int altW = 0;
+    // int altW = 0; // Unused
 
     // Center (Battery)
     int batSoc = 0;
 
     // Right Column (Outputs)
     int usbW = 0;
-    int dcW = 0;
+    // int dcW = 0; // Unused
     int acOutW = 0;
 
     if (status->id == DEV_TYPE_DELTA_PRO_3) {
-        solarW = (int)status->data.d3p.solarPower;
-        acW = (int)status->data.d3p.acPower; // Assuming acInPower
-        // altW?
+        solarW = (int)(status->data.d3p.solarLvPower + status->data.d3p.solarHvPower);
+        acW = (int)status->data.d3p.acInputPower;
+
         batSoc = (int)status->data.d3p.batteryLevel;
-        usbW = (int)status->data.d3p.usbPower;
-        dcW = (int)status->data.d3p.dcPower;
-        acOutW = (int)status->data.d3p.acPowerOut; // simplified
+
+        // Sum USB Powers
+        usbW = (int)(status->data.d3p.usbaOutputPower + status->data.d3p.usba2OutputPower +
+                     status->data.d3p.usbcOutputPower + status->data.d3p.usbc2OutputPower);
+
+        // dcW = (int)status->data.d3p.dc12vOutputPower; // Not displayed in this layout column directly or reused?
+
+        acOutW = (int)(status->data.d3p.acLvOutputPower + status->data.d3p.acHvOutputPower);
     }
 
     // Solar
