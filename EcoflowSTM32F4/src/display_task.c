@@ -10,40 +10,16 @@
 
 // QueueHandle_t displayQueue; // Defined in main.c
 
-// Backlight Control Pin: PA3
-#define BACKLIGHT_PIN GPIO_PIN_3
-#define BACKLIGHT_PORT GPIOA
-
-// Helper: Init Backlight
-static void Backlight_Init(void) {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-
-    GPIO_InitStruct.Pin = BACKLIGHT_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(BACKLIGHT_PORT, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(BACKLIGHT_PORT, BACKLIGHT_PIN, GPIO_PIN_SET);
-}
-
 void StartDisplayTask(void * argument) {
     // Init Hardware
     BSP_SDRAM_Init();
-    BSP_LCD_Init();
-    // No need to set layers manually here, LVGL driver handles it or we set default
-    // Ensure display is on
-    BSP_LCD_DisplayOn();
 
     // Init Touch
     BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
 
-    Backlight_Init();
-
     printf("Display Task Started\n");
 
-    // Init UI
+    // Init UI (Handles LCD and Backlight Init)
     UI_LVGL_Init();
 
     printf("UI Init Done\n");
