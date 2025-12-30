@@ -45,13 +45,14 @@ int LightSensor::getRaw() const {
 
 uint8_t LightSensor::getBrightnessPercent() const {
     // Map average ADC to 10-100%
-    // ADC 0 (Dark) -> 10%
-    // ADC 4095 (Bright) -> 100%
+    // Inverted Logic based on user feedback (High ADC = Dark, Low ADC = Bright)
+    // ADC 0 (Bright) -> 100%
+    // ADC 4095 (Dark) -> 10%
     int val = _average;
     if (val < _minADC) val = _minADC;
     if (val > _maxADC) val = _maxADC;
 
-    int pct = map(val, _minADC, _maxADC, 10, 100);
+    int pct = map(val, _minADC, _maxADC, 100, 10);
     return (uint8_t)constrain(pct, 10, 100);
 }
 
