@@ -132,6 +132,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
     }
     else if (cmd == CMD_DEVICE_STATUS) {
+        printf("UART: Parsing Status...\n");
         DeviceStatus status;
         if (unpack_device_status_message(packet, &status) == 0) {
              DisplayEvent event;
@@ -139,7 +140,13 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
              // Pass the full structure, including ID
              memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatus));
 
-             xQueueSend(displayQueue, &event, 0); // Don't block if full
+             if(xQueueSend(displayQueue, &event, 0) == pdTRUE) {
+                 printf("UART: Status Queued\n");
+             } else {
+                 printf("UART: Queue Full!\n");
+             }
+        } else {
+            printf("UART: Unpack Failed\n");
         }
     }
 }

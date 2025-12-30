@@ -33,8 +33,17 @@ void StartDisplayTask(void * argument) {
         // Handle Data Updates
         while (xQueueReceive(displayQueue, &event, 0) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
+                printf("Display: Update UI...\n");
                 UI_LVGL_Update(&event.data.deviceStatus);
+                printf("Display: UI Updated\n");
             }
+        }
+
+        // Monitor Heap
+        static TickType_t lastHeapPrint = 0;
+        if (xTaskGetTickCount() - lastHeapPrint > pdMS_TO_TICKS(5000)) {
+            lastHeapPrint = xTaskGetTickCount();
+            printf("Free Heap: %d\n", xPortGetFreeHeapSize());
         }
 
         // LVGL Task Handler
