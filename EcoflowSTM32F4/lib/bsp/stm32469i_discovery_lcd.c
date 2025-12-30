@@ -149,6 +149,7 @@ static LCD_DrawPropTypeDef DrawProp[LTDC_MAX_LAYER_NUMBER];
 static void DrawChar(uint16_t Xpos, uint16_t Ypos, const uint8_t *c);
 static void FillTriangle(uint16_t x1, uint16_t x2, uint16_t x3, uint16_t y1, uint16_t y2, uint16_t y3);
 static void LL_FillBuffer(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t ColorIndex);
+static void LL_FillBuffer_Blend(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t Color, uint8_t Alpha);
 static void LL_ConvertLineToARGB8888(void * pSrc, void *pDst, uint32_t xSize, uint32_t ColorMode);
 static LCD_Driver_TypeDef LCD_ReadType(LCD_Driver_TypeDef Lcd_type);
 /**
@@ -1138,6 +1139,42 @@ void BSP_LCD_FillRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Hei
 }
 
 /**
+  * @brief  Draws a full rectangle in currently active layer with Alpha Blending.
+  * @param  Xpos: X position
+  * @param  Ypos: Y position
+  * @param  Width: Rectangle width
+  * @param  Height: Rectangle height
+  * @param  Color: RGB Color (Alpha part ignored, controlled by Alpha arg)
+  * @param  Alpha: Transparency (0=Transparent, 255=Opaque)
+  */
+void BSP_LCD_FillRect_Blend(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height, uint32_t Color, uint8_t Alpha)
+{
+  uint32_t  Xaddress = 0;
+
+  /* Get the rectangle start address */
+  Xaddress = (hltdc_eval.LayerCfg[ActiveLayer].FBStartAdress) + 4*(BSP_LCD_GetXSize()*Ypos + Xpos);
+
+  /* Fill the rectangle */
+  LL_FillBuffer_Blend(ActiveLayer, (uint32_t *)Xaddress, Width, Height, (BSP_LCD_GetXSize() - Width), Color, Alpha);
+}
+
+/**
+  * @brief  Draws a horizontal line with blending.
+  */
+void BSP_LCD_DrawHLine_Blend(uint16_t Xpos, uint16_t Ypos, uint16_t Length, uint32_t Color, uint8_t Alpha)
+{
+  BSP_LCD_FillRect_Blend(Xpos, Ypos, Length, 1, Color, Alpha);
+}
+
+/**
+  * @brief  Draws a vertical line with blending.
+  */
+void BSP_LCD_DrawVLine_Blend(uint16_t Xpos, uint16_t Ypos, uint16_t Length, uint32_t Color, uint8_t Alpha)
+{
+  BSP_LCD_FillRect_Blend(Xpos, Ypos, 1, Length, Color, Alpha);
+}
+
+/**
   * @brief  Draws a full circle in currently active layer.
   * @param  Xpos: X position
   * @param  Ypos: Y position
@@ -1633,6 +1670,76 @@ static void LL_FillBuffer(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint3
         HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
       }
     }
+  }
+}
+
+/**
+  * @brief  Fills a buffer with blending (Software Simulation for Source Color, Hardware Blend).
+  *         This function creates a temporary line buffer, fills it with the color,
+  *         and then blends it line-by-line over the destination.
+  * @param  LayerIndex: Layer index (Destination)
+  * @param  pDst: Pointer to destination buffer (Frame Buffer)
+  * @param  xSize: Buffer width
+  * @param  ySize: Buffer height
+  * @param  OffLine: Offset (Stride - Width)
+  * @param  Color: Color (RGB)
+  * @param  Alpha: Alpha
+  */
+static void LL_FillBuffer_Blend(uint32_t LayerIndex, void *pDst, uint32_t xSize, uint32_t ySize, uint32_t OffLine, uint32_t Color, uint8_t Alpha)
+{
+  static uint32_t scratch_buf[800]; // Max width line buffer
+  uint32_t i;
+  uint32_t argb_color = (Alpha << 24) | (Color & 0x00FFFFFF);
+
+  if (xSize > 800) return; // Safety
+
+  // 1. Prepare Scratch Buffer (Fill with color) - Fast CPU loop or R2M
+  for(i=0; i<xSize; i++) {
+      scratch_buf[i] = argb_color;
+  }
+  // Ideally use DMA2D R2M here too for speed, but CPU loop for 800px is negligible compared to blend
+
+  // 2. Configure DMA2D for Blending (M2M_BLEND)
+  // FG: Scratch Buf, BG: FrameBuffer (pDst), Out: FrameBuffer (pDst)
+
+  hdma2d_eval.Init.Mode         = DMA2D_M2M_BLEND;
+  hdma2d_eval.Init.ColorMode    = DMA2D_ARGB8888;
+  hdma2d_eval.Init.OutputOffset = OffLine; // Stride for Output
+
+  hdma2d_eval.Instance = DMA2D;
+
+  if(HAL_DMA2D_Init(&hdma2d_eval) != HAL_OK) return;
+
+  // Configure FG (Layer 1) - The Scratch Buffer
+  hdma2d_eval.LayerCfg[1].AlphaMode = DMA2D_REPLACE_ALPHA;
+  hdma2d_eval.LayerCfg[1].InputAlpha = Alpha;
+  hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
+  hdma2d_eval.LayerCfg[1].InputOffset = 0; // No offset for scratch (it's dense)
+
+  if(HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) != HAL_OK) return;
+
+  // Configure BG (Layer 0) - The Current FrameBuffer
+  hdma2d_eval.LayerCfg[0].AlphaMode = DMA2D_NO_MODIF_ALPHA;
+  hdma2d_eval.LayerCfg[0].InputAlpha = 0xFF;
+  hdma2d_eval.LayerCfg[0].InputColorMode = DMA2D_ARGB8888;
+  hdma2d_eval.LayerCfg[0].InputOffset = OffLine; // Stride for Background
+
+  if(HAL_DMA2D_ConfigLayer(&hdma2d_eval, 0) != HAL_OK) return;
+
+  // 3. Process Line by Line
+  // Because our scratch buffer is only 1 line, but we want to fill 'ySize' lines.
+  // We can't do one big transfer because FG source would increment beyond scratch buffer.
+  // So we launch a transfer for each line.
+
+  uint32_t currentDst = (uint32_t)pDst;
+
+  for (i = 0; i < ySize; i++) {
+      if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)scratch_buf, (uint32_t)currentDst, xSize, 1) == HAL_OK) {
+        HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
+      }
+      // Increment destination pointer by (Width + Offset) * 4 bytes
+      // xSize + OffLine is the total stride in pixels
+      currentDst += (xSize + OffLine) * 4;
   }
 }
 

@@ -1,6 +1,7 @@
 #include "display_task.h"
 #include "stm32469i_discovery_lcd.h"
 #include "stm32469i_discovery_ts.h"
+#include "ui/ui_core.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -11,15 +12,6 @@
 #define BACKLIGHT_PIN GPIO_PIN_3
 #define BACKLIGHT_PORT GPIOA
 
-// Modern UI Colors
-#define GUI_COLOR_BG        LCD_COLOR_BLACK
-#define GUI_COLOR_HEADER    0xFF202020
-#define GUI_COLOR_TEXT      LCD_COLOR_WHITE
-#define GUI_COLOR_ACCENT    0xFF00ADB5
-#define GUI_COLOR_BUTTON    0xFF393E46
-#define GUI_COLOR_BTN_PRESS 0xFF00ADB5
-#define GUI_COLOR_PANEL     0xFF222831
-
 // Double Buffering
 #define LCD_FRAME_BUFFER_1  LCD_FB_START_ADDRESS
 #define LCD_FRAME_BUFFER_2  (LCD_FB_START_ADDRESS + 0x200000) // 800*480*4 is ~1.5MB, so +2MB is safe
@@ -27,20 +19,23 @@
 static uint32_t current_buffer = LCD_FRAME_BUFFER_1;
 static uint32_t pending_buffer = LCD_FRAME_BUFFER_2;
 
-// Simple Button Struct
-typedef struct {
-    uint16_t x, y, w, h;
-    char label[16];
-    bool pressed;
-    bool visible;
-} SimpleButton;
-
-// Global UI State
-SimpleButton testBtn = {250, 200, 200, 60, "TOGGLE", false, true};
-
 // Cache data to redraw full frame
-// Use DeviceStatus to store ID + Data
 DeviceStatus currentDevStatus = {0};
+
+// View State
+typedef enum {
+    VIEW_DASHBOARD,
+    VIEW_SETTINGS
+} ViewState;
+
+static ViewState currentView = VIEW_DASHBOARD;
+
+// External View Renderers
+void UI_Dashboard_Init(void);
+void UI_Render_Dashboard(DeviceStatus* dev);
+bool UI_CheckTouch_Dashboard(uint16_t x, uint16_t y);
+void UI_Render_Settings(void);
+bool UI_HandleTouch_Settings(uint16_t x, uint16_t y, bool pressed);
 
 // Helper: Init Backlight
 static void Backlight_Init(void) {
@@ -56,144 +51,27 @@ static void Backlight_Init(void) {
     HAL_GPIO_WritePin(BACKLIGHT_PORT, BACKLIGHT_PIN, GPIO_PIN_SET);
 }
 
-// Helper: Draw Button
-static void DrawButton(SimpleButton* btn) {
-    if (!btn->visible) return;
-
-    if (btn->pressed) {
-        BSP_LCD_SetTextColor(GUI_COLOR_BTN_PRESS);
-    } else {
-        BSP_LCD_SetTextColor(GUI_COLOR_BUTTON);
-    }
-    BSP_LCD_FillRect(btn->x, btn->y, btn->w, btn->h);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    BSP_LCD_SetBackColor(btn->pressed ? GUI_COLOR_BTN_PRESS : GUI_COLOR_BUTTON);
-    BSP_LCD_SetFont(&Font24);
-
-    int textLen = strlen(btn->label);
-    int textWidth = textLen * 17;
-    int tx = btn->x + (btn->w - textWidth) / 2;
-    int ty = btn->y + (btn->h - 24) / 2;
-
-    BSP_LCD_DisplayStringAt(tx, ty, (uint8_t*)btn->label, LEFT_MODE);
-}
-
-static void DrawHeader(void) {
-    BSP_LCD_SetTextColor(GUI_COLOR_HEADER);
-    BSP_LCD_FillRect(0, 0, BSP_LCD_GetXSize(), 50);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    BSP_LCD_SetBackColor(GUI_COLOR_HEADER);
-    BSP_LCD_SetFont(&Font24);
-    BSP_LCD_DisplayStringAt(20, 13, (uint8_t*)"Ecoflow Controller", LEFT_MODE);
-}
-
-// Draws the static background of the status panels
-static void InitStatusPanel(void) {
-    BSP_LCD_SetFont(&Font20);
-    BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
-
-    // Panel 1: SOC Background
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(20, 70, 200, 100);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_ACCENT);
-    BSP_LCD_DisplayStringAt(40, 80, (uint8_t*)"Battery", LEFT_MODE);
-
-    // Panel 2: Power Background
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(240, 70, 200, 100);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_ACCENT);
-    BSP_LCD_SetFont(&Font20);
-    BSP_LCD_DisplayStringAt(260, 80, (uint8_t*)"Power", LEFT_MODE);
-}
-
-// Updates only the dynamic values in the status panels
-static void UpdateStatusPanel(DeviceStatus* dev) {
-    char buf[32];
-    int soc = 0;
-    int power = 0;
-
-    // Determine data based on ID
-    if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-        soc = (int)dev->data.d3p.batteryLevel;
-        power = (int)(dev->data.d3p.inputPower - dev->data.d3p.outputPower);
-    } else if (dev->id == DEV_TYPE_DELTA_3) {
-        soc = (int)dev->data.d3.batteryLevel;
-        power = (int)(dev->data.d3.inputPower - dev->data.d3.outputPower);
-    } else if (dev->id == DEV_TYPE_WAVE_2) {
-        soc = dev->data.w2.batSoc;
-        // Wave 2 power calculation might differ, using battery power for now
-        power = dev->data.w2.batPwrWatt;
-    } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
-        soc = (int)dev->data.ac.batteryLevel;
-        power = (int)dev->data.ac.dcPower;
-    } else {
-        // Fallback or unknown
-        soc = 0;
-        power = 0;
-    }
-
-    printf("DISPLAY: Updating Panel. Device=%s (%d), SOC=%d\n", dev->name, dev->id, soc);
-
-    // Update Header with Device Name if available
-    if (dev->name[0] != 0) {
-        BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-        BSP_LCD_SetBackColor(GUI_COLOR_HEADER);
-        BSP_LCD_SetFont(&Font24);
-        BSP_LCD_DisplayStringAt(300, 13, (uint8_t*)dev->name, LEFT_MODE);
-    }
-
-
-    // Panel 1: SOC Value
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(40, 110, 160, 24);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
-    snprintf(buf, sizeof(buf), "%d %%", soc);
-    BSP_LCD_SetFont(&Font24);
-    BSP_LCD_DisplayStringAt(40, 110, (uint8_t*)buf, LEFT_MODE);
-
-    // Panel 2: Power Value
-    BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
-    BSP_LCD_FillRect(260, 110, 160, 24);
-
-    BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
-    BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
-    snprintf(buf, sizeof(buf), "%d W", power);
-    BSP_LCD_SetFont(&Font24);
-    BSP_LCD_DisplayStringAt(260, 110, (uint8_t*)buf, LEFT_MODE);
-}
-
 static void RenderFrame() {
     // 1. Set the pending buffer as the drawing target (but don't make it visible yet)
-    // We update the handle's config so BSP functions draw to pending_buffer,
-    // but we DO NOT call HAL_LTDC_SetAddress which would make it visible immediately.
     hltdc_eval.LayerCfg[LTDC_ACTIVE_LAYER_BACKGROUND].FBStartAdress = pending_buffer;
 
     // 2. Draw everything
-    BSP_LCD_Clear(GUI_COLOR_BG);
-    DrawHeader();
-    DrawButton(&testBtn);
-    InitStatusPanel();
-    UpdateStatusPanel(&currentDevStatus);
+    if (currentView == VIEW_DASHBOARD) {
+        UI_Render_Dashboard(&currentDevStatus);
+    } else {
+        UI_Render_Settings();
+    }
 
     // 3. Request buffer swap
-    // Set the layer configuration to point to the pending buffer
     HAL_LTDC_SetAddress(&hltdc_eval, pending_buffer, LTDC_ACTIVE_LAYER_BACKGROUND);
 
     // Trigger reload during Vertical Blanking to prevent tearing
     HAL_LTDC_Reload(&hltdc_eval, LTDC_RELOAD_VERTICAL_BLANKING);
 
     // 4. Wait for the reload to complete (poll the VBR bit)
-    // The VBR bit is cleared when the reload has happened (at VSYNC)
     uint32_t tickstart = HAL_GetTick();
     int safety_count = 0;
     while(hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) {
-        // Busy wait (short duration usually)
         if((HAL_GetTick() - tickstart) > 50) {
             printf("DISPLAY: VSYNC Timeout!\n");
             break;
@@ -221,15 +99,18 @@ void StartDisplayTask(void * argument) {
     BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER_BACKGROUND, current_buffer);
     BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER_BACKGROUND);
 
-    BSP_LCD_Clear(GUI_COLOR_BG);
-    BSP_LCD_SetBackColor(GUI_COLOR_BG);
-    BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
+    BSP_LCD_Clear(UI_COLOR_BG);
+    BSP_LCD_SetBackColor(UI_COLOR_BG);
+    BSP_LCD_SetTextColor(UI_COLOR_TEXT);
     BSP_LCD_DisplayOn();
 
     // Init Touch
     BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
 
     Backlight_Init();
+
+    // Init UI
+    UI_Dashboard_Init();
 
     // Initial Draw
     RenderFrame();
@@ -239,6 +120,7 @@ void StartDisplayTask(void * argument) {
     bool needs_redraw = false;
 
     uint32_t last_touch_poll = 0;
+    bool last_touch_detected = false;
 
     for (;;) {
         // Handle Data Updates
@@ -263,25 +145,34 @@ void StartDisplayTask(void * argument) {
                 uint16_t tx = tsState.touchX[0];
                 uint16_t ty = tsState.touchY[0];
 
-                if (tx >= testBtn.x && tx <= (testBtn.x + testBtn.w) &&
-                    ty >= testBtn.y && ty <= (testBtn.y + testBtn.h)) {
-
-                    if (!testBtn.pressed) {
-                        testBtn.pressed = true;
-                        stateChanged = true;
+                if (!last_touch_detected) {
+                    // Touch Start (Click)
+                    if (currentView == VIEW_DASHBOARD) {
+                        if (UI_CheckTouch_Dashboard(tx, ty)) {
+                            // Switch to Settings
+                            currentView = VIEW_SETTINGS;
+                            stateChanged = true;
+                        }
+                    } else {
+                        if (UI_HandleTouch_Settings(tx, ty, true)) {
+                            // Back pressed
+                            currentView = VIEW_DASHBOARD;
+                            stateChanged = true;
+                        } else {
+                            // Slider interaction (drag) - continuously redraw?
+                            stateChanged = true;
+                        }
                     }
                 } else {
-                    if (testBtn.pressed) {
-                        testBtn.pressed = false;
-                        stateChanged = true;
+                    // Touch Move (Drag)
+                    if (currentView == VIEW_SETTINGS) {
+                         UI_HandleTouch_Settings(tx, ty, true);
+                         stateChanged = true;
                     }
                 }
-            } else {
-                if (testBtn.pressed) {
-                    testBtn.pressed = false;
-                    stateChanged = true;
-                }
             }
+
+            last_touch_detected = isTouched;
 
             if (stateChanged) {
                 needs_redraw = true;
