@@ -12,6 +12,7 @@ public:
     void update();
 
     int getRaw() const; // Current filtered value
+    uint8_t getBrightnessPercent() const; // Returns 10-100
     int getMin() const;
     int getMax() const;
 

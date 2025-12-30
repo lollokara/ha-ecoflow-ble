@@ -1,0 +1,272 @@
+#include "Stm32Serial.h"
+#include "DeviceManager.h"
+#include "LightSensor.h"
+#include "EcoflowESP32.h"
+
+// Hardware Serial pin definition (moved from main.cpp)
+// RX Pin = 17 (connected to F4 TX)
+// TX Pin = 16 (connected to F4 RX)
+#define RX_PIN 16
+#define TX_PIN 17
+
+static const char* TAG = "Stm32Serial";
+
+void Stm32Serial::begin() {
+    Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+}
+
+void Stm32Serial::update() {
+    static uint8_t rx_buf[1024];
+    static uint16_t rx_idx = 0;
+    static uint8_t expected_len = 0;
+    static bool collecting = false;
+
+    while (Serial1.available()) {
+        uint8_t b = Serial1.read();
+        if (!collecting) {
+            if (b == START_BYTE) {
+                collecting = true;
+                rx_idx = 0;
+                rx_buf[rx_idx++] = b;
+            }
+        } else {
+            rx_buf[rx_idx++] = b;
+
+            if (rx_idx == 3) { // We have START, CMD, LEN
+                expected_len = rx_buf[2];
+                // Sanity check length
+                if (expected_len > 250) {
+                    collecting = false;
+                    rx_idx = 0;
+                }
+            } else if (rx_idx > 3) {
+                 if (rx_idx == (4 + expected_len)) {
+                    // Packet complete
+                    uint8_t received_crc = rx_buf[rx_idx - 1];
+                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+
+                    if (received_crc == calculated_crc) {
+                        processPacket(rx_buf, rx_idx);
+                    } else {
+                        ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
+                    }
+                    collecting = false; // Reset for next packet
+                    rx_idx = 0;
+                }
+            }
+
+            if (rx_idx >= sizeof(rx_buf)) {
+                collecting = false; // Overflow protection
+                rx_idx = 0;
+            }
+        }
+    }
+}
+
+void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
+    uint8_t cmd = rx_buf[1];
+
+    if (cmd == CMD_HANDSHAKE) {
+        uint8_t ack[4];
+        int l = pack_handshake_ack_message(ack);
+        Serial1.write(ack, l);
+        sendDeviceList();
+    } else if (cmd == CMD_GET_DEVICE_STATUS) {
+        uint8_t dev_id;
+        if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
+            sendDeviceStatus(dev_id);
+        }
+    } else if (cmd == CMD_SET_WAVE2) {
+        uint8_t type, value;
+        if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
+            EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+            if (w2 && w2->isAuthenticated()) {
+                switch(type) {
+                    case W2_PARAM_TEMP: w2->setTemperature(value); break;
+                    case W2_PARAM_MODE: w2->setMainMode(value); break;
+                    case W2_PARAM_SUB_MODE: w2->setSubMode(value); break;
+                    case W2_PARAM_FAN: w2->setFanSpeed(value); break;
+                    case W2_PARAM_POWER: w2->setPowerState(value); break;
+                }
+            }
+        }
+    } else if (cmd == CMD_SET_AC) {
+        uint8_t enable;
+        if (unpack_set_ac_message(rx_buf, &enable) == 0) {
+            EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+            if (d3 && d3->isAuthenticated()) d3->setAC(enable);
+
+            EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+            if (d3p && d3p->isAuthenticated()) d3p->setAC(enable);
+        }
+    } else if (cmd == CMD_SET_DC) {
+        uint8_t enable;
+        if (unpack_set_dc_message(rx_buf, &enable) == 0) {
+            EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+            if (d3 && d3->isAuthenticated()) d3->setDC(enable);
+             EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+            if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+        }
+    } else if (cmd == CMD_SET_VALUE) {
+        uint8_t type;
+        int value;
+        if (unpack_set_value_message(rx_buf, &type, &value) == 0) {
+             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+             if (d3 && d3->isAuthenticated()) {
+                switch(type) {
+                    case SET_VAL_AC_LIMIT: d3->setAcChargingLimit(value); break;
+                    case SET_VAL_MAX_SOC: d3->setBatterySOCLimits(value, -1); break;
+                    case SET_VAL_MIN_SOC: d3->setBatterySOCLimits(101, value); break;
+                }
+             }
+             EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+             if (d3p && d3p->isAuthenticated()) {
+                 switch(type) {
+                    case SET_VAL_AC_LIMIT: d3p->setAcChargingLimit(value); break;
+                    case SET_VAL_MAX_SOC: d3p->setBatterySOCLimits(value, -1); break;
+                    case SET_VAL_MIN_SOC: d3p->setBatterySOCLimits(101, value); break;
+                 }
+             }
+        }
+    }
+}
+
+void Stm32Serial::sendDeviceList() {
+    DeviceList list = {0};
+    DeviceSlot* slots[] = {
+        DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
+        DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
+        DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
+        DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
+    };
+
+    uint8_t count = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slots[i] && slots[i]->isConnected) {
+            list.devices[count].id = (uint8_t)slots[i]->type;
+            strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
+            list.devices[count].connected = 1;
+            count++;
+        }
+    }
+    list.count = count;
+
+    uint8_t buffer[sizeof(DeviceList) + 4];
+    int len = pack_device_list_message(buffer, &list);
+    Serial1.write(buffer, len);
+}
+
+void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
+    DeviceType type = (DeviceType)device_id;
+    EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
+
+    if (!dev || !dev->isAuthenticated()) return;
+
+    DeviceStatus status = {0};
+    status.id = device_id;
+    status.connected = 1;
+
+    // Set Brightness
+    status.brightness = LightSensor::getInstance().getBrightnessPercent();
+
+    if (type == DeviceType::DELTA_3) {
+        strncpy(status.name, "Delta 3", 15);
+        const Delta3Data& src = dev->getData().delta3;
+        Delta3DataStruct& dst = status.data.d3;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.acInputPower = src.acInputPower;
+        dst.acOutputPower = src.acOutputPower;
+        dst.inputPower = src.inputPower;
+        dst.outputPower = src.outputPower;
+        dst.dc12vOutputPower = src.dc12vOutputPower;
+        dst.dcPortInputPower = src.dcPortInputPower;
+        dst.dcPortState = src.dcPortState;
+        dst.usbcOutputPower = src.usbcOutputPower;
+        dst.usbc2OutputPower = src.usbc2OutputPower;
+        dst.usbaOutputPower = src.usbaOutputPower;
+        dst.usba2OutputPower = src.usba2OutputPower;
+        dst.pluggedInAc = src.pluggedInAc;
+        dst.energyBackup = src.energyBackup;
+        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
+        dst.batteryInputPower = src.batteryInputPower;
+        dst.batteryOutputPower = src.batteryOutputPower;
+        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
+        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
+        dst.cellTemperature = src.cellTemperature;
+        dst.dc12vPort = src.dc12vPort;
+        dst.acPorts = src.acPorts;
+        dst.solarInputPower = src.solarInputPower;
+        dst.acChargingSpeed = src.acChargingSpeed;
+        dst.maxAcChargingPower = src.maxAcChargingPower;
+        dst.acOn = src.acOn;
+        dst.dcOn = src.dcOn;
+        dst.usbOn = src.usbOn;
+
+    } else if (type == DeviceType::WAVE_2) {
+        strncpy(status.name, "Wave 2", 15);
+        const Wave2Data& src = dev->getData().wave2;
+        Wave2DataStruct& dst = status.data.w2;
+
+        dst.mode = src.mode;
+        dst.subMode = src.subMode;
+        dst.setTemp = src.setTemp;
+        dst.fanValue = src.fanValue;
+        dst.envTemp = src.envTemp;
+        dst.tempSys = src.tempSys;
+        dst.batSoc = src.batSoc;
+        dst.remainingTime = src.remainingTime;
+        dst.powerMode = src.powerMode;
+        dst.batPwrWatt = src.batPwrWatt;
+
+    } else if (type == DeviceType::DELTA_PRO_3) {
+        strncpy(status.name, "Delta Pro 3", 15);
+        const DeltaPro3Data& src = dev->getData().deltaPro3;
+        DeltaPro3DataStruct& dst = status.data.d3p;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.acInputPower = src.acInputPower;
+        dst.acLvOutputPower = src.acLvOutputPower;
+        dst.acHvOutputPower = src.acHvOutputPower;
+        dst.inputPower = src.inputPower;
+        dst.outputPower = src.outputPower;
+        dst.dc12vOutputPower = src.dc12vOutputPower;
+        dst.dcLvInputPower = src.dcLvInputPower;
+        dst.dcHvInputPower = src.dcHvInputPower;
+        dst.dcLvInputState = src.dcLvInputState;
+        dst.dcHvInputState = src.dcHvInputState;
+        dst.usbcOutputPower = src.usbcOutputPower;
+        dst.usbc2OutputPower = src.usbc2OutputPower;
+        dst.usbaOutputPower = src.usbaOutputPower;
+        dst.usba2OutputPower = src.usba2OutputPower;
+        dst.acChargingSpeed = src.acChargingSpeed;
+        dst.maxAcChargingPower = src.maxAcChargingPower;
+        dst.pluggedInAc = src.pluggedInAc;
+        dst.energyBackup = src.energyBackup;
+        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
+        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
+        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
+        dst.cellTemperature = src.cellTemperature;
+        dst.dc12vPort = src.dc12vPort;
+        dst.acLvPort = src.acLvPort;
+        dst.acHvPort = src.acHvPort;
+        dst.solarLvPower = src.solarLvPower;
+        dst.solarHvPower = src.solarHvPower;
+        dst.gfiMode = src.gfiMode;
+
+    } else if (type == DeviceType::ALTERNATOR_CHARGER) {
+        strncpy(status.name, "Alt Charger", 15);
+        const AlternatorChargerData& src = dev->getData().alternatorCharger;
+        AlternatorChargerDataStruct& dst = status.data.ac;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.dcPower = src.dcPower;
+        dst.chargerMode = src.chargerMode;
+        dst.chargerOpen = src.chargerOpen;
+        dst.carBatteryVoltage = src.carBatteryVoltage;
+    }
+
+    uint8_t buffer[sizeof(DeviceStatus) + 4];
+    int len = pack_device_status_message(buffer, &status);
+    Serial1.write(buffer, len);
+}

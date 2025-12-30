@@ -7,6 +7,7 @@
 
 extern UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3;
+TIM_HandleTypeDef htim2;
 QueueHandle_t displayQueue;
 
 // System Clock Configuration
@@ -68,6 +69,41 @@ static void MX_USART3_UART_Init(void) {
     HAL_NVIC_DisableIRQ(USART3_IRQn);
 }
 
+static void MX_TIM2_Init(void) {
+    TIM_MasterConfigTypeDef sMasterConfig = {0};
+    TIM_OC_InitTypeDef sConfigOC = {0};
+
+    htim2.Instance = TIM2;
+    // Prescaler to get around 1kHz frequency
+    // Clock is APB1 * 2 = 90MHz (approx, based on PLLN=360/M=8*P=2 => SYS=180, APB1=45 => TIM2=90MHz)
+    // 90,000,000 / 1000 = 90000.
+    // Period = 100 (for % logic) -> Prescaler = 900.
+    htim2.Init.Prescaler = 900 - 1;
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 100 - 1; // 0-99
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+    if (HAL_TIM_PWM_Init(&htim2) != HAL_OK) {
+        // Error
+    }
+
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK) {
+        // Error
+    }
+
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 100; // Start full brightness
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK) {
+        // Error
+    }
+
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+}
+
 void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     if(uartHandle->Instance==USART3) {
@@ -84,11 +120,34 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     }
 }
 
+void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
+    if(tim_pwmHandle->Instance==TIM2) {
+        __HAL_RCC_TIM2_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+
+        // PA3 -> TIM2_CH4 (Backlight)
+        GPIO_InitTypeDef GPIO_InitStruct = {0};
+        GPIO_InitStruct.Pin = GPIO_PIN_3;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    }
+}
+
+// Exposed to UI Task
+void SetBacklight(uint8_t percent) {
+    if (percent > 100) percent = 100;
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, percent);
+}
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
 
     MX_USART3_UART_Init();
+    MX_TIM2_Init();
 
     // Create Tasks
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));

@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <math.h>
 
+extern void SetBacklight(uint8_t percent);
+static uint32_t last_touch_time = 0;
+static bool is_sleeping = false;
+
 static int safe_float_to_int(float f) {
     if (isnan(f) || isinf(f)) return 0;
     return (int)f;
@@ -100,6 +104,19 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_btn_green, lv_palette_main(LV_PALETTE_GREEN));
     lv_style_set_text_color(&style_btn_green, lv_color_white());
     lv_style_set_radius(&style_btn_green, 8);
+}
+
+// --- Input Interceptor for Sleep ---
+static void input_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED || code == LV_EVENT_VALUE_CHANGED) {
+        last_touch_time = xTaskGetTickCount();
+        if (is_sleeping) {
+            is_sleeping = false;
+            // Wake up backlight immediately handled in Update loop or here
+            // We'll let the Update loop handle it to use the brightness value
+        }
+    }
 }
 
 // --- Navigation Callbacks ---
@@ -614,9 +631,46 @@ void UI_LVGL_Init(void) {
     ui_view_wave2_init(NULL); // Pre-init Wave 2 to ensure styles
 
     lv_scr_load(scr_dash);
+
+    // Add global input listener
+    lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_ALL, NULL);
+    // Also add to active screen just in case layer_top isn't catching everything?
+    // Usually layer_sys or checking indev is better, but this is simple.
+    // Actually, let's just use the tick count in the Update loop if we can detect input.
+    // A better way is to attach to the indev driver, but since we can't easily modify drivers here:
+    // We will assume any meaningful interaction triggers a callback we already have OR we rely on touch polling.
+    // But `lv_layer_top` doesn't always catch events if they are consumed by buttons.
+    // We'll stick to updating `last_touch_time` in `input_event_cb` and attaching it to screens.
+    lv_obj_add_event_cb(scr_dash, input_event_cb, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(scr_settings, input_event_cb, LV_EVENT_ALL, NULL);
+
+    last_touch_time = xTaskGetTickCount();
 }
 
 void UI_LVGL_Update(DeviceStatus* dev) {
+    // Handle Sleep
+    uint32_t now = xTaskGetTickCount();
+    uint8_t target_brightness = 100;
+
+    if (dev) {
+         if (dev->brightness > 0) target_brightness = dev->brightness;
+    }
+
+    if ((now - last_touch_time) > (60000 / portTICK_PERIOD_MS)) { // 60s
+        if (!is_sleeping) {
+            is_sleeping = true;
+            SetBacklight(10); // Dim
+        }
+    } else {
+        if (is_sleeping) {
+            is_sleeping = false;
+            SetBacklight(target_brightness);
+        } else {
+            // Continuous update of brightness (if auto-brightness changes)
+            SetBacklight(target_brightness);
+        }
+    }
+
     if (!dev) return;
 
     if (dev->id == DEV_TYPE_WAVE_2) {
@@ -692,11 +746,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 lim_charge_p = new_max_chg;
                 if (label_lim_chg_val) lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
                 if (slider_lim_chg) lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
+                lv_obj_invalidate(arc_batt);
             }
             if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
                 lim_discharge_p = new_min_dsg;
                 if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
                 if (slider_lim_out) lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
+                lv_obj_invalidate(arc_batt);
             }
         }
     }

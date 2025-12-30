@@ -1,7 +1,4 @@
 #include "LightSensor.h"
-#include <esp_log.h>
-
-static const char* TAG = "LightSensor";
 
 LightSensor& LightSensor::getInstance() {
     static LightSensor instance;
@@ -9,43 +6,35 @@ LightSensor& LightSensor::getInstance() {
 }
 
 LightSensor::LightSensor() {
-    for (int i = 0; i < WINDOW_SIZE; i++) {
-        _readings[i] = 0;
-    }
+    for (int i = 0; i < WINDOW_SIZE; i++) _readings[i] = 0;
 }
 
 void LightSensor::begin() {
-    _prefs.begin("light_cfg", false);
+    pinMode(_pin, INPUT);
+    _prefs.begin("lightsensor", false);
     _minADC = _prefs.getInt("min", 0);
     _maxADC = _prefs.getInt("max", 4095);
-    _prefs.end();
-
-    // Initialize readings with current value to avoid ramp-up
-    pinMode(_pin, INPUT);
-    //analogReadResolution(12); // Default is 12 for ESP32
-    //analogSetAttenuation(ADC_11db); // Default
-
-    int initial = 4095 - analogRead(_pin);
-    for (int i = 0; i < WINDOW_SIZE; i++) {
-        _readings[i] = initial;
-    }
-    _total = initial * WINDOW_SIZE;
-    _average = initial;
-
-    ESP_LOGI(TAG, "Initialized: Min=%d, Max=%d, Curr=%d", _minADC, _maxADC, initial);
 }
 
 void LightSensor::update() {
-    unsigned long now = millis();
-    if (now - _lastUpdate < 50) return; // 20Hz sampling
-    _lastUpdate = now;
+    if (millis() - _lastUpdate < 100) return; // 10Hz sampling
+    _lastUpdate = millis();
 
-    int val = 4095 - analogRead(_pin);
-
+    // Subtract the last reading
     _total = _total - _readings[_readIndex];
+
+    // Read new value
+    int val = analogRead(_pin);
+    // Invert because typically LDR pullup means lower value = brighter light?
+    // Or depends on wiring. Standard LDR circuit:
+    // VCC -> LDR -> Pin -> R -> GND ==> Bright = High V (High ADC)
+    // VCC -> R -> Pin -> LDR -> GND ==> Bright = Low V (Low ADC)
+    // Assuming Bright = High ADC for now, or calibratable.
+
     _readings[_readIndex] = val;
     _total = _total + _readings[_readIndex];
-    _readIndex = (_readIndex + 1) % WINDOW_SIZE;
+    _readIndex = (_readIndex + 1);
+    if (_readIndex >= WINDOW_SIZE) _readIndex = 0;
 
     _average = _total / WINDOW_SIZE;
 }
@@ -54,26 +43,24 @@ int LightSensor::getRaw() const {
     return _average;
 }
 
-int LightSensor::getMin() const {
-    return _minADC;
+uint8_t LightSensor::getBrightnessPercent() const {
+    // Map average ADC to 10-100%
+    // ADC 0 (Dark) -> 10%
+    // ADC 4095 (Bright) -> 100%
+    int val = _average;
+    if (val < _minADC) val = _minADC;
+    if (val > _maxADC) val = _maxADC;
+
+    int pct = map(val, _minADC, _maxADC, 10, 100);
+    return (uint8_t)constrain(pct, 10, 100);
 }
 
-int LightSensor::getMax() const {
-    return _maxADC;
-}
+int LightSensor::getMin() const { return _minADC; }
+int LightSensor::getMax() const { return _maxADC; }
 
 void LightSensor::setCalibration(int min, int max) {
-    if (min < 0) min = 0;
-    if (max > 4095) max = 4095;
-    if (min >= max) min = max - 1; // Basic sanity check
-
     _minADC = min;
     _maxADC = max;
-
-    _prefs.begin("light_cfg", false);
-    _prefs.putInt("min", _minADC);
-    _prefs.putInt("max", _maxADC);
-    _prefs.end();
-
-    ESP_LOGI(TAG, "Calibration Saved: Min=%d, Max=%d", _minADC, _maxADC);
+    _prefs.putInt("min", min);
+    _prefs.putInt("max", max);
 }
