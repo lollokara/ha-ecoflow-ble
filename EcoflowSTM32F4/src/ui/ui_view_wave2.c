@@ -243,9 +243,12 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_obj_align(cont_sub_mode, LV_ALIGN_TOP_LEFT, start_x, start_y + btn_size + 30);
     lv_obj_set_style_bg_opa(cont_sub_mode, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(cont_sub_mode, 0, 0);
+    lv_obj_clear_flag(cont_sub_mode, LV_OBJ_FLAG_SCROLLABLE); // Disable Scroll
 
     lv_obj_t * lbl_sub = lv_label_create(cont_sub_mode);
     lv_label_set_text(lbl_sub, "Mode:");
+    lv_obj_set_style_text_color(lbl_sub, lv_color_white(), 0); // White Text
+    lv_obj_set_style_text_font(lbl_sub, &lv_font_montserrat_32, 0); // Large Font
     lv_obj_align(lbl_sub, LV_ALIGN_LEFT_MID, 0, 0);
 
     dd_sub_mode = lv_dropdown_create(cont_sub_mode);
@@ -259,7 +262,10 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_slider_set_range(slider_fan, 1, 3);
     lv_slider_set_value(slider_fan, 1, LV_ANIM_OFF);
     lv_obj_set_width(slider_fan, 280);
-    lv_obj_align(slider_fan, LV_ALIGN_BOTTOM_RIGHT, -40, -40);
+    // Center alignment relative to the 3 mode buttons
+    // The buttons start at start_x (300) and span 3*btn_size + 2*spacing = 3*80 + 2*20 = 280px
+    // So aligning to start_x will center it under them.
+    lv_obj_align(slider_fan, LV_ALIGN_TOP_LEFT, start_x, start_y + btn_size + 30 + 30);
     lv_obj_add_event_cb(slider_fan, event_fan_change, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_fan, event_fan_change, LV_EVENT_RELEASED, NULL);
 

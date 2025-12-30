@@ -42,13 +42,16 @@ static lv_obj_t * scr_settings;
 static lv_obj_t * label_lim_in_val;
 static lv_obj_t * label_lim_out_val;
 static lv_obj_t * label_lim_chg_val;
+static lv_obj_t * slider_lim_in;
+static lv_obj_t * slider_lim_out;
+static lv_obj_t * slider_lim_chg;
 static lv_obj_t * label_calib_debug; // For touch calibration
 
 // Indicator
 static lv_obj_t * led_status_dot;
 static lv_obj_t * label_disconnected;
 
-// Flow Data Labels
+// Flow Data Labels - Now managed via card structs
 static lv_obj_t * label_solar_val;
 static lv_obj_t * label_grid_val;
 static lv_obj_t * label_car_val;
@@ -259,29 +262,58 @@ static void event_arc_draw(lv_event_t * e) {
 }
 
 // --- Helper to create Info Card ---
-static void create_info_card(lv_obj_t * parent, const char* icon_code, const char* label_text, int x, int y, lv_obj_t ** val_label_ptr) {
-    lv_obj_t * card = lv_obj_create(parent);
-    lv_obj_set_size(card, 160, 90);
-    lv_obj_set_pos(card, x, y);
-    lv_obj_add_style(card, &style_panel, 0);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+// Stores object pointers for dynamic styling
+typedef struct {
+    lv_obj_t * card;
+    lv_obj_t * icon;
+    lv_obj_t * title;
+    lv_obj_t * value;
+} InfoCardObj;
 
-    lv_obj_t * icon = lv_label_create(card);
-    ui_set_icon(icon, icon_code);
-    lv_obj_align(icon, LV_ALIGN_LEFT_MID, -5, 0);
-    lv_obj_set_style_text_font(icon, &ui_font_mdi, 0);
-    lv_obj_set_style_text_color(icon, lv_palette_main(LV_PALETTE_TEAL), 0);
+// Global Card Objects
+static InfoCardObj card_solar, card_grid, card_car;
+static InfoCardObj card_usb, card_12v, card_ac;
 
-    lv_obj_t * name = lv_label_create(card);
-    lv_label_set_text(name, label_text);
-    lv_obj_add_style(name, &style_text_small, 0);
-    lv_obj_align(name, LV_ALIGN_TOP_RIGHT, 0, -5);
+static void create_info_card(lv_obj_t * parent, const char* icon_code, const char* label_text, int x, int y, InfoCardObj * obj) {
+    obj->card = lv_obj_create(parent);
+    lv_obj_set_size(obj->card, 160, 90);
+    lv_obj_set_pos(obj->card, x, y);
+    lv_obj_add_style(obj->card, &style_panel, 0);
+    lv_obj_clear_flag(obj->card, LV_OBJ_FLAG_SCROLLABLE);
 
-    *val_label_ptr = lv_label_create(card);
-    lv_label_set_text(*val_label_ptr, "0 W");
-    lv_obj_add_style(*val_label_ptr, &style_text_large, 0);
-    lv_obj_set_style_text_font(*val_label_ptr, &lv_font_montserrat_20, 0);
-    lv_obj_align(*val_label_ptr, LV_ALIGN_BOTTOM_RIGHT, 0, 5);
+    obj->icon = lv_label_create(obj->card);
+    ui_set_icon(obj->icon, icon_code);
+    lv_obj_align(obj->icon, LV_ALIGN_LEFT_MID, -5, 0);
+    lv_obj_set_style_text_font(obj->icon, &ui_font_mdi, 0);
+    lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+    obj->title = lv_label_create(obj->card);
+    lv_label_set_text(obj->title, label_text);
+    lv_obj_add_style(obj->title, &style_text_small, 0);
+    lv_obj_align(obj->title, LV_ALIGN_TOP_RIGHT, 0, -5);
+
+    obj->value = lv_label_create(obj->card);
+    lv_label_set_text(obj->value, "0 W");
+    lv_obj_add_style(obj->value, &style_text_large, 0);
+    lv_obj_set_style_text_font(obj->value, &lv_font_montserrat_20, 0);
+    lv_obj_align(obj->value, LV_ALIGN_BOTTOM_RIGHT, 0, 5);
+}
+
+static void update_card_style(InfoCardObj * obj, int val) {
+    if (val > 0) {
+        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
+        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
+        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
+        // Invert Icon? Or keep Teal? User said "invert then the icon and text to be still readable"
+        // Dark grey or black icon on white looks good.
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+    } else {
+        // Revert to Dark Theme
+        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
+    }
 }
 
 static void create_settings(void) {
@@ -336,14 +368,14 @@ static void create_settings(void) {
     lv_obj_set_style_text_font(label_lim_in_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
-    lv_obj_t * s1 = lv_slider_create(p1);
-    lv_slider_set_range(s1, 400, 3000);
-    lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
-    lv_obj_set_width(s1, 600);
-    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -5);
-    lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_RELEASED, NULL); // Catch release to send cmd
-    lv_obj_add_event_cb(s1, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
+    slider_lim_in = lv_slider_create(p1);
+    lv_slider_set_range(slider_lim_in, 400, 3000);
+    lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
+    lv_obj_set_width(slider_lim_in, 600);
+    lv_obj_align(slider_lim_in, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_add_event_cb(slider_lim_in, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(slider_lim_in, event_slider_input, LV_EVENT_RELEASED, NULL); // Catch release to send cmd
+    lv_obj_add_event_cb(slider_lim_in, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
 
     // 2. Min Discharge (0 - 30)
     lv_obj_t * p2 = lv_obj_create(cont);
@@ -363,14 +395,14 @@ static void create_settings(void) {
     lv_obj_set_style_text_font(label_lim_out_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
-    lv_obj_t * s2 = lv_slider_create(p2);
-    lv_slider_set_range(s2, 0, 30);
-    lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
-    lv_obj_set_width(s2, 600);
-    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -5);
-    lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_RELEASED, NULL);
-    lv_obj_add_event_cb(s2, event_calib_touch, LV_EVENT_CLICKED, NULL);
+    slider_lim_out = lv_slider_create(p2);
+    lv_slider_set_range(slider_lim_out, 0, 30);
+    lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
+    lv_obj_set_width(slider_lim_out, 600);
+    lv_obj_align(slider_lim_out, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_add_event_cb(slider_lim_out, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(slider_lim_out, event_slider_discharge, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(slider_lim_out, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // 3. Max Charge (50 - 100)
     lv_obj_t * p3 = lv_obj_create(cont);
@@ -390,14 +422,14 @@ static void create_settings(void) {
     lv_obj_set_style_text_font(label_lim_chg_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
-    lv_obj_t * s3 = lv_slider_create(p3);
-    lv_slider_set_range(s3, 50, 100);
-    lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
-    lv_obj_set_width(s3, 600);
-    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -5);
-    lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_RELEASED, NULL);
-    lv_obj_add_event_cb(s3, event_calib_touch, LV_EVENT_CLICKED, NULL);
+    slider_lim_chg = lv_slider_create(p3);
+    lv_slider_set_range(slider_lim_chg, 50, 100);
+    lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
+    lv_obj_set_width(slider_lim_chg, 600);
+    lv_obj_align(slider_lim_chg, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(slider_lim_chg, event_calib_touch, LV_EVENT_CLICKED, NULL);
 }
 
 
@@ -431,14 +463,20 @@ static void create_dashboard(void) {
     lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
 
     // --- Left Column (Inputs) ---
-    create_info_card(scr_dash, MDI_ICON_SOLAR, "Solar", 20, 60, &label_solar_val);
-    create_info_card(scr_dash, MDI_ICON_PLUG, "Grid", 20, 160, &label_grid_val);
-    create_info_card(scr_dash, MDI_ICON_CAR, "Car", 20, 260, &label_car_val);
+    create_info_card(scr_dash, MDI_ICON_SOLAR, "Solar", 20, 60, &card_solar);
+    label_solar_val = card_solar.value;
+    create_info_card(scr_dash, MDI_ICON_PLUG, "Grid", 20, 160, &card_grid);
+    label_grid_val = card_grid.value;
+    create_info_card(scr_dash, MDI_ICON_CAR, "Car", 20, 260, &card_car);
+    label_car_val = card_car.value;
 
     // --- Right Column (Outputs) ---
-    create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &label_usb_val);
-    create_info_card(scr_dash, MDI_ICON_AC, "12V DC", 620, 160, &label_12v_val);
-    create_info_card(scr_dash, MDI_ICON_AC, "AC Out", 620, 260, &label_ac_val);
+    create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &card_usb);
+    label_usb_val = card_usb.value;
+    create_info_card(scr_dash, MDI_ICON_AC, "12V DC", 620, 160, &card_12v);
+    label_12v_val = card_12v.value;
+    create_info_card(scr_dash, MDI_ICON_AC, "AC Out", 620, 260, &card_ac);
+    label_ac_val = card_ac.value;
 
     // --- Center (Battery) ---
     arc_batt = lv_arc_create(scr_dash);
@@ -628,6 +666,41 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     int temp_int = safe_float_to_int(temp);
 
+    // Settings Sync: Update state variables only if settings screen is not active
+    if (lv_scr_act() != scr_settings) {
+        if (dev->id == DEV_TYPE_DELTA_PRO_3 || dev->id == DEV_TYPE_DELTA_3) {
+            int new_ac_lim = 0;
+            int new_max_chg = 0;
+            int new_min_dsg = 0;
+
+            if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+                new_ac_lim = dev->data.d3p.acChargingSpeed;
+                new_max_chg = dev->data.d3p.batteryChargeLimitMax;
+                new_min_dsg = dev->data.d3p.batteryChargeLimitMin;
+            } else {
+                new_ac_lim = dev->data.d3.acChargingSpeed;
+                new_max_chg = dev->data.d3.batteryChargeLimitMax;
+                new_min_dsg = dev->data.d3.batteryChargeLimitMin;
+            }
+
+            if (new_ac_lim > 0 && new_ac_lim != lim_input_w) {
+                lim_input_w = new_ac_lim;
+                if (label_lim_in_val) lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+                if (slider_lim_in) lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
+            }
+            if (new_max_chg > 0 && new_max_chg != lim_charge_p) {
+                lim_charge_p = new_max_chg;
+                if (label_lim_chg_val) lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
+                if (slider_lim_chg) lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
+            }
+            if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
+                lim_discharge_p = new_min_dsg;
+                if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
+                if (slider_lim_out) lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
+            }
+        }
+    }
+
     // Update Disconnected State
     if (dev->connected) {
         lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
@@ -650,26 +723,32 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (first_run || in_solar != last_solar) {
         lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
+        update_card_style(&card_solar, in_solar);
         last_solar = in_solar;
     }
     if (first_run || in_ac != last_grid) {
         lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
+        update_card_style(&card_grid, in_ac);
         last_grid = in_ac;
     }
     if (first_run || in_alt != last_car) {
         lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
+        update_card_style(&card_car, in_alt);
         last_car = in_alt;
     }
     if (first_run || out_usb != last_usb) {
         lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
+        update_card_style(&card_usb, out_usb);
         last_usb = out_usb;
     }
     if (first_run || out_12v != last_12v) {
         lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
+        update_card_style(&card_12v, out_12v);
         last_12v = out_12v;
     }
     if (first_run || out_ac != last_ac) {
         lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
+        update_card_style(&card_ac, out_ac);
         last_ac = out_ac;
     }
 

@@ -74,7 +74,7 @@ static void logWave2Data(const Wave2Data& w) {
 static void logDeltaPro3Data(const DeltaPro3Data& d) {
     ESP_LOGI(TAG, "=== Delta Pro 3 Data ===");
     ESP_LOGI(TAG, "Batt: %.1f%%, Backup: %d (Lvl: %d%%)", d.batteryLevel, d.energyBackup, d.energyBackupBatteryLevel);
-    ESP_LOGI(TAG, "AC: In=%.1fW, Out LV=%.1fW, Out HV=%.1fW", d.acInputPower, d.acLvOutputPower, d.acHvOutputPower);
+    ESP_LOGI(TAG, "AC: In=%.1fW, Out LV=%.1fW, Out HV=%.1fW", d.inputPower, d.acLvOutputPower, d.acHvOutputPower);
     ESP_LOGI(TAG, "DC: 12V=%.1fW, Solar LV=%.1fW, Solar HV=%.1fW", d.dc12vOutputPower, d.solarLvPower, d.solarHvPower);
     ESP_LOGI(TAG, "Limits: AC Chg=%dW, SOC %d-%d%%", d.acChargingSpeed, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
     ESP_LOGI(TAG, "State: AC LV=%d, AC HV=%d, DC=%d, GFI=%d", d.acLvPort, d.acHvPort, d.dc12vPort, d.gfiMode);

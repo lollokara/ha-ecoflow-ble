@@ -28,11 +28,10 @@ extern const lv_font_t ui_font_mdi;
 
 // New Icons for Wave 2
 // Note: These will only render if the font is regenerated with these glyphs.
-// Since the generator is missing, these are placeholders for now.
 #define MDI_ICON_FAN        "\U000F0210" // 󰈐
 #define MDI_ICON_THERMOMETER "\U000F050F" // 󰔏
-#define MDI_ICON_FIRE       "\U000F023E" // 󰈾
-#define MDI_ICON_SNOWFLAKE  "\U000F0494" // 󰒔
+#define MDI_ICON_FIRE       "\U000F18D6" // 󱣖 (New Hot Icon)
+#define MDI_ICON_SNOWFLAKE  "\U000F1A71" // 󱩱 (New Cold Icon)
 #define MDI_ICON_LEAF       "\U000F030D" // 󰌍
 #define MDI_ICON_MOON       "\U000F0594" // 󰖔
 #define MDI_ICON_POWER      "\U000F0425" // 󰐥
