@@ -220,6 +220,7 @@ void checkUart() {
                                 uint8_t ack[4];
                                 int len = pack_handshake_ack_message(ack);
                                 Serial1.write(ack, len);
+                                delay(50);
                                 sendDeviceList();
                         } else if (cmd == CMD_GET_DEVICE_STATUS) {
                                 uint8_t dev_id;

@@ -96,6 +96,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     HAL_UART_Receive_IT(&huart6, &rx_byte, 1);
 }
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART6) {
+        // Clear error flags by reading SR and DR
+        volatile uint32_t tmp;
+        tmp = huart->Instance->SR;
+        tmp = huart->Instance->DR;
+        (void)tmp;
+
+        // Reset buffer index to avoid partial packet corruption
+        rx_index = 0;
+
+        // Restart reception
+        HAL_UART_Receive_IT(&huart6, &rx_byte, 1);
+    }
+}
+
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
