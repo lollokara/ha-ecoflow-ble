@@ -31,6 +31,7 @@ extern "C" {
 #define CMD_HANDSHAKE 0x20
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
+#define CMD_SET_VALUE 0x40
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
@@ -190,6 +191,28 @@ typedef struct {
 } DeviceStatus;
 
 typedef struct {
+    uint8_t device_type;
+    uint8_t command_id;
+    uint8_t value_type; // 0=int, 1=float
+    union {
+        int32_t int_val;
+        float float_val;
+    } value;
+} SetValueCommand;
+
+// Set Value Command IDs
+// Generic / Delta 3
+#define SET_CMD_AC_ENABLE 1
+#define SET_CMD_DC_ENABLE 2
+#define SET_CMD_USB_ENABLE 3
+// Wave 2
+#define SET_CMD_W2_POWER 10
+#define SET_CMD_W2_TEMP 11
+#define SET_CMD_W2_MODE 12
+#define SET_CMD_W2_SUBMODE 13
+#define SET_CMD_W2_FAN 14
+
+typedef struct {
     uint8_t count;
     struct {
         uint8_t id;
@@ -215,6 +238,9 @@ int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id);
 
 int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status);
 int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status);
+
+int pack_set_value_message(uint8_t *buffer, const SetValueCommand *cmd);
+int unpack_set_value_message(const uint8_t *buffer, SetValueCommand *cmd);
 
 
 #ifdef __cplusplus
