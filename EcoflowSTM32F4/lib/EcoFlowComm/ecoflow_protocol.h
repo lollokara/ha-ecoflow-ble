@@ -37,12 +37,12 @@ extern "C" {
 #define CMD_SET_AC 0x31
 #define CMD_SET_DC 0x32
 
-// Wave 2 Set Types
-#define W2_SET_TEMP 1
-#define W2_SET_MODE 2
-#define W2_SET_SUB_MODE 3
-#define W2_SET_FAN 4
-#define W2_SET_POWER 5
+// Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
+#define W2_PARAM_TEMP 1
+#define W2_PARAM_MODE 2
+#define W2_PARAM_SUB_MODE 3
+#define W2_PARAM_FAN 4
+#define W2_PARAM_POWER 5
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
@@ -211,7 +211,7 @@ typedef struct {
 } DeviceList;
 
 typedef struct {
-    uint8_t type;  // W2_SET_TEMP, etc.
+    uint8_t type;  // W2_PARAM_TEMP, etc.
     uint8_t value;
 } Wave2SetMsg;
 

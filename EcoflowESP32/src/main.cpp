@@ -313,13 +313,12 @@ void checkUart() {
                                 if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
                                     EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
                                     if (w2 && w2->isAuthenticated()) {
-                                        // W2_SET_TEMP 1, MODE 2, SUB 3, FAN 4, POWER 5
                                         switch(type) {
-                                            case 1: w2->setTemperature(value); break;
-                                            case 2: w2->setMainMode(value); break;
-                                            case 3: w2->setSubMode(value); break;
-                                            case 4: w2->setFanSpeed(value); break;
-                                            case 5: w2->setPowerState(value); break;
+                                            case W2_PARAM_TEMP: w2->setTemperature(value); break;
+                                            case W2_PARAM_MODE: w2->setMainMode(value); break;
+                                            case W2_PARAM_SUB_MODE: w2->setSubMode(value); break;
+                                            case W2_PARAM_FAN: w2->setFanSpeed(value); break;
+                                            case W2_PARAM_POWER: w2->setPowerState(value); break;
                                         }
                                     }
                                 }

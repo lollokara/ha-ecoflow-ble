@@ -73,7 +73,7 @@ static void event_temp_change(lv_event_t * e) {
     int val = (int)lv_arc_get_value(arc);
     lv_label_set_text_fmt(label_set_temp_val, "%d C", val);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        send_cmd(W2_SET_TEMP, (uint8_t)val);
+        send_cmd(W2_PARAM_TEMP, (uint8_t)val);
     }
 }
 
@@ -120,7 +120,7 @@ static void update_visibility(int mode, int sub) {
 
 static void event_mode_click(lv_event_t * e) {
     int mode = (int)(intptr_t)lv_event_get_user_data(e);
-    send_cmd(W2_SET_MODE, (uint8_t)mode);
+    send_cmd(W2_PARAM_MODE, (uint8_t)mode);
 
     // Optimistic UI update
     int sub = lv_dropdown_get_selected(dd_sub_mode);
@@ -129,7 +129,7 @@ static void event_mode_click(lv_event_t * e) {
 
 static void event_sub_mode_change(lv_event_t * e) {
     uint16_t opt = lv_dropdown_get_selected(dd_sub_mode);
-    send_cmd(W2_SET_SUB_MODE, (uint8_t)opt);
+    send_cmd(W2_PARAM_SUB_MODE, (uint8_t)opt);
 
     update_visibility(current_mode, opt);
 }
@@ -139,7 +139,7 @@ static void event_fan_change(lv_event_t * e) {
     int val = (int)lv_slider_get_value(slider);
     lv_label_set_text_fmt(label_fan_val, "Fan: %d", val);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        send_cmd(W2_SET_FAN, (uint8_t)val);
+        send_cmd(W2_PARAM_FAN, (uint8_t)val);
     }
 }
 
@@ -278,7 +278,7 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
         lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", (int)data->setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
     }
 
     if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {
