@@ -523,6 +523,12 @@ void UI_LVGL_Init(void) {
 void UI_LVGL_Update(DeviceStatus* dev) {
     if (!dev) return;
 
+    // Fix for Unaligned Access HardFault:
+    // DeviceStatus is packed, so float members are likely unaligned.
+    // Copy to a local aligned struct before accessing.
+    DeviceSpecificData aligned_data;
+    memcpy(&aligned_data, &dev->data, sizeof(DeviceSpecificData));
+
     // Map data
     int soc = 0;
     int in_solar=0, in_ac=0, in_alt=0;
@@ -530,23 +536,23 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     float temp = 25.0f;
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-        soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.acInputPower);
-        in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
-        out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
-        temp = (float)dev->data.d3p.cellTemperature; // Int to Float
+        soc = safe_float_to_int(aligned_data.d3p.batteryLevel);
+        in_ac = safe_float_to_int(aligned_data.d3p.acInputPower);
+        in_solar = safe_float_to_int(aligned_data.d3p.solarLvPower + aligned_data.d3p.solarHvPower);
+        in_alt = safe_float_to_int(aligned_data.d3p.dcLvInputPower);
+        out_ac = safe_float_to_int(aligned_data.d3p.acLvOutputPower + aligned_data.d3p.acHvOutputPower);
+        out_12v = safe_float_to_int(aligned_data.d3p.dc12vOutputPower);
+        out_usb = safe_float_to_int(aligned_data.d3p.usbaOutputPower + aligned_data.d3p.usbcOutputPower);
+        temp = (float)aligned_data.d3p.cellTemperature; // Int to Float
     } else if (dev->id == DEV_TYPE_DELTA_3) {
-        soc = safe_float_to_int(dev->data.d3.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3.acInputPower);
-        in_solar = safe_float_to_int(dev->data.d3.solarInputPower);
-        in_alt = safe_float_to_int(dev->data.d3.dcPortInputPower);
-        out_ac = safe_float_to_int(dev->data.d3.acOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
-        temp = (float)dev->data.d3.cellTemperature; // Int to Float
+        soc = safe_float_to_int(aligned_data.d3.batteryLevel);
+        in_ac = safe_float_to_int(aligned_data.d3.acInputPower);
+        in_solar = safe_float_to_int(aligned_data.d3.solarInputPower);
+        in_alt = safe_float_to_int(aligned_data.d3.dcPortInputPower);
+        out_ac = safe_float_to_int(aligned_data.d3.acOutputPower);
+        out_12v = safe_float_to_int(aligned_data.d3.dc12vOutputPower);
+        out_usb = safe_float_to_int(aligned_data.d3.usbaOutputPower + aligned_data.d3.usbcOutputPower);
+        temp = (float)aligned_data.d3.cellTemperature; // Int to Float
     }
 
     lv_label_set_text_fmt(label_temp, "%d C", safe_float_to_int(temp));
@@ -560,24 +566,36 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
     lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
 
-    // Toggle Styles
-    if (out_ac > 0) {
-        lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-        lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
-        lv_label_set_text(lbl_ac_t, "AC\nON");
-    } else {
-        lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
-        lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
-        lv_label_set_text(lbl_ac_t, "AC\nOFF");
+    // Toggle Styles (Optimized)
+    static int last_ac_state = -1;
+    int curr_ac_state = (out_ac > 0) ? 1 : 0;
+
+    if (curr_ac_state != last_ac_state) {
+        last_ac_state = curr_ac_state;
+        if (curr_ac_state) {
+            lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
+            lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
+            lv_label_set_text(lbl_ac_t, "AC\nON");
+        } else {
+            lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+            lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
+            lv_label_set_text(lbl_ac_t, "AC\nOFF");
+        }
     }
 
-    if (out_12v > 0) {
-        lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-        lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
-        lv_label_set_text(lbl_dc_t, "12V\nON");
-    } else {
-        lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-        lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
-        lv_label_set_text(lbl_dc_t, "12V\nOFF");
+    static int last_dc_state = -1;
+    int curr_dc_state = (out_12v > 0) ? 1 : 0;
+
+    if (curr_dc_state != last_dc_state) {
+        last_dc_state = curr_dc_state;
+        if (curr_dc_state) {
+            lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
+            lv_label_set_text(lbl_dc_t, "12V\nON");
+        } else {
+            lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+            lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
+            lv_label_set_text(lbl_dc_t, "12V\nOFF");
+        }
     }
 }
