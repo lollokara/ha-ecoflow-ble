@@ -6,7 +6,7 @@
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 17 (connected to F4 TX)
 // TX Pin = 16 (connected to F4 RX)
-#define RX_PIN 16
+#define RX_PIN 18
 #define TX_PIN 17
 
 static const char* TAG = "Stm32Serial";
