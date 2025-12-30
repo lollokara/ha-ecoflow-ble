@@ -5,7 +5,9 @@
 #include <math.h>
 
 // --- Helpers ---
-static int safe_float_to_int(float f) {
+static int get_safe_int_from_float(const void* ptr) {
+    float f;
+    memcpy(&f, ptr, sizeof(float));
     if (isnan(f) || isinf(f)) return 0;
     return (int)f;
 }
@@ -518,32 +520,45 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     int out_usb=0, out_12v=0, out_ac=0;
     float temp = 25.0f;
 
-    // Use local aligned structs to avoid unaligned access HardFaults on M4
-    // caused by packed DeviceStatus structure.
+    // Use helper to read floats safely from packed/unaligned structs
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-        DeltaPro3DataStruct d3p;
-        memcpy(&d3p, &dev->data.d3p, sizeof(d3p));
+        soc = get_safe_int_from_float(&dev->data.d3p.batteryLevel);
+        in_ac = get_safe_int_from_float(&dev->data.d3p.acInputPower);
 
-        soc = safe_float_to_int(d3p.batteryLevel);
-        in_ac = safe_float_to_int(d3p.acInputPower);
-        in_solar = safe_float_to_int(d3p.solarLvPower + d3p.solarHvPower);
-        in_alt = safe_float_to_int(d3p.dcLvInputPower);
-        out_ac = safe_float_to_int(d3p.acLvOutputPower + d3p.acHvOutputPower);
-        out_12v = safe_float_to_int(d3p.dc12vOutputPower);
-        out_usb = safe_float_to_int(d3p.usbaOutputPower + d3p.usbcOutputPower);
-        temp = (float)d3p.cellTemperature; // Integer in struct
+        // Solar sum (read individually)
+        int sol_lv = get_safe_int_from_float(&dev->data.d3p.solarLvPower);
+        int sol_hv = get_safe_int_from_float(&dev->data.d3p.solarHvPower);
+        in_solar = sol_lv + sol_hv;
+
+        in_alt = get_safe_int_from_float(&dev->data.d3p.dcLvInputPower);
+
+        // AC Out sum
+        int ac_lv = get_safe_int_from_float(&dev->data.d3p.acLvOutputPower);
+        int ac_hv = get_safe_int_from_float(&dev->data.d3p.acHvOutputPower);
+        out_ac = ac_lv + ac_hv;
+
+        out_12v = get_safe_int_from_float(&dev->data.d3p.dc12vOutputPower);
+
+        // USB sum
+        int usb_a = get_safe_int_from_float(&dev->data.d3p.usbaOutputPower);
+        int usb_c = get_safe_int_from_float(&dev->data.d3p.usbcOutputPower);
+        out_usb = usb_a + usb_c;
+
+        temp = (float)dev->data.d3p.cellTemperature; // Integer access is safe on M4
     } else if (dev->id == DEV_TYPE_DELTA_3) {
-        Delta3DataStruct d3;
-        memcpy(&d3, &dev->data.d3, sizeof(d3));
+        soc = get_safe_int_from_float(&dev->data.d3.batteryLevel);
+        in_ac = get_safe_int_from_float(&dev->data.d3.acInputPower);
+        in_solar = get_safe_int_from_float(&dev->data.d3.solarInputPower);
+        in_alt = get_safe_int_from_float(&dev->data.d3.dcPortInputPower);
+        out_ac = get_safe_int_from_float(&dev->data.d3.acOutputPower);
+        out_12v = get_safe_int_from_float(&dev->data.d3.dc12vOutputPower);
 
-        soc = safe_float_to_int(d3.batteryLevel);
-        in_ac = safe_float_to_int(d3.acInputPower);
-        in_solar = safe_float_to_int(d3.solarInputPower);
-        in_alt = safe_float_to_int(d3.dcPortInputPower);
-        out_ac = safe_float_to_int(d3.acOutputPower);
-        out_12v = safe_float_to_int(d3.dc12vOutputPower);
-        out_usb = safe_float_to_int(d3.usbaOutputPower + d3.usbcOutputPower);
-        temp = (float)d3.cellTemperature;
+        // USB sum
+        int usb_a = get_safe_int_from_float(&dev->data.d3.usbaOutputPower);
+        int usb_c = get_safe_int_from_float(&dev->data.d3.usbcOutputPower);
+        out_usb = usb_a + usb_c;
+
+        temp = (float)dev->data.d3.cellTemperature;
     }
 
     lv_label_set_text_fmt(label_temp, "%d C", (int)temp);
