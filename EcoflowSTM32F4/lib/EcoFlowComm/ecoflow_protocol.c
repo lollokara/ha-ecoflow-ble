@@ -57,6 +57,11 @@ int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
     if (received_crc != calculated_crc) return -1;
 
     memcpy(list, &buffer[3], len);
+
+    // Sanitize count to prevent overflow in consumer
+    if (list->count > MAX_DEVICES) {
+        list->count = MAX_DEVICES;
+    }
     return 0;
 }
 
