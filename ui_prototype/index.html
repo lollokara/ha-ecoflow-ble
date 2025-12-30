@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=800, height=480, initial-scale=1.0">
+    <title>EcoFlow Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 800px;
+            height: 480px;
+            background-color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Colors */
+        :root {
+            --bg: #FFFFFF;
+            --text: #000000;
+            --text-sec: #333333;
+            --accent: #00BCD4;
+            --warn: #F44336;
+            --charge: #2196F3;
+            --success: #4CAF50;
+            --panel: #F5F5F5;
+            --border: #E0E0E0;
+        }
+
+        /* Section 1: Top Bar & Battery */
+        .header {
+            height: 140px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            height: 30px;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .battery-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .charge-bar-container {
+            width: 700px;
+            height: 60px;
+            background-color: var(--panel);
+            border: 1px solid #999;
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .charge-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #F44336 0%, #FF9800 30%, #4CAF50 100%);
+            width: 75%; /* Dynamic */
+        }
+
+        .limit-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: var(--text);
+            z-index: 10;
+        }
+
+        .limit-label {
+            position: absolute;
+            top: 65px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .soc-badge {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.9);
+            padding: 5px 15px;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stats-row {
+            height: 35px;
+            display: flex;
+            background-color: var(--panel);
+            border-top: 1px solid var(--border);
+        }
+
+        .stat-item {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            border-right: 1px solid var(--border);
+        }
+
+        /* Section 2: Energy Flow */
+        .flow-diagram {
+            height: 210px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            align-items: center;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            height: 100%;
+            width: 100px;
+            align-items: center;
+        }
+
+        .center-column {
+            width: 200px;
+        }
+
+        .icon-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80px;
+        }
+
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--panel);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .icon-circle.active {
+            background-color: #E8F5E9; /* Light Green */
+        }
+
+        .icon-circle svg {
+            width: 32px;
+            height: 32px;
+            fill: var(--text-sec);
+        }
+
+        .icon-circle.active svg {
+            fill: var(--success);
+        }
+
+        .val-text {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Battery Center */
+        .battery-center svg {
+            width: 80px;
+            height: 80px;
+            fill: var(--accent);
+        }
+
+        /* Connecting Lines (SVG Overlay) */
+        .connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Section 3: Footer */
+        .footer {
+            height: 130px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            background-color: var(--bg);
+        }
+
+        .status-info {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-sec);
+        }
+
+        .settings-btn {
+            width: 120px;
+            height: 50px;
+            background-color: var(--accent);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="top-bar">
+            <span>Battery Status</span>
+            <span>Temp: 25°C</span>
+        </div>
+        <div class="battery-area">
+            <div class="charge-bar-container">
+                <div class="charge-bar-fill" style="width: 75%;"></div>
+                <!-- Limits -->
+                <div class="limit-line" style="left: 10%;"></div>
+                <div class="limit-label" style="left: 9%;">10%</div>
+
+                <div class="limit-line" style="left: 95%; background-color: var(--charge);"></div>
+                <div class="limit-label" style="left: 94%;">95%</div>
+
+                <div class="soc-badge">75%</div>
+            </div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-item">In: 450W</div>
+            <div class="stat-item">Out: 120W</div>
+            <div class="stat-item">5h 30m remaining</div>
+        </div>
+    </div>
+
+    <!-- Energy Flow -->
+    <div class="flow-diagram">
+        <svg class="connections">
+            <!-- Lines drawn here -->
+            <line x1="80" y1="50" x2="350" y2="105" stroke="#E0E0E0" stroke-width="2" />
+            <line x1="80" y1="160" x2="350" y2="105" stroke="#E0E0E0" stroke-width="2" />
+            <line x1="450" y1="105" x2="720" y2="50" stroke="#4CAF50" stroke-width="3" stroke-dasharray="5,5" /> <!-- Active -->
+            <line x1="450" y1="105" x2="720" y2="160" stroke="#E0E0E0" stroke-width="2" />
+        </svg>
+
+        <!-- Left: Inputs -->
+        <div class="column">
+            <div class="icon-box">
+                <div class="icon-circle">
+                    <!-- Solar -->
+                    <svg viewBox="0 0 24 24"><path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M2,13H6V11H2M18,13H22V11H18M11,2V6H13V2M11,18V22H13V18M4.93,4.93L7.76,7.76L6.34,9.17L3.51,6.34M16.24,16.24L19.07,19.07L17.66,20.49L14.83,17.66M19.07,4.93L16.24,2.1L14.83,3.51L17.66,6.34M7.76,16.24L4.93,13.41L3.51,14.83L6.34,17.66Z" /></svg>
+                </div>
+                <span class="val-text">0W</span>
+            </div>
+            <div class="icon-box">
+                <div class="icon-circle active">
+                    <!-- AC Plug -->
+                    <svg viewBox="0 0 24 24"><path d="M16,7V3H14V7H10V3H8V7A3,3 0 0,0 5,10V12H19V10A3,3 0 0,0 16,7Z" /></svg>
+                </div>
+                <span class="val-text">450W</span>
+            </div>
+        </div>
+
+        <!-- Center: Battery -->
+        <div class="column center-column">
+            <div class="icon-box">
+                <div class="battery-center">
+                    <svg viewBox="0 0 24 24"><path d="M16,20H8V6H16M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" /></svg>
+                </div>
+                <span class="val-text" style="font-size: 24px; color: var(--accent);">75%</span>
+                <span style="font-size: 12px; color: #999;">Charging</span>
+            </div>
+        </div>
+
+        <!-- Right: Outputs -->
+        <div class="column">
+            <div class="icon-box">
+                <div class="icon-circle active">
+                    <!-- USB -->
+                    <svg viewBox="0 0 24 24"><path d="M15,7V11H16V13H13V7H15M11,7V9H9V11H8V13H11V15H7V7H11M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" /></svg> <!-- Placeholder USB -->
+                </div>
+                <span class="val-text">45W</span>
+            </div>
+            <div class="icon-box">
+                <div class="icon-circle">
+                    <!-- AC Socket -->
+                    <svg viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M8,11A2,2 0 0,1 10,13A2,2 0 0,1 8,15A2,2 0 0,1 6,13A2,2 0 0,1 8,11M16,11A2,2 0 0,1 18,13A2,2 0 0,1 16,15A2,2 0 0,1 14,13A2,2 0 0,1 16,11Z" /></svg>
+                </div>
+                <span class="val-text">0W</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="status-info">
+            <div>BMS Status: <span style="color: var(--success); font-weight: bold;">OK</span></div>
+            <div>Connectivity: Connected</div>
+            <div style="font-size: 12px; color: #999;">Last Update: Just now</div>
+        </div>
+
+        <div class="settings-btn">
+            <svg style="width:24px; height:24px; fill: white; margin-right: 8px;" viewBox="0 0 24 24">
+                <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97V12.97Z" />
+            </svg>
+            Settings
+        </div>
+    </div>
+
+</body>
+</html>
