@@ -15,6 +15,9 @@ static lv_obj_t * btn_dc;
 static lv_obj_t * btn_wave2;
 static lv_obj_t * btn_power_off;
 
+static lv_obj_t * lbl_ac_pwr;
+static lv_obj_t * lbl_dc_pwr;
+
 // Popup Objects
 static lv_obj_t * popup_power_off = NULL;
 
@@ -30,6 +33,7 @@ static lv_obj_t * create_stat_item(lv_obj_t * parent, const char * title, const 
     lv_obj_set_size(cont, 240, 80);
     lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(cont, 0, 0);
+    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -47,20 +51,39 @@ static lv_obj_t * create_stat_item(lv_obj_t * parent, const char * title, const 
     return l_val; // Return value label for updates
 }
 
-static lv_obj_t * create_big_toggle(lv_obj_t * parent, const char * label_text, ui_icon_type_t icon, lv_color_t color) {
+static lv_obj_t * create_big_toggle(lv_obj_t * parent, const char * label_text, ui_icon_type_t icon, lv_color_t color, lv_obj_t ** lbl_pwr_out) {
     lv_obj_t * btn = lv_btn_create(parent);
     lv_obj_set_size(btn, 360, 160);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_bg_color(btn, color, LV_STATE_CHECKED);
 
     lv_obj_t * l_icon = ui_create_icon(btn, icon, 48, lv_color_hex(0xFFFFFF));
     lv_obj_align(l_icon, LV_ALIGN_LEFT_MID, 20, 0);
 
-    lv_obj_t * l_text = lv_label_create(btn);
+    // Container for text to center vertically
+    lv_obj_t * txt_cont = lv_obj_create(btn);
+    lv_obj_set_size(txt_cont, 200, 100);
+    lv_obj_align(txt_cont, LV_ALIGN_CENTER, 20, 0);
+    lv_obj_set_style_bg_opa(txt_cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(txt_cont, 0, 0);
+    lv_obj_clear_flag(txt_cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(txt_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(txt_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t * l_text = lv_label_create(txt_cont);
     lv_label_set_text(l_text, label_text);
-    lv_obj_set_style_text_font(l_text, &lv_font_montserrat_24, 0);
-    lv_obj_align(l_text, LV_ALIGN_CENTER, 20, 0);
+    lv_obj_set_style_text_font(l_text, &lv_font_montserrat_32, 0); // Bigger font
+    lv_obj_set_style_text_color(l_text, lv_color_hex(0xFFFFFF), 0);
+
+    // Power Label (Hidden if 0W/Off typically, or "0W")
+    if (lbl_pwr_out) {
+        *lbl_pwr_out = lv_label_create(txt_cont);
+        lv_label_set_text(*lbl_pwr_out, "0 W");
+        lv_obj_set_style_text_font(*lbl_pwr_out, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(*lbl_pwr_out, lv_color_hex(0xDDDDDD), 0);
+    }
 
     lv_obj_add_event_cb(btn, btn_toggle_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -72,6 +95,7 @@ static lv_obj_t * create_big_toggle(lv_obj_t * parent, const char * label_text, 
 void UI_Dashboard_Init(void) {
     scr_main = lv_scr_act();
     lv_obj_set_style_bg_color(scr_main, lv_color_hex(0x000000), 0);
+    lv_obj_clear_flag(scr_main, LV_OBJ_FLAG_SCROLLABLE);
 
     // 1. Header (Battery & Stats)
     lv_obj_t * header = lv_obj_create(scr_main);
@@ -79,11 +103,13 @@ void UI_Dashboard_Init(void) {
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_color(header, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(header, 0, 0);
+    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
     // SOC (Left)
     label_soc = lv_label_create(header);
     lv_label_set_text(label_soc, "0%");
     lv_obj_set_style_text_font(label_soc, &lv_font_montserrat_48, 0); // Need big font
+    lv_obj_set_style_text_color(label_soc, lv_color_hex(0xFFFFFF), 0); // Explicit White
     lv_obj_align(label_soc, LV_ALIGN_LEFT_MID, 30, 0);
 
     // Stats Container (Right)
@@ -92,6 +118,7 @@ void UI_Dashboard_Init(void) {
     lv_obj_align(stats, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_bg_opa(stats, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(stats, 0, 0);
+    lv_obj_clear_flag(stats, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(stats, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(stats, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
@@ -105,14 +132,15 @@ void UI_Dashboard_Init(void) {
     lv_obj_align(body, LV_ALIGN_CENTER, 0, 20);
     lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(body, 0, 0);
+    lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(body, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(body, 40, 0);
 
     // AC Toggle (220V)
-    btn_ac = create_big_toggle(body, "AC 220V", UI_ICON_FLASH, lv_color_hex(0xFF9800)); // Orange for AC
+    btn_ac = create_big_toggle(body, "AC 220V", UI_ICON_FLASH, lv_color_hex(0xFF9800), &lbl_ac_pwr); // Orange for AC
     // DC Toggle (12V)
-    btn_dc = create_big_toggle(body, "DC 12V", UI_ICON_CAR, lv_color_hex(0x03A9F4)); // Blue for DC
+    btn_dc = create_big_toggle(body, "DC 12V", UI_ICON_CAR, lv_color_hex(0x03A9F4), &lbl_dc_pwr); // Blue for DC
 
     // 3. Footer (Wave 2 & Power Off)
     lv_obj_t * footer = lv_obj_create(scr_main);
@@ -120,6 +148,7 @@ void UI_Dashboard_Init(void) {
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_bg_color(footer, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(footer, 0, 0);
+    lv_obj_clear_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
 
     // Wave 2 Button (Bottom Left 1)
     btn_wave2 = lv_btn_create(footer);
@@ -127,6 +156,7 @@ void UI_Dashboard_Init(void) {
     lv_obj_align(btn_wave2, LV_ALIGN_LEFT_MID, 20, 0);
     lv_obj_t * l_w2 = lv_label_create(btn_wave2);
     lv_label_set_text(l_w2, "Wave 2");
+    lv_obj_set_style_text_color(l_w2, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(l_w2);
 
     // Power Off Button (Bottom Left 2, next to Wave 2)
@@ -136,6 +166,7 @@ void UI_Dashboard_Init(void) {
     lv_obj_set_style_bg_color(btn_power_off, lv_color_hex(0xF44336), 0); // Red
     lv_obj_t * l_po = lv_label_create(btn_power_off);
     lv_label_set_text(l_po, "Power Off");
+    lv_obj_set_style_text_color(l_po, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(l_po);
     lv_obj_add_event_cb(btn_power_off, btn_power_off_cb, LV_EVENT_CLICKED, NULL);
 }
@@ -147,6 +178,7 @@ void UI_Render_Dashboard(DeviceStatus* dev) {
 
     char buf[32];
     int soc = 0, in_w = 0, out_w = 0;
+    int out_ac_w = 0, out_dc_w = 0;
     bool ac_on = false, dc_on = false;
 
     // Map Data
@@ -154,12 +186,21 @@ void UI_Render_Dashboard(DeviceStatus* dev) {
         soc = (int)dev->data.d3p.batteryLevel;
         in_w = (int)dev->data.d3p.inputPower;
         out_w = (int)dev->data.d3p.outputPower;
-        ac_on = dev->data.d3p.acLvOutputPower > 0; // Rough heuristic, or use switch state if available
+
+        // Detailed Output
+        out_ac_w = (int)(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
+        out_dc_w = (int)(dev->data.d3p.dc12vOutputPower + dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower); // Sum DC/USB
+
+        ac_on = dev->data.d3p.acLvOutputPower > 0; // Rough heuristic
         dc_on = dev->data.d3p.dc12vOutputPower > 0;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         soc = (int)dev->data.d3.batteryLevel;
         in_w = (int)dev->data.d3.inputPower;
         out_w = (int)dev->data.d3.outputPower;
+
+        out_ac_w = (int)dev->data.d3.acOutputPower;
+        out_dc_w = (int)(dev->data.d3.dc12vOutputPower + dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
+
         // Switches mapping depends on struct fields, assuming existence:
         // ac_on = dev->data.d3.invSwitch;
         // dc_on = dev->data.d3.dcSwitch;
@@ -173,6 +214,16 @@ void UI_Render_Dashboard(DeviceStatus* dev) {
 
     snprintf(buf, sizeof(buf), "%d W", out_w);
     lv_label_set_text(label_out_power, buf);
+
+    // Update Button Power Labels
+    if (lbl_ac_pwr) {
+        snprintf(buf, sizeof(buf), "%d W", out_ac_w);
+        lv_label_set_text(lbl_ac_pwr, buf);
+    }
+    if (lbl_dc_pwr) {
+        snprintf(buf, sizeof(buf), "%d W", out_dc_w);
+        lv_label_set_text(lbl_dc_pwr, buf);
+    }
 
     // Update Toggle States (Avoid loopback if user just pressed)
     // Only update if not pressed recently?

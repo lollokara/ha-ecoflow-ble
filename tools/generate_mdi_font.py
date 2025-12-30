@@ -10,11 +10,17 @@ FONT_SIZE = 32  # Pixel size
 FONT_NAME = "font_mdi"
 
 # Icons Mapping: Name -> MDI Codepoint (Input)
-# We will remap these to a continuous Private Use Area starting at 0xF000 (16-bit)
-# to ensure they fit in LVGL's sparse map (BMP).
+# Re-verified inputs based on standard MDI (assuming latest version or similar)
+# If F0079 is > FFFF, it might be 20-bit.
+# But often webfonts have them at Fxxx.
+# Let's assume F0079 is a valid index if we treat it as 16-bit, OR we use char code.
+# The previous script successfully compiled, but the icons were blank.
+# This often means the char wasn't found in the TTF at that index.
+# We will inspect the glyph bitmap size in the script to ensure it's not 0.
+
 ICONS_INPUT = {
     "battery_100": 0xF0079,
-    "battery_50": 0xF0079, # Duplicate for now
+    "battery_50": 0xF0079, # Duplicate
     "flash": 0xF01E4,
     "plug": 0xF0425,
     "solar": 0xF059F,
@@ -36,9 +42,6 @@ for i, (name, input_code) in enumerate(ICONS_INPUT.items()):
         "input": input_code,
         "output": START_CODE + i
     }
-
-# Add Basic ASCII
-CHARS_ASCII = list(range(0x20, 0x7F))
 
 def generate_font():
     if not os.path.exists(FONT_PATH):
@@ -64,23 +67,6 @@ def generate_font():
     current_bitmap_offset = 0
     unicode_list = []
 
-    # Process ASCII (No Remap)
-    for char_code in CHARS_ASCII:
-        unicode_list.append(char_code)
-
-        if char_code == 0x20: # Space
-            glyph_dsc.append(f"    {{.bitmap_index = 0, .adv_w = {FONT_SIZE//2}, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0}}")
-            continue
-
-        # For ASCII, we might need a different font file or assume MDI includes ASCII?
-        # MDI usually does NOT include standard ASCII glyphs, only icons.
-        # But we need to output *something* or use a fallback.
-        # If MDI doesn't have 'A', we shouldn't include it in this font.
-        # Actually, for this task, let's ONLY generate the ICONS and use LVGL's built-in font for text.
-        # The user code uses `&font_mdi` for icons and `&lv_font_montserrat_xx` for text.
-        # So we can DROP ASCII from this font to save space and confusion.
-        pass
-
     # Reset lists for just Icons
     unicode_list = []
     glyph_dsc = []
@@ -96,13 +82,24 @@ def generate_font():
 
         unicode_list.append(output_code)
 
-        # Load by Input Code
-        face.load_char(input_code, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_TARGET_MONO)
+        # Load by Char Code
+        try:
+            face.load_char(input_code, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_TARGET_MONO)
+        except Exception as e:
+            print(f"Error loading char {name} (0x{input_code:X}): {e}")
+            # Try to recover or skip?
+            # If load fails, we get an empty glyph probably.
+            pass
+
         bitmap = face.glyph.bitmap
         width = bitmap.width
         rows = bitmap.rows
         pitch = bitmap.pitch
         buffer = bitmap.buffer
+
+        # Check if empty
+        if width == 0 or rows == 0:
+            print(f"Warning: Glyph {name} (0x{input_code:X}) has 0 size. Might be missing from font.")
 
         # Extract bits
         char_bitmap_bytes = []
