@@ -308,6 +308,34 @@ void checkUart() {
                                 if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
                                     sendDeviceStatus(dev_id);
                                 }
+                        } else if (cmd == CMD_SET_VALUE) {
+                            SetValueCommand setCmd;
+                            if (unpack_set_value_message(rx_buf, &setCmd) == 0) {
+                                EcoflowESP32* dev = DeviceManager::getInstance().getDevice((DeviceType)setCmd.device_type);
+                                if (dev && dev->isAuthenticated()) {
+                                    switch(setCmd.command_id) {
+                                        // Generic / Delta 3
+                                        case SET_CMD_AC_ENABLE: dev->setAC(setCmd.value.int_val ? true : false); break;
+                                        case SET_CMD_DC_ENABLE: dev->setDC(setCmd.value.int_val ? true : false); break;
+                                        case SET_CMD_USB_ENABLE: dev->setUSB(setCmd.value.int_val ? true : false); break;
+
+                                        // Wave 2
+                                        case SET_CMD_W2_POWER: dev->setPowerState((uint8_t)setCmd.value.int_val); break;
+                                        case SET_CMD_W2_TEMP: dev->setTemperature((uint8_t)setCmd.value.int_val); break;
+                                        case SET_CMD_W2_MODE:
+                                            // Ensure power is on if setting mode
+                                            if (dev->getData().wave2.powerMode != 1) {
+                                                 dev->setPowerState(1);
+                                                 delay(200);
+                                            }
+                                            dev->setMainMode((uint8_t)setCmd.value.int_val);
+                                            break;
+                                        case SET_CMD_W2_SUBMODE: dev->setSubMode((uint8_t)setCmd.value.int_val); break;
+                                        case SET_CMD_W2_FAN: dev->setFanSpeed((uint8_t)setCmd.value.int_val); break;
+                                        default: ESP_LOGW(TAG, "Unknown Set Command: %d", setCmd.command_id); break;
+                                    }
+                                }
+                            }
                         }
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);

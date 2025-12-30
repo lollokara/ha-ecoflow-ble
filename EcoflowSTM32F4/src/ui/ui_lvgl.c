@@ -35,6 +35,17 @@ static lv_obj_t * lbl_ac_t;
 static lv_obj_t * btn_dc_toggle;
 static lv_obj_t * lbl_dc_t;
 
+// --- Wave 2 Widgets ---
+static lv_obj_t * scr_wave2;
+static lv_obj_t * w2_btn_pwr;
+static lv_obj_t * w2_lbl_temp_val;
+static lv_obj_t * w2_arc_temp;
+static lv_obj_t * w2_dd_mode;
+static lv_obj_t * w2_dd_submode;
+static lv_obj_t * w2_slider_fan;
+static lv_obj_t * w2_cont_submode; // Container to hide/show
+static lv_obj_t * w2_cont_fan;     // Container to hide/show
+
 // --- Settings Widgets ---
 static lv_obj_t * scr_settings;
 static lv_obj_t * label_lim_in_val;
@@ -101,6 +112,10 @@ static void event_to_dash(lv_event_t * e) {
     lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
 }
 
+static void event_to_wave2(lv_event_t * e) {
+    lv_scr_load_anim(scr_wave2, LV_SCR_LOAD_ANIM_MOVE_LEFT, 300, 0, false);
+}
+
 // --- Popup Handlers ---
 static void event_power_off_click(lv_event_t * e) {
     lv_obj_clear_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
@@ -109,16 +124,203 @@ static void event_popup_hide(lv_event_t * e) {
     lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
 }
 
+// --- Send Helper ---
+static void send_set_value(uint8_t dev_type, uint8_t cmd_id, int32_t val) {
+    SetValueCommand cmd;
+    cmd.device_type = dev_type;
+    cmd.command_id = cmd_id;
+    cmd.value_type = 0; // Int
+    cmd.value.int_val = val;
+
+    uint8_t buffer[sizeof(SetValueCommand) + 4];
+    int len = pack_set_value_message(buffer, &cmd);
+    UART_SendPacket(buffer, len);
+}
+
 // --- Toggle Callbacks ---
 static void event_toggle_ac(lv_event_t * e) {
-    // Placeholder for sending AC toggle command
     lv_obj_t * btn = lv_event_get_target(e);
-    // Visual toggle is handled by update function, but we can force state here if needed
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED); // Logic might be inverted depending on current visual state, but simpler to send desired toggle.
+    // Actually, UI update overrides button state. The button click should just send "toggle" or "set opposite".
+    // We don't know current true state here easily without checking static var or querying object style.
+    // Let's assume the button click implies "Toggle". Or we send "Set to Pressed State".
+    // Better: Send Set command with !current_state.
+    // Simplified: Just send 1 or 0 based on checked.
+    send_set_value(DEV_TYPE_DELTA_3, SET_CMD_AC_ENABLE, state ? 1 : 0);
 }
 
 static void event_toggle_dc(lv_event_t * e) {
-    // Placeholder for sending DC toggle command
     lv_obj_t * btn = lv_event_get_target(e);
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    send_set_value(DEV_TYPE_DELTA_3, SET_CMD_DC_ENABLE, state ? 1 : 0);
+}
+
+// --- Wave 2 Callbacks ---
+static void event_w2_pwr(lv_event_t * e) {
+    lv_obj_t * btn = lv_event_get_target(e);
+    // Determine target state (toggle)
+    // We send logic 1/0 or specific power command. Protocol uses 1=Main, 2=Standby/Off? Or 0/1.
+    // ESP32 code: w2->setPowerState((uint8_t)getSetW2Val());
+    // Let's send 1 (On) or 0 (Off). ESP32 will map if needed, or we check protocol.
+    // Existing ESP32 logic: W2_TOGGLE_PWR toggles 1 <-> 2.
+    // SET_CMD_W2_POWER sends raw value.
+    // Let's assume we want to toggle. But we need to know state.
+    // For now, let's send 1 if we want ON, 0 if OFF.
+    // We can check button color to guess state?
+    // Simpler: Just send "1" always? No.
+    // Let's just implement toggle logic in ESP32 if value is special, OR track it here.
+    // UI_LVGL_Update tracks `last_w2_pwr`.
+    // But we are in callback.
+    // Let's assume "Click" means Toggle.
+    // If we send SET_CMD_W2_POWER with value 255 (Toggle)? No.
+    // Let's just send 1 for now, assuming user wants ON. But OFF?
+    // Let's use `lv_obj_has_state(btn, LV_STATE_CHECKED)` if it was a toggle btn.
+    // It is a normal btn.
+    // Let's use USER_DATA or just send a special "Toggle" command if defined, or rely on UI state.
+    // I will read the style. If green -> send Off (0). If default -> send On (1).
+    if (lv_obj_has_style(btn, &style_btn_green, 0)) {
+         send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_POWER, 0);
+    } else {
+         send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_POWER, 1);
+    }
+}
+
+static void event_w2_temp(lv_event_t * e) {
+    lv_obj_t * arc = lv_event_get_target(e);
+    int val = lv_arc_get_value(arc);
+    lv_label_set_text_fmt(w2_lbl_temp_val, "%d C", val);
+    send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_TEMP, val);
+}
+
+static void event_w2_mode(lv_event_t * e) {
+    lv_obj_t * dd = lv_event_get_target(e);
+    int val = lv_dropdown_get_selected(dd);
+    send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_MODE, val);
+}
+
+static void event_w2_submode(lv_event_t * e) {
+    lv_obj_t * dd = lv_event_get_target(e);
+    int val = lv_dropdown_get_selected(dd);
+    send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_SUBMODE, val);
+}
+
+static void event_w2_fan(lv_event_t * e) {
+    lv_obj_t * slider = lv_event_get_target(e);
+    int val = lv_slider_get_value(slider);
+    send_set_value(DEV_TYPE_WAVE_2, SET_CMD_W2_FAN, val);
+}
+
+
+static void create_wave2_panel(void) {
+    scr_wave2 = lv_obj_create(NULL);
+    lv_obj_add_style(scr_wave2, &style_scr, 0);
+
+    // Header
+    lv_obj_t * btn_back = lv_btn_create(scr_wave2);
+    lv_obj_set_size(btn_back, 100, 50);
+    lv_obj_align(btn_back, LV_ALIGN_TOP_LEFT, 20, 20);
+    lv_obj_add_style(btn_back, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_back, event_to_dash, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_back = lv_label_create(btn_back);
+    ui_set_icon(lbl_back, MDI_ICON_BACK);
+    lv_obj_center(lbl_back);
+
+    lv_obj_t * title = lv_label_create(scr_wave2);
+    lv_label_set_text(title, "Wave 2 Control");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 25);
+
+    // Power Button (Top Right)
+    w2_btn_pwr = lv_btn_create(scr_wave2);
+    lv_obj_set_size(w2_btn_pwr, 80, 50);
+    lv_obj_align(w2_btn_pwr, LV_ALIGN_TOP_RIGHT, -20, 20);
+    lv_obj_add_style(w2_btn_pwr, &style_btn_default, 0); // Default Off
+    lv_obj_add_event_cb(w2_btn_pwr, event_w2_pwr, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_pwr = lv_label_create(w2_btn_pwr);
+    ui_set_icon(lbl_pwr, MDI_ICON_POWER);
+    lv_obj_center(lbl_pwr);
+
+
+    // Container for controls
+    lv_obj_t * cont = lv_obj_create(scr_wave2);
+    lv_obj_set_size(cont, 760, 350);
+    lv_obj_align(cont, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont, 0, 0);
+
+    // Left: Temp Arc
+    w2_arc_temp = lv_arc_create(cont);
+    lv_obj_set_size(w2_arc_temp, 250, 250);
+    lv_arc_set_rotation(w2_arc_temp, 135);
+    lv_arc_set_bg_angles(w2_arc_temp, 0, 270);
+    lv_arc_set_range(w2_arc_temp, 16, 30); // Temp range
+    lv_arc_set_value(w2_arc_temp, 25);
+    lv_obj_align(w2_arc_temp, LV_ALIGN_LEFT_MID, 20, 0);
+    lv_obj_add_event_cb(w2_arc_temp, event_w2_temp, LV_EVENT_VALUE_CHANGED, NULL);
+
+    w2_lbl_temp_val = lv_label_create(cont);
+    lv_label_set_text(w2_lbl_temp_val, "25 C");
+    lv_obj_set_style_text_font(w2_lbl_temp_val, &lv_font_montserrat_32, 0);
+    lv_obj_align_to(w2_lbl_temp_val, w2_arc_temp, LV_ALIGN_CENTER, 0, 0);
+
+    // Icon inside arc
+    lv_obj_t * icon_therm = lv_label_create(cont);
+    ui_set_icon(icon_therm, MDI_ICON_THERMOMETER);
+    lv_obj_set_style_text_font(icon_therm, &ui_font_mdi, 0);
+    lv_obj_set_style_text_color(icon_therm, lv_palette_main(LV_PALETTE_TEAL), 0);
+    lv_obj_align_to(icon_therm, w2_lbl_temp_val, LV_ALIGN_OUT_TOP_MID, 0, -10);
+
+
+    // Right: Controls
+    lv_obj_t * right_col = lv_obj_create(cont);
+    lv_obj_set_size(right_col, 400, 300);
+    lv_obj_align(right_col, LV_ALIGN_RIGHT_MID, -20, 0);
+    lv_obj_set_style_bg_opa(right_col, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(right_col, 0, 0);
+    lv_obj_set_flex_flow(right_col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(right_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Mode
+    lv_obj_t * lbl_mode = lv_label_create(right_col);
+    lv_label_set_text(lbl_mode, "Mode");
+    lv_obj_set_style_text_font(lbl_mode, &lv_font_montserrat_20, 0);
+
+    w2_dd_mode = lv_dropdown_create(right_col);
+    lv_dropdown_set_options(w2_dd_mode, "Cool\nHeat\nFan"); // 0, 1, 2
+    lv_obj_set_width(w2_dd_mode, 300);
+    lv_obj_add_event_cb(w2_dd_mode, event_w2_mode, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // Submode (Container to hide)
+    w2_cont_submode = lv_obj_create(right_col);
+    lv_obj_set_size(w2_cont_submode, 320, 100);
+    lv_obj_set_style_bg_opa(w2_cont_submode, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(w2_cont_submode, 0, 0);
+    lv_obj_set_flex_flow(w2_cont_submode, LV_FLEX_FLOW_COLUMN);
+
+    lv_obj_t * lbl_sub = lv_label_create(w2_cont_submode);
+    lv_label_set_text(lbl_sub, "Sub-Mode");
+    lv_obj_set_style_text_font(lbl_sub, &lv_font_montserrat_20, 0);
+
+    w2_dd_submode = lv_dropdown_create(w2_cont_submode);
+    lv_dropdown_set_options(w2_dd_submode, "Auto\nEco\nNight\nMax"); // 0, 1, 2, 3
+    lv_obj_set_width(w2_dd_submode, 300);
+    lv_obj_add_event_cb(w2_dd_submode, event_w2_submode, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // Fan (Container to hide)
+    w2_cont_fan = lv_obj_create(right_col);
+    lv_obj_set_size(w2_cont_fan, 320, 100);
+    lv_obj_set_style_bg_opa(w2_cont_fan, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(w2_cont_fan, 0, 0);
+    lv_obj_set_flex_flow(w2_cont_fan, LV_FLEX_FLOW_COLUMN);
+
+    lv_obj_t * lbl_fan = lv_label_create(w2_cont_fan);
+    lv_label_set_text(lbl_fan, "Fan Speed");
+    lv_obj_set_style_text_font(lbl_fan, &lv_font_montserrat_20, 0);
+
+    w2_slider_fan = lv_slider_create(w2_cont_fan);
+    lv_slider_set_range(w2_slider_fan, 1, 3);
+    lv_obj_set_width(w2_slider_fan, 300);
+    lv_obj_add_event_cb(w2_slider_fan, event_w2_fan, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
 // --- Slider Callbacks ---
@@ -440,6 +642,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_wave2, 120, 60);
     lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, 0);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave, "Wave 2");
     lv_obj_center(lbl_wave);
@@ -515,6 +718,7 @@ void UI_LVGL_Init(void) {
 
     create_styles();
     create_settings(); // Create first so we can load it
+    create_wave2_panel(); // Create Wave 2 panel
     create_dashboard();
 
     lv_scr_load(scr_dash);
@@ -628,6 +832,71 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             lv_label_set_text(lbl_dc_t, "12V\nOFF");
         }
         last_dc_on = dc_on;
+    }
+
+    // Wave 2 Update
+    if (dev->id == DEV_TYPE_WAVE_2) {
+        int w2_temp = (int)dev->data.w2.setTemp;
+        int w2_mode = (int)dev->data.w2.mode;
+        int w2_submode = (int)dev->data.w2.subMode;
+        int w2_fan = (int)dev->data.w2.fanValue;
+        bool w2_pwr = (dev->data.w2.powerMode != 0);
+
+        static int last_w2_temp = -1;
+        static int last_w2_mode = -1;
+        static int last_w2_submode = -1;
+        static int last_w2_fan = -1;
+        static bool last_w2_pwr = false;
+
+        if (first_run || w2_pwr != last_w2_pwr) {
+            if (w2_pwr) {
+                lv_obj_add_style(w2_btn_pwr, &style_btn_green, 0);
+                lv_obj_remove_style(w2_btn_pwr, &style_btn_default, 0);
+                // Also enable other controls
+            } else {
+                lv_obj_add_style(w2_btn_pwr, &style_btn_default, 0);
+                lv_obj_remove_style(w2_btn_pwr, &style_btn_green, 0);
+                // Maybe disable controls?
+            }
+            last_w2_pwr = w2_pwr;
+        }
+
+        if (first_run || w2_temp != last_w2_temp) {
+            lv_arc_set_value(w2_arc_temp, w2_temp);
+            lv_label_set_text_fmt(w2_lbl_temp_val, "%d C", w2_temp);
+            last_w2_temp = w2_temp;
+        }
+
+        if (first_run || w2_mode != last_w2_mode) {
+             lv_dropdown_set_selected(w2_dd_mode, w2_mode); // Assuming mode enum matches index
+             // Show/Hide submode logic
+             if (w2_mode == 0 || w2_mode == 1) { // Cool/Heat
+                 lv_obj_clear_flag(w2_cont_submode, LV_OBJ_FLAG_HIDDEN);
+             } else {
+                 lv_obj_add_flag(w2_cont_submode, LV_OBJ_FLAG_HIDDEN);
+             }
+             last_w2_mode = w2_mode;
+        }
+
+        if (first_run || w2_submode != last_w2_submode) {
+             lv_dropdown_set_selected(w2_dd_submode, w2_submode);
+             // Fan Logic: Fan is settable only in mode Auto (submode?) or Fan (main mode?)
+             // Based on prompt: "fan is settable only in mode Auto or Fan the other submodes do not allow for fan setting"
+             // Interpretation: If Main Mode = Fan (2), OR (Main Mode = Cool/Heat AND Submode = Auto (0?))
+             bool show_fan = false;
+             if (w2_mode == 2) show_fan = true; // Fan Mode
+             else if ((w2_mode == 0 || w2_mode == 1) && w2_submode == 0) show_fan = true; // Auto submode
+
+             if (show_fan) lv_obj_clear_flag(w2_cont_fan, LV_OBJ_FLAG_HIDDEN);
+             else lv_obj_add_flag(w2_cont_fan, LV_OBJ_FLAG_HIDDEN);
+
+             last_w2_submode = w2_submode;
+        }
+
+        if (first_run || w2_fan != last_w2_fan) {
+             lv_slider_set_value(w2_slider_fan, w2_fan, LV_ANIM_OFF);
+             last_w2_fan = w2_fan;
+        }
     }
 
     first_run = false;

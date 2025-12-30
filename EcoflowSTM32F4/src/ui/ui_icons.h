@@ -16,6 +16,13 @@ extern const lv_font_t ui_font_mdi;
 #define MDI_ICON_BATTERY    "\U000F0079" // 󰁹
 #define MDI_ICON_AC         "\U000F1107" // 󱄇 (Used for AC Output?)
 
+// New Icons (Wave 2)
+#define MDI_ICON_FAN          "\U000F0210" // 󰈐
+#define MDI_ICON_THERMOMETER  "\U000F050F" // 󰔏
+#define MDI_ICON_SNOWFLAKE    "\U000F04AE" // 󰒮
+#define MDI_ICON_SUN          "\U000F0599" // 󰖙
+#define MDI_ICON_POWER        "\U000F0425" // 󰐥
+
 // Helper to set label to icon
 static inline void ui_set_icon(lv_obj_t * label, const char * icon_code) {
     lv_obj_set_style_text_font(label, &ui_font_mdi, 0);
