@@ -268,10 +268,6 @@ void checkUart() {
 
     while (Serial1.available()) {
         uint8_t b = Serial1.read();
-
-        // Debug only - can be verbose
-        ESP_LOGI(TAG, "UART: %02X", b);
-
         if (!collecting) {
             if (b == START_BYTE) {
                 // Serial.println("UART RX: Start Byte");
