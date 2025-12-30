@@ -37,7 +37,8 @@ typedef enum {
     UI_ICON_BATTERY,
     UI_ICON_SETTINGS,
     UI_ICON_BACK,
-    UI_ICON_BLE
+    UI_ICON_BLE,
+    UI_ICON_FLASH
 } UIIconType;
 
 // --- Widget Types ---

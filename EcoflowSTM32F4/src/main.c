@@ -6,6 +6,10 @@
 #include <stdio.h>
 
 extern UART_HandleTypeDef huart6;
+extern LTDC_HandleTypeDef hltdc_eval;
+extern DMA2D_HandleTypeDef hdma2d_eval;
+extern DSI_HandleTypeDef hdsi_eval;
+
 UART_HandleTypeDef huart3;
 QueueHandle_t displayQueue;
 
