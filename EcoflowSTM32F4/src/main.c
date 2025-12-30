@@ -97,7 +97,7 @@ int main(void) {
         while(1);
     }
 
-    xTaskCreate(StartDisplayTask, "Display", 2048, NULL, 2, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 4096, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 1024, NULL, 3, NULL);
 
     // Start Scheduler

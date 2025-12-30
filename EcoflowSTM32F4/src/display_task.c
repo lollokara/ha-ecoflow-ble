@@ -41,8 +41,12 @@ void StartDisplayTask(void * argument) {
 
     Backlight_Init();
 
+    printf("Display Task Started\n");
+
     // Init UI
     UI_LVGL_Init();
+
+    printf("UI Init Done\n");
 
     DisplayEvent event;
     TickType_t xLastWakeTime;
