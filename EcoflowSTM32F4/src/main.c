@@ -53,10 +53,6 @@ void SystemClock_Config(void) {
     }
 }
 
-void USART6_IRQHandler(void) {
-    HAL_UART_IRQHandler(&huart6);
-}
-
 static void MX_USART3_UART_Init(void) {
     huart3.Instance = USART3;
     huart3.Init.BaudRate = 115200;
@@ -67,6 +63,9 @@ static void MX_USART3_UART_Init(void) {
     huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart3.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart3);
+
+    // Explicitly disable interrupts for debug UART as we only use polling
+    HAL_NVIC_DisableIRQ(USART3_IRQn);
 }
 
 void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
@@ -125,36 +124,7 @@ void vApplicationMallocFailedHook(void) {
     while(1);
 }
 
-void HardFault_Handler(void) {
-    printf("HardFault_Handler\n");
-    while(1);
-}
-
-void MemManage_Handler(void) {
-    printf("MemManage_Handler\n");
-    while(1);
-}
-
-void BusFault_Handler(void) {
-    printf("BusFault_Handler\n");
-    while(1);
-}
-
-void UsageFault_Handler(void) {
-    printf("UsageFault_Handler\n");
-    while(1);
-}
-
 void WWDG_IRQHandler(void) {
     printf("WWDG_IRQHandler (IRQ 0) Triggered!\n");
     while(1);
-}
-
-void NMI_Handler(void) {
-    printf("NMI_Handler\n");
-    while(1);
-}
-
-void USART3_IRQHandler(void) {
-    HAL_UART_IRQHandler(&huart3);
 }
