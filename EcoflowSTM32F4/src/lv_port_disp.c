@@ -85,55 +85,59 @@ static void disp_init(void)
     BSP_LCD_Clear(LCD_COLOR_BLACK);
     BSP_LCD_DisplayOn();
     Backlight_Init();
+
+    // Initialize DMA2D once
+    hdma2d_eval.Init.Mode = DMA2D_M2M;
+    hdma2d_eval.Init.ColorMode = DMA2D_ARGB8888;
+    hdma2d_eval.Init.OutputOffset = 0; // Will be updated in flush
+    HAL_DMA2D_Init(&hdma2d_eval);
+    HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1);
+    hdma2d_eval.LayerCfg[1].InputOffset = 0;
+    hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
 }
 
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    int32_t x, y;
-
     // Use DMA2D to copy from buffer to active LCD Framebuffer
-    // Destination is always LCD_FB_START_ADDRESS (or whatever the active one is)
-    // Actually, we should probably query the active layer address.
     uint32_t dest_addr = hltdc_eval.LayerCfg[0].FBStartAdress;
 
-    // DMA2D Copy
     // Calculate destination address
     uint32_t dest_address = dest_addr + 4 * (area->y1 * DISP_HOR_RES + area->x1);
 
-    // Configure DMA2D
     // Width: area->x2 - area->x1 + 1
     // Height: area->y2 - area->y1 + 1
     uint32_t width = area->x2 - area->x1 + 1;
     uint32_t height = area->y2 - area->y1 + 1;
     uint32_t offLine = DISP_HOR_RES - width;
 
-    hdma2d_eval.Init.Mode = DMA2D_M2M;
-    hdma2d_eval.Init.ColorMode = DMA2D_ARGB8888;
+    // Update OutputOffset
     hdma2d_eval.Init.OutputOffset = offLine;
+    // We must re-init/config if we change Init structure?
+    // HAL_DMA2D_Init calls HAL_DMA2D_MspInit.
+    // To be safe and fast, we can access registers directly or use HAL_DMA2D_Init.
+    // But since we want to avoid re-init overhead, let's write the register.
+    // hdma2d_eval.Instance->OOR = offLine;
 
-    if(HAL_DMA2D_Init(&hdma2d_eval) == HAL_OK)
-    {
-        if(HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) == HAL_OK)
-        {
-            hdma2d_eval.LayerCfg[1].InputOffset = 0; // Source is dense
-            hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
+    // However, for stability, let's stick to HAL but skip full MSP init if possible.
+    // Re-calling Init is safer than direct register access if we don't know the state machine.
+    // Optimization: Just call Init, assuming it's fast enough if MSP is already done.
+    // Actually, the main issue might be re-entrancy or state.
 
-            if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
-            {
-                HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
-            }
-        }
-    }
-    else
+    // Let's try minimal reconfiguration.
+    HAL_DMA2D_Init(&hdma2d_eval);
+    // Note: ConfigLayer is needed for layer 1 (foreground/source)?
+    // Yes, but we set it in disp_init. Does Init reset it? Yes, Init resets handle state.
+
+    // Let's stick to the safe path but move big init out if possible.
+    // If Init is required to change OutputOffset via HAL, we must do it.
+    // BUT, we can simplify the flush function.
+
+    if (HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) == HAL_OK)
     {
-        // Fallback CPU Copy
-        for(y = area->y1; y <= area->y2; y++) {
-            for(x = area->x1; x <= area->x2; x++) {
-                // BSP_LCD_DrawPixel(x, y, color_p->full); // Slow
-                 *(__IO uint32_t*) (dest_addr + (4*(y*DISP_HOR_RES + x))) = color_p->full;
-                color_p++;
-            }
-        }
+         if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
+         {
+             HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
+         }
     }
 
     lv_disp_flush_ready(disp_drv);

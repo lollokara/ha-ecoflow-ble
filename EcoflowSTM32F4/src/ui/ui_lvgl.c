@@ -122,29 +122,35 @@ static void event_slider_input(lv_event_t * e) {
     int val = (int)lv_slider_get_value(slider);
     // Snap to 100W increments
     val = (val + 50) / 100 * 100;
-    lv_slider_set_value(slider, val, LV_ANIM_OFF);
-    lim_input_w = val;
-    lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+    if (val != lim_input_w) {
+        lv_slider_set_value(slider, val, LV_ANIM_OFF);
+        lim_input_w = val;
+        lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+    }
 }
 static void event_slider_discharge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
     // Snap to 5% increments
     val = (val + 2) / 5 * 5;
-    lv_slider_set_value(slider, val, LV_ANIM_OFF);
-    lim_discharge_p = val;
-    lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
-    lv_obj_invalidate(arc_batt); // Redraw arc
+    if (val != lim_discharge_p) {
+        lv_slider_set_value(slider, val, LV_ANIM_OFF);
+        lim_discharge_p = val;
+        lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
+        lv_obj_invalidate(arc_batt); // Redraw arc
+    }
 }
 static void event_slider_charge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
     // Snap to 5% increments
     val = (val + 2) / 5 * 5;
-    lv_slider_set_value(slider, val, LV_ANIM_OFF);
-    lim_charge_p = val;
-    lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
-    lv_obj_invalidate(arc_batt); // Redraw arc
+    if (val != lim_charge_p) {
+        lv_slider_set_value(slider, val, LV_ANIM_OFF);
+        lim_charge_p = val;
+        lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
+        lv_obj_invalidate(arc_batt); // Redraw arc
+    }
 }
 
 // --- Arc Draw Callback for Limits ---
@@ -279,12 +285,14 @@ static void create_settings(void) {
 
     lv_obj_t * l1 = lv_label_create(p1);
     lv_label_set_text(l1, "Max AC Input");
-    lv_obj_add_style(l1, &style_text_large, 0);
+    lv_obj_set_style_text_color(l1, lv_color_white(), 0);
+    lv_obj_set_style_text_font(l1, &lv_font_montserrat_32, 0);
     lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, 0);
 
     label_lim_in_val = lv_label_create(p1);
     lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
-    lv_obj_add_style(label_lim_in_val, &style_text_large, 0);
+    lv_obj_set_style_text_color(label_lim_in_val, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_lim_in_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, 0);
 
     lv_obj_t * s1 = lv_slider_create(p1);
@@ -302,12 +310,14 @@ static void create_settings(void) {
 
     lv_obj_t * l2 = lv_label_create(p2);
     lv_label_set_text(l2, "Min Discharge Limit (Red)");
-    lv_obj_add_style(l2, &style_text_large, 0);
+    lv_obj_set_style_text_color(l2, lv_color_white(), 0);
+    lv_obj_set_style_text_font(l2, &lv_font_montserrat_32, 0);
     lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, 0);
 
     label_lim_out_val = lv_label_create(p2);
     lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
-    lv_obj_add_style(label_lim_out_val, &style_text_large, 0);
+    lv_obj_set_style_text_color(label_lim_out_val, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_lim_out_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, 0);
 
     lv_obj_t * s2 = lv_slider_create(p2);
@@ -325,12 +335,14 @@ static void create_settings(void) {
 
     lv_obj_t * l3 = lv_label_create(p3);
     lv_label_set_text(l3, "Max Charge Limit (Blue)");
-    lv_obj_add_style(l3, &style_text_large, 0);
+    lv_obj_set_style_text_color(l3, lv_color_white(), 0);
+    lv_obj_set_style_text_font(l3, &lv_font_montserrat_32, 0);
     lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, 0);
 
     label_lim_chg_val = lv_label_create(p3);
     lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
-    lv_obj_add_style(label_lim_chg_val, &style_text_large, 0);
+    lv_obj_set_style_text_color(label_lim_chg_val, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_lim_chg_val, &lv_font_montserrat_32, 0);
     lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, 0);
 
     lv_obj_t * s3 = lv_slider_create(p3);
