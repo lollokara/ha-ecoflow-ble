@@ -1,5 +1,7 @@
 #include "stm32f4xx_it.h"
 #include "stm32f4xx_hal.h"
+#include "stm32469i_discovery.h"
+#include "stm32469i_discovery_lcd.h"
 #include <stdio.h>
 
 /* External variables */
@@ -58,4 +60,71 @@ void USART3_IRQHandler(void)
 void USART6_IRQHandler(void)
 {
   HAL_UART_IRQHandler(&huart6);
+}
+
+/******************************************************************************/
+/*                 STM32F4xx Peripherals Interrupt Handlers                   */
+/*  Add here the Interrupt Handler for the used peripheral(s) (PPP), for the  */
+/*  available peripheral interrupt handler's name please refer to the startup */
+/*  file (startup_stm32f4xx.s).                                             */
+/******************************************************************************/
+
+/**
+  * @brief  This function handles I2C1 event interrupt request.
+  * @param  None
+  * @retval None
+  */
+void I2C1_EV_IRQHandler(void)
+{
+  HAL_I2C_EV_IRQHandler(&heval_I2c1);
+}
+
+/**
+  * @brief  This function handles I2C1 error interrupt request.
+  * @param  None
+  * @retval None
+  */
+void I2C1_ER_IRQHandler(void)
+{
+  HAL_I2C_ER_IRQHandler(&heval_I2c1);
+}
+
+/**
+  * @brief  This function handles LTDC global interrupt request.
+  * @param  None
+  * @retval None
+  */
+void LTDC_IRQHandler(void)
+{
+  HAL_LTDC_IRQHandler(&hltdc_eval);
+}
+
+/**
+  * @brief  This function handles LTDC error interrupt request.
+  * @param  None
+  * @retval None
+  */
+void LTDC_ER_IRQHandler(void)
+{
+  HAL_LTDC_IRQHandler(&hltdc_eval);
+}
+
+/**
+  * @brief  This function handles DMA2D global interrupt request.
+  * @param  None
+  * @retval None
+  */
+void DMA2D_IRQHandler(void)
+{
+  HAL_DMA2D_IRQHandler(&hdma2d_eval);
+}
+
+/**
+  * @brief  This function handles DSI global interrupt request.
+  * @param  None
+  * @retval None
+  */
+void DSI_IRQHandler(void)
+{
+  HAL_DSI_IRQHandler(&hdsi_eval);
 }

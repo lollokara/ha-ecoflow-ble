@@ -174,6 +174,9 @@ typedef enum
 
 #define BUTTON_GPIO_CLK_ENABLE()            __HAL_RCC_GPIOA_CLK_ENABLE()
 
+extern I2C_HandleTypeDef heval_I2c1;
+extern I2C_HandleTypeDef heval_I2c2;
+
 /**
   * @}
   */
