@@ -338,6 +338,19 @@ void checkUart() {
                                         dev->setDC(enable ? true : false);
                                     }
                                 }
+                        } else if (cmd == CMD_SET_VALUE) {
+                                uint8_t type;
+                                int value;
+                                if (unpack_set_value_message(rx_buf, &type, &value) == 0) {
+                                    EcoflowESP32* dev = DeviceManager::getInstance().getDevice(currentViewDevice);
+                                    if (dev && dev->isAuthenticated()) {
+                                        switch(type) {
+                                            case SET_VAL_AC_LIMIT: dev->setAcChargingLimit(value); break;
+                                            case SET_VAL_MAX_SOC: dev->setBatterySOCLimits(value, -1); break; // Keep existing min
+                                            case SET_VAL_MIN_SOC: dev->setBatterySOCLimits(101, value); break; // Keep existing max
+                                        }
+                                    }
+                                }
                         }
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);

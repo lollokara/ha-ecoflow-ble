@@ -36,6 +36,7 @@ extern "C" {
 #define CMD_SET_WAVE2 0x30
 #define CMD_SET_AC 0x31
 #define CMD_SET_DC 0x32
+#define CMD_SET_VALUE 0x40
 
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
@@ -43,6 +44,11 @@ extern "C" {
 #define W2_PARAM_SUB_MODE 3
 #define W2_PARAM_FAN 4
 #define W2_PARAM_POWER 5
+
+// Set Value Types
+#define SET_VAL_AC_LIMIT 1
+#define SET_VAL_MAX_SOC 2
+#define SET_VAL_MIN_SOC 3
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
@@ -242,6 +248,8 @@ int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable);
 int pack_set_dc_message(uint8_t *buffer, uint8_t enable);
 int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable);
 
+int pack_set_value_message(uint8_t *buffer, uint8_t type, int value);
+int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value);
 
 #ifdef __cplusplus
 }

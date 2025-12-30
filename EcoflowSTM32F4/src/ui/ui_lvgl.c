@@ -44,6 +44,10 @@ static lv_obj_t * label_lim_out_val;
 static lv_obj_t * label_lim_chg_val;
 static lv_obj_t * label_calib_debug; // For touch calibration
 
+// Indicator
+static lv_obj_t * led_status_dot;
+static lv_obj_t * label_disconnected;
+
 // Flow Data Labels
 static lv_obj_t * label_solar_val;
 static lv_obj_t * label_grid_val;
@@ -165,6 +169,9 @@ static void event_slider_input(lv_event_t * e) {
         lim_input_w = val;
         lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
     }
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        UART_SendSetValue(SET_VAL_AC_LIMIT, lim_input_w);
+    }
 }
 static void event_slider_discharge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
@@ -176,6 +183,9 @@ static void event_slider_discharge(lv_event_t * e) {
         lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
         lv_obj_invalidate(arc_batt);
     }
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        UART_SendSetValue(SET_VAL_MIN_SOC, lim_discharge_p);
+    }
 }
 static void event_slider_charge(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
@@ -186,6 +196,9 @@ static void event_slider_charge(lv_event_t * e) {
         lim_charge_p = val;
         lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
         lv_obj_invalidate(arc_batt);
+    }
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        UART_SendSetValue(SET_VAL_MAX_SOC, lim_charge_p);
     }
 }
 
@@ -307,7 +320,7 @@ static void create_settings(void) {
 
     // 1. AC Input Limit (400 - 3000)
     lv_obj_t * p1 = lv_obj_create(cont);
-    lv_obj_set_size(p1, 650, 90); // Increased height to prevent overlap
+    lv_obj_set_size(p1, 650, 100); // Increased height to prevent overlap
     lv_obj_set_style_bg_opa(p1, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p1, 0, 0);
 
@@ -315,25 +328,26 @@ static void create_settings(void) {
     lv_label_set_text(l1, "Max AC Input");
     lv_obj_set_style_text_color(l1, lv_color_white(), 0);
     lv_obj_set_style_text_font(l1, &lv_font_montserrat_32, 0);
-    lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l1, LV_ALIGN_TOP_LEFT, 0, -10); // Moved up
 
     label_lim_in_val = lv_label_create(p1);
     lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
     lv_obj_set_style_text_color(label_lim_in_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_in_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_in_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
     lv_obj_t * s1 = lv_slider_create(p1);
     lv_slider_set_range(s1, 400, 3000);
     lv_slider_set_value(s1, lim_input_w, LV_ANIM_OFF);
     lv_obj_set_width(s1, 600);
-    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -10); // Moved up slightly
+    lv_obj_align(s1, LV_ALIGN_BOTTOM_MID, 0, -5);
     lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s1, event_slider_input, LV_EVENT_RELEASED, NULL); // Catch release to send cmd
     lv_obj_add_event_cb(s1, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
 
     // 2. Min Discharge (0 - 30)
     lv_obj_t * p2 = lv_obj_create(cont);
-    lv_obj_set_size(p2, 650, 90);
+    lv_obj_set_size(p2, 650, 100);
     lv_obj_set_style_bg_opa(p2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p2, 0, 0);
 
@@ -341,25 +355,26 @@ static void create_settings(void) {
     lv_label_set_text(l2, "Min Discharge Limit (Red)");
     lv_obj_set_style_text_color(l2, lv_color_white(), 0);
     lv_obj_set_style_text_font(l2, &lv_font_montserrat_32, 0);
-    lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l2, LV_ALIGN_TOP_LEFT, 0, -10);
 
     label_lim_out_val = lv_label_create(p2);
     lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
     lv_obj_set_style_text_color(label_lim_out_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_out_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_out_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
     lv_obj_t * s2 = lv_slider_create(p2);
     lv_slider_set_range(s2, 0, 30);
     lv_slider_set_value(s2, lim_discharge_p, LV_ANIM_OFF);
     lv_obj_set_width(s2, 600);
-    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(s2, LV_ALIGN_BOTTOM_MID, 0, -5);
     lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s2, event_slider_discharge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(s2, event_calib_touch, LV_EVENT_CLICKED, NULL);
 
     // 3. Max Charge (50 - 100)
     lv_obj_t * p3 = lv_obj_create(cont);
-    lv_obj_set_size(p3, 650, 90);
+    lv_obj_set_size(p3, 650, 100);
     lv_obj_set_style_bg_opa(p3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(p3, 0, 0);
 
@@ -367,20 +382,21 @@ static void create_settings(void) {
     lv_label_set_text(l3, "Max Charge Limit (Blue)");
     lv_obj_set_style_text_color(l3, lv_color_white(), 0);
     lv_obj_set_style_text_font(l3, &lv_font_montserrat_32, 0);
-    lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(l3, LV_ALIGN_TOP_LEFT, 0, -10);
 
     label_lim_chg_val = lv_label_create(p3);
     lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
     lv_obj_set_style_text_color(label_lim_chg_val, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_lim_chg_val, &lv_font_montserrat_32, 0);
-    lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(label_lim_chg_val, LV_ALIGN_TOP_RIGHT, 0, -10);
 
     lv_obj_t * s3 = lv_slider_create(p3);
     lv_slider_set_range(s3, 50, 100);
     lv_slider_set_value(s3, lim_charge_p, LV_ANIM_OFF);
     lv_obj_set_width(s3, 600);
-    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(s3, LV_ALIGN_BOTTOM_MID, 0, -5);
     lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s3, event_slider_charge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(s3, event_calib_touch, LV_EVENT_CLICKED, NULL);
 }
 
@@ -399,6 +415,20 @@ static void create_dashboard(void) {
     lv_label_set_text(label_temp, "25 C");
     lv_obj_set_style_text_font(label_temp, &lv_font_montserrat_20, 0);
     lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
+
+    led_status_dot = lv_obj_create(scr_dash);
+    lv_obj_set_size(led_status_dot, 15, 15);
+    lv_obj_set_style_radius(led_status_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_border_width(led_status_dot, 0, 0);
+    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -100, 15); // Left of Temp
+
+    label_disconnected = lv_label_create(scr_dash);
+    lv_label_set_text(label_disconnected, "DISCONNECTED");
+    lv_obj_set_style_text_color(label_disconnected, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_text_font(label_disconnected, &lv_font_montserrat_32, 0);
+    lv_obj_center(label_disconnected);
+    lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
 
     // --- Left Column (Inputs) ---
     create_info_card(scr_dash, MDI_ICON_SOLAR, "Solar", 20, 60, &label_solar_val);
@@ -462,8 +492,8 @@ static void create_dashboard(void) {
 
     // Wave 2 (Left of Settings)
     lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_wave2, 120, 60);
-    lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, 0);
+    lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
+    lv_obj_align_to(btn_wave2, btn_settings, LV_ALIGN_OUT_LEFT_MID, -20, -5);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
@@ -564,7 +594,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.acInputPower);
+        in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
         in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
         in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
         out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
@@ -597,6 +627,15 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     static bool first_run = true;
 
     int temp_int = safe_float_to_int(temp);
+
+    // Update Disconnected State
+    if (dev->connected) {
+        lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0); // Green dot for data
+    } else {
+        lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    }
 
     if (first_run || temp_int != last_temp) {
         lv_label_set_text_fmt(label_temp, "%d C", temp_int);
@@ -634,8 +673,18 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         last_ac = out_ac;
     }
 
-    // Toggle Styles
-    bool ac_on = (out_ac > 0);
+    // Toggle Styles based on PORT state, not power
+    bool ac_on = false;
+    bool dc_on = false;
+
+    if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+        ac_on = dev->data.d3p.acHvPort; // Or acLvPort, D3P typically uses HV for output
+        dc_on = dev->data.d3p.dc12vPort;
+    } else if (dev->id == DEV_TYPE_DELTA_3) {
+        ac_on = dev->data.d3.acOn;
+        dc_on = dev->data.d3.dcOn;
+    }
+
     if (first_run || ac_on != last_ac_on) {
         if (ac_on) {
             lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
@@ -651,7 +700,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         last_ac_on = ac_on;
     }
 
-    bool dc_on = (out_12v > 0);
     if (first_run || dc_on != last_dc_on) {
         if (dc_on) {
             lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
@@ -668,4 +716,16 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     first_run = false;
+
+    // Reset LED to Red after a short while?
+    // For now, it stays Green if connected.
+    // To "Blink" on data, we could toggle it, but simply showing connected status is usually better.
+    // User asked for "dot that blinks red and green when new data is received".
+    // Implementation: Toggle it here.
+    static bool toggle = false;
+    if (dev->connected) {
+       if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+       else lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+       toggle = !toggle;
+    }
 }

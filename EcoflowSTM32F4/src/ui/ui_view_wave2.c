@@ -35,6 +35,7 @@ static void create_styles(void) {
 
     lv_style_init(&style_panel);
     lv_style_set_bg_color(&style_panel, lv_color_hex(0xFF282828));
+    lv_style_set_text_color(&style_panel, lv_color_white()); // Force White Text
     lv_style_set_radius(&style_panel, 20);
     lv_style_set_border_width(&style_panel, 0);
 
@@ -190,10 +191,12 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     label_set_temp_val = lv_label_create(panel);
     lv_label_set_text(label_set_temp_val, "25 C");
     lv_obj_set_style_text_font(label_set_temp_val, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_color(label_set_temp_val, lv_color_white(), 0);
     lv_obj_align_to(label_set_temp_val, arc_set_temp, LV_ALIGN_CENTER, 0, 0);
 
     lv_obj_t * lbl_set_title = lv_label_create(panel);
     lv_label_set_text(lbl_set_title, "Set Temp");
+    lv_obj_set_style_text_color(lbl_set_title, lv_color_white(), 0);
     lv_obj_align_to(lbl_set_title, arc_set_temp, LV_ALIGN_OUT_TOP_MID, 0, -10);
 
     // Right Side: Controls
