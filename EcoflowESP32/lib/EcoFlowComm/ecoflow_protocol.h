@@ -2,6 +2,7 @@
 #define ECOFLOW_PROTOCOL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,59 +32,187 @@ extern "C" {
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
 
+// Device Types (matching types.h)
+#define DEV_TYPE_DELTA_3 1
+#define DEV_TYPE_DELTA_PRO_3 2
+#define DEV_TYPE_WAVE_2 3
+#define DEV_TYPE_ALT_CHARGER 4
+
 
 #pragma pack(push, 1)
 
+// Shared Data Structures (POD versions of EcoflowData.h)
+
+typedef struct {
+    float batteryLevel;
+    float acInputPower;
+    float acOutputPower;
+    float inputPower;
+    float outputPower;
+    float dc12vOutputPower;
+    float dcPortInputPower;
+    int32_t dcPortState;
+    float usbcOutputPower;
+    float usbc2OutputPower;
+    float usbaOutputPower;
+    float usba2OutputPower;
+    bool pluggedInAc;
+    bool energyBackup;
+    int32_t energyBackupBatteryLevel;
+    float batteryInputPower;
+    float batteryOutputPower;
+    int32_t batteryChargeLimitMin;
+    int32_t batteryChargeLimitMax;
+    int32_t cellTemperature;
+    bool dc12vPort;
+    bool acPorts;
+    float solarInputPower;
+    int32_t acChargingSpeed;
+    int32_t maxAcChargingPower;
+    bool acOn;
+    bool dcOn;
+    bool usbOn;
+} Delta3DataStruct;
+
+typedef struct {
+    int32_t mode;
+    int32_t subMode;
+    int32_t setTemp;
+    int32_t fanValue;
+    float envTemp;
+    int32_t tempSys;
+    int32_t displayIdleTime;
+    int32_t displayIdleMode;
+    int32_t timeEn;
+    int32_t timeSetVal;
+    int32_t timeRemainVal;
+    int32_t beepEnable;
+    uint32_t errCode;
+    int32_t refEn;
+    int32_t bmsPid;
+    int32_t wteFthEn;
+    int32_t tempDisplay;
+    int32_t powerMode;
+    int32_t powerSrc;
+    int32_t psdrPwrWatt;
+    int32_t batPwrWatt;
+    int32_t mpptPwrWatt;
+    uint32_t batDsgRemainTime;
+    uint32_t batChgRemainTime;
+    int32_t batSoc;
+    int32_t batChgStatus;
+    float outLetTemp;
+    int32_t mpptWork;
+    int32_t bmsErr;
+    int32_t rgbState;
+    int32_t waterValue;
+    int32_t bmsBoundFlag;
+    int32_t bmsUndervoltage;
+    int32_t ver;
+    int32_t remainingTime;
+} Wave2DataStruct;
+
+typedef struct {
+    float batteryLevel;
+    float acInputPower;
+    float acLvOutputPower;
+    float acHvOutputPower;
+    float inputPower;
+    float outputPower;
+    float dc12vOutputPower;
+    float dcLvInputPower;
+    float dcHvInputPower;
+    int32_t dcLvInputState;
+    int32_t dcHvInputState;
+    float usbcOutputPower;
+    float usbc2OutputPower;
+    float usbaOutputPower;
+    float usba2OutputPower;
+    int32_t acChargingSpeed;
+    int32_t maxAcChargingPower;
+    bool pluggedInAc;
+    bool energyBackup;
+    int32_t energyBackupBatteryLevel;
+    int32_t batteryChargeLimitMin;
+    int32_t batteryChargeLimitMax;
+    int32_t cellTemperature;
+    bool dc12vPort;
+    bool acLvPort;
+    bool acHvPort;
+    float solarLvPower;
+    float solarHvPower;
+    bool gfiMode;
+} DeltaPro3DataStruct;
+
+typedef struct {
+    float batteryLevel;
+    float batteryTemperature;
+    float dcPower;
+    float carBatteryVoltage;
+    float startVoltage;
+    int32_t startVoltageMin;
+    int32_t startVoltageMax;
+    int32_t chargerMode;
+    bool chargerOpen;
+    int32_t powerLimit;
+    int32_t powerMax;
+    float reverseChargingCurrentLimit;
+    float chargingCurrentLimit;
+    float reverseChargingCurrentMax;
+    float chargingCurrentMax;
+} AlternatorChargerDataStruct;
+
+
+// Legacy BatteryStatus for backward compatibility (if needed) or simple views
 typedef struct {
     uint8_t soc;
     int16_t power_w;
     uint16_t voltage_v;
     uint8_t connected;
-    char device_name[16]; // Fixed size for simplicity
+    char device_name[16];
 } BatteryStatus;
 
-typedef struct {
-    int8_t temp_c;
-    int8_t temp_min;
-    int8_t temp_max;
-} Temperature;
+// Union to hold data based on device type
+typedef union {
+    Delta3DataStruct d3;
+    Wave2DataStruct w2;
+    DeltaPro3DataStruct d3p;
+    AlternatorChargerDataStruct ac;
+    BatteryStatus legacy; // Fallback
+} DeviceSpecificData;
 
+// The payload sent over UART
 typedef struct {
-    uint8_t state;
-    int8_t signal_db;
-} UartConnectionState;
-
-typedef struct {
-    uint8_t id;
-    char name[16];
+    uint8_t id;          // DeviceType enum
     uint8_t connected;
-} DeviceInfo;
+    char name[16];
+    DeviceSpecificData data;
+} DeviceStatus;
 
 typedef struct {
     uint8_t count;
-    DeviceInfo devices[MAX_DEVICES];
+    struct {
+        uint8_t id;
+        char name[16];
+        uint8_t connected;
+    } devices[MAX_DEVICES];
 } DeviceList;
-
-typedef struct {
-    uint8_t id;
-    BatteryStatus status;
-} DeviceStatus;
 
 #pragma pack(pop)
 
+// API Functions
 uint8_t calculate_crc8(const uint8_t *data, uint8_t len);
-int pack_battery_status_message(uint8_t *buffer, const BatteryStatus *status);
-int unpack_battery_status_message(const uint8_t *buffer, BatteryStatus *status);
-int pack_request_status_message(uint8_t *buffer);
 
-// New packing/unpacking functions
 int pack_handshake_message(uint8_t *buffer);
 int pack_handshake_ack_message(uint8_t *buffer);
+
 int pack_device_list_message(uint8_t *buffer, const DeviceList *list);
 int unpack_device_list_message(const uint8_t *buffer, DeviceList *list);
 int pack_device_list_ack_message(uint8_t *buffer);
+
 int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id);
 int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id);
+
 int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status);
 int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status);
 

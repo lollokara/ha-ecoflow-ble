@@ -113,42 +113,57 @@ static void InitStatusPanel(void) {
 // Updates only the dynamic values in the status panels
 static void UpdateStatusPanel(DeviceStatus* dev) {
     char buf[32];
-    BatteryStatus* batt = &dev->status;
+    int soc = 0;
+    int power = 0;
 
-    printf("DISPLAY: Updating Panel. Device=%d, SOC=%d\n", dev->id, batt->soc);
+    // Determine data based on ID
+    if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+        soc = (int)dev->data.d3p.batteryLevel;
+        power = (int)(dev->data.d3p.inputPower - dev->data.d3p.outputPower);
+    } else if (dev->id == DEV_TYPE_DELTA_3) {
+        soc = (int)dev->data.d3.batteryLevel;
+        power = (int)(dev->data.d3.inputPower - dev->data.d3.outputPower);
+    } else if (dev->id == DEV_TYPE_WAVE_2) {
+        soc = dev->data.w2.batSoc;
+        // Wave 2 power calculation might differ, using battery power for now
+        power = dev->data.w2.batPwrWatt;
+    } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        soc = (int)dev->data.ac.batteryLevel;
+        power = (int)dev->data.ac.dcPower;
+    } else {
+        // Fallback or unknown
+        soc = 0;
+        power = 0;
+    }
+
+    printf("DISPLAY: Updating Panel. Device=%s (%d), SOC=%d\n", dev->name, dev->id, soc);
 
     // Update Header with Device Name if available
-    if (batt->device_name[0] != 0) {
+    if (dev->name[0] != 0) {
         BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
         BSP_LCD_SetBackColor(GUI_COLOR_HEADER);
         BSP_LCD_SetFont(&Font24);
-        // Clear previous name area? Assuming simple overwrite for now or header redraw handles it.
-        // Actually RenderFrame redraws header every time, so just draw name.
-        // But DrawHeader is called before this.
-        // Let's just overlay name.
-        BSP_LCD_DisplayStringAt(300, 13, (uint8_t*)batt->device_name, LEFT_MODE);
+        BSP_LCD_DisplayStringAt(300, 13, (uint8_t*)dev->name, LEFT_MODE);
     }
 
 
     // Panel 1: SOC Value
-    // Clear only the text area to prevent flicker
     BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
     BSP_LCD_FillRect(40, 110, 160, 24);
 
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
     BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
-    snprintf(buf, sizeof(buf), "%d %%", batt->soc);
+    snprintf(buf, sizeof(buf), "%d %%", soc);
     BSP_LCD_SetFont(&Font24);
     BSP_LCD_DisplayStringAt(40, 110, (uint8_t*)buf, LEFT_MODE);
 
     // Panel 2: Power Value
-    // Clear only the text area to prevent flicker
     BSP_LCD_SetTextColor(GUI_COLOR_PANEL);
     BSP_LCD_FillRect(260, 110, 160, 24);
 
     BSP_LCD_SetTextColor(GUI_COLOR_TEXT);
     BSP_LCD_SetBackColor(GUI_COLOR_PANEL);
-    snprintf(buf, sizeof(buf), "%d W", batt->power_w);
+    snprintf(buf, sizeof(buf), "%d W", power);
     BSP_LCD_SetFont(&Font24);
     BSP_LCD_DisplayStringAt(260, 110, (uint8_t*)buf, LEFT_MODE);
 }

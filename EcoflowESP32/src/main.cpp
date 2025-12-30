@@ -156,21 +156,103 @@ void sendDeviceStatus(uint8_t device_id) {
 
     DeviceStatus status = {0};
     status.id = device_id;
+    status.connected = 1;
 
-    // Fill BatteryStatus part
     if (type == DeviceType::DELTA_3) {
-        status.status.soc = (uint8_t)dev->getData().delta3.batteryLevel;
-        status.status.power_w = dev->getData().delta3.inputPower - dev->getData().delta3.outputPower;
-        status.status.voltage_v = 0;
-        status.status.connected = 1;
-        strncpy(status.status.device_name, "Delta 3", 15);
+        strncpy(status.name, "Delta 3", 15);
+        const Delta3Data& src = dev->getData().delta3;
+        Delta3DataStruct& dst = status.data.d3;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.acInputPower = src.acInputPower;
+        dst.acOutputPower = src.acOutputPower;
+        dst.inputPower = src.inputPower;
+        dst.outputPower = src.outputPower;
+        dst.dc12vOutputPower = src.dc12vOutputPower;
+        dst.dcPortInputPower = src.dcPortInputPower;
+        dst.dcPortState = src.dcPortState;
+        dst.usbcOutputPower = src.usbcOutputPower;
+        dst.usbc2OutputPower = src.usbc2OutputPower;
+        dst.usbaOutputPower = src.usbaOutputPower;
+        dst.usba2OutputPower = src.usba2OutputPower;
+        dst.pluggedInAc = src.pluggedInAc;
+        dst.energyBackup = src.energyBackup;
+        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
+        dst.batteryInputPower = src.batteryInputPower;
+        dst.batteryOutputPower = src.batteryOutputPower;
+        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
+        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
+        dst.cellTemperature = src.cellTemperature;
+        dst.dc12vPort = src.dc12vPort;
+        dst.acPorts = src.acPorts;
+        dst.solarInputPower = src.solarInputPower;
+        dst.acChargingSpeed = src.acChargingSpeed;
+        dst.maxAcChargingPower = src.maxAcChargingPower;
+        dst.acOn = src.acOn;
+        dst.dcOn = src.dcOn;
+        dst.usbOn = src.usbOn;
+
     } else if (type == DeviceType::WAVE_2) {
-        // Wave 2 data mapping (simplified for now)
-        status.status.soc = 0; // Wave 2 might not have battery
-        status.status.power_w = 0;
-        status.status.voltage_v = 0;
-        status.status.connected = 1;
-        strncpy(status.status.device_name, "Wave 2", 15);
+        strncpy(status.name, "Wave 2", 15);
+        const Wave2Data& src = dev->getData().wave2;
+        Wave2DataStruct& dst = status.data.w2;
+
+        dst.mode = src.mode;
+        dst.subMode = src.subMode;
+        dst.setTemp = src.setTemp;
+        dst.fanValue = src.fanValue;
+        dst.envTemp = src.envTemp;
+        dst.tempSys = src.tempSys;
+        dst.batSoc = src.batSoc;
+        dst.remainingTime = src.remainingTime;
+        dst.powerMode = src.powerMode;
+        dst.batPwrWatt = src.batPwrWatt;
+
+    } else if (type == DeviceType::DELTA_PRO_3) {
+        strncpy(status.name, "Delta Pro 3", 15);
+        const DeltaPro3Data& src = dev->getData().deltaPro3;
+        DeltaPro3DataStruct& dst = status.data.d3p;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.acInputPower = src.acInputPower;
+        dst.acLvOutputPower = src.acLvOutputPower;
+        dst.acHvOutputPower = src.acHvOutputPower;
+        dst.inputPower = src.inputPower;
+        dst.outputPower = src.outputPower;
+        dst.dc12vOutputPower = src.dc12vOutputPower;
+        dst.dcLvInputPower = src.dcLvInputPower;
+        dst.dcHvInputPower = src.dcHvInputPower;
+        dst.dcLvInputState = src.dcLvInputState;
+        dst.dcHvInputState = src.dcHvInputState;
+        dst.usbcOutputPower = src.usbcOutputPower;
+        dst.usbc2OutputPower = src.usbc2OutputPower;
+        dst.usbaOutputPower = src.usbaOutputPower;
+        dst.usba2OutputPower = src.usba2OutputPower;
+        dst.acChargingSpeed = src.acChargingSpeed;
+        dst.maxAcChargingPower = src.maxAcChargingPower;
+        dst.pluggedInAc = src.pluggedInAc;
+        dst.energyBackup = src.energyBackup;
+        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
+        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
+        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
+        dst.cellTemperature = src.cellTemperature;
+        dst.dc12vPort = src.dc12vPort;
+        dst.acLvPort = src.acLvPort;
+        dst.acHvPort = src.acHvPort;
+        dst.solarLvPower = src.solarLvPower;
+        dst.solarHvPower = src.solarHvPower;
+        dst.gfiMode = src.gfiMode;
+
+    } else if (type == DeviceType::ALTERNATOR_CHARGER) {
+        strncpy(status.name, "Alt Charger", 15);
+        const AlternatorChargerData& src = dev->getData().alternatorCharger;
+        AlternatorChargerDataStruct& dst = status.data.ac;
+
+        dst.batteryLevel = src.batteryLevel;
+        dst.dcPower = src.dcPower;
+        dst.chargerMode = src.chargerMode;
+        dst.chargerOpen = src.chargerOpen;
+        dst.carBatteryVoltage = src.carBatteryVoltage;
     }
 
     uint8_t buffer[sizeof(DeviceStatus) + 4];
@@ -179,8 +261,8 @@ void sendDeviceStatus(uint8_t device_id) {
 }
 
 void checkUart() {
-    static uint8_t rx_buf[260];
-    static uint8_t rx_idx = 0;
+    static uint8_t rx_buf[1024];
+    static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
     static bool collecting = false;
 
@@ -246,6 +328,7 @@ void checkUart() {
 void loop() {
     static uint32_t last_display_update = 0;
     static uint32_t last_data_refresh = 0;
+    static uint32_t last_device_list_update = 0;
 
     LightSensor::getInstance().update();
     DeviceManager::getInstance().update();
@@ -268,12 +351,18 @@ void loop() {
     if (millis() - last_data_refresh > 2000) {
         last_data_refresh = millis();
 
-        // sendBatteryStatus(); // Replaced by request/response from F4
-
         EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
         if (d3 && d3->isAuthenticated()) d3->requestData();
         EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
         if (w2 && w2->isAuthenticated()) w2->requestData();
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) d3p->requestData();
+    }
+
+    // Periodically update device list (every 5 seconds) to handle disconnects/reconnects
+    if (millis() - last_device_list_update > 5000) {
+        last_device_list_update = millis();
+        sendDeviceList();
     }
 
     if (millis() - last_display_update > 20) {

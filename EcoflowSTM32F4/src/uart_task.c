@@ -65,8 +65,8 @@ typedef enum {
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10]; // Enough for header + payload + CRC
-static uint8_t parseIndex = 0;
+static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10 + sizeof(DeviceStatus)]; // Ensure buffer is large enough for big payloads
+static uint16_t parseIndex = 0; // Payload can be > 255
 static uint8_t expectedPayloadLen = 0;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
@@ -108,7 +108,7 @@ static void UART_Init(void) {
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
-static void process_packet(uint8_t *packet, uint8_t total_len) {
+static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
 
@@ -151,6 +151,7 @@ void StartUARTTask(void * argument) {
     int len;
     uint8_t b;
     TickType_t lastActivityTime = xTaskGetTickCount();
+    TickType_t lastHandshakeTime = 0; // Non-blocking timer for handshake
 
     for(;;) {
         // 1. Process Incoming Data
@@ -172,7 +173,7 @@ void StartUARTTask(void * argument) {
                 case PARSE_LEN:
                     parseBuffer[parseIndex++] = b;
                     expectedPayloadLen = b;
-                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) {
+                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) { // Note: If DeviceStatus > 255 this logic needs protocol change. Protocol says LEN is 1 byte, so max 255. DeviceStatus is ~180 bytes. Safe.
                         parseState = PARSE_START; // Invalid length, reset
                         parseIndex = 0;
                     } else {
@@ -196,12 +197,12 @@ void StartUARTTask(void * argument) {
                     {
                         uint8_t received_crc = b;
                         // Calculate CRC over CMD, LEN, PAYLOAD
-                        // parseBuffer[0] is START
-                        // Data starts at parseBuffer[1], length is parseIndex - 1
+                        // Data starts at parseBuffer[1]
+                        // Length is parseIndex - 1 (Total bytes so far minus START byte)
                         uint8_t calcd_crc = calculate_crc8(&parseBuffer[1], parseIndex - 1);
 
                         if (received_crc == calcd_crc) {
-                            parseBuffer[parseIndex++] = b; // Store CRC byte just in case
+                            parseBuffer[parseIndex++] = b;
                             process_packet(parseBuffer, parseIndex);
                         } else {
                             printf("UART: CRC Fail. Rx=%02X Calc=%02X\n", received_crc, calcd_crc);
@@ -213,26 +214,30 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Handle State Machine (Periodic actions)
-        // Reduced to 200ms polling for faster updates
+        // 2. Handle State Machine (Non-blocking)
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
 
             switch (protocolState) {
                 case STATE_HANDSHAKE:
-                    printf("UART: Sending Handshake...\n");
-                    len = pack_handshake_message(tx_buf);
-                    HAL_UART_Transmit(&huart6, tx_buf, len, 100);
-                    protocolState = STATE_WAIT_HANDSHAKE_ACK;
-                    // Wait 1s for handshake, don't spam it every 200ms
-                    vTaskDelay(pdMS_TO_TICKS(800));
+                    // Only send every 1 second
+                    if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
+                        lastHandshakeTime = xTaskGetTickCount();
+                        printf("UART: Sending Handshake...\n");
+                        len = pack_handshake_message(tx_buf);
+                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        protocolState = STATE_WAIT_HANDSHAKE_ACK;
+                    }
                     break;
 
                 case STATE_WAIT_HANDSHAKE_ACK:
-                    printf("UART: Timeout waiting for ACK, resending handshake...\n");
-                    len = pack_handshake_message(tx_buf);
-                    HAL_UART_Transmit(&huart6, tx_buf, len, 100);
-                    vTaskDelay(pdMS_TO_TICKS(800));
+                    // Retry every 1 second
+                    if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
+                        lastHandshakeTime = xTaskGetTickCount();
+                        printf("UART: Timeout waiting for ACK, resending handshake...\n");
+                        len = pack_handshake_message(tx_buf);
+                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                    }
                     break;
 
                 case STATE_WAIT_DEVICE_LIST:
@@ -252,6 +257,6 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5)); // Yield to other tasks
+        vTaskDelay(pdMS_TO_TICKS(5)); // Yield to allow other tasks to run
     }
 }
