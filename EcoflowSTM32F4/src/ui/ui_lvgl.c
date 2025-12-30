@@ -512,24 +512,32 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     int out_usb=0, out_12v=0, out_ac=0;
     float temp = 25.0f;
 
+    // Use local aligned structs to avoid unaligned access HardFaults on M4
+    // caused by packed DeviceStatus structure.
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-        soc = (int)dev->data.d3p.batteryLevel;
-        in_ac = (int)dev->data.d3p.acInputPower;
-        in_solar = (int)(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = (int)dev->data.d3p.dcLvInputPower;
-        out_ac = (int)(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
-        out_12v = (int)dev->data.d3p.dc12vOutputPower;
-        out_usb = (int)(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
-        temp = dev->data.d3p.cellTemperature;
+        DeltaPro3DataStruct d3p;
+        memcpy(&d3p, &dev->data.d3p, sizeof(d3p));
+
+        soc = (int)d3p.batteryLevel;
+        in_ac = (int)d3p.acInputPower;
+        in_solar = (int)(d3p.solarLvPower + d3p.solarHvPower);
+        in_alt = (int)d3p.dcLvInputPower;
+        out_ac = (int)(d3p.acLvOutputPower + d3p.acHvOutputPower);
+        out_12v = (int)d3p.dc12vOutputPower;
+        out_usb = (int)(d3p.usbaOutputPower + d3p.usbcOutputPower);
+        temp = d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
-        soc = (int)dev->data.d3.batteryLevel;
-        in_ac = (int)dev->data.d3.acInputPower;
-        in_solar = (int)dev->data.d3.solarInputPower;
-        in_alt = (int)dev->data.d3.dcPortInputPower;
-        out_ac = (int)dev->data.d3.acOutputPower;
-        out_12v = (int)dev->data.d3.dc12vOutputPower;
-        out_usb = (int)(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
-        temp = dev->data.d3.cellTemperature;
+        Delta3DataStruct d3;
+        memcpy(&d3, &dev->data.d3, sizeof(d3));
+
+        soc = (int)d3.batteryLevel;
+        in_ac = (int)d3.acInputPower;
+        in_solar = (int)d3.solarInputPower;
+        in_alt = (int)d3.dcPortInputPower;
+        out_ac = (int)d3.acOutputPower;
+        out_12v = (int)d3.dc12vOutputPower;
+        out_usb = (int)(d3.usbaOutputPower + d3.usbcOutputPower);
+        temp = d3.cellTemperature;
     }
 
     lv_label_set_text_fmt(label_temp, "%d C", (int)temp);

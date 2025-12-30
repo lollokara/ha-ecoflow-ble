@@ -132,6 +132,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
     }
     else if (cmd == CMD_DEVICE_STATUS) {
+        printf("UART: Device Status received.\n");
         DeviceStatus status;
         if (unpack_device_status_message(packet, &status) == 0) {
              DisplayEvent event;
