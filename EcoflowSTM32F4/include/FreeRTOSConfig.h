@@ -88,8 +88,7 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */
-#define vPortSVCHandler    SVC_Handler
-#define xPortPendSVHandler PendSV_Handler
+/* definitions removed in favor of manual forwarding in main.c */
 
 /* IMPORTANT: SysTick is handled by HAL, so we need to be careful.
    However, FreeRTOS expects to handle SysTick.
@@ -102,6 +101,6 @@ standard names. */
    or we configure HAL to use a different timer.
    For simplicity, let's map it here and see if we can chain them or use the hook.
 */
-#define xPortSysTickHandler SysTick_Handler
+/* xPortSysTickHandler mapping removed in favor of manual forwarding in main.c */
 
 #endif /* FREERTOS_CONFIG_H */
