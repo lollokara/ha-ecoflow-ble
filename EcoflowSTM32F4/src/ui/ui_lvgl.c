@@ -16,6 +16,7 @@
 #include "ui_view_debug.h"
 #include "lvgl.h"
 #include "uart_task.h" // Added for UART commands
+#include "fan_task.h"  // Added for Fan/Amb Temp
 #include <stdio.h>
 #include <math.h>
 #include "stm32f4xx_hal.h"
@@ -61,7 +62,8 @@ static lv_style_t style_btn_green;
 
 // --- Dashboard Widgets ---
 static lv_obj_t * scr_dash;
-static lv_obj_t * label_temp;
+static lv_obj_t * label_batt_temp; // Renamed from label_temp
+static lv_obj_t * label_amb_temp;  // New
 static lv_obj_t * arc_batt;
 static lv_obj_t * label_soc;
 
@@ -82,6 +84,7 @@ static lv_obj_t * label_calib_debug; // For touch calibration
 
 // Indicator
 static lv_obj_t * led_status_dot;
+static lv_obj_t * led_rp2040_dot; // New
 static lv_obj_t * label_disconnected;
 
 // Flow Data Labels - Now managed via card structs
@@ -517,17 +520,33 @@ static void create_dashboard(void) {
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 10);
 
-    label_temp = lv_label_create(scr_dash);
-    lv_label_set_text(label_temp, "25 C");
-    lv_obj_set_style_text_font(label_temp, &lv_font_montserrat_20, 0);
-    lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
+    // Battery Temp (Right Top)
+    label_batt_temp = lv_label_create(scr_dash);
+    lv_label_set_text(label_batt_temp, "Batt. -- C");
+    lv_obj_set_style_text_font(label_batt_temp, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_batt_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
 
+    // ESP32 Status Dot (Left of Batt Temp)
     led_status_dot = lv_obj_create(scr_dash);
     lv_obj_set_size(led_status_dot, 15, 15);
     lv_obj_set_style_radius(led_status_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
     lv_obj_set_style_border_width(led_status_dot, 0, 0);
-    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -100, 15); // Left of Temp
+    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -150, 15);
+
+    // Ambient Temp (Left of ESP32 Dot)
+    label_amb_temp = lv_label_create(scr_dash);
+    lv_label_set_text(label_amb_temp, "Amb. -- C");
+    lv_obj_set_style_text_font(label_amb_temp, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_amb_temp, LV_ALIGN_TOP_RIGHT, -180, 10);
+
+    // RP2040 Status Dot (Left of Amb Temp)
+    led_rp2040_dot = lv_obj_create(scr_dash);
+    lv_obj_set_size(led_rp2040_dot, 15, 15);
+    lv_obj_set_style_radius(led_rp2040_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0); // Default Disconnected (Yellow per spec)
+    lv_obj_set_style_border_width(led_rp2040_dot, 0, 0);
+    lv_obj_align(led_rp2040_dot, LV_ALIGN_TOP_RIGHT, -310, 15);
 
     label_disconnected = lv_label_create(scr_dash);
     lv_label_set_text(label_disconnected, "DISCONNECTED");
@@ -749,7 +768,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     int soc = 0;
     int in_solar=0, in_ac=0, in_alt=0;
     int out_usb=0, out_12v=0, out_ac=0;
-    float temp = 25.0f;
+    float temp = 0.0f;
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         soc = safe_float_to_int(dev->data.d3p.batteryLevel);
@@ -834,8 +853,30 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     if (first_run || temp_int != last_temp) {
-        lv_label_set_text_fmt(label_temp, "%d C", temp_int);
+        lv_label_set_text_fmt(label_batt_temp, "Batt. %d C", temp_int);
         last_temp = temp_int;
+    }
+
+    // Update Ambient Temp from RP2040
+    FanStatus* fstat = Fan_GetStatus();
+    if (fstat) {
+        static int last_amb_temp = -999;
+        int amb_t = (int)fstat->amb_temp;
+        if (amb_t != last_amb_temp) {
+            lv_label_set_text_fmt(label_amb_temp, "Amb. %d C", amb_t);
+            last_amb_temp = amb_t;
+        }
+
+        // Update RP2040 Dot
+        static bool last_conn = false;
+        if (fstat->connected != last_conn || first_run) {
+             if (fstat->connected) {
+                 lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
+             } else {
+                 lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0);
+             }
+             last_conn = fstat->connected;
+        }
     }
 
     if (first_run || soc != last_soc) {

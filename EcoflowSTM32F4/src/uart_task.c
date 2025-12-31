@@ -71,6 +71,10 @@ static int rb_pop(RingBuffer *rb, uint8_t *byte) {
 
 // ISR Variables
 uint8_t rx_byte_isr;
+uint8_t rx_byte_fan; // For Fan Task (UART4)
+
+extern void Fan_RxByteISR(uint8_t byte);
+extern UART_HandleTypeDef huart4;
 
 // Protocol State
 typedef enum {
@@ -102,6 +106,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART6) {
         rb_push(&rx_ring_buffer, rx_byte_isr);
         HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+    }
+    else if (huart->Instance == UART4) {
+        Fan_RxByteISR(rx_byte_fan);
+        HAL_UART_Receive_IT(&huart4, &rx_byte_fan, 1);
     }
 }
 
