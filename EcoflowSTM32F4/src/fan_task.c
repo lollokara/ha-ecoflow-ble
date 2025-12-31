@@ -5,8 +5,7 @@
 #include "semphr.h"
 
 // --- Hardware Handles ---
-UART_HandleTypeDef huart4; // RX (PA1)
-UART_HandleTypeDef huart2; // TX (PA2)
+UART_HandleTypeDef huart4; // RX (PA1), TX (PA0)
 static SemaphoreHandle_t dataMutex;
 
 // --- State ---
@@ -58,27 +57,16 @@ static uint8_t calc_crc8(uint8_t *data, size_t len) {
 
 // --- UART Initialization ---
 void MX_Fan_UART_Init(void) {
-    // RX: UART4
+    // UART4 (TX+RX)
     huart4.Instance = UART4;
     huart4.Init.BaudRate = 115200;
     huart4.Init.WordLength = UART_WORDLENGTH_8B;
     huart4.Init.StopBits = UART_STOPBITS_1;
     huart4.Init.Parity = UART_PARITY_NONE;
-    huart4.Init.Mode = UART_MODE_RX;
+    huart4.Init.Mode = UART_MODE_TX_RX;
     huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart4.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart4);
-
-    // TX: USART2
-    huart2.Instance = USART2;
-    huart2.Init.BaudRate = 115200;
-    huart2.Init.WordLength = UART_WORDLENGTH_8B;
-    huart2.Init.StopBits = UART_STOPBITS_1;
-    huart2.Init.Parity = UART_PARITY_NONE;
-    huart2.Init.Mode = UART_MODE_TX;
-    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-    HAL_UART_Init(&huart2);
 }
 
 // --- Sender ---
@@ -92,8 +80,8 @@ static void send_packet(uint8_t cmd, uint8_t *payload, uint8_t len) {
     if (len > 0 && payload) memcpy(&packet[3], payload, len);
     packet[3 + len] = calc_crc8(packet, 3 + len);
 
-    // Transmit via USART2 (TX Pin)
-    HAL_UART_Transmit(&huart2, packet, 3 + len + 1, 100);
+    // Transmit via UART4
+    HAL_UART_Transmit(&huart4, packet, 3 + len + 1, 100);
 }
 
 // --- Parser State ---
@@ -102,6 +90,9 @@ static uint8_t parseBuffer[RX_PARSE_BUF_SIZE];
 static int parseIndex = 0;
 
 static void process_byte(uint8_t b) {
+    // Simple debug log for raw bytes (limit frequency or only unexpected?)
+    // printf("FAN RX: %02X\n", b);
+
     if (parseIndex == 0) {
         if (b == FAN_UART_START_BYTE) {
             parseBuffer[0] = b;
@@ -122,6 +113,8 @@ static void process_byte(uint8_t b) {
                 uint8_t cmd = parseBuffer[1];
                 uint8_t *payload = &parseBuffer[3];
 
+                printf("FAN: Valid Packet CMD=%02X LEN=%d\n", cmd, len);
+
                 xSemaphoreTake(dataMutex, portMAX_DELAY);
                 lastPacketTime = xTaskGetTickCount();
                 currentStatus.connected = true;
@@ -129,17 +122,24 @@ static void process_byte(uint8_t b) {
                 if (cmd == FAN_CMD_STATUS && len == 12) {
                     memcpy(&currentStatus.amb_temp, payload, 4);
                     memcpy(currentStatus.fan_rpm, payload + 4, 8);
+                    printf("FAN: Status Updated. Temp=%.2f\n", currentStatus.amb_temp);
                 } else if (cmd == FAN_CMD_CONFIG_RESP && len == sizeof(FanConfig)) {
                     memcpy(&currentConfig, payload, sizeof(FanConfig));
+                    printf("FAN: Config Received\n");
                 }
                 xSemaphoreGive(dataMutex);
+            } else {
+                printf("FAN: CRC Error. Calc=%02X Recv=%02X\n", calc_crc8(parseBuffer, 3 + len), parseBuffer[3 + len]);
             }
             // Reset
             parseIndex = 0;
         }
     }
 
-    if (parseIndex >= RX_PARSE_BUF_SIZE) parseIndex = 0; // Overflow safety
+    if (parseIndex >= RX_PARSE_BUF_SIZE) {
+        printf("FAN: Buffer Overflow, Resetting\n");
+        parseIndex = 0; // Overflow safety
+    }
 }
 
 // --- Interface ---
