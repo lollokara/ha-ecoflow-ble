@@ -2,12 +2,15 @@
 #include "ui_core.h"
 #include "ui_lvgl.h"
 #include "uart_task.h"
+#include "rp2040_task.h"
+#include "ui_view_fan.h"
 #include <stdio.h>
 #include "lvgl.h"
 
 // Externs should match LVGL defines or be removed if included
 
 void UI_CreateConnectionsView(void);
+void UI_CreateFanView(void);
 
 // Externs not needed if lvgl.h is included properly and fonts are enabled in lv_conf.h
 // If needed, they should be const
@@ -32,6 +35,10 @@ static void event_close_debug(lv_event_t * e) {
 
 static void event_to_connections(lv_event_t * e) {
     UI_CreateConnectionsView();
+}
+
+static void event_to_fan(lv_event_t * e) {
+    UI_CreateFanView();
 }
 
 static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
@@ -165,14 +172,26 @@ void UI_CreateDebugView(void) {
     lv_obj_add_event_cb(btn_manage, event_to_connections, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t * lbl_manage = lv_label_create(btn_manage);
-    lv_label_set_text(lbl_manage, "Manage Connections");
+    lv_label_set_text(lbl_manage, "Connections");
     lv_obj_center(lbl_manage);
+
+    // Fan Control Button
+    lv_obj_t * btn_fan = lv_btn_create(header);
+    lv_obj_set_size(btn_fan, 150, 40);
+    lv_obj_align(btn_fan, LV_ALIGN_LEFT_MID, 240, 0);
+    lv_obj_set_style_bg_color(btn_fan, lv_palette_main(LV_PALETTE_PURPLE), 0);
+    lv_obj_add_event_cb(btn_fan, event_to_fan, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t * lbl_fan = lv_label_create(btn_fan);
+    lv_label_set_text(lbl_fan, "Fan Control");
+    lv_obj_center(lbl_fan);
 
     // Close Button (Top Right)
     lv_obj_t * btn_close = lv_btn_create(header);
     lv_obj_set_size(btn_close, 40, 40);
     lv_obj_align(btn_close, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_set_style_bg_color(btn_close, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_clear_flag(btn_close, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(btn_close, event_close_debug, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_x = lv_label_create(btn_close);
     lv_label_set_text(lbl_x, "X");
@@ -236,6 +255,24 @@ void UI_CreateDebugView(void) {
 
     // Initial population of device list
     populate_device_list();
+
+    // Add Fan Info
+    add_section_header(cont_list, "Fan Controller");
+    RP2040_Status* fan_stat = RP2040_GetStatus();
+    char buf[32];
+
+    if (fan_stat->connected) {
+        snprintf(buf, sizeof(buf), "%.1f C", fan_stat->temp);
+        add_list_item(cont_list, "Amb Temp", buf);
+        for(int i=0; i<4; i++) {
+             snprintf(buf, sizeof(buf), "Fan %d", i+1);
+             char val[16];
+             snprintf(val, sizeof(val), "%d RPM", fan_stat->rpm[i]);
+             add_list_item(cont_list, buf, val);
+        }
+    } else {
+        add_list_item(cont_list, "Status", "Disconnected");
+    }
 
     lv_obj_add_event_cb(scr_debug, event_debug_cleanup, LV_EVENT_DELETE, NULL);
 

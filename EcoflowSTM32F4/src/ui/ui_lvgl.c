@@ -16,6 +16,7 @@
 #include "ui_view_debug.h"
 #include "lvgl.h"
 #include "uart_task.h" // Added for UART commands
+#include "rp2040_task.h"
 #include <stdio.h>
 #include <math.h>
 #include "stm32f4xx_hal.h"
@@ -62,6 +63,7 @@ static lv_style_t style_btn_green;
 // --- Dashboard Widgets ---
 static lv_obj_t * scr_dash;
 static lv_obj_t * label_temp;
+static lv_obj_t * label_amb_temp; // RP2040 Temp
 static lv_obj_t * arc_batt;
 static lv_obj_t * label_soc;
 
@@ -82,6 +84,7 @@ static lv_obj_t * label_calib_debug; // For touch calibration
 
 // Indicator
 static lv_obj_t * led_status_dot;
+static lv_obj_t * rp2040_dot;
 static lv_obj_t * label_disconnected;
 
 // Flow Data Labels - Now managed via card structs
@@ -517,8 +520,9 @@ static void create_dashboard(void) {
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 10);
 
+    // Battery Temp
     label_temp = lv_label_create(scr_dash);
-    lv_label_set_text(label_temp, "25 C");
+    lv_label_set_text(label_temp, "Batt. 25 C");
     lv_obj_set_style_text_font(label_temp, &lv_font_montserrat_20, 0);
     lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
 
@@ -527,7 +531,20 @@ static void create_dashboard(void) {
     lv_obj_set_style_radius(led_status_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
     lv_obj_set_style_border_width(led_status_dot, 0, 0);
-    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -100, 15); // Left of Temp
+    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -140, 15);
+
+    // Ambient Temp (RP2040)
+    label_amb_temp = lv_label_create(scr_dash);
+    lv_label_set_text(label_amb_temp, "Amb. -- C");
+    lv_obj_set_style_text_font(label_amb_temp, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_amb_temp, LV_ALIGN_TOP_RIGHT, -200, 10);
+
+    rp2040_dot = lv_obj_create(scr_dash);
+    lv_obj_set_size(rp2040_dot, 15, 15);
+    lv_obj_set_style_radius(rp2040_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0);
+    lv_obj_set_style_border_width(rp2040_dot, 0, 0);
+    lv_obj_align(rp2040_dot, LV_ALIGN_TOP_RIGHT, -320, 15);
 
     label_disconnected = lv_label_create(scr_dash);
     lv_label_set_text(label_disconnected, "DISCONNECTED");
@@ -740,6 +757,16 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
     }
 
+    // Update RP2040 Status
+    RP2040_Status* fan_stat = RP2040_GetStatus();
+    if (fan_stat->connected) {
+         lv_obj_set_style_bg_color(rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
+         lv_label_set_text_fmt(label_amb_temp, "Amb. %.1f C", fan_stat->temp);
+    } else {
+         lv_obj_set_style_bg_color(rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0);
+         lv_label_set_text(label_amb_temp, "Amb. -- C");
+    }
+
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
         return; // Don't update dashboard with Wave 2 data
@@ -834,7 +861,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     if (first_run || temp_int != last_temp) {
-        lv_label_set_text_fmt(label_temp, "%d C", temp_int);
+        lv_label_set_text_fmt(label_temp, "Batt. %d C", temp_int);
         last_temp = temp_int;
     }
 

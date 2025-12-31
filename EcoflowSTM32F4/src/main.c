@@ -18,10 +18,13 @@
 #include "task.h"
 #include "display_task.h"
 #include "uart_task.h"
+#include "rp2040_task.h"
 #include <stdio.h>
 
 // External Handles
 extern UART_HandleTypeDef huart6;
+extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart4;
 
 // Local Handles
 UART_HandleTypeDef huart3;
@@ -256,6 +259,7 @@ int main(void) {
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
+    xTaskCreate(StartRP2040Task, "RP2040", 2048, NULL, 3, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
