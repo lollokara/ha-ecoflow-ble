@@ -135,7 +135,10 @@ static void populate_device_list(void) {
 }
 
 void UI_CreateDebugView(void) {
-    if (scr_debug) return;
+    if (scr_debug) {
+        lv_scr_load(scr_debug);
+        return;
+    }
 
     scr_debug = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(scr_debug, lv_color_hex(0xFF121212), 0);

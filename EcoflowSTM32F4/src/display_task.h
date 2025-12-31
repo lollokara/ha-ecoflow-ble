@@ -12,7 +12,8 @@ typedef enum {
     DISPLAY_EVENT_UPDATE_BATTERY,
     DISPLAY_EVENT_UPDATE_TEMP,
     DISPLAY_EVENT_UPDATE_CONNECTION,
-    DISPLAY_EVENT_UPDATE_DEBUG
+    DISPLAY_EVENT_UPDATE_DEBUG,
+    DISPLAY_EVENT_UPDATE_DEVICE_LIST
 } DisplayEventType;
 
 typedef struct {
@@ -20,6 +21,7 @@ typedef struct {
     union {
         DeviceStatus deviceStatus; // Includes id and BatteryStatus
         DebugInfo debugInfo;
+        DeviceList deviceList;
     } data;
 } DisplayEvent;
 

@@ -152,6 +152,12 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             printf("UART: Device List received.\n");
             unpack_device_list_message(packet, &knownDevices);
 
+            // Notify UI
+            DisplayEvent event;
+            event.type = DISPLAY_EVENT_UPDATE_DEVICE_LIST;
+            memcpy(&event.data.deviceList, &knownDevices, sizeof(DeviceList));
+            xQueueSend(displayQueue, &event, 0);
+
             // Send Ack
             uint8_t ack[4];
             int len = pack_device_list_ack_message(ack);
