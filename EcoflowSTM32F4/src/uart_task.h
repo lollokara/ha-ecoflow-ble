@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "ecoflow_protocol.h"
+#include "stm32f4xx_hal.h"
 
 void StartUARTTask(void * argument);
 
@@ -17,5 +18,8 @@ void UART_SendGetDebugInfo(void);
 void UART_SendConnectDevice(uint8_t type);
 void UART_SendForgetDevice(uint8_t type);
 void UART_GetKnownDevices(DeviceList *list);
+
+// Helper for IRQ dispatch
+void UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 #endif // UART_TASK_H

@@ -147,7 +147,10 @@ void UI_UpdateConnectionsView(DeviceList *list) {
 }
 
 void UI_CreateConnectionsView(void) {
-    if (scr_connections) return;
+    if (scr_connections) {
+        lv_scr_load(scr_connections);
+        return;
+    }
 
     scr_connections = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(scr_connections, lv_color_hex(0xFF121212), 0);

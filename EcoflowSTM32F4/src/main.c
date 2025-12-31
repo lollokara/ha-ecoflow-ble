@@ -18,6 +18,7 @@
 #include "task.h"
 #include "display_task.h"
 #include "uart_task.h"
+#include "fan_task.h"
 #include <stdio.h>
 
 // External Handles
@@ -189,6 +190,7 @@ static void MX_TIM2_Init(void) {
 /**
  * @brief UART MSP Initialization.
  * Configures PB10 (TX) and PB11 (RX) for USART3.
+ * Configures PA1 (RX) for UART4 and PA2 (TX) for USART2 (Split Mode).
  */
 void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -203,6 +205,33 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
         GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
         GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
         HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    }
+    else if(uartHandle->Instance==UART4) {
+        __HAL_RCC_UART4_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+
+        // PA1 -> RX
+        GPIO_InitStruct.Pin = GPIO_PIN_1;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF8_UART4;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        HAL_NVIC_SetPriority(UART4_IRQn, 5, 0);
+        HAL_NVIC_EnableIRQ(UART4_IRQn);
+    }
+    else if(uartHandle->Instance==USART2) {
+        __HAL_RCC_USART2_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+
+        // PA2 -> TX
+        GPIO_InitStruct.Pin = GPIO_PIN_2;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     }
 }
 
@@ -256,6 +285,7 @@ int main(void) {
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
+    xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();

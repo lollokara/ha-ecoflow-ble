@@ -72,6 +72,13 @@ static int rb_pop(RingBuffer *rb, uint8_t *byte) {
 // ISR Variables
 uint8_t rx_byte_isr;
 
+void UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART6) {
+        rb_push(&rx_ring_buffer, rx_byte_isr);
+        HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+    }
+}
+
 // Protocol State
 typedef enum {
     STATE_HANDSHAKE,
@@ -98,12 +105,7 @@ static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10 + sizeof(DeviceStatus)]; // Ensu
 static uint16_t parseIndex = 0; // Payload can be > 255
 static uint8_t expectedPayloadLen = 0;
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART6) {
-        rb_push(&rx_ring_buffer, rx_byte_isr);
-        HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
-    }
-}
+// Moved HAL_UART_RxCpltCallback to stm32f4xx_it.c or handled globally
 
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
