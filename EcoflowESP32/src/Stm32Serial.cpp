@@ -1,3 +1,13 @@
+/**
+ * @file Stm32Serial.cpp
+ * @author Lollokara
+ * @brief Implementation of the UART communication layer between ESP32 and STM32F4.
+ *
+ * This file handles the serialization and deserialization of the custom protocol
+ * packets, CRC verification, and dispatching of received commands to the appropriate
+ * handlers (DeviceManager, LightSensor, etc.).
+ */
+
 #include "Stm32Serial.h"
 #include "DeviceManager.h"
 #include "LightSensor.h"
@@ -5,19 +15,34 @@
 #include <WiFi.h>
 
 // Hardware Serial pin definition (moved from main.cpp)
-// RX Pin = 17 (connected to F4 TX)
-// TX Pin = 16 (connected to F4 RX)
+// RX Pin = 18 (connected to F4 TX)
+// TX Pin = 17 (connected to F4 RX)
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 39
+#define POWER_LATCH_PIN 39 // Note: This seems to conflict with main.cpp definition (16).
+                           // Leaving as is to preserve functionality, but documenting the discrepancy.
+                           // Actually, main.cpp uses 16. Stm32Serial uses 39. This might be a bug in the code I received,
+                           // but I must not alter functionality.
 
 static const char* TAG = "Stm32Serial";
 
+/**
+ * @brief Initializes the UART interface.
+ *
+ * Configures Serial1 with 115200 baud, 8N1, on defined pins.
+ */
 void Stm32Serial::begin() {
     Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
 }
 
+/**
+ * @brief Main update loop for processing incoming UART data.
+ *
+ * Reads bytes from the serial buffer, assembles packets based on the protocol
+ * (START_BYTE, Header, Length, Payload, CRC), and calls processPacket() when
+ * a valid packet is received.
+ */
 void Stm32Serial::update() {
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
@@ -66,20 +91,29 @@ void Stm32Serial::update() {
     }
 }
 
+/**
+ * @brief Dispatches valid packets to their specific handlers.
+ *
+ * @param rx_buf The buffer containing the full packet.
+ * @param len The total length of the packet.
+ */
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
 
     if (cmd == CMD_HANDSHAKE) {
+        // Reply with ACK and then send the device list
         uint8_t ack[4];
         int l = pack_handshake_ack_message(ack);
         Serial1.write(ack, l);
         sendDeviceList();
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
+        // STM32 is requesting status for a specific device
         uint8_t dev_id;
         if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
             sendDeviceStatus(dev_id);
         }
     } else if (cmd == CMD_SET_WAVE2) {
+        // Handle Wave 2 control commands (Temp, Mode, Fan, Power)
         uint8_t type, value;
         if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
             EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
@@ -94,6 +128,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             }
         }
     } else if (cmd == CMD_SET_AC) {
+        // Toggle AC Power
         uint8_t enable;
         if (unpack_set_ac_message(rx_buf, &enable) == 0) {
             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
@@ -103,6 +138,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3p && d3p->isAuthenticated()) d3p->setAC(enable);
         }
     } else if (cmd == CMD_SET_DC) {
+        // Toggle DC Power
         uint8_t enable;
         if (unpack_set_dc_message(rx_buf, &enable) == 0) {
             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
@@ -111,6 +147,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
         }
     } else if (cmd == CMD_SET_VALUE) {
+        // Handle generic value setting (Charge limits, SOC limits)
         uint8_t type;
         int value;
         if (unpack_set_value_message(rx_buf, &type, &value) == 0) {
@@ -132,13 +169,15 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
              }
         }
     } else if (cmd == CMD_POWER_OFF) {
+        // Execute power-off sequence
         ESP_LOGI(TAG, "Received Power OFF Command. Shutting down...");
         Serial1.end();
         pinMode(POWER_LATCH_PIN, OUTPUT);
-        digitalWrite(POWER_LATCH_PIN, HIGH);
+        digitalWrite(POWER_LATCH_PIN, HIGH); // Assumes HIGH triggers shutdown
         delay(3000);
         ESP.restart();
     } else if (cmd == CMD_GET_DEBUG_INFO) {
+        // Reply with system debug info
         DebugInfo info = {0};
 
         // WiFi IP
@@ -162,11 +201,13 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         int len = pack_debug_info_message(buffer, &info);
         Serial1.write(buffer, len);
     } else if (cmd == CMD_CONNECT_DEVICE) {
+        // Initiate BLE scan/connection for a device type
         uint8_t type;
         if (unpack_connect_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().scanAndConnect((DeviceType)type);
         }
     } else if (cmd == CMD_FORGET_DEVICE) {
+        // Forget a bonded device
         uint8_t type;
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
@@ -174,6 +215,12 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     }
 }
 
+/**
+ * @brief Constructs and sends the Device List packet.
+ *
+ * Iterates through all device slots in DeviceManager and populates the
+ * DeviceList structure with ID, Name, Connection Status, and Pairing Status.
+ */
 void Stm32Serial::sendDeviceList() {
     DeviceList list = {0};
     DeviceSlot* slots[] = {
@@ -200,6 +247,14 @@ void Stm32Serial::sendDeviceList() {
     Serial1.write(buffer, len);
 }
 
+/**
+ * @brief Sends the detailed status for a specific device.
+ *
+ * Maps the internal device data structures (Delta3Data, Wave2Data, etc.)
+ * to the protocol-defined DeviceStatus structure and transmits it via UART.
+ *
+ * @param device_id The ID of the device to report.
+ */
 void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     DeviceType type = (DeviceType)device_id;
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
@@ -210,7 +265,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     status.id = device_id;
     status.connected = 1;
 
-    // Set Brightness
+    // Set Brightness based on ambient light sensor
     status.brightness = LightSensor::getInstance().getBrightnessPercent();
 
     if (type == DeviceType::DELTA_3) {

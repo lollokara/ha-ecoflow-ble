@@ -4,7 +4,8 @@
  * @brief Implementation for the DeviceManager class.
  *
  * This file contains the logic for managing multiple EcoFlow devices, including
- * BLE scanning, connection management, and persistence of device details.
+ * BLE scanning, connection management, persistence of device details, and
+ * collecting basic telemetry history.
  */
 
 #include "DeviceManager.h"
@@ -31,11 +32,17 @@ static std::string extractSerial(const std::string& manufacturerData) {
 //--- Singleton and Constructor
 //--------------------------------------------------------------------------
 
+/**
+ * @brief Gets the singleton instance of DeviceManager.
+ */
 DeviceManager& DeviceManager::getInstance() {
     static DeviceManager instance;
     return instance;
 }
 
+/**
+ * @brief Private Constructor. Initializes device slots and synchronization primitives.
+ */
 DeviceManager::DeviceManager() {
     // Initialize device slots
     slotD3.instance = &d3;
@@ -65,6 +72,9 @@ DeviceManager::DeviceManager() {
 //--- Public Methods
 //--------------------------------------------------------------------------
 
+/**
+ * @brief Initializes the manager, BLE stack, and restores saved devices.
+ */
 void DeviceManager::initialize() {
     NimBLEDevice::init(""); // Initialize BLE centrally
     prefs.begin("ecoflow", false);
@@ -89,17 +99,22 @@ void DeviceManager::initialize() {
     }
 }
 
+/**
+ * @brief Main update loop. Handles pending connections, device updates, and scanning.
+ */
 void DeviceManager::update() {
-    // The main loop is split into three parts:
+    // The main loop is split into four parts:
+
     // 1. Handle any pending connection found during a scan.
     _handlePendingConnection();
 
-    // 2. Call the update loop for each device instance.
+    // 2. Call the update loop for each device instance to process BLE traffic.
     slotD3.instance->update();
     slotW2.instance->update();
     slotD3P.instance->update();
     slotAC.instance->update();
 
+    // Sync status flags
     slotD3.isConnected = slotD3.instance->isConnected();
     slotW2.isConnected = slotW2.instance->isConnected();
     slotD3P.isConnected = slotD3P.instance->isConnected();
@@ -112,11 +127,19 @@ void DeviceManager::update() {
     _updateHistory();
 }
 
+/**
+ * @brief Manually triggers a scan for a specific device type.
+ * @param type The device type to scan for.
+ */
 void DeviceManager::scanAndConnect(DeviceType type) {
     if (_isScanning) return;
     startScan(type);
 }
 
+/**
+ * @brief Disconnects a device and removes it from persistent storage.
+ * @param type The device type to forget.
+ */
 void DeviceManager::disconnect(DeviceType type) {
     DeviceSlot* slot = getSlot(type);
     if (slot) {
@@ -187,12 +210,11 @@ void DeviceManager::forget(DeviceType type) {
     Serial.println("Device forgotten.");
 }
 
+/**
+ * @brief Returns a simple JSON string representation of device statuses.
+ * @return String JSON.
+ */
 String DeviceManager::getDeviceStatusJson() {
-    // Simple JSON construction manually to avoid big dependency overhead if not needed,
-    // but since we added ArduinoJson, let's use it?
-    // Actually manual string building is often faster/smaller for simple fixed structures.
-    // Let's use string building for now.
-
     String json = "{";
     json += "\"d3\":{\"connected\":" + String(slotD3.isConnected) + ", \"sn\":\"" + String(slotD3.serialNumber.c_str()) + "\", \"batt\":" + String(d3.getBatteryLevel()) + "},";
     json += "\"w2\":{\"connected\":" + String(slotW2.isConnected) + ", \"sn\":\"" + String(slotW2.serialNumber.c_str()) + "\", \"batt\":" + String(w2.getBatteryLevel()) + "},";
@@ -283,6 +305,9 @@ void DeviceManager::_manageScanning() {
     }
 }
 
+/**
+ * @brief Loads device details (MAC, SN) from NVS preferences.
+ */
 void DeviceManager::loadDevices() {
     String mac = prefs.getString("d3_mac", "");
     String sn = prefs.getString("d3_sn", "");
@@ -313,6 +338,9 @@ void DeviceManager::loadDevices() {
     }
 }
 
+/**
+ * @brief Saves device details to NVS preferences.
+ */
 void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const std::string& sn) {
     if (type == DeviceType::DELTA_3) {
         prefs.putString("d3_mac", mac.c_str());
@@ -337,6 +365,9 @@ void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const st
     }
 }
 
+/**
+ * @brief Periodic task to update historical data buffers.
+ */
 void DeviceManager::_updateHistory() {
     if (millis() - _lastHistorySample > 60000) { // Every minute
         _lastHistorySample = millis();
@@ -470,6 +501,12 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
     }
 }
 
+/**
+ * @brief Checks if a serial number corresponds to a specific device type.
+ * @param sn The serial number string.
+ * @param type The device type to check against.
+ * @return True if the SN matches the pattern for the device type.
+ */
 bool DeviceManager::isTargetDevice(const std::string& sn, DeviceType type) {
     if (type == DeviceType::DELTA_3) {
         return (sn.rfind("P2", 0) == 0 || sn.rfind("R", 0) == 0);

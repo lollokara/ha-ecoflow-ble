@@ -1,3 +1,15 @@
+/**
+ * @file ui_lvgl.c
+ * @author Lollokara
+ * @brief LVGL UI Implementation for STM32F4.
+ *
+ * This file contains the main UI logic, including:
+ * - Creating screens (Dashboard, Settings, Wave 2 Control).
+ * - Handling touch events and navigation.
+ * - Updating UI widgets with data from the UART task.
+ * - Managing backlight dimming (sleep mode).
+ */
+
 #include "ui_lvgl.h"
 #include "ui_icons.h"
 #include "ui_view_wave2.h"
@@ -8,10 +20,15 @@
 #include <math.h>
 #include "stm32f4xx_hal.h"
 
+// External Backlight Control
 extern void SetBacklight(uint8_t percent);
+
 static uint32_t last_touch_time = 0;
 static bool is_sleeping = false;
 
+/**
+ * @brief Helper to safely cast float to int without crashing on NaN/Inf.
+ */
 static int safe_float_to_int(float f) {
     if (isnan(f) || isinf(f)) return 0;
     return (int)f;
@@ -270,7 +287,7 @@ static void event_arc_draw(lv_event_t * e) {
             lv_coord_t r_out = lv_area_get_width(coords) / 2;
             lv_coord_t r_in = r_out - 15;
 
-            // Red Line
+            // Red Line (Min SOC)
             if (lim_discharge_p >= 0) {
                 float angle_deg = 270.0f + (lim_discharge_p * 3.6f);
                 float angle_rad = angle_deg * (3.14159f / 180.0f);
@@ -288,7 +305,7 @@ static void event_arc_draw(lv_event_t * e) {
                 lv_draw_line(draw_ctx, &line_dsc, &p1, &p2);
             }
 
-            // Blue Line
+            // Blue Line (Max SOC)
             if (lim_charge_p < 100) {
                 float angle_deg = 270.0f + (lim_charge_p * 3.6f);
                 float angle_rad = angle_deg * (3.14159f / 180.0f);
@@ -352,7 +369,6 @@ static void update_card_style(InfoCardObj * obj, int val) {
         lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
         lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
         lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
-        // Invert Icon? Or keep Teal? User said "invert then the icon and text to be still readable"
         // Dark grey or black icon on white looks good.
         lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
     } else {
@@ -658,6 +674,9 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_no);
 }
 
+/**
+ * @brief Initializes LVGL and creates the UI.
+ */
 void UI_LVGL_Init(void) {
     lv_init();
 
@@ -675,21 +694,23 @@ void UI_LVGL_Init(void) {
 
     // Add global input listener
     lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_ALL, NULL);
-    // Also add to active screen just in case layer_top isn't catching everything?
-    // Usually layer_sys or checking indev is better, but this is simple.
-    // Actually, let's just use the tick count in the Update loop if we can detect input.
-    // A better way is to attach to the indev driver, but since we can't easily modify drivers here:
-    // We will assume any meaningful interaction triggers a callback we already have OR we rely on touch polling.
-    // But `lv_layer_top` doesn't always catch events if they are consumed by buttons.
-    // We'll stick to updating `last_touch_time` in `input_event_cb` and attaching it to screens.
+    // Also add to active screens
     lv_obj_add_event_cb(scr_dash, input_event_cb, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(scr_settings, input_event_cb, LV_EVENT_ALL, NULL);
 
     last_touch_time = xTaskGetTickCount();
 }
 
+/**
+ * @brief Updates the UI with fresh data.
+ *
+ * Called from the Display Task whenever a new packet is received or
+ * periodically for animations.
+ *
+ * @param dev Pointer to the device status data (can be NULL if no update).
+ */
 void UI_LVGL_Update(DeviceStatus* dev) {
-    // Handle Sleep
+    // Handle Sleep Logic (Dimming)
     uint32_t now = xTaskGetTickCount();
     uint8_t target_brightness = 100;
 
@@ -715,8 +736,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (!dev) return;
 
     // Cache the device status
-    // Find slot for this device ID or use a direct mapping if IDs are small enums
-    // Since IDs are enum 1,2,3,4, we can map to index 0,1,2,3
     if (dev->id > 0 && dev->id <= MAX_DEVICES) {
         memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
     }
@@ -752,7 +771,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         temp = (float)dev->data.d3.cellTemperature;
     }
 
-    // Static variables to track state
+    // Static variables to track state and minimize redraws
     static int last_soc = -1;
     static int last_temp = -999;
     static int last_solar = -1;
@@ -796,8 +815,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 if (slider_lim_chg) lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
             }
-            // Red Line Fix: Ensure it updates and invalidates even if it was 0 or same (to force redraw if hidden)
-            // Actually, simply checking != is enough, but let's ensure the red line logic in draw callback works.
             if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
                 lim_discharge_p = new_min_dsg;
                 if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
@@ -902,11 +919,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     first_run = false;
 
-    // Reset LED to Red after a short while?
-    // For now, it stays Green if connected.
-    // To "Blink" on data, we could toggle it, but simply showing connected status is usually better.
-    // User asked for "dot that blinks red and green when new data is received".
-    // Implementation: Toggle it here.
+    // Blink indicator
     static bool toggle = false;
     if (dev->connected) {
        if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);

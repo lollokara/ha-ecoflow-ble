@@ -1,3 +1,18 @@
+/**
+ * @file main.c
+ * @author Lollokara
+ * @brief Main entry point for the EcoflowSTM32F4 application.
+ *
+ * This file handles the low-level hardware initialization of the STM32F469I-Discovery board,
+ * including:
+ * - System Clock Configuration (HSE, PLL, LTDC/DSI Clocks).
+ * - ESP32 Reset Control (PG10).
+ * - Debug UART (USART3) Initialization.
+ * - Backlight PWM (TIM2 CH4) Initialization.
+ * - FreeRTOS Task Creation (Display Task, UART Task).
+ * - FreeRTOS Scheduler Start.
+ */
+
 #include "stm32f4xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -5,19 +20,48 @@
 #include "uart_task.h"
 #include <stdio.h>
 
+// External Handles
 extern UART_HandleTypeDef huart6;
+
+// Local Handles
 UART_HandleTypeDef huart3;
 TIM_HandleTypeDef htim2;
-QueueHandle_t displayQueue;
+QueueHandle_t displayQueue; // Global queue for UI events
 
-// System Clock Configuration
+// Forward Declarations
+void SystemClock_Config(void);
+static void ESP32_Reset_Init(void);
+static void MX_USART3_UART_Init(void);
+static void MX_TIM2_Init(void);
+
+/**
+ * @brief  System Clock Configuration
+ *         The system Clock is configured as follow :
+ *            System Clock source            = PLL (HSE)
+ *            SYSCLK(Hz)                     = 180000000
+ *            HCLK(Hz)                       = 180000000
+ *            AHB Prescaler                  = 1
+ *            APB1 Prescaler                 = 4
+ *            APB2 Prescaler                 = 2
+ *            HSE Frequency(Hz)              = 8000000
+ *            PLL_M                          = 8
+ *            PLL_N                          = 360
+ *            PLL_P                          = 2
+ *            PLL_Q                          = 7
+ *            VDD(V)                         = 3.3
+ *            Main regulator output voltage  = Scale1 mode
+ *            Flash Latency(WS)              = 5
+ * @retval None
+ */
 void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
+    // Enable Power Control Clock
     __HAL_RCC_PWR_CLK_ENABLE();
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
+    // Configure HSE and PLL
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -30,10 +74,12 @@ void SystemClock_Config(void) {
         // Error_Handler();
     }
 
+    // Enable OverDrive to reach 180MHz
     if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
         // Error_Handler();
     }
 
+    // Configure System Clocks
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
@@ -43,6 +89,7 @@ void SystemClock_Config(void) {
         // Error_Handler();
     }
 
+    // Configure LTDC/DSI Pixel Clock (PLLSAI)
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
     PeriphClkInitStruct.PLLSAI.PLLSAIN = 384;
@@ -54,6 +101,11 @@ void SystemClock_Config(void) {
     }
 }
 
+/**
+ * @brief Initializes the GPIOs used to control the ESP32 Reset line.
+ *
+ * Sets PG10 LOW to hold ESP32 in reset, waits 1 second, then releases it.
+ */
 static void ESP32_Reset_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -64,20 +116,23 @@ static void ESP32_Reset_Init(void) {
     HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOG, GPIO_PIN_10, GPIO_PIN_RESET);
 
-    // Configure PG6 and PG10
+    // Configure PG6 and PG10 as Outputs
     GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_10;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-    // Wait 1s
+    // Wait 1s to ensure full reset
     HAL_Delay(1000);
 
     // Release ESP32 Reset (Set PG10 High)
     HAL_GPIO_WritePin(GPIOG, GPIO_PIN_10, GPIO_PIN_SET);
 }
 
+/**
+ * @brief Initializes USART3 for Debug Logging (printf).
+ */
 static void MX_USART3_UART_Init(void) {
     huart3.Instance = USART3;
     huart3.Init.BaudRate = 115200;
@@ -93,6 +148,9 @@ static void MX_USART3_UART_Init(void) {
     HAL_NVIC_DisableIRQ(USART3_IRQn);
 }
 
+/**
+ * @brief Initializes TIM2 Channel 4 for Backlight PWM Control.
+ */
 static void MX_TIM2_Init(void) {
     TIM_MasterConfigTypeDef sMasterConfig = {0};
     TIM_OC_InitTypeDef sConfigOC = {0};
@@ -118,7 +176,7 @@ static void MX_TIM2_Init(void) {
     }
 
     sConfigOC.OCMode = TIM_OCMODE_PWM1;
-    sConfigOC.Pulse = 50; // Start at 50% to verify PWM
+    sConfigOC.Pulse = 50; // Start at 50%
     sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
     sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
     if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK) {
@@ -128,6 +186,10 @@ static void MX_TIM2_Init(void) {
     HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
 }
 
+/**
+ * @brief UART MSP Initialization.
+ * Configures PB10 (TX) and PB11 (RX) for USART3.
+ */
 void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     if(uartHandle->Instance==USART3) {
@@ -144,6 +206,10 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     }
 }
 
+/**
+ * @brief TIM PWM MSP Initialization.
+ * Configures PA3 for TIM2 Channel 4.
+ */
 void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
     if(tim_pwmHandle->Instance==TIM2) {
         __HAL_RCC_TIM2_CLK_ENABLE();
@@ -160,12 +226,18 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
     }
 }
 
-// Exposed to UI Task
+/**
+ * @brief Sets the display backlight brightness.
+ * @param percent Brightness 0-100.
+ */
 void SetBacklight(uint8_t percent) {
     if (percent > 100) percent = 100;
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, percent);
 }
 
+/**
+ * @brief Main Application Entry Point.
+ */
 int main(void) {
     HAL_Init();
     SystemClock_Config();
@@ -174,13 +246,14 @@ int main(void) {
     MX_USART3_UART_Init();
     MX_TIM2_Init();
 
-    // Create Tasks
+    // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
     if (displayQueue == NULL) {
         printf("Display Queue Creation Failed!\n");
         while(1);
     }
 
+    // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
 
@@ -191,18 +264,25 @@ int main(void) {
     while (1) {}
 }
 
-// Tick Hook to keep HAL happy
+/**
+ * @brief FreeRTOS Tick Hook.
+ * Called every tick to increment the HAL tick counter.
+ */
 void vApplicationTickHook(void) {
     HAL_IncTick();
 }
 
-// Stack Overflow Hook
+/**
+ * @brief FreeRTOS Stack Overflow Hook.
+ */
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
     printf("Stack Overflow in task: %s\n", pcTaskName);
     while(1);
 }
 
-// Malloc Failed Hook
+/**
+ * @brief FreeRTOS Malloc Failed Hook.
+ */
 void vApplicationMallocFailedHook(void) {
     printf("Malloc Failed!\n");
     while(1);

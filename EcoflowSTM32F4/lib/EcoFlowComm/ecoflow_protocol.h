@@ -1,6 +1,18 @@
 #ifndef ECOFLOW_PROTOCOL_H
 #define ECOFLOW_PROTOCOL_H
 
+/**
+ * @file ecoflow_protocol.h
+ * @author Lollokara
+ * @brief Shared protocol definitions for ESP32 and STM32F4 communication.
+ *
+ * This file defines the packet structure, command IDs, and data structures
+ * used for the UART communication between the BLE Gateway (ESP32) and the
+ * Display Controller (STM32F4).
+ *
+ * @note This file MUST be identical in both projects.
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -9,39 +21,39 @@ extern "C" {
 #endif
 
 // Protocol constants
-#define START_BYTE 0xAA
-#define MAX_PAYLOAD_LEN 255
-#define MAX_DEVICES 4
+#define START_BYTE 0xAA      ///< Packet Start Byte
+#define MAX_PAYLOAD_LEN 255  ///< Maximum payload size
+#define MAX_DEVICES 4        ///< Maximum supported devices
 
 // Message Format: [START][CMD][LEN][PAYLOAD][CRC8]
 
-// ESP32 -> F4 Command IDs
-#define CMD_BATTERY_STATUS 0x01
-#define CMD_TEMPERATURE 0x02
-#define CMD_CONNECTION_STATE 0x03
+// --- ESP32 -> F4 Command IDs ---
+#define CMD_BATTERY_STATUS 0x01      ///< Legacy: Simple Battery Status
+#define CMD_TEMPERATURE 0x02         ///< Legacy: Temperature
+#define CMD_CONNECTION_STATE 0x03    ///< Legacy: Connection State
 
-#define CMD_HANDSHAKE_ACK 0x21
-#define CMD_DEVICE_LIST 0x22
-#define CMD_DEVICE_STATUS 0x24
-#define CMD_DEBUG_INFO 0x61
+#define CMD_HANDSHAKE_ACK 0x21       ///< Handshake Acknowledgment
+#define CMD_DEVICE_LIST 0x22         ///< Push Device List to STM32
+#define CMD_DEVICE_STATUS 0x24       ///< Send Device Telemetry Data
+#define CMD_DEBUG_INFO 0x61          ///< Send Debug Info (IP, uptime)
 
 
-// F4 -> ESP32 Command IDs
-#define CMD_REQUEST_STATUS_UPDATE 0x10
+// --- F4 -> ESP32 Command IDs ---
+#define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
 
-#define CMD_HANDSHAKE 0x20
-#define CMD_DEVICE_LIST_ACK 0x23
-#define CMD_GET_DEVICE_STATUS 0x25
-#define CMD_GET_DEBUG_INFO 0x60
-#define CMD_CONNECT_DEVICE 0x62
-#define CMD_FORGET_DEVICE 0x63
+#define CMD_HANDSHAKE 0x20           ///< Initiate Handshake
+#define CMD_DEVICE_LIST_ACK 0x23     ///< Acknowledge Device List reception
+#define CMD_GET_DEVICE_STATUS 0x25   ///< Request Status for specific device
+#define CMD_GET_DEBUG_INFO 0x60      ///< Request Debug Info
+#define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
+#define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
 
-// New Commands
-#define CMD_SET_WAVE2 0x30
-#define CMD_SET_AC 0x31
-#define CMD_SET_DC 0x32
-#define CMD_SET_VALUE 0x40
-#define CMD_POWER_OFF 0x50
+// --- Control Commands (F4 -> ESP32) ---
+#define CMD_SET_WAVE2 0x30           ///< Control Wave 2 (Temp, Mode)
+#define CMD_SET_AC 0x31              ///< Toggle AC Ports
+#define CMD_SET_DC 0x32              ///< Toggle DC Ports
+#define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
+#define CMD_POWER_OFF 0x50           ///< Trigger System Power Off
 
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
@@ -64,8 +76,11 @@ extern "C" {
 
 #pragma pack(push, 1)
 
-// Shared Data Structures (POD versions of EcoflowData.h)
+// --- Shared Data Structures (POD versions of EcoflowData.h) ---
 
+/**
+ * @brief Telemetry data for Delta 3.
+ */
 typedef struct {
     float batteryLevel;
     float acInputPower;
@@ -97,6 +112,9 @@ typedef struct {
     bool usbOn;
 } Delta3DataStruct;
 
+/**
+ * @brief Telemetry data for Wave 2.
+ */
 typedef struct {
     int32_t mode;
     int32_t subMode;
@@ -135,6 +153,9 @@ typedef struct {
     int32_t remainingTime;
 } Wave2DataStruct;
 
+/**
+ * @brief Telemetry data for Delta Pro 3.
+ */
 typedef struct {
     float batteryLevel;
     float acInputPower;
@@ -167,6 +188,9 @@ typedef struct {
     bool gfiMode;
 } DeltaPro3DataStruct;
 
+/**
+ * @brief Telemetry data for Alternator Charger.
+ */
 typedef struct {
     float batteryLevel;
     float batteryTemperature;
@@ -186,7 +210,9 @@ typedef struct {
 } AlternatorChargerDataStruct;
 
 
-// Legacy BatteryStatus for backward compatibility (if needed) or simple views
+/**
+ * @brief Legacy Battery Status (Fallback).
+ */
 typedef struct {
     uint8_t soc;
     int16_t power_w;
@@ -195,7 +221,9 @@ typedef struct {
     char device_name[16];
 } BatteryStatus;
 
-// Union to hold data based on device type
+/**
+ * @brief Union to hold data based on device type.
+ */
 typedef union {
     Delta3DataStruct d3;
     Wave2DataStruct w2;
@@ -204,7 +232,9 @@ typedef union {
     BatteryStatus legacy; // Fallback
 } DeviceSpecificData;
 
-// The payload sent over UART
+/**
+ * @brief Payload for CMD_DEVICE_STATUS.
+ */
 typedef struct {
     uint8_t id;          // DeviceType enum
     uint8_t connected;
@@ -213,6 +243,9 @@ typedef struct {
     DeviceSpecificData data;
 } DeviceStatus;
 
+/**
+ * @brief Payload for CMD_DEVICE_LIST.
+ */
 typedef struct {
     uint8_t count;
     struct {
@@ -223,11 +256,17 @@ typedef struct {
     } devices[MAX_DEVICES];
 } DeviceList;
 
+/**
+ * @brief Payload for CMD_SET_WAVE2.
+ */
 typedef struct {
     uint8_t type;  // W2_PARAM_TEMP, etc.
     uint8_t value;
 } Wave2SetMsg;
 
+/**
+ * @brief Payload for CMD_DEBUG_INFO.
+ */
 typedef struct {
     char ip[16];
     uint8_t wifi_connected;
@@ -237,7 +276,8 @@ typedef struct {
 
 #pragma pack(pop)
 
-// API Functions
+// --- API Functions (Serialization/Deserialization) ---
+
 uint8_t calculate_crc8(const uint8_t *data, uint8_t len);
 
 int pack_handshake_message(uint8_t *buffer);

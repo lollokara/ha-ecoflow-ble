@@ -1,8 +1,21 @@
+/**
+ * @file ecoflow_protocol.c
+ * @author Lollokara
+ * @brief Implementation of the shared protocol serialization/deserialization functions.
+ *
+ * This file contains the logic to pack and unpack the C structures defined in
+ * ecoflow_protocol.h into raw byte buffers for UART transmission.
+ * It also implements the CRC8 checksum calculation.
+ */
+
 #include "ecoflow_protocol.h"
 #include <string.h>
 
 /**
  * @brief Calculates CRC8 checksum using the MAXIM polynomial (0x31).
+ *
+ * Used to verify packet integrity.
+ *
  * @param data Pointer to the data buffer.
  * @param len Length of the data in bytes.
  * @return The 8-bit CRC value.
@@ -22,6 +35,11 @@ uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
     return crc;
 }
 
+/**
+ * @brief Packs a Handshake packet.
+ * @param buffer Output buffer (must be >= 4 bytes).
+ * @return Length of the packed message.
+ */
 int pack_handshake_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_HANDSHAKE;
@@ -30,6 +48,11 @@ int pack_handshake_message(uint8_t *buffer) {
     return 4;
 }
 
+/**
+ * @brief Packs a Handshake Acknowledgment packet.
+ * @param buffer Output buffer.
+ * @return Length of the packed message.
+ */
 int pack_handshake_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_HANDSHAKE_ACK;
@@ -38,6 +61,12 @@ int pack_handshake_ack_message(uint8_t *buffer) {
     return 4;
 }
 
+/**
+ * @brief Packs the Device List packet.
+ * @param buffer Output buffer.
+ * @param list Pointer to the DeviceList structure.
+ * @return Length of the packed message.
+ */
 int pack_device_list_message(uint8_t *buffer, const DeviceList *list) {
     uint8_t len = sizeof(DeviceList);
     buffer[0] = START_BYTE;
@@ -48,6 +77,12 @@ int pack_device_list_message(uint8_t *buffer, const DeviceList *list) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Device List packet.
+ * @param buffer Input buffer (starting at START_BYTE).
+ * @param list Pointer to DeviceList structure to fill.
+ * @return 0 on success, -1 on CRC error, -2 on length error.
+ */
 int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
     uint8_t len = buffer[2];
     if (len != sizeof(DeviceList)) return -2; // Size mismatch
@@ -66,6 +101,11 @@ int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
     return 0;
 }
 
+/**
+ * @brief Packs a Power Off command.
+ * @param buffer Output buffer.
+ * @return Length of the packed message.
+ */
 int pack_power_off_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_POWER_OFF;
@@ -74,6 +114,11 @@ int pack_power_off_message(uint8_t *buffer) {
     return 4;
 }
 
+/**
+ * @brief Packs a Device List Acknowledgment packet.
+ * @param buffer Output buffer.
+ * @return Length of the packed message.
+ */
 int pack_device_list_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_DEVICE_LIST_ACK;
@@ -82,6 +127,12 @@ int pack_device_list_ack_message(uint8_t *buffer) {
     return 4;
 }
 
+/**
+ * @brief Packs a Request Device Status packet.
+ * @param buffer Output buffer.
+ * @param device_id ID of the device to query.
+ * @return Length of the packed message.
+ */
 int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
@@ -92,6 +143,12 @@ int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Request Device Status packet.
+ * @param buffer Input buffer.
+ * @param device_id Pointer to store the requested ID.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id) {
     uint8_t len = buffer[2];
     if (len != 1) return -2;
@@ -104,6 +161,12 @@ int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id) 
     return 0;
 }
 
+/**
+ * @brief Packs a Device Status (Telemetry) packet.
+ * @param buffer Output buffer.
+ * @param status Pointer to the DeviceStatus data.
+ * @return Length of the packed message.
+ */
 int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status) {
     uint8_t len = sizeof(DeviceStatus);
     buffer[0] = START_BYTE;
@@ -114,6 +177,12 @@ int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Device Status packet.
+ * @param buffer Input buffer.
+ * @param status Pointer to store the data.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
     uint8_t len = buffer[2];
     if (len != sizeof(DeviceStatus)) return -2;
@@ -126,6 +195,13 @@ int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
     return 0;
 }
 
+/**
+ * @brief Packs a Wave 2 Control packet.
+ * @param buffer Output buffer.
+ * @param type Control type (Mode, Temp, etc).
+ * @param value New value.
+ * @return Length of the packed message.
+ */
 int pack_set_wave2_message(uint8_t *buffer, uint8_t type, uint8_t value) {
     uint8_t len = sizeof(Wave2SetMsg);
     buffer[0] = START_BYTE;
@@ -141,6 +217,13 @@ int pack_set_wave2_message(uint8_t *buffer, uint8_t type, uint8_t value) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Wave 2 Control packet.
+ * @param buffer Input buffer.
+ * @param type Pointer to store type.
+ * @param value Pointer to store value.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *value) {
     uint8_t len = buffer[2];
     if (len != sizeof(Wave2SetMsg)) return -2;
@@ -156,6 +239,12 @@ int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *valu
     return 0;
 }
 
+/**
+ * @brief Packs an AC Control packet.
+ * @param buffer Output buffer.
+ * @param enable 1 for ON, 0 for OFF.
+ * @return Length of the packed message.
+ */
 int pack_set_ac_message(uint8_t *buffer, uint8_t enable) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
@@ -166,6 +255,12 @@ int pack_set_ac_message(uint8_t *buffer, uint8_t enable) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks an AC Control packet.
+ * @param buffer Input buffer.
+ * @param enable Pointer to store the value.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable) {
     uint8_t len = buffer[2];
     if (len != 1) return -2;
@@ -176,6 +271,12 @@ int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable) {
     return 0;
 }
 
+/**
+ * @brief Packs a DC Control packet.
+ * @param buffer Output buffer.
+ * @param enable 1 for ON, 0 for OFF.
+ * @return Length of the packed message.
+ */
 int pack_set_dc_message(uint8_t *buffer, uint8_t enable) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
@@ -186,6 +287,12 @@ int pack_set_dc_message(uint8_t *buffer, uint8_t enable) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a DC Control packet.
+ * @param buffer Input buffer.
+ * @param enable Pointer to store the value.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
     uint8_t len = buffer[2];
     if (len != 1) return -2;
@@ -196,6 +303,13 @@ int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
     return 0;
 }
 
+/**
+ * @brief Packs a Set Value packet (Numeric setting).
+ * @param buffer Output buffer.
+ * @param type Value type (e.g., SET_VAL_AC_LIMIT).
+ * @param value The 32-bit integer value.
+ * @return Length of the packed message.
+ */
 int pack_set_value_message(uint8_t *buffer, uint8_t type, int value) {
     // [type:1][value:4]
     uint8_t len = 5;
@@ -208,6 +322,13 @@ int pack_set_value_message(uint8_t *buffer, uint8_t type, int value) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Set Value packet.
+ * @param buffer Input buffer.
+ * @param type Pointer to store type.
+ * @param value Pointer to store value.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value) {
     uint8_t len = buffer[2];
     if (len != 5) return -2;
@@ -220,6 +341,11 @@ int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value) {
     return 0;
 }
 
+/**
+ * @brief Packs a Request Debug Info packet.
+ * @param buffer Output buffer.
+ * @return Length of the packed message.
+ */
 int pack_get_debug_info_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_GET_DEBUG_INFO;
@@ -228,6 +354,12 @@ int pack_get_debug_info_message(uint8_t *buffer) {
     return 4;
 }
 
+/**
+ * @brief Packs a Debug Info packet (Response).
+ * @param buffer Output buffer.
+ * @param info Pointer to DebugInfo struct.
+ * @return Length of the packed message.
+ */
 int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info) {
     uint8_t len = sizeof(DebugInfo);
     buffer[0] = START_BYTE;
@@ -238,6 +370,12 @@ int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Debug Info packet.
+ * @param buffer Input buffer.
+ * @param info Pointer to DebugInfo struct to fill.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info) {
     uint8_t len = buffer[2];
     if (len != sizeof(DebugInfo)) return -2;
@@ -250,6 +388,12 @@ int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info) {
     return 0;
 }
 
+/**
+ * @brief Packs a Connect Device packet.
+ * @param buffer Output buffer.
+ * @param device_type Device Type to connect to.
+ * @return Length of the packed message.
+ */
 int pack_connect_device_message(uint8_t *buffer, uint8_t device_type) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
@@ -260,6 +404,12 @@ int pack_connect_device_message(uint8_t *buffer, uint8_t device_type) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Connect Device packet.
+ * @param buffer Input buffer.
+ * @param device_type Pointer to store device type.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type) {
     uint8_t len = buffer[2];
     if (len != 1) return -2;
@@ -270,6 +420,12 @@ int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type) {
     return 0;
 }
 
+/**
+ * @brief Packs a Forget Device packet.
+ * @param buffer Output buffer.
+ * @param device_type Device Type to forget.
+ * @return Length of the packed message.
+ */
 int pack_forget_device_message(uint8_t *buffer, uint8_t device_type) {
     uint8_t len = 1;
     buffer[0] = START_BYTE;
@@ -280,6 +436,12 @@ int pack_forget_device_message(uint8_t *buffer, uint8_t device_type) {
     return 4 + len;
 }
 
+/**
+ * @brief Unpacks a Forget Device packet.
+ * @param buffer Input buffer.
+ * @param device_type Pointer to store device type.
+ * @return 0 on success, error code otherwise.
+ */
 int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type) {
     uint8_t len = buffer[2];
     if (len != 1) return -2;
