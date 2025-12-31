@@ -31,7 +31,8 @@ void checkSerial() {
 }
 
 void setup() {
-    pinMode(POWER_LATCH_PIN, INPUT_PULLUP);
+    pinMode(POWER_LATCH_PIN, OUTPUT);
+    digitalWrite(POWER_LATCH_PIN, LOW);
 
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");

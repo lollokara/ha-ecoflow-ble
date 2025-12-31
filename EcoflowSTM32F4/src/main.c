@@ -54,6 +54,30 @@ void SystemClock_Config(void) {
     }
 }
 
+static void ESP32_Reset_Init(void) {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Enable GPIOG Clock
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+
+    // Set PG6 High (LED OFF) and PG10 Low (ESP32 Reset Active)
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_10, GPIO_PIN_RESET);
+
+    // Configure PG6 and PG10
+    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_10;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // Wait 1s
+    HAL_Delay(1000);
+
+    // Release ESP32 Reset (Set PG10 High)
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_10, GPIO_PIN_SET);
+}
+
 static void MX_USART3_UART_Init(void) {
     huart3.Instance = USART3;
     huart3.Init.BaudRate = 115200;
@@ -145,6 +169,7 @@ void SetBacklight(uint8_t percent) {
 int main(void) {
     HAL_Init();
     SystemClock_Config();
+    ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
     MX_TIM2_Init();

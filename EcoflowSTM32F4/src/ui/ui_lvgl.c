@@ -177,7 +177,7 @@ static void event_power_off_confirm(lv_event_t * e) {
     UART_SendPowerOff();
 
     // Give time for UART transmission
-    HAL_Delay(500);
+    HAL_Delay(3000);
 
     // Reboot
     NVIC_SystemReset();

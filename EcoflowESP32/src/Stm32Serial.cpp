@@ -10,7 +10,7 @@
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 16
+#define POWER_LATCH_PIN 39
 
 static const char* TAG = "Stm32Serial";
 
@@ -135,7 +135,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         ESP_LOGI(TAG, "Received Power OFF Command. Shutting down...");
         Serial1.end();
         pinMode(POWER_LATCH_PIN, OUTPUT);
-        digitalWrite(POWER_LATCH_PIN, LOW);
+        digitalWrite(POWER_LATCH_PIN, HIGH);
         delay(3000);
         ESP.restart();
     } else if (cmd == CMD_GET_DEBUG_INFO) {
