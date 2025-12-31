@@ -26,7 +26,9 @@ typedef enum {
     MSG_DC_SET,
     MSG_SET_VALUE,
     MSG_POWER_OFF,
-    MSG_GET_DEBUG_INFO
+    MSG_GET_DEBUG_INFO,
+    MSG_CONNECT_DEVICE,
+    MSG_FORGET_DEVICE
 } TxMsgType;
 
 typedef struct {
@@ -38,6 +40,7 @@ typedef struct {
             uint8_t type;
             int value;
         } set_val;
+        uint8_t device_type;
     } data;
 } TxMessage;
 
@@ -240,6 +243,31 @@ void UART_SendGetDebugInfo(void) {
     }
 }
 
+void UART_SendConnectDevice(uint8_t type) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_CONNECT_DEVICE;
+        tx.data.device_type = type;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+void UART_SendForgetDevice(uint8_t type) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_FORGET_DEVICE;
+        tx.data.device_type = type;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+// Return a copy of known devices for UI
+void UART_GetKnownDevices(DeviceList *list) {
+    // Note: Not thread safe but low risk for read-only UI display
+    // Ideally use a mutex if critical
+    memcpy(list, &knownDevices, sizeof(DeviceList));
+}
+
 void StartUARTTask(void * argument) {
     UART_Init();
 
@@ -327,6 +355,10 @@ void StartUARTTask(void * argument) {
                 len = pack_power_off_message(buf);
             } else if (tx.type == MSG_GET_DEBUG_INFO) {
                 len = pack_get_debug_info_message(buf);
+            } else if (tx.type == MSG_CONNECT_DEVICE) {
+                len = pack_connect_device_message(buf, tx.data.device_type);
+            } else if (tx.type == MSG_FORGET_DEVICE) {
+                len = pack_forget_device_message(buf, tx.data.device_type);
             }
             if (len > 0) {
                 HAL_UART_Transmit(&huart6, buf, len, 100);
@@ -365,9 +397,15 @@ void StartUARTTask(void * argument) {
 
                 case STATE_POLLING:
                     if (knownDevices.count > 0) {
-                        uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
-                        len = pack_get_device_status_message(tx_buf, dev_id);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        // Skip if index out of bounds (safety)
+                        if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
+
+                        // Only poll if connected
+                        if (knownDevices.devices[currentDeviceIndex].connected) {
+                            uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
+                            len = pack_get_device_status_message(tx_buf, dev_id);
+                            HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        }
 
                         currentDeviceIndex++;
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;

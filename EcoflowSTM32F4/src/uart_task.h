@@ -14,5 +14,8 @@ void UART_SendDCSet(uint8_t enable);
 void UART_SendSetValue(uint8_t type, int value);
 void UART_SendPowerOff(void);
 void UART_SendGetDebugInfo(void);
+void UART_SendConnectDevice(uint8_t type);
+void UART_SendForgetDevice(uint8_t type);
+void UART_GetKnownDevices(DeviceList *list);
 
 #endif // UART_TASK_H

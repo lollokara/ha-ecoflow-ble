@@ -161,6 +161,16 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         uint8_t buffer[sizeof(DebugInfo) + 4];
         int len = pack_debug_info_message(buffer, &info);
         Serial1.write(buffer, len);
+    } else if (cmd == CMD_CONNECT_DEVICE) {
+        uint8_t type;
+        if (unpack_connect_device_message(rx_buf, &type) == 0) {
+            DeviceManager::getInstance().scanAndConnect((DeviceType)type);
+        }
+    } else if (cmd == CMD_FORGET_DEVICE) {
+        uint8_t type;
+        if (unpack_forget_device_message(rx_buf, &type) == 0) {
+            DeviceManager::getInstance().forget((DeviceType)type);
+        }
     }
 }
 
@@ -175,10 +185,11 @@ void Stm32Serial::sendDeviceList() {
 
     uint8_t count = 0;
     for (int i = 0; i < 4; i++) {
-        if (slots[i] && slots[i]->isConnected) {
+        if (slots[i]) {
             list.devices[count].id = (uint8_t)slots[i]->type;
             strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
-            list.devices[count].connected = 1;
+            list.devices[count].connected = slots[i]->isConnected ? 1 : 0;
+            list.devices[count].paired = !slots[i]->macAddress.empty() ? 1 : 0;
             count++;
         }
     }

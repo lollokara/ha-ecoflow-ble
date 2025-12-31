@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include "lvgl.h"
 
+// Externs should match LVGL defines or be removed if included
+
+void UI_CreateConnectionsView(void);
+
 // Externs not needed if lvgl.h is included properly and fonts are enabled in lv_conf.h
 // If needed, they should be const
 
@@ -24,6 +28,10 @@ static void event_debug_cleanup(lv_event_t * e) {
 
 static void event_close_debug(lv_event_t * e) {
     UI_LVGL_ShowSettings(true);
+}
+
+static void event_to_connections(lv_event_t * e) {
+    UI_CreateConnectionsView();
 }
 
 static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
@@ -140,11 +148,24 @@ void UI_CreateDebugView(void) {
     lv_obj_set_style_border_width(header, 0, 0);
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 0);
 
+    // Title Centered
     lv_obj_t * title = lv_label_create(header);
     lv_label_set_text(title, "Debug Info");
     lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
-    lv_obj_align(title, LV_ALIGN_LEFT_MID, 20, 0);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, 0);
 
+    // Manage Connections Button (Top Left)
+    lv_obj_t * btn_manage = lv_btn_create(header);
+    lv_obj_set_size(btn_manage, 220, 40);
+    lv_obj_align(btn_manage, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_bg_color(btn_manage, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_add_event_cb(btn_manage, event_to_connections, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t * lbl_manage = lv_label_create(btn_manage);
+    lv_label_set_text(lbl_manage, "Manage Connections");
+    lv_obj_center(lbl_manage);
+
+    // Close Button (Top Right)
     lv_obj_t * btn_close = lv_btn_create(header);
     lv_obj_set_size(btn_close, 40, 40);
     lv_obj_align(btn_close, LV_ALIGN_RIGHT_MID, -10, 0);

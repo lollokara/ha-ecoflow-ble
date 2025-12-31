@@ -33,6 +33,8 @@ extern "C" {
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
 #define CMD_GET_DEBUG_INFO 0x60
+#define CMD_CONNECT_DEVICE 0x62
+#define CMD_FORGET_DEVICE 0x63
 
 // New Commands
 #define CMD_SET_WAVE2 0x30
@@ -217,6 +219,7 @@ typedef struct {
         uint8_t id;
         char name[16];
         uint8_t connected;
+        uint8_t paired;
     } devices[MAX_DEVICES];
 } DeviceList;
 
@@ -267,6 +270,12 @@ int pack_power_off_message(uint8_t *buffer);
 int pack_get_debug_info_message(uint8_t *buffer);
 int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info);
 int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info);
+
+int pack_connect_device_message(uint8_t *buffer, uint8_t device_type);
+int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type);
+
+int pack_forget_device_message(uint8_t *buffer, uint8_t device_type);
+int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type);
 
 #ifdef __cplusplus
 }

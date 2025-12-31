@@ -249,3 +249,43 @@ int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info) {
     memcpy(info, &buffer[3], len);
     return 0;
 }
+
+int pack_connect_device_message(uint8_t *buffer, uint8_t device_type) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_CONNECT_DEVICE;
+    buffer[2] = len;
+    buffer[3] = device_type;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    *device_type = buffer[3];
+    return 0;
+}
+
+int pack_forget_device_message(uint8_t *buffer, uint8_t device_type) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_FORGET_DEVICE;
+    buffer[2] = len;
+    buffer[3] = device_type;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    *device_type = buffer[3];
+    return 0;
+}
