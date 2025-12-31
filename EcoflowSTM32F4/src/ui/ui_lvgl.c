@@ -159,6 +159,10 @@ void UI_LVGL_ShowWave2(void) {
     event_to_wave2(NULL);
 }
 
+void UI_LVGL_ShowSettings(bool auto_del_current) {
+    lv_scr_load_anim(scr_settings, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, auto_del_current);
+}
+
 
 // --- Popup Handlers ---
 static void event_power_off_click(lv_event_t * e) {

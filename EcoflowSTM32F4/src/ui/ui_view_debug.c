@@ -14,15 +14,16 @@ static lv_obj_t * label_ip = NULL;
 static lv_obj_t * label_conn_dev = NULL;
 static lv_obj_t * label_paired_dev = NULL;
 
+static void event_debug_cleanup(lv_event_t * e) {
+    scr_debug = NULL;
+    cont_list = NULL;
+    label_ip = NULL;
+    label_conn_dev = NULL;
+    label_paired_dev = NULL;
+}
+
 static void event_close_debug(lv_event_t * e) {
-    if (scr_debug) {
-        lv_obj_del(scr_debug);
-        scr_debug = NULL;
-        cont_list = NULL;
-        label_ip = NULL;
-        label_conn_dev = NULL;
-        label_paired_dev = NULL;
-    }
+    UI_LVGL_ShowSettings(true);
 }
 
 static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
@@ -211,6 +212,8 @@ void UI_CreateDebugView(void) {
 
     // Initial population of device list
     populate_device_list();
+
+    lv_obj_add_event_cb(scr_debug, event_debug_cleanup, LV_EVENT_DELETE, NULL);
 
     lv_scr_load(scr_debug);
 
