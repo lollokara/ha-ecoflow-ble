@@ -94,6 +94,7 @@ void loadConfig() {
 }
 
 void setup() {
+    Serial.begin(115200); // Debug USB
     Serial1.setTX(PIN_UART_TX);
     Serial1.setRX(PIN_UART_RX);
     Serial1.begin(115200);
@@ -206,6 +207,10 @@ void sendStatus() {
     buf[13] = crc;
 
     Serial1.write(buf, 14);
+
+    Serial.print("TX STATUS: T="); Serial.print(currentTemp);
+    Serial.print(" F1="); Serial.print(fans[0].current_rpm);
+    Serial.println();
 }
 
 void sendConfig(uint8_t group) {
@@ -230,12 +235,14 @@ void sendConfig(uint8_t group) {
     buf[10] = crc;
 
     Serial1.write(buf, 11);
+    Serial.print("TX CONFIG G="); Serial.println(group);
 }
 
 void processSerial() {
     while (Serial1.available() >= 4) { // Header check
         if (Serial1.peek() != PKT_START) {
-            Serial1.read();
+            uint8_t b = Serial1.read();
+            // Serial.print("SKIP: "); Serial.println(b, HEX);
             continue;
         }
 
@@ -250,13 +257,17 @@ void processSerial() {
 
         uint8_t len = header[2];
         if (len > 20) { // Garbage
+            Serial.println("ERR: Len too big");
             continue;
         }
 
         // Wait for payload + CRC
         unsigned long start = millis();
         while(Serial1.available() < len + 1) {
-            if (millis() - start > 10) return; // Timeout
+            if (millis() - start > 10) {
+                Serial.println("ERR: Timeout payload");
+                return; // Timeout
+            }
         }
 
         uint8_t payload[32]; // Increased buffer size for safety
@@ -266,7 +277,12 @@ void processSerial() {
         uint8_t calc_crc = 0;
         for(int i=0; i<len; i++) calc_crc += payload[i];
 
-        if (rx_crc != calc_crc) continue;
+        if (rx_crc != calc_crc) {
+            Serial.println("ERR: Bad CRC");
+            continue;
+        }
+
+        Serial.print("RX CMD: "); Serial.println(header[1], HEX);
 
         if (header[1] == CMD_SET_CONFIG) {
             if (len >= 7) {
@@ -277,6 +293,7 @@ void processSerial() {
                     groups[g].startTemp = payload[5];
                     groups[g].maxTemp = payload[6];
                     saveConfig();
+                    Serial.println("Config Saved");
                 }
             }
         } else if (header[1] == CMD_GET_CONFIG) {
@@ -301,6 +318,14 @@ void loop() {
 
         calculateRPM();
         updateFanControl();
+
+        Serial.print("Temp: "); Serial.print(currentTemp);
+        Serial.print(" RPM: ");
+        for(int i=0; i<4; i++) {
+            Serial.print(fans[i].current_rpm); Serial.print("/");
+            Serial.print(fans[i].target_rpm); Serial.print(" ");
+        }
+        Serial.println();
     }
 
     if (now - lastSendTime > 500) {

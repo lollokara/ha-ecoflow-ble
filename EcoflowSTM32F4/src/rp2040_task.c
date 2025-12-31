@@ -4,6 +4,7 @@
 #include "task.h"
 #include "queue.h"
 #include <string.h>
+#include <stdio.h>
 
 // UART Handles
 UART_HandleTypeDef huart2; // TX (PA2)
@@ -98,6 +99,7 @@ void RP2040_SendConfig(uint8_t group, FanGroupConfig* config) {
     pkt.len = 11;
 
     xQueueSend(txQueue, &pkt, 0);
+    printf("[RP2040] TX Config Group %d\n", group);
 }
 
 void RP2040_RequestConfig(uint8_t group) {
@@ -110,6 +112,7 @@ void RP2040_RequestConfig(uint8_t group) {
     pkt.data[4] = group; // Sum
     pkt.len = 5;
     xQueueSend(txQueue, &pkt, 0);
+    printf("[RP2040] TX Request Config Group %d\n", group);
 }
 
 RP2040_Status* RP2040_GetStatus(void) {
@@ -137,9 +140,9 @@ void StartRP2040Task(void *argument) {
             HAL_UART_Transmit(&huart2, txPkt.data, txPkt.len, 100);
         }
 
-        // Handle RX (Polling byte by byte for simplicity, or use interrupt ringbuffer if needed)
-        // Since we are in a task, blocking slightly is okay if timeout is short
-        if (HAL_UART_Receive(&huart4, rx_buf, 1, 10) == HAL_OK) {
+        // Handle RX - Drain buffer
+        while (HAL_UART_Receive(&huart4, rx_buf, 1, 0) == HAL_OK) {
+            // printf("[RP2040] RX %02X\n", rx_buf[0]); // Very verbose
             if (pkt_idx == 0) {
                 if (rx_buf[0] == PKT_START) {
                     pkt_buf[pkt_idx++] = rx_buf[0];
@@ -166,6 +169,7 @@ void StartRP2040Task(void *argument) {
                         // Valid Packet
                         uint8_t cmd = pkt_buf[1];
                         uint8_t* p = &pkt_buf[3];
+                        // printf("[RP2040] RX Valid Pkt CMD %02X\n", cmd);
 
                         if (cmd == RESP_STATUS) {
                             // Payload: [T_int] [T_dec] [F1H F1L] ...
@@ -178,6 +182,7 @@ void StartRP2040Task(void *argument) {
                             last_rx_time = xTaskGetTickCount();
                         }
                         else if (cmd == RESP_CONFIG) {
+                            printf("[RP2040] RX Config Group %d\n", p[0]);
                             // Payload: [Group] [MinH] [MinL] [MaxH] [MaxL] [Start] [Max]
                             if (config_cb) {
                                 FanGroupConfig cfg;
@@ -189,6 +194,8 @@ void StartRP2040Task(void *argument) {
                                 config_cb(g, &cfg);
                             }
                         }
+                    } else {
+                        printf("[RP2040] RX CRC Error Calc:%02X Rx:%02X\n", calc_crc, pkt_buf[pkt_idx-1]);
                     }
                     pkt_idx = 0;
                 }
@@ -200,6 +207,6 @@ void StartRP2040Task(void *argument) {
             global_status.connected = false;
         }
 
-        vTaskDelay(10);
+        vTaskDelay(5); // Increased polling rate
     }
 }
