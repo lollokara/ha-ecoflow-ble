@@ -14,13 +14,16 @@
 #define FAN3_TACH_PIN 16
 #define FAN4_TACH_PIN 17
 
-#define TEMP_PIN 18
+#define TEMP_PIN 4  // Updated
 
 // Using Serial1 on default pins for this core/board?
-// The user specified pin list for STM32, not RP2040. RP2040 pins 8/9 are UART1 default.
-// The user specified "PA1" for STM32. We need to match.
-#define UART_TX_PIN 8
-#define UART_RX_PIN 9
+// The user specified "PA1" for STM32 RX (UART4).
+// The user specified "PA2" for STM32 TX (USART2).
+// RP2040 Pins:
+// #define UART_TX_PIN 0  (RP2040 TX -> STM32 RX)
+// #define UART_RX_PIN 1  (RP2040 RX <- STM32 TX)
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
 
 #define EEPROM_SIZE 512
 #define CONFIG_ADDR 0
@@ -83,6 +86,11 @@ void send_packet(uint8_t cmd, uint8_t *payload, uint8_t len) {
     packet[3 + len] = calc_crc8(packet, 3 + len);
 
     Serial1.write(packet, 3 + len + 1);
+
+    // Debug Log Packet Sent
+    Serial.printf("TX CMD=%02X LEN=%d: ", cmd, len);
+    for(int i=0; i<3+len+1; i++) Serial.printf("%02X ", packet[i]);
+    Serial.println();
 }
 
 // --- Logic ---
@@ -95,43 +103,23 @@ void load_config() {
         config.group1 = {500, 3000, 30, 45};
         config.group2 = {500, 3000, 30, 45};
     }
+    Serial.println("Config Loaded");
 }
 
 void save_config() {
     EEPROM.put(CONFIG_ADDR, config);
     EEPROM.commit();
+    Serial.println("Config Saved");
 }
 
 int calc_pwm(FanGroupConfig *grp, float temp) {
     if (temp < grp->start_temp) return 0; // Off below start
     if (temp >= grp->max_temp) return 255; // Max speed
 
-    // Linear interpolation of temperature factor (0.0 to 1.0)
+    // Linear interpolation
     float temp_range = grp->max_temp - grp->start_temp;
     float temp_delta = temp - grp->start_temp;
     float factor = temp_delta / temp_range;
-
-    // Map Configured RPM to PWM Duty Cycle (0-255)
-    // Heuristic:
-    // Min Config Speed (e.g. 500 RPM) -> ~20% PWM (50)
-    // Max Config Speed (e.g. 3000 RPM) -> 100% PWM (255) if it matches fan max,
-    // but here we map the *control range*.
-    // User wants "Max Speed" at "Max Temp".
-    // We assume 100% PWM achieves the fan's physical max.
-    // If the user sets Max Speed to 3000, but the fan can do 5000, we should limit PWM?
-    // Without knowing the fan curve, accurate RPM targeting is hard without PID.
-    // **Simple Approach:**
-    // Map the temperature factor (0-100%) to the PWM range (MinPWM - MaxPWM).
-    // MinPWM is fixed at ~50 (start voltage). MaxPWM is 255.
-    // We ignore the specific RPM values for *control* (open loop) but use them for *status* logic if we had PID.
-    // However, the user specifically asked for "Min Fan Speed" and "Max Fan Speed" sliders.
-    // Ideally, we would use PID to hold target RPM.
-    // Given complexity, I will map the *User's Range* to PWM 0-255 effectively scaling the "power".
-    // Actually, "Max Speed" slider might imply a limit.
-    // Let's assume the user wants linear scaling between StartTemp and MaxTemp.
-    // At StartTemp, we want fan to start (PWM ~50 or user Min Speed equivalent).
-    // At MaxTemp, we want fan to be at user Max Speed equivalent.
-    // Since we don't know RPM->PWM map, we will assume linear 0-5000 RPM = 0-255 PWM.
 
     int target_rpm_min = grp->min_speed;
     int target_rpm_max = grp->max_speed;
@@ -148,6 +136,13 @@ int calc_pwm(FanGroupConfig *grp, float temp) {
 }
 
 void setup() {
+    // Debug Serial
+    Serial.begin(115200);
+    // Note: Not waiting for Serial to allow headless operation
+    delay(1000);
+    Serial.println("RP2040 Fan Controller Starting...");
+
+    // Hardware UART to STM32
     Serial1.setTX(UART_TX_PIN);
     Serial1.setRX(UART_RX_PIN);
     Serial1.begin(115200);
@@ -188,6 +183,10 @@ void loop() {
         int pwm2 = calc_pwm(&config.group2, currentTemp);
         analogWrite(FAN3_PWM_PIN, pwm2);
         analogWrite(FAN4_PWM_PIN, pwm2);
+
+        // Log Debug
+        // Reduce log spam, maybe every 1s? Or just rely on print
+        // Serial.printf("Temp: %.2f C | PWM1: %d | PWM2: %d\n", currentTemp, pwm1, pwm2);
     }
 
     // 2. Read Tach & Send Status (Every 1000ms)
@@ -195,7 +194,6 @@ void loop() {
         last_tach_time = now;
 
         for(int i=0; i<4; i++) {
-            // 2 pulses per revolution usually
             noInterrupts();
             uint32_t pulses = fan_pulses[i];
             fan_pulses[i] = 0;
@@ -204,8 +202,9 @@ void loop() {
             fan_rpm[i] = (pulses * 60) / 2;
         }
 
+        Serial.printf("Temp: %.2f C | RPM: %d %d %d %d\n", currentTemp, fan_rpm[0], fan_rpm[1], fan_rpm[2], fan_rpm[3]);
+
         // Send Status
-        // Payload: [Float Temp (4)][RPM1 (2)][RPM2 (2)][RPM3 (2)][RPM4 (2)]
         uint8_t payload[12];
         memcpy(&payload[0], &currentTemp, 4);
         memcpy(&payload[4], &fan_rpm[0], 2);
@@ -223,7 +222,10 @@ void loop() {
 
         while (Serial1.available()) {
             uint8_t b = Serial1.read();
-            if (rxIdx == 0 && b != FAN_UART_START_BYTE) continue; // Sync
+            if (rxIdx == 0 && b != FAN_UART_START_BYTE) {
+                 // Serial.printf("Skip %02X\n", b);
+                 continue; // Sync
+            }
 
             rxBuf[rxIdx++] = b;
 
@@ -232,9 +234,12 @@ void loop() {
                 uint8_t len = rxBuf[2];
                 if (rxIdx == 3 + len + 1) {
                     // Full Packet
-                    if (calc_crc8(rxBuf, 3 + len) == rxBuf[3 + len]) {
+                    uint8_t crc = calc_crc8(rxBuf, 3 + len);
+                    if (crc == rxBuf[3 + len]) {
                         // Valid
                         uint8_t cmd = rxBuf[1];
+                        Serial.printf("RX CMD=%02X LEN=%d\n", cmd, len);
+
                         if (cmd == FAN_CMD_SET_CONFIG) {
                             if (len == sizeof(FanConfig)) {
                                 memcpy(&config, &rxBuf[3], sizeof(FanConfig));
@@ -243,6 +248,8 @@ void loop() {
                         } else if (cmd == FAN_CMD_GET_CONFIG) {
                             send_packet(FAN_CMD_CONFIG_RESP, (uint8_t*)&config, sizeof(FanConfig));
                         }
+                    } else {
+                        Serial.printf("CRC Fail: Calc=%02X Recv=%02X\n", crc, rxBuf[3+len]);
                     }
                     rxIdx = 0;
                 }
