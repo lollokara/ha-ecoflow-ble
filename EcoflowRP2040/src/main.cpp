@@ -99,6 +99,10 @@ void setup() {
     Serial1.setRX(PIN_UART_RX);
     Serial1.begin(115200);
 
+    // Allow USB to connect
+    delay(2000);
+    Serial.println("RP2040 Fan Controller Booting...");
+
     sensors.begin();
     loadConfig();
 
@@ -239,21 +243,29 @@ void sendConfig(uint8_t group) {
 }
 
 void processSerial() {
-    while (Serial1.available() >= 4) { // Header check
+    while (Serial1.available() > 0) {
+        // Peek to sync
         if (Serial1.peek() != PKT_START) {
             uint8_t b = Serial1.read();
-            // Serial.print("SKIP: "); Serial.println(b, HEX);
+            Serial.print("RX_SKIP: "); Serial.println(b, HEX);
             continue;
         }
 
-        // [START] [CMD] [LEN]
-        // Wait for header bytes if not fully arrived
+        // Wait for header (3 bytes)
         if (Serial1.available() < 3) return;
+
+        // Peek header without consuming to ensure full packet availability check later?
+        // No, we need to read header to know len.
+        // We can't peek 3 bytes easily with standard API.
+        // Let's read header.
 
         uint8_t header[3];
         header[0] = Serial1.read(); // 0xAA
         header[1] = Serial1.read(); // CMD
         header[2] = Serial1.read(); // LEN
+
+        Serial.print("RX_HDR: CMD="); Serial.print(header[1], HEX);
+        Serial.print(" LEN="); Serial.println(header[2]);
 
         uint8_t len = header[2];
         if (len > 20) { // Garbage

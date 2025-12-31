@@ -142,7 +142,9 @@ void StartRP2040Task(void *argument) {
 
         // Handle RX - Drain buffer
         while (HAL_UART_Receive(&huart4, rx_buf, 1, 0) == HAL_OK) {
-            // printf("[RP2040] RX %02X\n", rx_buf[0]); // Very verbose
+            // Un-commented for debug
+            printf("[RP2040] RX %02X\n", rx_buf[0]);
+
             if (pkt_idx == 0) {
                 if (rx_buf[0] == PKT_START) {
                     pkt_buf[pkt_idx++] = rx_buf[0];
