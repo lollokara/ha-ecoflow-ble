@@ -2,6 +2,7 @@
 #include "DeviceManager.h"
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
+#include <WiFi.h>
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 17 (connected to F4 TX)
@@ -137,6 +138,29 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         digitalWrite(POWER_LATCH_PIN, LOW);
         delay(3000);
         ESP.restart();
+    } else if (cmd == CMD_GET_DEBUG_INFO) {
+        DebugInfo info = {0};
+
+        // WiFi IP
+        if(WiFi.status() == WL_CONNECTED) {
+            strncpy(info.ip, WiFi.localIP().toString().c_str(), 15);
+        } else {
+             strncpy(info.ip, "Disconnected", 15);
+        }
+
+        // Device Counts
+        DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
+        for(int i=0; i<4; i++) {
+             DeviceSlot* s = DeviceManager::getInstance().getSlot(types[i]);
+             if(s) {
+                 if(s->isConnected) info.devices_connected++;
+                 if(!s->macAddress.empty()) info.devices_paired++;
+             }
+        }
+
+        uint8_t buffer[sizeof(DebugInfo) + 4];
+        int len = pack_debug_info_message(buffer, &info);
+        Serial1.write(buffer, len);
     }
 }
 

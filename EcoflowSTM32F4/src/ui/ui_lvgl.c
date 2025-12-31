@@ -1,6 +1,7 @@
 #include "ui_lvgl.h"
 #include "ui_icons.h"
 #include "ui_view_wave2.h"
+#include "ui_view_debug.h"
 #include "lvgl.h"
 #include "uart_task.h" // Added for UART commands
 #include <stdio.h>
@@ -20,6 +21,16 @@ static int safe_float_to_int(float f) {
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
 static int lim_charge_p = 100;      // 50 - 100 %
+
+// --- Device Cache ---
+static DeviceStatus device_cache[MAX_DEVICES];
+
+DeviceStatus* UI_GetDeviceCache(int index) {
+    if (index >= 0 && index < MAX_DEVICES) {
+        return &device_cache[index];
+    }
+    return NULL;
+}
 
 // --- Styles ---
 static lv_style_t style_scr;
@@ -127,6 +138,10 @@ static void event_to_settings(lv_event_t * e) {
 
 static void event_to_dash(lv_event_t * e) {
     lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
+}
+
+static void event_to_debug(lv_event_t * e) {
+    UI_CreateDebugView();
 }
 
 static void event_to_wave2(lv_event_t * e) {
@@ -370,6 +385,16 @@ static void create_settings(void) {
     lv_label_set_text(title, "Settings");
     lv_obj_set_style_text_font(title, &lv_font_montserrat_32, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 25);
+
+    // Debug Button
+    lv_obj_t * btn_debug = lv_btn_create(scr_settings);
+    lv_obj_set_size(btn_debug, 100, 50);
+    lv_obj_align(btn_debug, LV_ALIGN_TOP_RIGHT, -20, 20);
+    lv_obj_add_style(btn_debug, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_debug, event_to_debug, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_debug = lv_label_create(btn_debug);
+    lv_label_set_text(lbl_debug, "Debug");
+    lv_obj_center(lbl_debug);
 
     // Container
     lv_obj_t * cont = lv_obj_create(scr_settings);
@@ -684,6 +709,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     if (!dev) return;
+
+    // Cache the device status
+    // Find slot for this device ID or use a direct mapping if IDs are small enums
+    // Since IDs are enum 1,2,3,4, we can map to index 0,1,2,3
+    if (dev->id > 0 && dev->id <= MAX_DEVICES) {
+        memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
+    }
 
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);

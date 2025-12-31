@@ -25,7 +25,8 @@ typedef enum {
     MSG_AC_SET,
     MSG_DC_SET,
     MSG_SET_VALUE,
-    MSG_POWER_OFF
+    MSG_POWER_OFF,
+    MSG_GET_DEBUG_INFO
 } TxMsgType;
 
 typedef struct {
@@ -174,6 +175,15 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             printf("UART: Unpack Failed\n");
         }
     }
+    else if (cmd == CMD_DEBUG_INFO) {
+        DebugInfo info;
+        if (unpack_debug_info_message(packet, &info) == 0) {
+            DisplayEvent event;
+            event.type = DISPLAY_EVENT_UPDATE_DEBUG;
+            memcpy(&event.data.debugInfo, &info, sizeof(DebugInfo));
+            xQueueSend(displayQueue, &event, 0);
+        }
+    }
 }
 
 // Public function to queue a Wave 2 command
@@ -218,6 +228,14 @@ void UART_SendSetValue(uint8_t type, int value) {
         tx.type = MSG_SET_VALUE;
         tx.data.set_val.type = type;
         tx.data.set_val.value = value;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
+void UART_SendGetDebugInfo(void) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_GET_DEBUG_INFO;
         xQueueSend(uartTxQueue, &tx, 0);
     }
 }
@@ -307,6 +325,8 @@ void StartUARTTask(void * argument) {
                 len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
             } else if (tx.type == MSG_POWER_OFF) {
                 len = pack_power_off_message(buf);
+            } else if (tx.type == MSG_GET_DEBUG_INFO) {
+                len = pack_get_debug_info_message(buf);
             }
             if (len > 0) {
                 HAL_UART_Transmit(&huart6, buf, len, 100);

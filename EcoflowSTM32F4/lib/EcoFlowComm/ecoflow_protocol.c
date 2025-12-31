@@ -219,3 +219,33 @@ int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value) {
     memcpy(value, &buffer[4], 4);
     return 0;
 }
+
+int pack_get_debug_info_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_GET_DEBUG_INFO;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info) {
+    uint8_t len = sizeof(DebugInfo);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_DEBUG_INFO;
+    buffer[2] = len;
+    memcpy(&buffer[3], info, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(DebugInfo)) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    memcpy(info, &buffer[3], len);
+    return 0;
+}

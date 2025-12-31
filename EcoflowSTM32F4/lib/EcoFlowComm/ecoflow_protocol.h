@@ -23,6 +23,7 @@ extern "C" {
 #define CMD_HANDSHAKE_ACK 0x21
 #define CMD_DEVICE_LIST 0x22
 #define CMD_DEVICE_STATUS 0x24
+#define CMD_DEBUG_INFO 0x61
 
 
 // F4 -> ESP32 Command IDs
@@ -31,6 +32,7 @@ extern "C" {
 #define CMD_HANDSHAKE 0x20
 #define CMD_DEVICE_LIST_ACK 0x23
 #define CMD_GET_DEVICE_STATUS 0x25
+#define CMD_GET_DEBUG_INFO 0x60
 
 // New Commands
 #define CMD_SET_WAVE2 0x30
@@ -223,6 +225,13 @@ typedef struct {
     uint8_t value;
 } Wave2SetMsg;
 
+typedef struct {
+    char ip[16];
+    uint8_t wifi_connected;
+    uint8_t devices_connected;
+    uint8_t devices_paired;
+} DebugInfo;
+
 #pragma pack(pop)
 
 // API Functions
@@ -254,6 +263,10 @@ int pack_set_value_message(uint8_t *buffer, uint8_t type, int value);
 int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value);
 
 int pack_power_off_message(uint8_t *buffer);
+
+int pack_get_debug_info_message(uint8_t *buffer);
+int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info);
+int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info);
 
 #ifdef __cplusplus
 }

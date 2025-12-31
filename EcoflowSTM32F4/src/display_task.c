@@ -3,6 +3,7 @@
 #include "stm32469i_discovery_ts.h"
 #include "stm32469i_discovery_sdram.h"
 #include "ui/ui_lvgl.h"
+#include "ui/ui_view_debug.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
@@ -33,9 +34,11 @@ void StartDisplayTask(void * argument) {
         // Handle Data Updates
         while (xQueueReceive(displayQueue, &event, 0) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {
-                printf("Display: Update UI...\n");
+                // printf("Display: Update UI...\n"); // Comment out excessive logging
                 UI_LVGL_Update(&event.data.deviceStatus);
-                printf("Display: UI Updated\n");
+                // printf("Display: UI Updated\n");
+            } else if (event.type == DISPLAY_EVENT_UPDATE_DEBUG) {
+                UI_UpdateDebugInfo(&event.data.debugInfo);
             }
         }
 
