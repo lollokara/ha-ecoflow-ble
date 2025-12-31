@@ -128,3 +128,17 @@ void DSI_IRQHandler(void)
 {
   HAL_DSI_IRQHandler(&hdsi_eval);
 }
+
+extern UART_HandleTypeDef huart4;
+extern void Fan_RxByteISR(uint8_t byte);
+
+void UART4_IRQHandler(void) {
+    HAL_UART_IRQHandler(&huart4);
+}
+
+// Override HAL callback to capture byte
+// Note: This callback is weak in HAL_UART.c, but if it is defined elsewhere (uart_task.c?), we might conflict.
+// Let's check uart_task.c. It defines HAL_UART_RxCpltCallback too?
+// If so, we need to merge logic.
+// Checking uart_task.c ...
+// If not, we define it here.

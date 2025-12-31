@@ -25,6 +25,8 @@ extern UART_HandleTypeDef huart6;
 
 // Local Handles
 UART_HandleTypeDef huart3;
+UART_HandleTypeDef huart2; // Fan TX
+UART_HandleTypeDef huart4; // Fan RX
 TIM_HandleTypeDef htim2;
 QueueHandle_t displayQueue; // Global queue for UI events
 
@@ -32,6 +34,7 @@ QueueHandle_t displayQueue; // Global queue for UI events
 void SystemClock_Config(void);
 static void ESP32_Reset_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_Fan_UART_Init(void);
 static void MX_TIM2_Init(void);
 
 /**
@@ -148,6 +151,30 @@ static void MX_USART3_UART_Init(void) {
     HAL_NVIC_DisableIRQ(USART3_IRQn);
 }
 
+static void MX_Fan_UART_Init(void) {
+    // TX on USART2
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+
+    // RX on UART4
+    huart4.Instance = UART4;
+    huart4.Init.BaudRate = 115200;
+    huart4.Init.WordLength = UART_WORDLENGTH_8B;
+    huart4.Init.StopBits = UART_STOPBITS_1;
+    huart4.Init.Parity = UART_PARITY_NONE;
+    huart4.Init.Mode = UART_MODE_RX;
+    huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart4);
+}
+
 /**
  * @brief Initializes TIM2 Channel 4 for Backlight PWM Control.
  */
@@ -204,6 +231,31 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
         GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
         HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
     }
+    else if(uartHandle->Instance==USART2) {
+        // PA2 -> TX
+        __HAL_RCC_USART2_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+        GPIO_InitStruct.Pin = GPIO_PIN_2;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    }
+    else if(uartHandle->Instance==UART4) {
+        // PA1 -> RX
+        __HAL_RCC_UART4_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+        GPIO_InitStruct.Pin = GPIO_PIN_1;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF8_UART4;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        HAL_NVIC_SetPriority(UART4_IRQn, 5, 0);
+        HAL_NVIC_EnableIRQ(UART4_IRQn);
+    }
 }
 
 /**
@@ -244,6 +296,7 @@ int main(void) {
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
+    MX_Fan_UART_Init();
     MX_TIM2_Init();
 
     // Create Display Event Queue
@@ -256,6 +309,8 @@ int main(void) {
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
+    extern void StartFanTask(void *argument);
+    xTaskCreate(StartFanTask, "Fan", 2048, NULL, 3, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
