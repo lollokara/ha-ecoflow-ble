@@ -24,7 +24,8 @@ typedef enum {
     MSG_WAVE2_SET,
     MSG_AC_SET,
     MSG_DC_SET,
-    MSG_SET_VALUE
+    MSG_SET_VALUE,
+    MSG_POWER_OFF
 } TxMsgType;
 
 typedef struct {
@@ -185,6 +186,14 @@ void UART_SendWave2Set(Wave2SetMsg *msg) {
     }
 }
 
+void UART_SendPowerOff(void) {
+    if (uartTxQueue) {
+        TxMessage tx;
+        tx.type = MSG_POWER_OFF;
+        xQueueSend(uartTxQueue, &tx, 0);
+    }
+}
+
 void UART_SendACSet(uint8_t enable) {
     if (uartTxQueue) {
         TxMessage tx;
@@ -296,6 +305,8 @@ void StartUARTTask(void * argument) {
                 len = pack_set_dc_message(buf, tx.data.enable);
             } else if (tx.type == MSG_SET_VALUE) {
                 len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
+            } else if (tx.type == MSG_POWER_OFF) {
+                len = pack_power_off_message(buf);
             }
             if (len > 0) {
                 HAL_UART_Transmit(&huart6, buf, len, 100);

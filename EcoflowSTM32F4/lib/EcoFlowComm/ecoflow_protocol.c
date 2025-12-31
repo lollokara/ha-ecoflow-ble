@@ -66,6 +66,14 @@ int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
     return 0;
 }
 
+int pack_power_off_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_POWER_OFF;
+    buffer[2] = 0; // Length
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
 int pack_device_list_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_DEVICE_LIST_ACK;

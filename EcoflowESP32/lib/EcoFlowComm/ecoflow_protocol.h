@@ -37,6 +37,7 @@ extern "C" {
 #define CMD_SET_AC 0x31
 #define CMD_SET_DC 0x32
 #define CMD_SET_VALUE 0x40
+#define CMD_POWER_OFF 0x50
 
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
@@ -251,6 +252,8 @@ int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable);
 
 int pack_set_value_message(uint8_t *buffer, uint8_t type, int value);
 int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value);
+
+int pack_power_off_message(uint8_t *buffer);
 
 #ifdef __cplusplus
 }

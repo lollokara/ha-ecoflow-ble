@@ -15,7 +15,7 @@
 // #define HOLD_PRESS_TIME 1000
 static const char* TAG = "Main";
 
-#define POWER_LATCH_PIN 12
+#define POWER_LATCH_PIN 16
 
 void checkSerial() {
     static String inputBuffer = "";
@@ -31,8 +31,7 @@ void checkSerial() {
 }
 
 void setup() {
-    pinMode(POWER_LATCH_PIN, OUTPUT);
-    digitalWrite(POWER_LATCH_PIN, HIGH);
+    pinMode(POWER_LATCH_PIN, INPUT_PULLUP);
 
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");

@@ -5,6 +5,7 @@
 #include "uart_task.h" // Added for UART commands
 #include <stdio.h>
 #include <math.h>
+#include "stm32f4xx_hal.h"
 
 extern void SetBacklight(uint8_t percent);
 static uint32_t last_touch_time = 0;
@@ -150,6 +151,17 @@ static void event_power_off_click(lv_event_t * e) {
 }
 static void event_popup_hide(lv_event_t * e) {
     lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void event_power_off_confirm(lv_event_t * e) {
+    lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
+    UART_SendPowerOff();
+
+    // Give time for UART transmission
+    HAL_Delay(500);
+
+    // Reboot
+    NVIC_SystemReset();
 }
 
 // --- Toggle Callbacks ---
@@ -602,7 +614,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_yes, 100, 50);
     lv_obj_align(btn_yes, LV_ALIGN_BOTTOM_LEFT, 40, -20);
     lv_obj_add_style(btn_yes, &style_btn_red, 0);
-    lv_obj_add_event_cb(btn_yes, event_popup_hide, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(btn_yes, event_power_off_confirm, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_yes = lv_label_create(btn_yes);
     lv_label_set_text(lbl_yes, "YES");
     lv_obj_center(lbl_yes);
