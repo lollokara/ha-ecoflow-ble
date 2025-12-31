@@ -671,7 +671,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if ((now - last_touch_time) > (60000 / portTICK_PERIOD_MS)) { // 60s
         if (!is_sleeping) {
             is_sleeping = true;
-            SetBacklight(99); // Dim
+            SetBacklight(1); // Dim
         }
     } else {
         if (is_sleeping) {

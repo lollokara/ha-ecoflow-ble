@@ -139,7 +139,7 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
 // Exposed to UI Task
 void SetBacklight(uint8_t percent) {
     if (percent > 100) percent = 100;
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, 100 - percent);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, percent);
 }
 
 int main(void) {
