@@ -1,91 +1,57 @@
-# ESP32 Ecoflow BLE
+# EcoFlow Monitor
 
-This project provides a C++ library for ESP32 devices to communicate with EcoFlow power stations over Bluetooth Low Energy (BLE). It allows you to monitor key metrics like battery percentage and power input/output, as well as control the device's AC, DC, and USB ports—all locally, without relying on the cloud.
+**A comprehensive, local-only monitoring and control system for EcoFlow power stations.**
 
-This library is a port of the excellent Python implementation, bringing its core functionalities to the PlatformIO ecosystem for embedded devices.
+## Overview
+
+EcoFlow Monitor is a custom embedded solution designed to interface with EcoFlow devices (such as Delta 3, Delta Pro 3, and Wave 2) without relying on the manufacturer's cloud services. It uses Bluetooth Low Energy (BLE) to communicate directly with the devices, ensuring privacy and operation in off-grid environments.
+
+The project is split into three modular components:
+1.  **ESP32-S3 (Gateway):** Handles BLE communication with the EcoFlow devices and bridges data to the display.
+2.  **STM32F469 (Display):** Provides a rich, touch-enabled graphical user interface (LVGL) for monitoring and control.
+3.  **RP2040 (Fan Controller):** Manages cabinet cooling with PWM fan control based on thermal readings.
 
 ## Features
 
--   **Local Control:** Communicate directly with your EcoFlow device over BLE.
--   **Real-time Monitoring:** Get live data for battery percentage, input/output power, and more.
--   **Remote Control:** Toggle the AC, DC, and USB ports on and off.
--   **Secure:** Implements the EcoFlow authentication handshake and AES-encrypted communication.
+-   **Cloud-Independent:** Fully local control via BLE. No internet connection required.
+-   **Multi-Device Support:**
+    -   **Delta 3:** Full telemetry (Battery, Input/Output, Port states) and charging controls.
+    -   **Delta Pro 3:** High/Low voltage port monitoring and split solar inputs.
+    -   **Wave 2:** Climate control (Cool/Heat/Fan), temperature monitoring, and mode switching.
+    -   **Alternator Charger:** Basic monitoring of vehicle charging systems.
+-   **Rich UI:** 800x480 Touchscreen Dashboard with real-time graphs and animations.
+-   **Thermal Management:** Integrated automatic fan control for the equipment cabinet.
+-   **Debug Tools:** On-screen debug console and raw data inspection.
 
-## Supported Devices
+## Architecture
 
-Currently, the library has been tested and is known to work with:
-
--   **EcoFlow Delta 3**
---   **EcoFlow Wave 2 (Partial Support)**
-
-Support for more devices is planned for the future. Contributions are welcome!
-
-## Installation
-
-This library is designed for the PlatformIO ecosystem.
-
-1.  **Clone the Repository:**
-    ```bash
-    git clone [repository-url]
-    ```
-
-2.  **Add to Your Project:**
-    Place the `EcoflowESP32` directory inside the `lib/` folder of your PlatformIO project.
-
-3.  **Credentials:**
-    You will need to provide your EcoFlow credentials in a `Credentials.h` file inside the `src/` directory. This file is not included in the repository for security reasons.
-
-    Create `EcoflowESP32/src/Credentials.h` with the following content:
-    ```cpp
-    #pragma once
-
-    #define ECOFLOW_USER_ID "YOUR_ECOFLOW_USER_ID"
-    #define ECOFLOW_DEVICE_SN "YOUR_DEVICE_SERIAL_NUMBER"
-    #define ECOFLOW_KEYDATA "YOUR_ECOFLOW_APP_KEY"
-    ```
-
-## How to Use
-
-Here is a basic example of how to use the library to connect to a Delta 3 device and print its battery level. For more advanced examples, including how to manage multiple devices, please see the `examples/` directory.
-
-```cpp
-#include <Arduino.h>
-#include "DeviceManager.h"
-#include "Credentials.h" // Make sure to fill this file with your data
-
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Starting EcoflowESP32 example...");
-
-  // Initialize the DeviceManager.
-  DeviceManager::getInstance().initialize();
-
-  // Start scanning for a Delta 3 device.
-  DeviceManager::getInstance().scanAndConnect(DeviceType::DELTA_3);
-}
-
-void loop() {
-  // The DeviceManager handles all BLE updates.
-  DeviceManager::getInstance().update();
-
-  // Get the device instance from the manager.
-  EcoflowESP32* delta3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-
-  // Check if the device is fully connected and authenticated.
-  if (delta3 && delta3->isAuthenticated()) {
-    Serial.print("Battery Level: ");
-    Serial.print(delta3->getBatteryLevel());
-    Serial.println("%");
-  } else {
-    Serial.println("Device not authenticated, waiting...");
-  }
-
-  delay(5000);
-}
+```mermaid
+graph TD
+    User((User)) -->|Touch| STM32[STM32F469 Display]
+    STM32 -->|UART| ESP32[ESP32-S3 Gateway]
+    STM32 -->|UART| RP2040[RP2040 Fan Ctrl]
+    ESP32 -->|BLE| D3[Delta 3]
+    ESP32 -->|BLE| W2[Wave 2]
+    RP2040 -->|PWM| Fans[Cooling Fans]
+    RP2040 -->|OneWire| Temp[Temp Sensor]
 ```
 
-For more detailed examples, please see the `examples/` directory.
+## Documentation
 
-## Contributing
+Comprehensive documentation is available in the **Wiki**.
 
-Contributions are welcome! If you would like to help improve this library, please feel free to submit a pull request or open an issue. Whether it's adding support for a new device, fixing a bug, or improving documentation, all contributions are appreciated.
+-   [**Home**](Wiki/Home.md): Project overview and navigation.
+-   [**EcoFlow Protocol**](Wiki/EcoFlow_Protocol.md): Deep dive into the reverse-engineered BLE protocol.
+-   [**Inter-Device Protocol**](Wiki/Inter_Device_Protocol.md): Details on the internal serial communication.
+-   [**Device: ESP32**](Wiki/Device_ESP32.md): BLE client and gateway firmware details.
+-   [**Device: STM32**](Wiki/Device_STM32.md): UI, FreeRTOS structure, and display logic.
+-   [**Device: RP2040**](Wiki/Device_RP2040.md): Fan control algorithm and hardware.
+
+## Installation & Build
+
+Please refer to the Wiki for detailed build instructions. The project uses **PlatformIO** for all microcontrollers.
+
+## License
+
+This project is open-source.
+**Author:** Lollokara
