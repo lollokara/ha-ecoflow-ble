@@ -1,15 +1,18 @@
 #include "uart_task.h"
 #include "ecoflow_protocol.h"
 #include "display_task.h"
+#include "flash_ops.h" // Include Flash Ops
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
 
+extern IWDG_HandleTypeDef hiwdg; // Refresh Watchdog during long ops
+
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 1024
+#define RING_BUFFER_SIZE 2048 // Increased to support OTA Chunks (1KB payload + overhead)
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -19,7 +22,6 @@ typedef struct {
 static RingBuffer rx_ring_buffer;
 
 // TX Queue for sending commands from UI Task to UART Task
-// Simple generic struct for TX messages
 typedef enum {
     MSG_WAVE2_SET,
     MSG_AC_SET,
@@ -57,7 +59,6 @@ static void rb_push(RingBuffer *rb, uint8_t byte) {
         rb->buffer[rb->head] = byte;
         rb->head = next_head;
     }
-    // Else: Buffer overflow, drop byte
 }
 
 static int rb_pop(RingBuffer *rb, uint8_t *byte) {
@@ -84,7 +85,8 @@ typedef enum {
     STATE_HANDSHAKE,
     STATE_WAIT_HANDSHAKE_ACK,
     STATE_WAIT_DEVICE_LIST,
-    STATE_POLLING
+    STATE_POLLING,
+    STATE_OTA_MODE
 } ProtocolState;
 
 static ProtocolState protocolState = STATE_HANDSHAKE;
@@ -95,17 +97,20 @@ static uint8_t currentDeviceIndex = 0;
 typedef enum {
     PARSE_START,
     PARSE_CMD,
-    PARSE_LEN,
+    PARSE_LEN_L,
     PARSE_PAYLOAD,
     PARSE_CRC
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10 + sizeof(DeviceStatus)]; // Ensure buffer is large enough for big payloads
-static uint16_t parseIndex = 0; // Payload can be > 255
+static uint8_t parseBuffer[300];
+static uint16_t parseIndex = 0;
 static uint8_t expectedPayloadLen = 0;
 
-// Moved HAL_UART_RxCpltCallback to stm32f4xx_it.c or handled globally
+// OTA State
+static bool ota_active = false;
+static uint32_t ota_bytes_received = 0;
+static uint32_t ota_total_size = 0;
 
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
@@ -132,35 +137,119 @@ static void UART_Init(void) {
     HAL_NVIC_SetPriority(USART6_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USART6_IRQn);
 
-    // Initialize Ring Buffer
     rb_init(&rx_ring_buffer);
-
-    // Start Reception
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
-static void process_packet(uint8_t *packet, uint16_t total_len) {
-    // packet[0] is START, packet[1] is CMD, packet[2] is LEN
-    uint8_t cmd = packet[1];
+static void send_ota_ack(void) {
+    uint8_t buf[4];
+    int l = pack_ota_ack_message(buf);
+    HAL_UART_Transmit(&huart6, buf, l, 100);
+}
 
-    if (cmd == CMD_HANDSHAKE_ACK) {
+static void send_ota_nack(void) {
+    uint8_t buf[4];
+    int l = pack_ota_nack_message(buf);
+    HAL_UART_Transmit(&huart6, buf, l, 100);
+}
+
+static void process_packet(uint8_t *packet, uint16_t total_len) {
+    uint8_t cmd = packet[1];
+    uint8_t *payload = &packet[3];
+
+    // Check OTA Commands first
+    if (cmd == CMD_OTA_START) {
+        printf("OTA: Start Command Received\n");
+        protocolState = STATE_OTA_MODE; // Stop polling
+        ota_active = true;
+        ota_bytes_received = 0;
+
+        // Unpack size
+        OtaStartMsg msg;
+        memcpy(&msg, payload, sizeof(OtaStartMsg));
+        ota_total_size = msg.total_size;
+
+        Flash_Unlock();
+        // Prepare Inactive Bank: Erase, Copy Bootloader
+        // This is blocking and long. We should refresh IWDG.
+
+        // 1. Copy Bootloader (Sectors 0->12)
+        if (!Flash_CopyBootloader()) {
+            printf("OTA: Copy Bootloader Failed\n");
+            send_ota_nack();
+            return;
+        }
+
+        // 2. Erase Application Sectors in Inactive Bank
+        // Sectors 14-23 (Bank 2 App Area)
+        for (int i = 14; i <= 23; i++) { // Hardcoded indices based on flash_ops header
+             HAL_IWDG_Refresh(&hiwdg);
+             if (!Flash_EraseSector(i)) {
+                 printf("OTA: Erase Failed Sector %d\n", i);
+                 send_ota_nack();
+                 return;
+             }
+        }
+
+        printf("OTA: Erase Complete. Ready for chunks.\n");
+        send_ota_ack();
+    }
+    else if (cmd == CMD_OTA_CHUNK) {
+        if (!ota_active) { send_ota_nack(); return; }
+
+        // [Offset(4)][Data(N)]
+        uint32_t offset;
+        memcpy(&offset, payload, 4);
+        uint8_t *data = &payload[4];
+        uint8_t len = packet[2] - 4;
+
+        if (Flash_WriteChunk(offset, data, len)) {
+            ota_bytes_received += len;
+            send_ota_ack();
+            // Provide feedback to UI
+            if (ota_bytes_received % 10240 == 0) {
+                 DisplayEvent event;
+                 event.type = DISPLAY_EVENT_OTA_PROGRESS;
+                 event.data.otaProgress = (uint8_t)((ota_bytes_received * 100) / ota_total_size);
+                 xQueueSend(displayQueue, &event, 0);
+            }
+        } else {
+            printf("OTA: Write Failed at %lu\n", offset);
+            send_ota_nack();
+        }
+    }
+    else if (cmd == CMD_OTA_END) {
+        printf("OTA: End Command\n");
+        Flash_Lock();
+        ota_active = false;
+        send_ota_ack();
+
+        DisplayEvent event;
+        event.type = DISPLAY_EVENT_OTA_PROGRESS;
+        event.data.otaProgress = 100;
+        xQueueSend(displayQueue, &event, 0);
+    }
+    else if (cmd == CMD_OTA_APPLY) {
+        printf("OTA: Applying Update (Swap Bank)...\n");
+        send_ota_ack();
+        HAL_Delay(100); // Give time for ACK to transmit
+        Flash_SwapBank(); // Resets system
+    }
+    // ... Normal Commands ...
+    else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
-            printf("UART: Handshake ACK received. State -> WAIT_DEVICE_LIST\n");
             protocolState = STATE_WAIT_DEVICE_LIST;
         }
     }
     else if (cmd == CMD_DEVICE_LIST) {
         if (protocolState == STATE_WAIT_DEVICE_LIST || protocolState == STATE_POLLING) {
-            printf("UART: Device List received.\n");
             unpack_device_list_message(packet, &knownDevices);
 
-            // Notify UI
             DisplayEvent event;
             event.type = DISPLAY_EVENT_UPDATE_DEVICE_LIST;
             memcpy(&event.data.deviceList, &knownDevices, sizeof(DeviceList));
             xQueueSend(displayQueue, &event, 0);
 
-            // Send Ack
             uint8_t ack[4];
             int len = pack_device_list_ack_message(ack);
             HAL_UART_Transmit(&huart6, ack, len, 100);
@@ -169,21 +258,12 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
     }
     else if (cmd == CMD_DEVICE_STATUS) {
-        // printf("UART: Parsing Status...\n");
         DeviceStatus status;
         if (unpack_device_status_message(packet, &status) == 0) {
              DisplayEvent event;
              event.type = DISPLAY_EVENT_UPDATE_BATTERY;
-             // Pass the full structure, including ID
              memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatus));
-
-             if(xQueueSend(displayQueue, &event, 0) == pdTRUE) {
-                 // printf("UART: Status Queued\n");
-             } else {
-                 printf("UART: Queue Full!\n");
-             }
-        } else {
-            printf("UART: Unpack Failed\n");
+             xQueueSend(displayQueue, &event, 0);
         }
     }
     else if (cmd == CMD_DEBUG_INFO) {
@@ -197,99 +277,48 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     }
 }
 
-// Public function to queue a Wave 2 command
+// ... Public Send Functions ...
 void UART_SendWave2Set(Wave2SetMsg *msg) {
     if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_WAVE2_SET;
-        tx.data.w2 = *msg;
+        TxMessage tx; tx.type = MSG_WAVE2_SET; tx.data.w2 = *msg;
         xQueueSend(uartTxQueue, &tx, 0);
     }
 }
-
 void UART_SendPowerOff(void) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_POWER_OFF;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_POWER_OFF; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendACSet(uint8_t enable) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_AC_SET;
-        tx.data.enable = enable;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_AC_SET; tx.data.enable = enable; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendDCSet(uint8_t enable) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_DC_SET;
-        tx.data.enable = enable;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_DC_SET; tx.data.enable = enable; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendSetValue(uint8_t type, int value) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_SET_VALUE;
-        tx.data.set_val.type = type;
-        tx.data.set_val.value = value;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_SET_VALUE; tx.data.set_val.type = type; tx.data.set_val.value = value; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendGetDebugInfo(void) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_GET_DEBUG_INFO;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_GET_DEBUG_INFO; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendConnectDevice(uint8_t type) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_CONNECT_DEVICE;
-        tx.data.device_type = type;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_CONNECT_DEVICE; tx.data.device_type = type; xQueueSend(uartTxQueue, &tx, 0); }
 }
-
 void UART_SendForgetDevice(uint8_t type) {
-    if (uartTxQueue) {
-        TxMessage tx;
-        tx.type = MSG_FORGET_DEVICE;
-        tx.data.device_type = type;
-        xQueueSend(uartTxQueue, &tx, 0);
-    }
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_FORGET_DEVICE; tx.data.device_type = type; xQueueSend(uartTxQueue, &tx, 0); }
 }
+void UART_GetKnownDevices(DeviceList *list) { memcpy(list, &knownDevices, sizeof(DeviceList)); }
 
-// Return a copy of known devices for UI
-void UART_GetKnownDevices(DeviceList *list) {
-    // Note: Not thread safe but low risk for read-only UI display
-    // Ideally use a mutex if critical
-    memcpy(list, &knownDevices, sizeof(DeviceList));
-}
 
 void StartUARTTask(void * argument) {
     UART_Init();
-
-    // Create TX Queue
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
-
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
     TickType_t lastActivityTime = xTaskGetTickCount();
-    TickType_t lastHandshakeTime = 0; // Non-blocking timer for handshake
+    TickType_t lastHandshakeTime = 0;
 
     for(;;) {
-        // 1. Process Incoming Data
+        // 1. Process RX
         while (rb_pop(&rx_ring_buffer, &b)) {
             switch (parseState) {
                 case PARSE_START:
@@ -299,45 +328,32 @@ void StartUARTTask(void * argument) {
                         parseState = PARSE_CMD;
                     }
                     break;
-
                 case PARSE_CMD:
                     parseBuffer[parseIndex++] = b;
-                    parseState = PARSE_LEN;
+                    parseState = PARSE_LEN_L;
                     break;
-
-                case PARSE_LEN:
+                case PARSE_LEN_L:
                     parseBuffer[parseIndex++] = b;
                     expectedPayloadLen = b;
                     if (expectedPayloadLen > MAX_PAYLOAD_LEN) {
-                        parseState = PARSE_START; // Invalid length, reset
+                        parseState = PARSE_START;
                         parseIndex = 0;
                     } else {
-                        if (expectedPayloadLen == 0) {
-                            parseState = PARSE_CRC;
-                        } else {
-                            parseState = PARSE_PAYLOAD;
-                        }
+                        if (expectedPayloadLen == 0) parseState = PARSE_CRC;
+                        else parseState = PARSE_PAYLOAD;
                     }
                     break;
-
                 case PARSE_PAYLOAD:
                     parseBuffer[parseIndex++] = b;
-                    if (parseIndex == (3 + expectedPayloadLen)) {
-                        parseState = PARSE_CRC;
-                    }
+                    if (parseIndex == (3 + expectedPayloadLen)) parseState = PARSE_CRC;
                     break;
-
                 case PARSE_CRC:
-                    // Last byte is CRC
                     {
                         uint8_t received_crc = b;
                         uint8_t calcd_crc = calculate_crc8(&parseBuffer[1], parseIndex - 1);
-
                         if (received_crc == calcd_crc) {
                             parseBuffer[parseIndex++] = b;
                             process_packet(parseBuffer, parseIndex);
-                        } else {
-                            printf("UART: CRC Fail. Rx=%02X Calc=%02X\n", received_crc, calcd_crc);
                         }
                     }
                     parseState = PARSE_START;
@@ -346,82 +362,56 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Check for Outgoing Commands (Priority)
+        // 2. Process TX
         TxMessage tx;
         if (xQueueReceive(uartTxQueue, &tx, 0) == pdTRUE) {
             uint8_t buf[32];
             int len = 0;
-            if (tx.type == MSG_WAVE2_SET) {
-                len = pack_set_wave2_message(buf, tx.data.w2.type, tx.data.w2.value);
-            } else if (tx.type == MSG_AC_SET) {
-                len = pack_set_ac_message(buf, tx.data.enable);
-            } else if (tx.type == MSG_DC_SET) {
-                len = pack_set_dc_message(buf, tx.data.enable);
-            } else if (tx.type == MSG_SET_VALUE) {
-                len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
-            } else if (tx.type == MSG_POWER_OFF) {
-                len = pack_power_off_message(buf);
-            } else if (tx.type == MSG_GET_DEBUG_INFO) {
-                len = pack_get_debug_info_message(buf);
-            } else if (tx.type == MSG_CONNECT_DEVICE) {
-                len = pack_connect_device_message(buf, tx.data.device_type);
-            } else if (tx.type == MSG_FORGET_DEVICE) {
-                len = pack_forget_device_message(buf, tx.data.device_type);
-            }
-            if (len > 0) {
-                HAL_UART_Transmit(&huart6, buf, len, 100);
-            }
+            if (tx.type == MSG_WAVE2_SET) len = pack_set_wave2_message(buf, tx.data.w2.type, tx.data.w2.value);
+            else if (tx.type == MSG_AC_SET) len = pack_set_ac_message(buf, tx.data.enable);
+            else if (tx.type == MSG_DC_SET) len = pack_set_dc_message(buf, tx.data.enable);
+            else if (tx.type == MSG_SET_VALUE) len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
+            else if (tx.type == MSG_POWER_OFF) len = pack_power_off_message(buf);
+            else if (tx.type == MSG_GET_DEBUG_INFO) len = pack_get_debug_info_message(buf);
+            else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(buf, tx.data.device_type);
+            else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(buf, tx.data.device_type);
+
+            if (len > 0) HAL_UART_Transmit(&huart6, buf, len, 100);
         }
 
-        // 3. Handle State Machine (Non-blocking)
-        if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
+        // 3. State Machine
+        if (!ota_active && (xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
-
             switch (protocolState) {
                 case STATE_HANDSHAKE:
-                    // Only send every 1 second
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
-                        printf("UART: Sending Handshake...\n");
                         len = pack_handshake_message(tx_buf);
                         HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                         protocolState = STATE_WAIT_HANDSHAKE_ACK;
                     }
                     break;
-
                 case STATE_WAIT_HANDSHAKE_ACK:
-                    // Retry every 1 second
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
-                        printf("UART: Timeout waiting for ACK, resending handshake...\n");
                         len = pack_handshake_message(tx_buf);
                         HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                     }
                     break;
-
-                case STATE_WAIT_DEVICE_LIST:
-                    // Just wait
-                     break;
-
                 case STATE_POLLING:
                     if (knownDevices.count > 0) {
-                        // Skip if index out of bounds (safety)
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
-
-                        // Only poll if connected
                         if (knownDevices.devices[currentDeviceIndex].connected) {
                             uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
                             len = pack_get_device_status_message(tx_buf, dev_id);
                             HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                         }
-
                         currentDeviceIndex++;
-                        if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
                     }
                     break;
+                default: break;
             }
         }
-
-        vTaskDelay(pdMS_TO_TICKS(5)); // Yield to allow other tasks to run
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }

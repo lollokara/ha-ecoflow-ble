@@ -37,6 +37,10 @@ extern "C" {
 #define CMD_DEVICE_STATUS 0x24       ///< Send Device Telemetry Data
 #define CMD_DEBUG_INFO 0x61          ///< Send Debug Info (IP, uptime)
 
+#define CMD_OTA_START 0xA0           ///< Start OTA Update
+#define CMD_OTA_CHUNK 0xA1           ///< OTA Data Chunk
+#define CMD_OTA_END   0xA2           ///< End OTA Update
+#define CMD_OTA_APPLY 0xA3           ///< Apply OTA Update
 
 // --- F4 -> ESP32 Command IDs ---
 #define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
@@ -47,6 +51,9 @@ extern "C" {
 #define CMD_GET_DEBUG_INFO 0x60      ///< Request Debug Info
 #define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
 #define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
+
+#define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
+#define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge
 
 // --- Control Commands (F4 -> ESP32) ---
 #define CMD_SET_WAVE2 0x30           ///< Control Wave 2 (Temp, Mode)
@@ -281,6 +288,16 @@ typedef struct {
     uint8_t devices_paired;
 } DebugInfo;
 
+// OTA Payload Structures
+typedef struct {
+    uint32_t total_size;
+} OtaStartMsg;
+
+typedef struct {
+    uint32_t offset;
+    // Data follows
+} OtaChunkHeader;
+
 #pragma pack(pop)
 
 // --- API Functions (Serialization/Deserialization) ---
@@ -323,6 +340,11 @@ int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type);
 
 int pack_forget_device_message(uint8_t *buffer, uint8_t device_type);
 int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type);
+
+int pack_ota_start_message(uint8_t *buffer, uint32_t total_size);
+int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len);
+int pack_ota_end_message(uint8_t *buffer);
+int pack_ota_apply_message(uint8_t *buffer);
 
 #ifdef __cplusplus
 }

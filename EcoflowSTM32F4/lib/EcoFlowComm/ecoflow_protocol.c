@@ -289,3 +289,19 @@ int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type) {
     *device_type = buffer[3];
     return 0;
 }
+
+int pack_ota_ack_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_OTA_ACK;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_ota_nack_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_OTA_NACK;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}

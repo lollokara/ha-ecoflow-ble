@@ -12,6 +12,7 @@
 
 #include <Arduino.h>
 #include "ecoflow_protocol.h"
+#include <freertos/semphr.h>
 
 /**
  * @class Stm32Serial
@@ -55,6 +56,17 @@ public:
      */
     void sendDeviceStatus(uint8_t device_id);
 
+    /**
+     * @brief Starts the background OTA task.
+     * @param filename Path to the firmware file in LittleFS.
+     */
+    void startOta(const String& filename);
+
+    bool isOtaInProgress() const { return _otaRunning; }
+
+    // Helper to send raw data safely
+    void sendData(const uint8_t* data, size_t len);
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
@@ -68,11 +80,10 @@ private:
      */
     void processPacket(uint8_t* buf, uint8_t len);
 
-    /**
-     * @brief Helper to calculate brightness (Not currently implemented/used).
-     * @return uint8_t
-     */
-    uint8_t calculateBrightness();
+    static void otaTask(void* parameter);
+
+    bool _otaRunning = false;
+    SemaphoreHandle_t _txMutex = NULL;
 };
 
 #endif

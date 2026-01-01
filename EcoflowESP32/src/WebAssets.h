@@ -255,6 +255,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="ctrl-row"><span>Max Light (ADC): <b id="val-max-adc" style="color:var(--neon-green)">4095</b></span></div>
                 <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
 
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+                <h4 style="color:#fff; margin-bottom: 10px;">Firmware Update</h4>
+
+                <div class="ctrl-row">
+                    <span>Update ESP32</span>
+                    <input type="file" id="file-esp32" style="max-width: 200px;">
+                </div>
+                <button class="btn btn-primary" onclick="uploadFirmware('esp32')" style="width:100%">Flash ESP32</button>
+
+                <div class="ctrl-row" style="margin-top: 15px;">
+                    <span>Update STM32</span>
+                    <input type="file" id="file-stm32" style="max-width: 200px;">
+                </div>
+                <button class="btn btn-primary" onclick="uploadFirmware('stm32')" style="width:100%">Flash STM32</button>
+
+                <div id="ota-status" style="margin-top: 10px; font-size: 0.8em; color: var(--neon-cyan);"></div>
+
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -262,6 +279,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
+        <!-- ... (Rest of HTML) ... -->
         <div id="intro-screen" class="intro hidden">
             <h3 style="color:#fff; margin-bottom: 10px;">Ready to Connect</h3>
             <p style="color:var(--text-sub);">Select a device type from the menu to begin scanning.</p>
@@ -606,6 +624,15 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 el('set-curr-adc').innerText = data.light_adc;
             }
         });
+
+        // Poll OTA Status if working
+        if(isOtaRunning) {
+            fetch(API + '/update/status').then(r=>r.json()).then(s => {
+                const div = el('ota-status');
+                div.innerText = s.msg + (s.progress > 0 ? ` (${s.progress}%)` : '');
+                if(s.state === 0) isOtaRunning = false; // Idle
+            });
+        }
     }
 
     function updateDeviceUI(type, d) {
@@ -795,6 +822,41 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             if(r.ok) closeSettings();
             else alert('Error saving settings');
         });
+    }
+
+    // --- Firmware Update ---
+    let isOtaRunning = false;
+    function uploadFirmware(type) {
+        const fileInput = el('file-' + type);
+        if (!fileInput.files.length) { alert('Please select a file'); return; }
+        const file = fileInput.files[0];
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        el('ota-status').innerText = 'Uploading ' + type + '...';
+        isOtaRunning = true;
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API + '/update/' + type, true);
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                el('ota-status').innerText = 'Uploading: ' + percent + '%';
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                el('ota-status').innerText = 'Upload complete. Flashing...';
+            } else {
+                el('ota-status').innerText = 'Upload failed: ' + xhr.responseText;
+                isOtaRunning = false;
+            }
+        };
+
+        xhr.send(fd);
     }
 
     function toggleW2Power() {

@@ -13,6 +13,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include <WiFi.h>
+#include <LittleFS.h>
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 18 (connected to F4 TX)
@@ -20,12 +21,13 @@
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 39 // Note: This seems to conflict with main.cpp definition (16).
-                           // Leaving as is to preserve functionality, but documenting the discrepancy.
-                           // Actually, main.cpp uses 16. Stm32Serial uses 39. This might be a bug in the code I received,
-                           // but I must not alter functionality.
+#define POWER_LATCH_PIN 39
 
 static const char* TAG = "Stm32Serial";
+
+// Variables for OTA
+static volatile bool otaAckReceived = false;
+static volatile bool otaNackReceived = false;
 
 /**
  * @brief Initializes the UART interface.
@@ -34,6 +36,22 @@ static const char* TAG = "Stm32Serial";
  */
 void Stm32Serial::begin() {
     Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+    if (_txMutex == NULL) {
+        _txMutex = xSemaphoreCreateMutex();
+    }
+}
+
+void Stm32Serial::sendData(const uint8_t* data, size_t len) {
+    if (_txMutex != NULL) {
+        if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            Serial1.write(data, len);
+            xSemaphoreGive(_txMutex);
+        } else {
+            ESP_LOGE(TAG, "Failed to take TX mutex");
+        }
+    } else {
+        Serial1.write(data, len);
+    }
 }
 
 /**
@@ -44,6 +62,9 @@ void Stm32Serial::begin() {
  * a valid packet is received.
  */
 void Stm32Serial::update() {
+    // If OTA is running, we might still receive packets (ACK/NACK)
+    // The OTA task needs to check flags set here.
+
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
@@ -104,8 +125,12 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         // Reply with ACK and then send the device list
         uint8_t ack[4];
         int l = pack_handshake_ack_message(ack);
-        Serial1.write(ack, l);
+        sendData(ack, l);
         sendDeviceList();
+    } else if (cmd == CMD_OTA_ACK) {
+        otaAckReceived = true;
+    } else if (cmd == CMD_OTA_NACK) {
+        otaNackReceived = true;
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
         // STM32 is requesting status for a specific device
         uint8_t dev_id;
@@ -213,7 +238,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
 
         uint8_t buffer[sizeof(DebugInfo) + 4];
         int len = pack_debug_info_message(buffer, &info);
-        Serial1.write(buffer, len);
+        sendData(buffer, len);
     } else if (cmd == CMD_CONNECT_DEVICE) {
         // Initiate BLE scan/connection for a device type
         uint8_t type;
@@ -258,7 +283,7 @@ void Stm32Serial::sendDeviceList() {
 
     uint8_t buffer[sizeof(DeviceList) + 4];
     int len = pack_device_list_message(buffer, &list);
-    Serial1.write(buffer, len);
+    sendData(buffer, len);
 }
 
 /**
@@ -391,5 +416,96 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
 
     uint8_t buffer[sizeof(DeviceStatus) + 4];
     int len = pack_device_status_message(buffer, &status);
-    Serial1.write(buffer, len);
+    sendData(buffer, len);
+}
+
+static String otaFilename;
+
+void Stm32Serial::startOta(const String& filename) {
+    if (_otaRunning) return;
+    otaFilename = filename;
+    _otaRunning = true;
+    xTaskCreate(otaTask, "OtaTask", 4096, this, 1, NULL);
+}
+
+void Stm32Serial::otaTask(void* parameter) {
+    Stm32Serial* self = (Stm32Serial*)parameter;
+
+    // 1. Open File
+    File f = LittleFS.open(otaFilename, "r");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to open firmware file");
+        self->_otaRunning = false;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    uint32_t totalSize = f.size();
+    ESP_LOGI(TAG, "Starting OTA. Size: %d", totalSize);
+
+    // 2. Send Start Command
+    uint8_t buf[256];
+    int len = pack_ota_start_message(buf, totalSize);
+    self->sendData(buf, len);
+
+    // Wait for ACK (longer timeout for erase)
+    otaAckReceived = false;
+    otaNackReceived = false;
+    uint32_t startWait = millis();
+    while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 10000)) { // 10s timeout
+        vTaskDelay(10);
+    }
+
+    if (!otaAckReceived) {
+        ESP_LOGE(TAG, "OTA Start NACK or Timeout");
+        f.close();
+        self->_otaRunning = false;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    // 3. Send Chunks
+    uint32_t offset = 0;
+    uint8_t chunk[200]; // Keep under 255 payload limit
+
+    while (f.available()) {
+        int bytesRead = f.read(chunk, sizeof(chunk));
+
+        len = pack_ota_chunk_message(buf, offset, chunk, bytesRead);
+        self->sendData(buf, len);
+
+        // Wait for ACK
+        otaAckReceived = false;
+        otaNackReceived = false;
+        startWait = millis();
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 1000)) { // 1s timeout
+            vTaskDelay(5);
+        }
+
+        if (!otaAckReceived) {
+            ESP_LOGE(TAG, "OTA Chunk NACK/Timeout at %d", offset);
+            break;
+        }
+
+        offset += bytesRead;
+        // Optional: Report progress globally?
+    }
+
+    f.close();
+
+    if (offset == totalSize) {
+        ESP_LOGI(TAG, "OTA Upload Complete. Sending End...");
+        len = pack_ota_end_message(buf);
+        self->sendData(buf, len);
+        vTaskDelay(500);
+
+        ESP_LOGI(TAG, "Sending Apply...");
+        len = pack_ota_apply_message(buf);
+        self->sendData(buf, len);
+    } else {
+        ESP_LOGE(TAG, "OTA Failed/Incomplete");
+    }
+
+    self->_otaRunning = false;
+    vTaskDelete(NULL);
 }

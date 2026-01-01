@@ -13,7 +13,8 @@ typedef enum {
     DISPLAY_EVENT_UPDATE_TEMP,
     DISPLAY_EVENT_UPDATE_CONNECTION,
     DISPLAY_EVENT_UPDATE_DEBUG,
-    DISPLAY_EVENT_UPDATE_DEVICE_LIST
+    DISPLAY_EVENT_UPDATE_DEVICE_LIST,
+    DISPLAY_EVENT_OTA_PROGRESS
 } DisplayEventType;
 
 typedef struct {
@@ -22,6 +23,7 @@ typedef struct {
         DeviceStatus deviceStatus; // Includes id and BatteryStatus
         DebugInfo debugInfo;
         DeviceList deviceList;
+        uint8_t otaProgress;
     } data;
 } DisplayEvent;
 
