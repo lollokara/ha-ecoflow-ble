@@ -13,6 +13,7 @@ void StartFanTask(void *argument);
 void Fan_GetStatus(FanStatus *status);
 void Fan_SetConfig(const FanConfig *config);
 void Fan_GetConfig(FanConfig *config); // Returns last known config sent or default
+void Fan_RequestConfig(void);
 
 // Helper for IRQ dispatch
 void Fan_UART_RxCpltCallback(UART_HandleTypeDef *huart);

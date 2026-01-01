@@ -207,6 +207,7 @@ void UI_CreateDebugView(void) {
     lv_obj_align(btn_close, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_set_style_bg_color(btn_close, lv_palette_main(LV_PALETTE_RED), 0);
     lv_obj_clear_flag(btn_close, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(btn_close, event_close_debug, LV_EVENT_CLICKED, NULL);
     lv_obj_t * lbl_x = lv_label_create(btn_close);
     lv_label_set_text(lbl_x, "X");
