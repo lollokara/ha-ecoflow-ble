@@ -1,6 +1,7 @@
 #include "lv_port_disp.h"
 #include "stm32469i_discovery_lcd.h"
 #include "stm32469i_discovery_sdram.h"
+#include "stm32f4xx_hal.h"
 
 // Define screen size
 #define DISP_HOR_RES 800
@@ -40,22 +41,11 @@ void lv_port_disp_init(void)
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf_dsc_1;
 
-    // Direct Mode: LVGL renders directly into the frame buffer
-    // disp_drv.direct_mode = 1;
-    // Wait, if we use direct mode, 'flush' doesn't copy, it just swaps.
-    // But BSP_LCD functions expect a specific address.
-    // For now, let's use standard partial/full buffering and copy in flush.
-    // Actually, full double buffering (2 buffers of full screen size) allows direct swap if supported.
-    // BSP_LCD_SetLayerAddress can swap.
-
-    // Let's stick to simple copy first to ensure stability.
-    // Double buffer full screen means flush is called with full area?
-    // If we give 2 buffers of full size, LVGL treats them as "render targets".
-    // Flush just needs to put the content on screen.
-    // If we use "full_refresh = 1", LVGL redraws everything.
-
-    // Optimization: Use partial buffer in internal RAM?
-    // No, F469 has plenty of SDRAM.
+    // Direct Mode: LVGL renders directly into the frame buffer.
+    // Full Refresh: LVGL renders the whole screen, not just dirty areas.
+    // This is required for true double buffering where we swap buffers.
+    disp_drv.direct_mode = 1;
+    disp_drv.full_refresh = 1;
 
     lv_disp_drv_register(&disp_drv);
 }
@@ -68,58 +58,41 @@ static void disp_init(void)
     BSP_LCD_Clear(LCD_COLOR_BLACK);
     BSP_LCD_DisplayOn();
 
-    // Initialize DMA2D once
+    // Initialize DMA2D once (if used by LVGL internally)
     hdma2d_eval.Init.Mode = DMA2D_M2M;
     hdma2d_eval.Init.ColorMode = DMA2D_ARGB8888;
-    hdma2d_eval.Init.OutputOffset = 0; // Will be updated in flush
+    hdma2d_eval.Init.OutputOffset = 0;
     HAL_DMA2D_Init(&hdma2d_eval);
     HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1);
-    hdma2d_eval.LayerCfg[1].InputOffset = 0;
-    hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
 }
 
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    // Use DMA2D to copy from buffer to active LCD Framebuffer
-    uint32_t dest_addr = hltdc_eval.LayerCfg[0].FBStartAdress;
-
-    // Calculate destination address
-    uint32_t dest_address = dest_addr + 4 * (area->y1 * DISP_HOR_RES + area->x1);
-
-    // Width: area->x2 - area->x1 + 1
-    // Height: area->y2 - area->y1 + 1
-    uint32_t width = area->x2 - area->x1 + 1;
-    uint32_t height = area->y2 - area->y1 + 1;
-    uint32_t offLine = DISP_HOR_RES - width;
-
-    // Update OutputOffset
-    hdma2d_eval.Init.OutputOffset = offLine;
-    // We must re-init/config if we change Init structure?
-    // HAL_DMA2D_Init calls HAL_DMA2D_MspInit.
-    // To be safe and fast, we can access registers directly or use HAL_DMA2D_Init.
-    // But since we want to avoid re-init overhead, let's write the register.
-    // hdma2d_eval.Instance->OOR = offLine;
-
-    // However, for stability, let's stick to HAL but skip full MSP init if possible.
-    // Re-calling Init is safer than direct register access if we don't know the state machine.
-    // Optimization: Just call Init, assuming it's fast enough if MSP is already done.
-    // Actually, the main issue might be re-entrancy or state.
-
-    // Let's try minimal reconfiguration.
-    HAL_DMA2D_Init(&hdma2d_eval);
-    // Note: ConfigLayer is needed for layer 1 (foreground/source)?
-    // Yes, but we set it in disp_init. Does Init reset it? Yes, Init resets handle state.
-
-    // Let's stick to the safe path but move big init out if possible.
-    // If Init is required to change OutputOffset via HAL, we must do it.
-    // BUT, we can simplify the flush function.
-
-    if (HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) == HAL_OK)
+    // With direct_mode, we swap the frame buffer address when the frame is complete
+    if (lv_disp_flush_is_last(disp_drv))
     {
-         if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
-         {
-             HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
-         }
+        // Update LTDC Layer 1 Address to the new buffer (which is color_p)
+        // We use direct register access to avoid HAL overhead and ensure we control the reload type.
+        // LTDC_Layer1 corresponds to Layer Index 0 in BSP.
+        LTDC_Layer1->CFBAR = (uint32_t)color_p;
+
+        // Also update the handle state so HAL functions don't get out of sync if used later
+        hltdc_eval.LayerCfg[0].FBStartAdress = (uint32_t)color_p;
+
+        // Trigger Reload on Vertical Blanking (VBR)
+        // Note: HAL_LTDC_Reload usually sets IMR (Immediate). We want VBR.
+        // SRCR register: Bit 1 = VBR, Bit 0 = IMR.
+        hltdc_eval.Instance->SRCR = LTDC_SRCR_VBR;
+
+        // Wait for VSYNC (Reload to take effect)
+        // This ensures we don't start drawing the next frame into the buffer
+        // that is still being displayed (until VSYNC happens).
+        // The VBR bit is cleared by hardware when the reload occurs.
+        uint32_t tickstart = HAL_GetTick();
+        while((hltdc_eval.Instance->SRCR & LTDC_SRCR_VBR) != 0)
+        {
+            if((HAL_GetTick() - tickstart) > 50) break; // Timeout 50ms
+        }
     }
 
     lv_disp_flush_ready(disp_drv);
