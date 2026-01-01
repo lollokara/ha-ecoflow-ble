@@ -255,6 +255,37 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="ctrl-row"><span>Max Light (ADC): <b id="val-max-adc" style="color:var(--neon-green)">4095</b></span></div>
                 <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
 
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+
+                <h4 style="margin: 0 0 10px 0; color: #fff;">System Update</h4>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                    <div class="ctrl-row" style="margin-bottom: 5px;">
+                        <span>Update ESP32</span>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="file" id="fw-esp" accept=".bin" style="width: 100%; font-size: 0.8em; color: #aaa;">
+                    </div>
+                    <div style="margin-top:5px; height: 5px; background: #333; border-radius: 3px; overflow: hidden;">
+                        <div id="prog-esp" style="width: 0%; height: 100%; background: var(--neon-cyan); transition: width 0.2s;"></div>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 5px; font-size: 0.85em;" onclick="updateFirmware('esp')">Flash ESP32</button>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                    <div class="ctrl-row" style="margin-bottom: 5px;">
+                        <span>Update STM32 (Display)</span>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="file" id="fw-stm" accept=".bin" style="width: 100%; font-size: 0.8em; color: #aaa;">
+                    </div>
+                    <div style="margin-top:5px; height: 5px; background: #333; border-radius: 3px; overflow: hidden;">
+                        <div id="prog-stm" style="width: 0%; height: 100%; background: var(--neon-pink); transition: width 0.2s;"></div>
+                    </div>
+                    <div id="stat-stm" style="font-size: 0.75em; color: #aaa; text-align: right; margin-top: 2px;">Idle</div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 5px; font-size: 0.85em;" onclick="updateFirmware('stm')">Flash STM32</button>
+                </div>
+
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -795,6 +826,67 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             if(r.ok) closeSettings();
             else alert('Error saving settings');
         });
+    }
+
+    function updateFirmware(target) {
+        const input = el(target === 'esp' ? 'fw-esp' : 'fw-stm');
+        const prog = el(target === 'esp' ? 'prog-esp' : 'prog-stm');
+        const file = input.files[0];
+
+        if (!file) { alert('Please select a file first.'); return; }
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', target === 'esp' ? '/update/esp' : '/update/stm32', true);
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                prog.style.width = percent + '%';
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                if (target === 'esp') {
+                    alert('ESP32 Update Success! Rebooting...');
+                    location.reload();
+                } else {
+                    // STM32 Upload done, now polling for Flash status
+                    pollStmUpdate();
+                }
+            } else {
+                alert('Update Failed: ' + xhr.responseText);
+            }
+        };
+
+        xhr.send(fd);
+    }
+
+    function pollStmUpdate() {
+        const prog = el('prog-stm');
+        const stat = el('stat-stm');
+        prog.style.width = '100%'; // Upload done
+        prog.classList.add('stripes'); // Animate
+
+        const iv = setInterval(() => {
+            fetch(API + '/ota_status').then(r => r.json()).then(d => {
+                stat.innerText = d.msg;
+                if (d.progress >= 0) prog.style.width = d.progress + '%';
+
+                if (d.state === 3) { // Done
+                    clearInterval(iv);
+                    alert('STM32 Update Completed Successfully!');
+                    stat.innerText = 'Completed';
+                } else if (d.state === 4) { // Error
+                    clearInterval(iv);
+                    alert('STM32 Update Failed: ' + d.msg);
+                    stat.innerText = 'Failed';
+                }
+            });
+        }, 1000);
     }
 
     function toggleW2Power() {

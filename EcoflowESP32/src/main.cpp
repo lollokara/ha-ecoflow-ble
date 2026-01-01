@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <LittleFS.h>
 #include "EcoflowESP32.h"
 #include "Credentials.h"
 #include "DeviceManager.h"
@@ -71,6 +72,11 @@ void setup() {
 
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();
+
+    // Initialize File System
+    if(!LittleFS.begin(true)){
+        Serial.println("LittleFS Mount Failed");
+    }
 
     // Initialize the Device Manager to handle BLE connections
     DeviceManager::getInstance().initialize();

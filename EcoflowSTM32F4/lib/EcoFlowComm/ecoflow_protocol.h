@@ -55,6 +55,14 @@ extern "C" {
 #define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
 #define CMD_POWER_OFF 0x50           ///< Trigger System Power Off
 
+// --- OTA Commands (ESP32 <-> F4) ---
+#define CMD_OTA_START 0xA0           ///< Start OTA [Len(4), CRC32(4)]
+#define CMD_OTA_CHUNK 0xA1           ///< Data Chunk [Offset(4), Data(N)]
+#define CMD_OTA_END 0xA2             ///< End OTA
+#define CMD_OTA_APPLY 0xA3           ///< Apply Update & Reboot
+#define CMD_OTA_ACK 0x06             ///< Chunk Acknowledged
+#define CMD_OTA_NACK 0x15            ///< Chunk Failed (Retry)
+
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
 #define W2_PARAM_MODE 2

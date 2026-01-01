@@ -11,7 +11,23 @@
  */
 
 #include <Arduino.h>
+#include <LittleFS.h>
 #include "ecoflow_protocol.h"
+
+// OTA State Machine
+enum class OTAState {
+    IDLE = 0,
+    STARTING = 1,
+    SENDING = 2,
+    VERIFYING = 3,
+    ERROR = 4
+};
+
+struct OTAStatus {
+    OTAState state;
+    int progress;
+    String message;
+};
 
 /**
  * @class Stm32Serial
@@ -55,11 +71,24 @@ public:
      */
     void sendDeviceStatus(uint8_t device_id);
 
+    // OTA Methods
+    void startOTA(String filename, size_t size);
+    OTAStatus getOTAStatus();
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
      */
     Stm32Serial() {}
+
+    // OTA Variables
+    OTAState _otaState = OTAState::IDLE;
+    String _otaFilename;
+    size_t _otaSize;
+    size_t _otaOffset;
+    File _otaFile;
+    uint32_t _otaLastPacketTime = 0;
+    String _otaError;
 
     /**
      * @brief Processes a fully received and validated packet.
