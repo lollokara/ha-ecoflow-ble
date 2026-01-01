@@ -746,6 +746,8 @@ static void create_dashboard(void) {
     label_grid_val = card_grid.value;
     create_info_card(scr_dash, MDI_ICON_CAR, "Car", 20, 260, &card_car);
     label_car_val = card_car.value;
+    lv_obj_add_flag(card_car.card, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(card_car.card, event_car_tile_click, LV_EVENT_CLICKED, NULL);
 
     // --- Right Column (Outputs) ---
     create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &card_usb);
