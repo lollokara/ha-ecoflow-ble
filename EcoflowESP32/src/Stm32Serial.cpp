@@ -393,3 +393,31 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     int len = pack_device_status_message(buffer, &status);
     Serial1.write(buffer, len);
 }
+
+/**
+ * @brief Sends a raw packet with a specific command ID and payload.
+ * Used for custom protocols like OTA.
+ * @param cmd_id The command ID.
+ * @param payload The payload data.
+ */
+void Stm32Serial::sendRaw(uint8_t cmd_id, const std::vector<uint8_t>& payload) {
+    // Protocol V1/Custom Format:
+    // [START(0xAA)][CMD][LEN][PAYLOAD...][CRC]
+
+    std::vector<uint8_t> packet;
+    packet.push_back(START_BYTE);
+    packet.push_back(cmd_id);
+    packet.push_back((uint8_t)payload.size()); // Max 255 bytes
+
+    for (uint8_t b : payload) {
+        packet.push_back(b);
+    }
+
+    // Calculate CRC8 over [CMD][LEN][PAYLOAD]
+    // The calculate_crc8 helper expects pointer to start of data (CMD) and length
+    // packet[1] is CMD.
+    uint8_t crc = calculate_crc8(&packet[1], packet.size() - 1);
+    packet.push_back(crc);
+
+    Serial1.write(packet.data(), packet.size());
+}

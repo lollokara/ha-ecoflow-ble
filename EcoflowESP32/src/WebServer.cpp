@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include "OtaManager.h"
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
@@ -81,6 +82,28 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // OTA Endpoints
+    server.on("/api/ota/esp", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200);
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+        OtaManager::getInstance().handleESP32Upload(request, filename, index, data, len, final);
+    });
+
+    server.on("/api/ota/stm", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200);
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+        OtaManager::getInstance().handleSTM32Upload(request, filename, index, data, len, final);
+    });
+
+    server.on("/api/ota/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        DynamicJsonDocument doc(256);
+        doc["msg"] = OtaManager::getInstance().getSTM32Status();
+        doc["progress"] = OtaManager::getInstance().getSTM32Progress();
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
