@@ -151,5 +151,6 @@ Detailed references for the specific data fields exposed by each supported devic
 *   **[>> ACCESS DELTA 3 DATA MAP](device_reference/Delta_3.md)**
 *   **[>> ACCESS WAVE 2 DATA MAP](device_reference/Wave_2.md)**
 *   **[>> ACCESS DELTA PRO 3 DATA MAP](device_reference/Delta_Pro_3.md)**
+*   **[>> ACCESS ALTERNATOR CHARGER DATA MAP](device_reference/Alternator_Charger.md)**
 
 > *Authorized Personnel Only.*
