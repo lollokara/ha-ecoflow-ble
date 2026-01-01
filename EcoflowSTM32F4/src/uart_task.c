@@ -5,11 +5,13 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "ota/ota_core.h"
 
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 1024
+// Increased size for OTA chunks
+#define RING_BUFFER_SIZE 2048
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -140,6 +142,11 @@ static void UART_Init(void) {
 }
 
 static void process_packet(uint8_t *packet, uint16_t total_len) {
+    // Check OTA first
+    if (OTA_ProcessPacket(packet, total_len)) {
+        return;
+    }
+
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
 

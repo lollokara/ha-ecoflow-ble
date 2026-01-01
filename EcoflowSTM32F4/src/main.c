@@ -19,6 +19,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "ota/ota_core.h"
 #include <stdio.h>
 
 // External Handles
@@ -285,6 +286,9 @@ int main(void) {
         printf("Display Queue Creation Failed!\n");
         while(1);
     }
+
+    // Initialize OTA
+    OTA_Init();
 
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);

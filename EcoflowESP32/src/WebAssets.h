@@ -255,6 +255,32 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="ctrl-row"><span>Max Light (ADC): <b id="val-max-adc" style="color:var(--neon-green)">4095</b></span></div>
                 <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
 
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+                <h4 style="margin: 10px 0; color:#fff;">Firmware Update</h4>
+
+                <div class="ctrl-row">
+                    <span>ESP32 Firmware</span>
+                    <input type="file" id="fw-esp" accept=".bin" style="width: 180px; font-size: 0.8em;">
+                </div>
+                <div class="ctrl-row" style="justify-content: flex-end;">
+                     <button class="btn btn-primary" onclick="uploadEsp()" id="btn-up-esp">Update ESP32</button>
+                </div>
+
+                <div class="ctrl-row" style="margin-top:10px">
+                    <span>STM32 Firmware</span>
+                    <input type="file" id="fw-stm" accept=".bin" style="width: 180px; font-size: 0.8em;">
+                </div>
+                <div class="ctrl-row" style="justify-content: flex-end;">
+                     <button class="btn btn-primary" onclick="uploadStm()" id="btn-up-stm">Update STM32</button>
+                </div>
+
+                <div id="up-progress-box" class="hidden" style="margin-top:10px;">
+                    <div style="background:#333; height:10px; border-radius:5px; overflow:hidden;">
+                        <div id="up-progress-bar" style="width:0%; height:100%; background:var(--neon-green); transition:width 0.2s;"></div>
+                    </div>
+                    <div style="text-align:center; font-size:0.8em; color:#aaa; margin-top:5px;" id="up-status">Starting...</div>
+                </div>
+
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -795,6 +821,61 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             if(r.ok) closeSettings();
             else alert('Error saving settings');
         });
+    }
+
+    function uploadEsp() { uploadFw('fw-esp', '/update/esp'); }
+    function uploadStm() { uploadFw('fw-stm', '/update/stm'); }
+
+    function uploadFw(inputId, endpoint) {
+        const fileInput = el(inputId);
+        if(!fileInput.files.length) return alert('Select a file first');
+        const file = fileInput.files[0];
+
+        const box = el('up-progress-box');
+        const bar = el('up-progress-bar');
+        const status = el('up-status');
+        box.classList.remove('hidden');
+        bar.style.width = '0%';
+        status.innerText = 'Uploading...';
+
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                bar.style.width = percent + '%';
+            }
+        };
+        xhr.onload = () => {
+             if(xhr.status === 200) {
+                 if(endpoint.includes('stm')) {
+                     status.innerText = 'Flashing STM32...';
+                     pollOtaStatus();
+                 } else {
+                     status.innerText = 'Done! Rebooting...';
+                     setTimeout(() => location.reload(), 5000);
+                 }
+             } else {
+                 status.innerText = 'Failed: ' + xhr.statusText;
+             }
+        };
+        xhr.onerror = () => { status.innerText = 'Upload Error'; };
+
+        const fd = new FormData();
+        fd.append("firmware", file);
+        xhr.open("POST", API + endpoint, true);
+        xhr.send(fd);
+    }
+
+    function pollOtaStatus() {
+        const intv = setInterval(() => {
+            fetch(API + '/update/status').then(r=>r.json()).then(d => {
+                el('up-status').innerText = d.status;
+                el('up-progress-bar').style.width = d.progress + '%';
+                if(d.status === 'Success' || d.status.startsWith('Failed')) {
+                    clearInterval(intv);
+                }
+            }).catch(() => clearInterval(intv));
+        }, 1000);
     }
 
     function toggleW2Power() {

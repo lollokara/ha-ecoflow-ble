@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include <Update.h>
+#include "OtaManager.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -81,6 +83,79 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // Firmware Update Handlers
+    server.on("/api/update/esp", HTTP_POST, [](AsyncWebServerRequest *request){
+        bool shouldReboot = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
+        response->addHeader("Connection", "close");
+        request->send(response);
+        if (shouldReboot) {
+            delay(100);
+            ESP.restart();
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (!index) {
+            ESP_LOGI(TAG, "Update Start: %s", filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                Update.printError(Serial);
+            }
+        }
+        if (Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        if (final) {
+            if (Update.end(true)) {
+                ESP_LOGI(TAG, "Update Success: %uB", index+len);
+            } else {
+                Update.printError(Serial);
+            }
+        }
+    });
+
+    server.on("/api/update/stm", HTTP_POST, [](AsyncWebServerRequest *request){
+         if (OtaManager::getInstance().isUpdating()) {
+             // If OTA still running (streaming), we tell client we are busy
+             // Or if it was just download, we say OK.
+             // The upload handler finishes download, then streaming starts.
+             // So this response is sent after download complete.
+             request->send(200, "text/plain", "OK");
+         } else {
+             request->send(400, "text/plain", "Failed");
+         }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (!index) {
+             ESP_LOGI(TAG, "STM32 Update Start: %s", filename.c_str());
+             // We don't know total size easily here in AsyncWebServer unless we check headers.
+             // But we can just open file.
+             // Assuming total size is in header "Content-Length" but it includes multipart overhead.
+             // Let's just start writing. OtaManager::beginStm32Ota expects a size mostly for progress calc.
+             // We can update size later or estimate.
+             // Actually, request->contentLength() might work.
+             if (!OtaManager::getInstance().beginStm32Ota(request->contentLength())) {
+                 request->send(500, "text/plain", "Failed to start");
+             }
+        }
+        if (!OtaManager::getInstance().writeStm32Data(data, len)) {
+             ESP_LOGE(TAG, "STM32 Write Failed");
+        }
+        if (final) {
+             if (OtaManager::getInstance().endStm32Ota()) {
+                 ESP_LOGI(TAG, "STM32 Download Success");
+             } else {
+                 ESP_LOGE(TAG, "STM32 End Failed");
+             }
+        }
+    });
+
+    server.on("/api/update/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        DynamicJsonDocument doc(200);
+        doc["status"] = OtaManager::getInstance().getStatus();
+        doc["progress"] = OtaManager::getInstance().getProgress();
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {

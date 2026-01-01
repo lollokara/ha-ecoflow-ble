@@ -13,6 +13,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include <WiFi.h>
+#include "OtaManager.h"
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 18 (connected to F4 TX)
@@ -106,6 +107,17 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         int l = pack_handshake_ack_message(ack);
         Serial1.write(ack, l);
         sendDeviceList();
+    } else if (cmd == CMD_OTA_ACK) {
+        // Handle OTA ACK
+        // Payload: [CMD_ID_ACKED]
+        if (len >= 5) {
+            OtaManager::getInstance().onAck(rx_buf[3]);
+        }
+    } else if (cmd == CMD_OTA_NACK) {
+        // Handle OTA NACK
+         if (len >= 5) {
+            OtaManager::getInstance().onNack(rx_buf[3]);
+        }
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
         // STM32 is requesting status for a specific device
         uint8_t dev_id;
