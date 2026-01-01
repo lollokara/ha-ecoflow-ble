@@ -32,6 +32,10 @@ private:
     static void handleSettings(AsyncWebServerRequest *request);
     static void handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
+    // OTA Handlers
+    static void handleUpdateSTM32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+    static void handleUpdateESP32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+
     // Log Handlers
     static void handleLogs(AsyncWebServerRequest *request);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);

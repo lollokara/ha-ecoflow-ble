@@ -19,6 +19,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "ota/ota_core.h"
 #include <stdio.h>
 
 // External Handles
@@ -271,11 +272,17 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
+    // Set Vector Table Offset for APP A
+    SCB->VTOR = 0x08008000;
+
     HAL_Init();
     SystemClock_Config();
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
+
+    // Initialize OTA Core
+    OtaCore_Init();
     MX_TIM2_Init();
     MX_IWDG_Init();
 

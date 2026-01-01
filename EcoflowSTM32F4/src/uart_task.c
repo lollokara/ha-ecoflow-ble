@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "ota/ota_core.h"
 
 UART_HandleTypeDef huart6;
 
@@ -194,6 +195,14 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             memcpy(&event.data.debugInfo, &info, sizeof(DebugInfo));
             xQueueSend(displayQueue, &event, 0);
         }
+    }
+    // Handle OTA commands directly
+    else if (cmd == 0xF0 || cmd == 0xF1 || cmd == 0xF2) {
+        // packet[0] = Start, [1] = Cmd, [2] = Len
+        // Payload starts at packet[3]
+        uint8_t *payload = &packet[3];
+        uint32_t len = packet[2];
+        OtaCore_HandleCmd(cmd, payload, len);
     }
 }
 
