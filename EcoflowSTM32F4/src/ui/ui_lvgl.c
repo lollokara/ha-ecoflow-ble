@@ -1123,7 +1123,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (fanStatus.connected) {
          if (blink_toggle) lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
-         else lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_lighten(LV_PALETTE_BLUE, 2), 0);
+         else lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
     }
 
     if (!dev) return;
