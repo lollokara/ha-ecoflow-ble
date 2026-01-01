@@ -20,6 +20,7 @@
 #include "uart_task.h"
 #include "fan_task.h"
 #include <stdio.h>
+#include "flash_ops.h"
 
 // External Handles
 extern UART_HandleTypeDef huart6;
@@ -276,6 +277,10 @@ int main(void) {
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
+
+    // Ensure we are in Dual Bank Mode (Triggers Reset if not)
+    Flash_EnsureDualBank();
+
     MX_TIM2_Init();
     MX_IWDG_Init();
 

@@ -88,6 +88,39 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
     return 0;
 }
 
+void Flash_EnsureDualBank(void) {
+    FLASH_OBProgramInitTypeDef OBInit;
+
+    // Unlock OB
+    HAL_FLASH_OB_Unlock();
+    OBInit.OptionType = OPTIONBYTE_USER;
+    HAL_FLASHEx_OBGetConfig(&OBInit);
+
+    if ((OBInit.USERConfig & FLASH_OPTCR_DB1M) == 0) {
+        printf("Flash_Ops: Single Bank Mode Detected. Switching to Dual Bank (Mass Erase imminent)...\n");
+
+        OBInit.OptionType = OPTIONBYTE_USER;
+        OBInit.USERConfig |= FLASH_OPTCR_DB1M;
+
+        // Ensure BFB2 is OFF initially when switching modes
+        OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
+
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                               FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+
+        if(HAL_FLASHEx_OBProgram(&OBInit) != HAL_OK) {
+            printf("Flash_Ops: Failed to set DB1M! Error: %lu\n", HAL_FLASH_GetError());
+        } else {
+            printf("Flash_Ops: DB1M Set. Launching Reset...\n");
+            __disable_irq();
+            HAL_FLASH_OB_Launch();
+        }
+    } else {
+        // printf("Flash_Ops: Dual Bank Mode Active.\n");
+    }
+    HAL_FLASH_OB_Lock();
+}
+
 void Flash_SwapBank(void) {
     FLASH_OBProgramInitTypeDef OBInit;
 
@@ -96,20 +129,6 @@ void Flash_SwapBank(void) {
 
     OBInit.OptionType = OPTIONBYTE_USER;
     HAL_FLASHEx_OBGetConfig(&OBInit);
-
-    // Ensure OptionType is set correctly for Program call
-    OBInit.OptionType = OPTIONBYTE_USER;
-
-    // Check Dual Bank Mode (DB1M)
-    // On STM32F469, bit 30 of OPTCR is DB1M.
-    // If 0: Single Bank (2MB contiguous). BFB2 is ignored.
-    // If 1: Dual Bank (1MB + 1MB). BFB2 selects bank.
-    // We MUST ensure DB1M is 1.
-
-    if ((OBInit.USERConfig & FLASH_OPTCR_DB1M) == 0) {
-        printf("Flash_SwapBank: DB1M is 0 (Single Bank). Enabling Dual Bank Mode...\n");
-        OBInit.USERConfig |= FLASH_OPTCR_DB1M;
-    }
 
     // Toggle BFB2
     if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
