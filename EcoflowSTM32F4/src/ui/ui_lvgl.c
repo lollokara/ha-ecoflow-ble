@@ -711,6 +711,10 @@ static void event_alt_mode_click(lv_event_t * e) {
     UART_SendSetValue(SET_VAL_ALT_MODE, mode);
 }
 
+static void event_consume(lv_event_t * e) {
+    // Consume click to prevent propagation
+}
+
 // Helper to open popup
 static void UI_ShowAltChargerPopup(void) {
     if (!cont_popup_alt) {
@@ -729,7 +733,8 @@ static void UI_ShowAltChargerPopup(void) {
         lv_obj_add_style(panel, &style_panel, 0);
         lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
         // Stop click propagation so panel clicks don't close popup
-        lv_obj_add_event_cb(panel, NULL, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(panel, event_consume, LV_EVENT_CLICKED, NULL);
 
         // Header Switch
         lv_obj_t * sw_master = lv_switch_create(panel);
@@ -754,7 +759,7 @@ static void UI_ShowAltChargerPopup(void) {
 
         // Mode 1: Charging (Driving)
         lv_obj_t * btn1 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn1, 140, 140);
+        lv_obj_set_size(btn1, 100, 100);
         lv_obj_add_style(btn1, &style_btn_default, 0);
         lv_obj_add_style(btn1, &style_btn_green, LV_STATE_CHECKED); // Use Green style for checked/active
         lv_obj_add_event_cb(btn1, event_alt_mode_click, LV_EVENT_CLICKED, (void*)1); // Mode 1
@@ -772,7 +777,7 @@ static void UI_ShowAltChargerPopup(void) {
         // Memory said: 0=Idle, 1=Driving, 2=Maintenance, 3=Parking/Reverse
         // User text: Ric. Van (Reverse Charging) -> Mode 3
         lv_obj_t * btn2 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn2, 140, 140);
+        lv_obj_set_size(btn2, 100, 100);
         lv_obj_add_style(btn2, &style_btn_default, 0);
         lv_obj_add_style(btn2, &style_btn_green, LV_STATE_CHECKED);
         lv_obj_add_event_cb(btn2, event_alt_mode_click, LV_EVENT_CLICKED, (void*)3); // Mode 3
@@ -788,7 +793,7 @@ static void UI_ShowAltChargerPopup(void) {
 
         // Mode 2: Maintenance
         lv_obj_t * btn3 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn3, 140, 140);
+        lv_obj_set_size(btn3, 100, 100);
         lv_obj_add_style(btn3, &style_btn_default, 0);
         lv_obj_add_style(btn3, &style_btn_green, LV_STATE_CHECKED);
         lv_obj_add_event_cb(btn3, event_alt_mode_click, LV_EVENT_CLICKED, (void*)2); // Mode 2
