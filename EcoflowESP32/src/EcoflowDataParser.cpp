@@ -73,9 +73,10 @@ static void logWave2Data(const Wave2Data& w) {
 
 static void logDeltaPro3Data(const DeltaPro3Data& d) {
     ESP_LOGI(TAG, "=== Delta Pro 3 Data ===");
-    ESP_LOGI(TAG, "Batt: %.1f%%, Backup: %d (Lvl: %d%%)", d.batteryLevel, d.energyBackup, d.energyBackupBatteryLevel);
+    ESP_LOGI(TAG, "Batt: %.1f%% (Main: %.1f%%), Backup: %d (Lvl: %d%%)", d.batteryLevel, d.batteryLevelMain, d.energyBackup, d.energyBackupBatteryLevel);
     ESP_LOGI(TAG, "AC: In=%.1fW, Out LV=%.1fW, Out HV=%.1fW", d.inputPower, d.acLvOutputPower, d.acHvOutputPower);
     ESP_LOGI(TAG, "DC: 12V=%.1fW, Solar LV=%.1fW, Solar HV=%.1fW", d.dc12vOutputPower, d.solarLvPower, d.solarHvPower);
+    ESP_LOGI(TAG, "USB: A=%.1fW/%.1fW, C=%.1fW/%.1fW", d.usbaOutputPower, d.usba2OutputPower, d.usbcOutputPower, d.usbc2OutputPower);
     ESP_LOGI(TAG, "Limits: AC Chg=%dW, SOC %d-%d%%", d.acChargingSpeed, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
     ESP_LOGI(TAG, "State: AC LV=%d, AC HV=%d, DC=%d, GFI=%d", d.acLvPort, d.acHvPort, d.dc12vPort, d.gfiMode);
 }
@@ -179,6 +180,11 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
                      if (mr521_msg.has_plug_in_info_pv_l_type) d3p.dcLvInputState = mr521_msg.plug_in_info_pv_l_type;
                      if (mr521_msg.has_plug_in_info_pv_h_type) d3p.dcHvInputState = mr521_msg.plug_in_info_pv_h_type;
+
+                     if (mr521_msg.has_pow_get_qcusb1) d3p.usbaOutputPower = -std::abs(mr521_msg.pow_get_qcusb1);
+                     if (mr521_msg.has_pow_get_qcusb2) d3p.usba2OutputPower = -std::abs(mr521_msg.pow_get_qcusb2);
+                     if (mr521_msg.has_pow_get_typec1) d3p.usbcOutputPower = -std::abs(mr521_msg.pow_get_typec1);
+                     if (mr521_msg.has_pow_get_typec2) d3p.usbc2OutputPower = -std::abs(mr521_msg.pow_get_typec2);
 
                      if (mr521_msg.has_plug_in_info_ac_in_chg_pow_max) d3p.acChargingSpeed = mr521_msg.plug_in_info_ac_in_chg_pow_max;
                      if (mr521_msg.has_plug_in_info_ac_in_chg_hal_pow_max) d3p.maxAcChargingPower = mr521_msg.plug_in_info_ac_in_chg_hal_pow_max;
