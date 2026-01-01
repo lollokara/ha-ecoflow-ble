@@ -54,6 +54,28 @@ static void cmd_println(const char* s) {
     cmd_printf("%s\n", s);
 }
 
+// Wrapper class to redirect Print output to cmd_printf (and thus LogBuffer)
+class LogPrinter : public Print {
+    String buffer;
+public:
+    size_t write(uint8_t c) override {
+        if (c == '\n') {
+            cmd_printf("%s\n", buffer.c_str());
+            buffer = "";
+        } else {
+            buffer += (char)c;
+        }
+        return 1;
+    }
+
+    size_t write(const uint8_t *buffer, size_t size) override {
+        for(size_t i=0; i<size; i++) {
+            write(buffer[i]);
+        }
+        return size;
+    }
+};
+
 
 // Helper to read internal temperature safely
 static float readInternalTemp() {
@@ -248,28 +270,9 @@ void CmdUtils::handleConCommand(String cmd, String args) {
     DeviceManager& dm = DeviceManager::getInstance();
 
     if (cmd.equalsIgnoreCase("con_status")) {
-        // DeviceManager::printStatus uses Serial internally.
-        // We should update DeviceManager or redirect it.
-        // Since DeviceManager is separate, we can't easily redirect without modifying it.
-        // However, the user only complained about "help" and commands sent from CLI.
-        // Let's assume DeviceManager output is less critical or we'll fix it later if needed.
-        // Actually, it's better to replicate printStatus here using cmd_printf
-        // OR modify DeviceManager to take a Stream or use ESP_LOG.
-        // For now, let's manually print status here.
-
-        cmd_println("=== Device Connection Status ===");
-        auto printSlot = [](DeviceSlot* slot) {
-            cmd_printf("[%s] %s (%s): %s\n",
-                slot->name.c_str(),
-                slot->isConnected ? "CONNECTED" : "DISCONNECTED",
-                slot->macAddress.empty() ? "Unpaired" : slot->macAddress.c_str(),
-                slot->serialNumber.c_str()
-            );
-        };
-        printSlot(dm.getSlot(DeviceType::DELTA_3));
-        printSlot(dm.getSlot(DeviceType::WAVE_2));
-        printSlot(dm.getSlot(DeviceType::DELTA_PRO_3));
-        printSlot(dm.getSlot(DeviceType::ALTERNATOR_CHARGER));
+        // Use LogPrinter to redirect DeviceManager output to CLI/Logs
+        LogPrinter printer;
+        dm.printStatus(printer);
         return;
     }
 

@@ -87,7 +87,7 @@ public:
     bool isAnyConnecting();
 
     // --- Management Commands ---
-    void printStatus();
+    void printStatus(Print& out);
     void forget(DeviceType type);
     String getDeviceStatusJson();
 

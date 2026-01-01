@@ -186,11 +186,11 @@ bool DeviceManager::isAnyConnecting() {
 //--- Management Commands
 //--------------------------------------------------------------------------
 
-void DeviceManager::printStatus() {
-    Serial.println("=== Device Connection Status ===");
+void DeviceManager::printStatus(Print& out) {
+    out.println("=== Device Connection Status ===");
 
-    auto printSlot = [](DeviceSlot& slot) {
-        Serial.printf("[%s] %s (%s): %s\n",
+    auto printSlot = [&](DeviceSlot& slot) {
+        out.printf("[%s] %s (%s): %s\n",
             slot.name.c_str(),
             slot.isConnected ? "CONNECTED" : "DISCONNECTED",
             slot.macAddress.empty() ? "Unpaired" : slot.macAddress.c_str(),
