@@ -109,4 +109,47 @@ graph LR
 *   **Floating Point**: Transmitted as standard IEEE 754 4-byte floats.
 *   **Safety**: The ESP32 sanitizes all floats (checking for `NaN`/`Inf`) before sending to STM32 to prevent FPU faults.
 
+---
+
+## ≡ PART 3: V2 BINARY PROTOCOL (WAVE 2)
+
+Legacy devices like the Wave 2 use a simpler, structure-based binary protocol over BLE instead of Protobuf. The ESP32 handles the translation seamlessly.
+
+### PACKET FORMAT
+V2 packets are encapsulated similarly to V3 but lack the complex headers and encryption for some commands.
+
+| Byte | Field | Description |
+| :--- | :--- | :--- |
+| 0x00 | **START** | Fixed `0xAA`. |
+| 0x01 | **VER** | Version `0x02`. |
+| 0x02 | **LEN_L** | Length Low Byte. |
+| 0x03 | **LEN_H** | Length High Byte. |
+| 0x04 | **CRC8** | Header Checksum. |
+| 0x05 | **PROD** | Product ID. |
+| 0x06-09 | **SEQ** | Sequence Number (4 bytes). |
+| 0x0A-0B | **RES** | Reserved (Zeroes). |
+| 0x0C | **SRC** | Source ID. |
+| 0x0D | **DEST** | Destination ID. |
+| 0x0E | **CMD_SET** | Command Set ID. |
+| 0x0F | **CMD_ID** | Command ID. |
+| ... | **PAYLOAD**| The packed struct data. |
+| END-2| **CRC16_L**| Payload Checksum Low. |
+| END-1| **CRC16_H**| Payload Checksum High. |
+
+### DATA PARSING
+The payload is a direct C-style struct memory dump.
+*   **Endianness**: Little-Endian.
+*   **Alignment**: Packed (1-byte alignment).
+*   **Parsing Strategy**: The `EcoflowDataParser::parsePacket` function casts the byte array directly into a `Wave2DataStruct` after endian swapping where necessary.
+
+---
+
+## ≡ PART 4: DEVICE DATA MAPS
+
+Detailed references for the specific data fields exposed by each supported device type.
+
+*   **[>> ACCESS DELTA 3 DATA MAP](device_reference/Delta_3.md)**
+*   **[>> ACCESS WAVE 2 DATA MAP](device_reference/Wave_2.md)**
+*   **[>> ACCESS DELTA PRO 3 DATA MAP](device_reference/Delta_Pro_3.md)**
+
 > *Authorized Personnel Only.*
