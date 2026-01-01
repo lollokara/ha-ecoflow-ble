@@ -36,6 +36,10 @@ extern const lv_font_t ui_font_mdi;
 #define MDI_ICON_MOON       "\U000F0594" // 󰖔
 #define MDI_ICON_POWER      "\U000F0425" // 󰐥
 
+// Alternator Charger Icons
+#define MDI_ICON_CHARGING_WIRELESS "\U000F0084" // 󰂄
+#define MDI_ICON_VAN_UTILITY       "\U000F05F1" // 󰗱
+
 // Helper to set label to icon
 static inline void ui_set_icon(lv_obj_t * label, const char * icon_code) {
     lv_obj_set_style_text_font(label, &ui_font_mdi, 0);

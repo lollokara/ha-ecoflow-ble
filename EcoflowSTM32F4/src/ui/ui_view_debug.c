@@ -119,11 +119,11 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "DC 12V Out", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dcLvInputPower, " W");
                  add_list_item(cont_list, "DC LV In", buf);
-                 snprintf(buf, sizeof(buf), "%d", dev->data.d3p.dcLvInputState);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcLvInputState);
                  add_list_item(cont_list, "DC LV State", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dcHvInputPower, " W");
                  add_list_item(cont_list, "DC HV In", buf);
-                 snprintf(buf, sizeof(buf), "%d", dev->data.d3p.dcHvInputState);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcHvInputState);
                  add_list_item(cont_list, "DC HV State", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarLvPower, " W");
                  add_list_item(cont_list, "Solar LV", buf);
@@ -139,7 +139,7 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "USB-C(2) Out", buf);
                  snprintf(buf, sizeof(buf), "%s", dev->data.d3p.pluggedInAc ? "Yes" : "No");
                  add_list_item(cont_list, "AC Plugged", buf);
-                 snprintf(buf, sizeof(buf), "%d C", dev->data.d3p.cellTemperature);
+                 snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3p.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
@@ -153,19 +153,19 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Solar Input", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3.dc12vOutputPower, " W");
                  add_list_item(cont_list, "DC 12V Out", buf);
-                 snprintf(buf, sizeof(buf), "%d C", dev->data.d3.cellTemperature);
+                 snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
             }
             else if (dev->id == DEV_TYPE_WAVE_2) {
-                 snprintf(buf, sizeof(buf), "%d", dev->data.w2.mode);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.w2.mode);
                  add_list_item(cont_list, "Mode", buf);
-                 snprintf(buf, sizeof(buf), "%d", dev->data.w2.setTemp);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.w2.setTemp);
                  add_list_item(cont_list, "Set Temp", buf);
                  fmt_float(buf, sizeof(buf), dev->data.w2.envTemp, " C");
                  add_list_item(cont_list, "Env Temp", buf);
-                 snprintf(buf, sizeof(buf), "%d %%", dev->data.w2.batSoc);
+                 snprintf(buf, sizeof(buf), "%d %%", (int)dev->data.w2.batSoc);
                  add_list_item(cont_list, "Bat SOC", buf);
-                 snprintf(buf, sizeof(buf), "%d W", dev->data.w2.batPwrWatt);
+                 snprintf(buf, sizeof(buf), "%d W", (int)dev->data.w2.batPwrWatt);
                  add_list_item(cont_list, "Bat Power", buf);
             }
             else if (dev->id == DEV_TYPE_ALT_CHARGER) {
@@ -177,11 +177,11 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Car Batt Volt", buf);
                  fmt_float(buf, sizeof(buf), dev->data.ac.startVoltage, " V");
                  add_list_item(cont_list, "Start Volt", buf);
-                 snprintf(buf, sizeof(buf), "%d", dev->data.ac.chargerMode);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.ac.chargerMode);
                  add_list_item(cont_list, "Mode", buf);
                  snprintf(buf, sizeof(buf), "%s", dev->data.ac.chargerOpen ? "ON" : "OFF");
                  add_list_item(cont_list, "Charger Open", buf);
-                 snprintf(buf, sizeof(buf), "%d W", dev->data.ac.powerLimit);
+                 snprintf(buf, sizeof(buf), "%d W", (int)dev->data.ac.powerLimit);
                  add_list_item(cont_list, "Power Limit", buf);
                  fmt_float(buf, sizeof(buf), dev->data.ac.chargingCurrentLimit, " A");
                  add_list_item(cont_list, "Chg Limit", buf);

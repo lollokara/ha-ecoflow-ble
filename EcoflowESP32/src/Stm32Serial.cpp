@@ -143,8 +143,12 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         if (unpack_set_dc_message(rx_buf, &enable) == 0) {
             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
             if (d3 && d3->isAuthenticated()) d3->setDC(enable);
-             EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+
+            EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+
+            EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+            if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
         }
     } else if (cmd == CMD_SET_VALUE) {
         // Handle generic value setting (Charge limits, SOC limits)
@@ -165,6 +169,16 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                     case SET_VAL_AC_LIMIT: d3p->setAcChargingLimit(value); break;
                     case SET_VAL_MAX_SOC: d3p->setBatterySOCLimits(value, -1); break;
                     case SET_VAL_MIN_SOC: d3p->setBatterySOCLimits(101, value); break;
+                 }
+             }
+             EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+             if (alt && alt->isAuthenticated()) {
+                 switch(type) {
+                    case SET_VAL_ALT_START_VOLTAGE: alt->setBatteryVoltage((float)value / 10.0f); break;
+                    case SET_VAL_ALT_MODE: alt->setChargerMode(value); break;
+                    case SET_VAL_ALT_PROD_LIMIT: alt->setPowerLimit(value); break;
+                    case SET_VAL_ALT_REV_LIMIT: alt->setCarBatteryChargeLimit((float)value); break;
+                    case SET_VAL_ALT_CHG_LIMIT: alt->setDeviceBatteryChargeLimit((float)value); break;
                  }
              }
         }
@@ -364,6 +378,15 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.chargerMode = src.chargerMode;
         dst.chargerOpen = src.chargerOpen;
         dst.carBatteryVoltage = src.carBatteryVoltage;
+        dst.startVoltage = src.startVoltage;
+        dst.powerLimit = src.powerLimit;
+        dst.reverseChargingCurrentLimit = src.reverseChargingCurrentLimit;
+        dst.chargingCurrentLimit = src.chargingCurrentLimit;
+        dst.startVoltageMin = src.startVoltageMin;
+        dst.startVoltageMax = src.startVoltageMax;
+        dst.powerMax = src.powerMax;
+        dst.reverseChargingCurrentMax = src.reverseChargingCurrentMax;
+        dst.chargingCurrentMax = src.chargingCurrentMax;
     }
 
     uint8_t buffer[sizeof(DeviceStatus) + 4];
