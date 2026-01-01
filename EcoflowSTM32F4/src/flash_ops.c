@@ -21,6 +21,48 @@
 
 // Current approach: Just write to Bank 2 (Address 0x08100000).
 
+// RAM Function to safely switch to Dual Bank Mode
+// Must be placed in RAM to avoid crashing during mass erase.
+#define FLASH_KEY1               0x45670123U
+#define FLASH_KEY2               0xCDEF89ABU
+#define FLASH_OPT_KEY1           0x08192A3BU
+#define FLASH_OPT_KEY2           0x4C5D6E7FU
+
+__attribute__((section(".data"), noinline)) void Flash_SetDualBankMode_RAM(void) {
+    // 1. Unlock Flash Option Bytes
+    if (FLASH->OPTCR & FLASH_OPTCR_OPTLOCK) {
+        FLASH->OPTKEYR = FLASH_OPT_KEY1;
+        FLASH->OPTKEYR = FLASH_OPT_KEY2;
+    }
+
+    // 2. Wait for BSY
+    while (FLASH->SR & FLASH_SR_BSY);
+
+    // 3. Modify OPTCR
+    // Set DB1M (Bit 30)
+    // Clear BFB2 (Bit 4) -> Boot from Bank 1
+    uint32_t optcr = FLASH->OPTCR;
+    optcr |= FLASH_OPTCR_DB1M;
+    optcr &= ~FLASH_OPTCR_BFB2;
+    FLASH->OPTCR = optcr;
+
+    // 4. Start Programming
+    FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+    // 5. Wait for BSY (Mass Erase happens here)
+    while (FLASH->SR & FLASH_SR_BSY);
+
+    // 6. Launch / Reset
+    // Use NVIC_SystemReset equivalent inline
+    __DSB();
+    SCB->AIRCR  = (uint32_t)((0x5FAUL << SCB_AIRCR_VECTKEY_Pos) |
+                             (SCB->AIRCR & SCB_AIRCR_PRIGROUP_Msk) |
+                             SCB_AIRCR_SYSRESETREQ_Msk);
+    __DSB();
+
+    while(1);
+}
+
 void Flash_Unlock(void) {
     HAL_FLASH_Unlock();
 }

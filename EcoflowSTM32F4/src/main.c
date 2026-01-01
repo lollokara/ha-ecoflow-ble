@@ -287,6 +287,17 @@ int main(void) {
         while(1);
     }
 
+    // Check if we are in Dual Bank Mode but BFB2 is 0 (Default to Bank 1)
+    // If so, we might have just flashed via PIO/ST-Link into Bank 1 (0x08000000).
+    // The hardware aliases 0x08000000 to 0x00000000.
+    // If BFB2 is 1, it aliases Bank 2 to 0x00000000.
+
+    // Explicitly set Vector Table Offset (Safety for Dual Bank aliasing)
+    // If we are running, VTOR should point to where we are executing.
+    // If we are in Bank 2 (BFB2=1), 0x00000000 is mapped to 0x08100000.
+    // Ideally VTOR is 0x00000000.
+    SCB->VTOR = 0x00000000; // Assuming we boot from 0x00000000 alias
+
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);

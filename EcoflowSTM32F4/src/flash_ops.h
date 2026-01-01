@@ -9,5 +9,6 @@ void Flash_Lock(void);
 uint8_t Flash_EraseSector(uint32_t address);
 uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len);
 void Flash_SwapBank(void);
+void Flash_SetDualBankMode_RAM(void);
 
 #endif
