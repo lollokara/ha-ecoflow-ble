@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include <Update.h>
+#include "OtaManager.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -81,6 +83,29 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // OTA Routes
+    server.on("/api/update/stm32", HTTP_POST, [](AsyncWebServerRequest *request){
+        // Do nothing here, response is sent in upload handler when final=true
+    }, handleUpdateSTM32);
+
+    server.on("/api/update/esp32", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (Update.hasError()) request->send(500, "text/plain", "Update Failed");
+        else request->send(200, "text/plain", "Update Success. Rebooting...");
+        ESP.restart();
+    }, handleUpdateESP32);
+
+    server.on("/api/update/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        DynamicJsonDocument doc(256);
+        OtaState state = OtaManager::getState();
+        doc["state"] = (int)state;
+        doc["progress"] = OtaManager::getProgress();
+        if (state == OTA_ERROR) doc["error"] = OtaManager::getError();
+
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
@@ -401,5 +426,79 @@ void WebServer::handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data
         request->send(200, "text/plain", "Saved");
     } else {
         request->send(400, "text/plain", "Invalid Payload");
+    }
+}
+
+// OTA Implementation
+static uint8_t *otaBuffer = NULL;
+static size_t otaLen = 0;
+
+void WebServer::handleUpdateSTM32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if (index == 0) {
+        if (OtaManager::getState() != OTA_IDLE && OtaManager::getState() != OTA_COMPLETE && OtaManager::getState() != OTA_ERROR) {
+            request->send(409, "text/plain", "Update in progress");
+            return;
+        }
+
+        ESP_LOGI(TAG, "STM32 OTA Start: %s", filename.c_str());
+        // Attempt to allocate full buffer
+        // Note: request->contentLength() includes multipart headers, so it's larger than file.
+        // But allocating slightly more is safe. We need a way to know exact file size if possible,
+        // but 'final' gives us end. Allocating contentLength is safest upper bound.
+        size_t allocSize = request->contentLength();
+        if (allocSize == 0) allocSize = 1024 * 1024; // Fallback 1MB
+
+        if (otaBuffer) free(otaBuffer);
+
+        // Try PSRAM first
+        otaBuffer = (uint8_t*)ps_malloc(allocSize);
+        if (!otaBuffer) {
+            otaBuffer = (uint8_t*)malloc(allocSize);
+        }
+
+        if (!otaBuffer) {
+            ESP_LOGE(TAG, "OTA Alloc Failed: %d bytes", allocSize);
+            return;
+        }
+        otaLen = 0;
+    }
+
+    if (otaBuffer) {
+        memcpy(otaBuffer + otaLen, data, len);
+        otaLen += len;
+    }
+
+    if (final) {
+        if (!otaBuffer) {
+             request->send(500, "text/plain", "Alloc Failed");
+             return;
+        }
+
+        ESP_LOGI(TAG, "STM32 OTA Received: %d bytes. Flashing...", otaLen);
+        OtaManager::startUpdateSTM32(otaBuffer, otaLen);
+        request->send(200, "text/plain", "STM32 Update Started");
+        // Buffer ownership transferred to OtaManager
+        otaBuffer = NULL;
+    }
+}
+
+void WebServer::handleUpdateESP32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if (index == 0) {
+        ESP_LOGI(TAG, "ESP32 OTA Start: %s", filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            Update.printError(Serial);
+        }
+    }
+
+    if (Update.write(data, len) != len) {
+        Update.printError(Serial);
+    }
+
+    if (final) {
+        if (Update.end(true)) {
+            ESP_LOGI(TAG, "ESP32 Update Success");
+        } else {
+            Update.printError(Serial);
+        }
     }
 }

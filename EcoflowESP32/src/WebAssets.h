@@ -259,6 +259,20 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <button class="btn" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
                 </div>
+
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+                <h4 style="color:#fff; margin-bottom:10px;">Firmware Update</h4>
+                <div class="ctrl-row">
+                    <span>ESP32 Firmware</span>
+                    <input type="file" id="file-esp32" style="max-width:200px">
+                    <button class="btn btn-primary" onclick="upload('esp32')">Update</button>
+                </div>
+                <div class="ctrl-row">
+                    <span>STM32 Firmware</span>
+                    <input type="file" id="file-stm32" style="max-width:200px">
+                    <button class="btn btn-primary" onclick="upload('stm32')">Update</button>
+                </div>
+                <div id="ota-progress" style="margin-top:10px; font-size:0.8em; color:var(--neon-green)"></div>
             </div>
         </div>
 
@@ -795,6 +809,69 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             if(r.ok) closeSettings();
             else alert('Error saving settings');
         });
+    }
+
+    function upload(type) {
+        const fileInput = el('file-' + type);
+        const file = fileInput.files[0];
+        if (!file) return alert('Please select a file');
+
+        const fd = new FormData();
+        fd.append("update", file);
+
+        el('ota-progress').innerText = "Uploading " + type.toUpperCase() + "...";
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/update/' + type, true);
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                el('ota-progress').innerText = `Uploading ${type.toUpperCase()}: ${percent}%`;
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                 if (type === 'stm32') {
+                     el('ota-progress').innerText = "Flashing STM32...";
+                     pollStatus();
+                 } else {
+                     el('ota-progress').innerText = "Update Complete! Rebooting...";
+                     alert("Update Success. Device Rebooting...");
+                 }
+            } else {
+                 el('ota-progress').innerText = "Upload Failed: " + xhr.statusText;
+                 alert("Failed: " + xhr.responseText);
+            }
+        };
+        xhr.send(fd);
+    }
+
+    function pollStatus() {
+        let failures = 0;
+        const interval = setInterval(() => {
+            fetch(API + '/update/status')
+            .then(r => r.json())
+            .then(d => {
+                // States: 0=IDLE, 1=BUFFER, 2=ERASE, 3=FLASH, 4=COMPL, 5=ERROR
+                if (d.state === 5) {
+                    clearInterval(interval);
+                    el('ota-progress').innerText = "Error: " + d.error;
+                    alert("STM32 Update Error: " + d.error);
+                } else if (d.state === 4) {
+                    clearInterval(interval);
+                    el('ota-progress').innerText = "STM32 Update Complete!";
+                    alert("STM32 Updated Successfully!");
+                } else {
+                    el('ota-progress').innerText = `Flashing STM32: ${d.progress}%`;
+                }
+            })
+            .catch(e => {
+                failures++;
+                if(failures > 5) clearInterval(interval);
+            });
+        }, 1000);
     }
 
     function toggleW2Power() {
