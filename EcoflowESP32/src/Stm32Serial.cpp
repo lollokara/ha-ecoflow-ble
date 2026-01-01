@@ -44,6 +44,87 @@ void Stm32Serial::begin() {
  * a valid packet is received.
  */
 void Stm32Serial::update() {
+    // OTA State Machine Logic
+    if (_otaState == OTAState::STARTING) {
+        // Wait for ACK of START command? Or just delay?
+        // Let's assume processPacket handles the ACK/NACK state transition.
+        // We need a timeout though.
+         if (_otaLastPacketTime == 0) _otaLastPacketTime = millis();
+         if (millis() - _otaLastPacketTime > 5000) { // 5s timeout for Start
+             _otaState = OTAState::SENDING; // Assume it worked? No, dangerous. Retry.
+             startOTA(_otaFilename, _otaSize);
+         }
+    }
+    else if (_otaState == OTAState::SENDING) {
+        // Check if we need to send a chunk
+        // We only send one chunk at a time and wait for ACK (handled in processPacket)
+        // If _otaLastPacketTime == 0, it means we are ready to send.
+        if (_otaLastPacketTime == 0) {
+             File f = LittleFS.open(_otaFilename);
+             if (f) {
+                 f.seek(_otaOffset);
+                 uint8_t chunk[240]; // Max payload 255. 4B offset + data.
+                 size_t read = f.read(chunk, 240);
+                 f.close();
+
+                 if (read > 0) {
+                     uint8_t head[5];
+                     head[0] = START_BYTE;
+                     head[1] = CMD_OTA_CHUNK;
+                     head[2] = 4 + read; // Len
+                     memcpy(&head[3], &_otaOffset, 4);
+
+                     Serial1.write(head, 7); // Start, Cmd, Len, Offset
+                     Serial1.write(chunk, read); // Data
+
+                     // CRC
+                     // Need to calculate CRC over Cmd(1)+Len(1)+Offset(4)+Data(read)
+                     // Reconstruct buffer for CRC calc is inefficient.
+                     // Helper:
+                     uint8_t crc_buf[256];
+                     crc_buf[0] = CMD_OTA_CHUNK;
+                     crc_buf[1] = 4 + read;
+                     memcpy(&crc_buf[2], &_otaOffset, 4);
+                     memcpy(&crc_buf[6], chunk, read);
+                     uint8_t crc = calculate_crc8(crc_buf, 6 + read);
+                     Serial1.write(crc);
+
+                     _otaLastPacketTime = millis();
+                 } else {
+                     // EOF?
+                     _otaState = OTAState::VERIFYING;
+                 }
+             } else {
+                 _otaState = OTAState::ERROR;
+                 _otaError = "File Read Error";
+             }
+        } else {
+            // Waiting for ACK. Timeout?
+            if (millis() - _otaLastPacketTime > 3000) {
+                ESP_LOGW(TAG, "OTA Chunk Timeout. Retrying...");
+                _otaLastPacketTime = 0; // Retry
+            }
+        }
+    }
+    else if (_otaState == OTAState::VERIFYING) {
+        // Send END/APPLY command
+        uint8_t buf[4];
+        buf[0] = START_BYTE;
+        buf[1] = CMD_OTA_END;
+        buf[2] = 0;
+        buf[3] = calculate_crc8(&buf[1], 2);
+        Serial1.write(buf, 4);
+
+        delay(100);
+
+        buf[1] = CMD_OTA_APPLY;
+        buf[3] = calculate_crc8(&buf[1], 2);
+        Serial1.write(buf, 4);
+
+        _otaState = OTAState::IDLE; // Done
+        ESP_LOGI(TAG, "OTA Sequence Completed.");
+    }
+
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
@@ -226,7 +307,61 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
+    } else if (cmd == CMD_OTA_ACK) {
+        if (_otaState == OTAState::SENDING) {
+             _otaState = OTAState::SENDING; // Keep state
+             _otaOffset += 1024; // Assuming fixed chunk size, logic in loop handles remainder
+             _otaLastPacketTime = 0; // Reset timeout
+             if (_otaOffset >= _otaSize) {
+                 _otaState = OTAState::VERIFYING;
+             }
+        }
+    } else if (cmd == CMD_OTA_NACK) {
+        if (_otaState == OTAState::SENDING) {
+             ESP_LOGE(TAG, "OTA NACK received, retrying chunk at %u", _otaOffset);
+             // Logic will retry in update() loop
+        } else if (_otaState == OTAState::STARTING) {
+             _otaState = OTAState::ERROR;
+             _otaError = "Target Rejected OTA Start";
+        }
     }
+}
+
+void Stm32Serial::startOTA(String filename, size_t size) {
+    if (_otaState != OTAState::IDLE && _otaState != OTAState::ERROR) return;
+
+    _otaFilename = filename;
+    _otaSize = size;
+    _otaOffset = 0;
+    _otaState = OTAState::STARTING;
+    _otaError = "";
+    _otaLastPacketTime = 0;
+
+    // Send Start Command
+    uint8_t buf[12];
+    buf[0] = START_BYTE;
+    buf[1] = CMD_OTA_START;
+    buf[2] = 4; // Length
+    uint32_t size_be = htonl(size); // Send size Big Endian or just Raw? Protocol defines. Let's send raw 4 bytes.
+    // Actually, simple cast is safer if endianness matches or defined. ESP32 is Little Endian. STM32 is Little Endian.
+    memcpy(&buf[3], &size, 4);
+    buf[7] = calculate_crc8(&buf[1], 6);
+    Serial1.write(buf, 8);
+
+    ESP_LOGI(TAG, "OTA Starting: %s (%u bytes)", filename.c_str(), size);
+}
+
+OTAStatus Stm32Serial::getOTAStatus() {
+    OTAStatus s;
+    s.state = _otaState;
+    if (_otaSize > 0) s.progress = (_otaOffset * 100) / _otaSize;
+    else s.progress = 0;
+    s.message = _otaError;
+    if (_otaState == OTAState::IDLE) s.message = "Idle";
+    else if (_otaState == OTAState::VERIFYING) { s.message = "Verifying..."; s.progress = 100; }
+    else if (_otaState == OTAState::SENDING) s.message = "Flashing...";
+
+    return s;
 }
 
 /**

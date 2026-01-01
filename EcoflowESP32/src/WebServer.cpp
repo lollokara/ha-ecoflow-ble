@@ -2,6 +2,9 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include <Update.h>
+#include <LittleFS.h>
+#include "Stm32Serial.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -81,6 +84,20 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    server.on("/update/esp", HTTP_POST, [](AsyncWebServerRequest *request){
+        bool shouldReboot = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
+        response->addHeader("Connection", "close");
+        request->send(response);
+        if (shouldReboot) ESP.restart();
+    }, handleUpdateESP);
+
+    server.on("/update/stm32", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200, "text/plain", "OK");
+    }, handleUpdateSTM);
+
+    server.on("/api/ota_status", HTTP_GET, handleOTAStatus);
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
@@ -402,4 +419,59 @@ void WebServer::handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data
     } else {
         request->send(400, "text/plain", "Invalid Payload");
     }
+}
+
+void WebServer::handleUpdateESP(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if (!index) {
+        ESP_LOGI(TAG, "ESP32 Update Start: %s", filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            Update.printError(Serial);
+        }
+    }
+    if (Update.write(data, len) != len) {
+        Update.printError(Serial);
+    }
+    if (final) {
+        if (Update.end(true)) {
+            ESP_LOGI(TAG, "ESP32 Update Success: %uB", index+len);
+        } else {
+            Update.printError(Serial);
+        }
+    }
+}
+
+void WebServer::handleUpdateSTM(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    static File f;
+    if (!index) {
+        ESP_LOGI(TAG, "STM32 Update Start: %s", filename.c_str());
+        f = LittleFS.open("/update.bin", "w");
+        if(!f) {
+             ESP_LOGE(TAG, "Failed to open /update.bin for writing");
+             request->send(500, "text/plain", "Filesystem Error");
+             return;
+        }
+    }
+
+    if(f) f.write(data, len);
+
+    if (final) {
+        if(f) {
+            f.close();
+            ESP_LOGI(TAG, "STM32 Update Downloaded: %uB. Starting UART Flash...", index+len);
+            Stm32Serial::getInstance().startOTA("/update.bin", index+len);
+        }
+    }
+}
+
+void WebServer::handleOTAStatus(AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(256);
+    OTAStatus status = Stm32Serial::getInstance().getOTAStatus();
+
+    doc["state"] = (int)status.state;
+    doc["progress"] = status.progress;
+    doc["msg"] = status.message;
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
 }
