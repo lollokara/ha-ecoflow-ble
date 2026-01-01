@@ -10,28 +10,39 @@ static const char* TAG = "OtaManager";
 #define CMD_OTA_DATA    0xF1
 #define CMD_OTA_END     0xF2
 
+#include <LittleFS.h>
+
 OtaState OtaManager::_state = OTA_IDLE;
 int OtaManager::_progress = 0;
 String OtaManager::_error = "";
-uint8_t* OtaManager::_fwBuffer = NULL;
+String OtaManager::_fwPath = "";
 size_t OtaManager::_fwSize = 0;
 
 // Helper to calculate STM32 Hardware Compatible CRC32
-static uint32_t stm32_crc32(const uint8_t *data, size_t len) {
+static uint32_t stm32_crc32(File& f, size_t len) {
     uint32_t crc = 0xFFFFFFFF;
     size_t words = len / 4;
+    uint8_t buf[128]; // Buffer for CRC calc
+
+    f.seek(0);
+
     for (size_t i = 0; i < words; i++) {
+        // Read 4 bytes
+        if (f.read(buf, 4) != 4) break;
+
         uint32_t val = 0;
-        val |= data[i * 4 + 0] << 0;
-        val |= data[i * 4 + 1] << 8;
-        val |= data[i * 4 + 2] << 16;
-        val |= data[i * 4 + 3] << 24;
+        val |= buf[0] << 0;
+        val |= buf[1] << 8;
+        val |= buf[2] << 16;
+        val |= buf[3] << 24;
+
         crc ^= val;
         for (int j = 0; j < 32; j++) {
             if (crc & 0x80000000) crc = (crc << 1) ^ 0x04C11DB7;
             else crc <<= 1;
         }
     }
+    f.seek(0);
     return crc;
 }
 
@@ -40,30 +51,38 @@ int OtaManager::getProgress() { return _progress; }
 String OtaManager::getError() { return _error; }
 
 void OtaManager::cleanup() {
-    if (_fwBuffer) {
-        free(_fwBuffer);
-        _fwBuffer = NULL;
+    if (LittleFS.exists(_fwPath)) {
+        LittleFS.remove(_fwPath);
     }
+    _fwPath = "";
     _fwSize = 0;
     _state = OTA_IDLE;
 }
 
-void OtaManager::startUpdateSTM32(uint8_t* buffer, size_t size) {
+void OtaManager::startUpdateSTM32(const char* filepath, size_t size) {
     if (_state != OTA_IDLE && _state != OTA_COMPLETE && _state != OTA_ERROR) return;
 
-    _fwBuffer = buffer;
+    _fwPath = String(filepath);
     _fwSize = size;
     _state = OTA_BUFFERING;
     _progress = 0;
     _error = "";
 
-    xTaskCreate(otaTask, "OtaTask", 4096, NULL, 1, NULL);
+    xTaskCreate(otaTask, "OtaTask", 8192, NULL, 1, NULL); // Increased stack for FS ops
 }
 
 void OtaManager::otaTask(void* param) {
     ESP_LOGI(TAG, "Starting STM32 Update Task. Size: %d", _fwSize);
 
-    uint32_t checksum = stm32_crc32(_fwBuffer, _fwSize);
+    File f = LittleFS.open(_fwPath, "r");
+    if (!f) {
+        _error = "Failed to open file";
+        _state = OTA_ERROR;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    uint32_t checksum = stm32_crc32(f, _fwSize);
     ESP_LOGI(TAG, "Checksum: 0x%08X", checksum);
 
     // Helper to send packet
@@ -94,7 +113,7 @@ void OtaManager::otaTask(void* param) {
     memcpy(payload + 4, &checksum, 4);
     sendPacket(CMD_OTA_START, payload, 8);
 
-    // 2. Wait for Erase (60s for safety - Full Bank Erase on F4 can take 20s+)
+    // 2. Wait for Erase (60s for safety)
     ESP_LOGI(TAG, "Waiting 60s for erase...");
     for(int i=0; i<600; i++) {
         _progress = i / 60; // 0-10% progress during erase
@@ -105,12 +124,23 @@ void OtaManager::otaTask(void* param) {
     _state = OTA_FLASHING;
     size_t offset = 0;
     size_t total = _fwSize;
+    uint8_t buf[128]; // Smaller buffer for chunks
 
     while (offset < total) {
         size_t chunk = 128;
         if (offset + chunk > total) chunk = total - offset;
 
-        sendPacket(CMD_OTA_DATA, _fwBuffer + offset, chunk);
+        // Read from File
+        if (f.read(buf, chunk) != chunk) {
+             _error = "File Read Error";
+             _state = OTA_ERROR;
+             f.close();
+             cleanup();
+             vTaskDelete(NULL);
+             return;
+        }
+
+        sendPacket(CMD_OTA_DATA, buf, chunk);
         offset += chunk;
 
         _progress = 10 + (int)((offset * 90) / total); // 10-100%
@@ -124,6 +154,7 @@ void OtaManager::otaTask(void* param) {
     _progress = 100;
     ESP_LOGI(TAG, "STM32 Update Complete");
 
+    f.close();
     cleanup();
     vTaskDelete(NULL);
 }

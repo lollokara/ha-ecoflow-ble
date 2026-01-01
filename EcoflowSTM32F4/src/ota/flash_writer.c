@@ -2,6 +2,8 @@
 #include "stm32f4xx_hal.h"
 #include "../boot_shared.h"
 
+extern IWDG_HandleTypeDef hiwdg;
+
 void Flash_Unlock(void) {
     HAL_FLASH_Unlock();
 }
@@ -14,15 +16,24 @@ bool Flash_EraseBank2(void) {
     FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t SectorError;
 
-    // Erase Sectors 12 to 23
+    // Erase Sectors 12 to 23 ONE BY ONE to refresh Watchdog
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
     EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-    EraseInitStruct.Sector = FLASH_SECTOR_12;
-    EraseInitStruct.NbSectors = 12; // 12 to 23
+    EraseInitStruct.NbSectors = 1;
 
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-        return false;
+    // Sector 12 (16KB) to 23 (128KB)
+    // Note: FLASH_SECTOR_12 is 12. Loop from 12 to 23.
+    for (uint32_t sector = FLASH_SECTOR_12; sector <= FLASH_SECTOR_23; sector++) {
+        EraseInitStruct.Sector = sector;
+
+        HAL_IWDG_Refresh(&hiwdg);
+
+        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+            return false;
+        }
     }
+
+    HAL_IWDG_Refresh(&hiwdg);
     return true;
 }
 

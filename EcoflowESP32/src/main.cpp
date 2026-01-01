@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <LittleFS.h>
 #include "EcoflowESP32.h"
 #include "Credentials.h"
 #include "DeviceManager.h"
@@ -68,6 +69,11 @@ void setup() {
 
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");
+
+    // Initialize LittleFS
+    if (!LittleFS.begin(true)) {
+        Serial.println("LittleFS Mount Failed");
+    }
 
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();

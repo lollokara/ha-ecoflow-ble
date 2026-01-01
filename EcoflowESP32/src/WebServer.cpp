@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <esp_log.h>
 #include <Update.h>
+#include <LittleFS.h>
 #include "OtaManager.h"
 
 static const char* TAG = "WebServer";
@@ -430,7 +431,7 @@ void WebServer::handleSettingsSave(AsyncWebServerRequest *request, uint8_t *data
 }
 
 // OTA Implementation
-static uint8_t *otaBuffer = NULL;
+static File otaFile;
 static size_t otaLen = 0;
 
 void WebServer::handleUpdateSTM32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
@@ -441,44 +442,39 @@ void WebServer::handleUpdateSTM32(AsyncWebServerRequest *request, String filenam
         }
 
         ESP_LOGI(TAG, "STM32 OTA Start: %s", filename.c_str());
-        // Attempt to allocate full buffer
-        // Note: request->contentLength() includes multipart headers, so it's larger than file.
-        // But allocating slightly more is safe. We need a way to know exact file size if possible,
-        // but 'final' gives us end. Allocating contentLength is safest upper bound.
-        size_t allocSize = request->contentLength();
-        if (allocSize == 0) allocSize = 1024 * 1024; // Fallback 1MB
 
-        if (otaBuffer) free(otaBuffer);
-
-        // Try PSRAM first
-        otaBuffer = (uint8_t*)ps_malloc(allocSize);
-        if (!otaBuffer) {
-            otaBuffer = (uint8_t*)malloc(allocSize);
+        if (LittleFS.exists("/update_stm32.bin")) {
+            LittleFS.remove("/update_stm32.bin");
         }
 
-        if (!otaBuffer) {
-            ESP_LOGE(TAG, "OTA Alloc Failed: %d bytes", allocSize);
+        otaFile = LittleFS.open("/update_stm32.bin", "w");
+        if (!otaFile) {
+            ESP_LOGE(TAG, "Failed to open file for writing");
+            request->send(500, "text/plain", "FS Error");
             return;
         }
         otaLen = 0;
     }
 
-    if (otaBuffer) {
-        memcpy(otaBuffer + otaLen, data, len);
+    if (otaFile) {
+        if (otaFile.write(data, len) != len) {
+             ESP_LOGE(TAG, "Write Failed");
+             otaFile.close();
+             return;
+        }
         otaLen += len;
     }
 
     if (final) {
-        if (!otaBuffer) {
-             request->send(500, "text/plain", "Alloc Failed");
+        if (!otaFile) {
+             request->send(500, "text/plain", "Upload Error");
              return;
         }
+        otaFile.close();
 
         ESP_LOGI(TAG, "STM32 OTA Received: %d bytes. Flashing...", otaLen);
-        OtaManager::startUpdateSTM32(otaBuffer, otaLen);
+        OtaManager::startUpdateSTM32("/update_stm32.bin", otaLen);
         request->send(200, "text/plain", "STM32 Update Started");
-        // Buffer ownership transferred to OtaManager
-        otaBuffer = NULL;
     }
 }
 

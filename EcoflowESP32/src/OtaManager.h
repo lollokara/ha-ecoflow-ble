@@ -15,7 +15,7 @@ enum OtaState {
 
 class OtaManager {
 public:
-    static void startUpdateSTM32(uint8_t* buffer, size_t size);
+    static void startUpdateSTM32(const char* filepath, size_t size);
     static bool updateESP32(Stream& firmware, size_t size);
 
     static OtaState getState();
@@ -28,7 +28,7 @@ private:
     static OtaState _state;
     static int _progress;
     static String _error;
-    static uint8_t* _fwBuffer;
+    static String _fwPath;
     static size_t _fwSize;
 };
 

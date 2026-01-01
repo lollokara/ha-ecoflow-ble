@@ -97,13 +97,30 @@ void PerformUpdate(BootConfig *cfg) {
     HAL_FLASH_Lock();
 }
 
+static void LED_Init(void) {
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_6; // LED4 (Red)
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+}
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
+    LED_Init();
 
     BootConfig *cfg = (BootConfig *)ADDR_CONFIG;
 
     if (cfg->magic == BOOT_MAGIC_UPDATE_PENDING) {
+        // Blink fast to indicate update start
+        for(int i=0; i<5; i++) {
+            HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+            HAL_Delay(100);
+        }
+
         PerformUpdate(cfg);
         NVIC_SystemReset(); // Reset to clean state after update
     }
@@ -129,8 +146,10 @@ int main(void) {
         JumpToApplication();
     }
 
-    // No App found? Blink LED or Loop
+    // No App found? Blink LED (Heartbeat)
     while (1) {
+        HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+        HAL_Delay(500);
     }
 }
 
