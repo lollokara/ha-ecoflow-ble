@@ -119,10 +119,18 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "DC LV In", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dcHvInputPower, " W");
                  add_list_item(cont_list, "DC HV In", buf);
+                 snprintf(buf, sizeof(buf), "%d", dev->data.d3p.dcLvInputState);
+                 add_list_item(cont_list, "DC LV State", buf);
+                 snprintf(buf, sizeof(buf), "%d", dev->data.d3p.dcHvInputState);
+                 add_list_item(cont_list, "DC HV State", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarLvPower, " W");
                  add_list_item(cont_list, "Solar LV", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarHvPower, " W");
                  add_list_item(cont_list, "Solar HV", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.usbcOutputPower, " W");
+                 add_list_item(cont_list, "USB-C", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.usbaOutputPower, " W");
+                 add_list_item(cont_list, "USB-A", buf);
                  snprintf(buf, sizeof(buf), "%d C", dev->data.d3p.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.mainBatteryLevel, "%");

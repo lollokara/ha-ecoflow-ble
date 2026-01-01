@@ -181,6 +181,13 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_plug_in_info_pv_l_type) d3p.dcLvInputState = mr521_msg.plug_in_info_pv_l_type;
                      if (mr521_msg.has_plug_in_info_pv_h_type) d3p.dcHvInputState = mr521_msg.plug_in_info_pv_h_type;
 
+                     if (mr521_msg.has_pow_get_typec1) d3p.usbcOutputPower = -std::abs(mr521_msg.pow_get_typec1);
+                     if (mr521_msg.has_pow_get_typec2) d3p.usbc2OutputPower = -std::abs(mr521_msg.pow_get_typec2);
+                     if (mr521_msg.has_pow_get_qcusb1) d3p.usbaOutputPower = -std::abs(mr521_msg.pow_get_qcusb1);
+                     if (mr521_msg.has_pow_get_qcusb2) d3p.usba2OutputPower = -std::abs(mr521_msg.pow_get_qcusb2);
+
+                     if (mr521_msg.has_plug_in_info_ac_charger_flag) d3p.pluggedInAc = mr521_msg.plug_in_info_ac_charger_flag;
+
                      if (mr521_msg.has_plug_in_info_ac_in_chg_pow_max) d3p.acChargingSpeed = mr521_msg.plug_in_info_ac_in_chg_pow_max;
                      if (mr521_msg.has_plug_in_info_ac_in_chg_hal_pow_max) d3p.maxAcChargingPower = mr521_msg.plug_in_info_ac_in_chg_hal_pow_max;
 
