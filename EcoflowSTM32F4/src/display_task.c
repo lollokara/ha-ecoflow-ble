@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 // QueueHandle_t displayQueue; // Defined in main.c
+extern IWDG_HandleTypeDef hiwdg;
 
 void StartDisplayTask(void * argument) {
     // Init Hardware
@@ -32,6 +33,8 @@ void StartDisplayTask(void * argument) {
     xLastWakeTime = xTaskGetTickCount();
 
     for (;;) {
+        HAL_IWDG_Refresh(&hiwdg);
+
         // Handle Data Updates
         while (xQueueReceive(displayQueue, &event, 0) == pdTRUE) {
             if (event.type == DISPLAY_EVENT_UPDATE_BATTERY) {

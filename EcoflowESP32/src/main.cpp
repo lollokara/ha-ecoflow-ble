@@ -12,6 +12,7 @@
  */
 
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include "EcoflowESP32.h"
 #include "Credentials.h"
 #include "DeviceManager.h"
@@ -53,6 +54,10 @@ void checkSerial() {
  * and starts background tasks (Web Server, BLE scanning).
  */
 void setup() {
+    // Initialize Task Watchdog Timer (TWDT) for 10 seconds, panic on timeout
+    esp_task_wdt_init(10, true);
+    esp_task_wdt_add(NULL); // Add current task (loop task)
+
     // Initialize Power Latch to keep the device powered on
     pinMode(POWER_LATCH_PIN, OUTPUT);
     digitalWrite(POWER_LATCH_PIN, LOW); // Active Low/High depends on hardware, assuming Low keeps it ON based on previous context or defaulting.
@@ -89,6 +94,8 @@ void setup() {
  * - Periodic device list broadcasting (every 5s).
  */
 void loop() {
+    esp_task_wdt_reset();
+
     static uint32_t last_data_refresh = 0;
     static uint32_t last_device_list_update = 0;
 

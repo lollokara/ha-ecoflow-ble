@@ -27,6 +27,7 @@ extern UART_HandleTypeDef huart6;
 // Local Handles
 UART_HandleTypeDef huart3;
 TIM_HandleTypeDef htim2;
+IWDG_HandleTypeDef hiwdg;
 QueueHandle_t displayQueue; // Global queue for UI events
 
 // Forward Declarations
@@ -34,6 +35,7 @@ void SystemClock_Config(void);
 static void ESP32_Reset_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_IWDG_Init(void);
 
 /**
  * @brief  System Clock Configuration
@@ -188,6 +190,19 @@ static void MX_TIM2_Init(void) {
 }
 
 /**
+ * @brief Initializes the Independent Watchdog (IWDG).
+ * Configured for ~10 seconds timeout.
+ */
+static void MX_IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256; // 32kHz / 256 = 125Hz
+    hiwdg.Init.Reload = 1250; // 10s * 125Hz = 1250
+    if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+        // Error_Handler();
+    }
+}
+
+/**
  * @brief UART MSP Initialization.
  * Configures PB10 (TX) and PB11 (RX) for USART3.
  * Configures PA1 (RX) for UART4 and PA2 (TX) for USART2 (Split Mode).
@@ -262,6 +277,7 @@ int main(void) {
 
     MX_USART3_UART_Init();
     MX_TIM2_Init();
+    MX_IWDG_Init();
 
     // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));

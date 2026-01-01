@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "hardware/watchdog.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <EEPROM.h>
@@ -162,9 +163,13 @@ void setup() {
 
     sensors.begin();
     load_config();
+
+    // Enable Watchdog (8s timeout, pause on debug)
+    watchdog_enable(8000, 1);
 }
 
 void loop() {
+    watchdog_update();
     uint32_t now = millis();
 
     // 1. Read Temp & Control Fans (Every 200ms)
