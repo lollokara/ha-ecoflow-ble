@@ -13,383 +13,331 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include <WiFi.h>
+#include <esp_task_wdt.h>
+#include "ecoflow_protocol.h"
 
-// Hardware Serial pin definition (moved from main.cpp)
-// RX Pin = 18 (connected to F4 TX)
-// TX Pin = 17 (connected to F4 RX)
+// Hardware Serial pin definition
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 39 // Note: This seems to conflict with main.cpp definition (16).
-                           // Leaving as is to preserve functionality, but documenting the discrepancy.
-                           // Actually, main.cpp uses 16. Stm32Serial uses 39. This might be a bug in the code I received,
-                           // but I must not alter functionality.
+#define POWER_LATCH_PIN 39
 
 static const char* TAG = "Stm32Serial";
 
-/**
- * @brief Initializes the UART interface.
- *
- * Configures Serial1 with 115200 baud, 8N1, on defined pins.
- */
+// Global flag to indicate OTA handshake success
+static volatile bool ota_ack_received = false;
+
 void Stm32Serial::begin() {
     Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+    _txMutex = xSemaphoreCreateMutex();
 }
 
-/**
- * @brief Main update loop for processing incoming UART data.
- *
- * Reads bytes from the serial buffer, assembles packets based on the protocol
- * (START_BYTE, Header, Length, Payload, CRC), and calls processPacket() when
- * a valid packet is received.
- */
 void Stm32Serial::update() {
-    static uint8_t rx_buf[1024];
-    static uint16_t rx_idx = 0;
-    static uint8_t expected_len = 0;
-    static bool collecting = false;
-
     while (Serial1.available()) {
         uint8_t b = Serial1.read();
-        if (!collecting) {
-            if (b == START_BYTE) {
-                collecting = true;
-                rx_idx = 0;
-                rx_buf[rx_idx++] = b;
+        if (!_collecting) {
+            if (b == PROTOCOL_START_BYTE) {
+                _collecting = true;
+                _rx_idx = 0;
+                _rx_buf[_rx_idx++] = b;
             }
         } else {
-            rx_buf[rx_idx++] = b;
+            _rx_buf[_rx_idx++] = b;
 
-            if (rx_idx == 3) { // We have START, CMD, LEN
-                expected_len = rx_buf[2];
-                // Sanity check length
-                if (expected_len > 250) {
-                    collecting = false;
-                    rx_idx = 0;
+            if (_rx_idx == 3) {
+                _expected_len = _rx_buf[2];
+                if (_expected_len > 250) {
+                    _collecting = false;
+                    _rx_idx = 0;
                 }
-            } else if (rx_idx > 3) {
-                 if (rx_idx == (4 + expected_len)) {
-                    // Packet complete
-                    uint8_t received_crc = rx_buf[rx_idx - 1];
-                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+            } else if (_rx_idx > 3) {
+                 if (_rx_idx == (4 + _expected_len)) {
+                    uint8_t received_crc = _rx_buf[_rx_idx - 1];
+
+                    uint8_t calculated_crc = 0;
+                    auto update_crc = [&](uint8_t val) {
+                        uint8_t crc = calculated_crc;
+                        uint8_t extract = val;
+                        for (uint8_t tempI = 8; tempI; tempI--) {
+                            uint8_t sum = (crc ^ extract) & 0x01;
+                            crc >>= 1;
+                            if (sum) {
+                                crc ^= 0x8C;
+                            }
+                            extract >>= 1;
+                        }
+                        calculated_crc = crc;
+                    };
+
+                    update_crc(_rx_buf[1]);
+                    update_crc(_rx_buf[2]);
+                    for(int i=0; i<_expected_len; i++) update_crc(_rx_buf[3+i]);
 
                     if (received_crc == calculated_crc) {
-                        processPacket(rx_buf, rx_idx);
+                        processPacket(_rx_buf, _rx_idx);
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
                     }
-                    collecting = false; // Reset for next packet
-                    rx_idx = 0;
+                    _collecting = false;
+                    _rx_idx = 0;
                 }
             }
 
-            if (rx_idx >= sizeof(rx_buf)) {
-                collecting = false; // Overflow protection
-                rx_idx = 0;
+            if (_rx_idx >= sizeof(_rx_buf)) {
+                _collecting = false;
+                _rx_idx = 0;
             }
         }
     }
 }
 
-/**
- * @brief Dispatches valid packets to their specific handlers.
- *
- * @param rx_buf The buffer containing the full packet.
- * @param len The total length of the packet.
- */
+void Stm32Serial::sendPacket(uint8_t cmd, const uint8_t* payload, size_t len) {
+    uint8_t header[3];
+    header[0] = PROTOCOL_START_BYTE;
+    header[1] = cmd;
+    header[2] = (uint8_t)len;
+
+    uint8_t crc = 0;
+    auto update_crc = [&](uint8_t b) {
+        uint8_t extract = b;
+        for (uint8_t tempI = 8; tempI; tempI--) {
+            uint8_t sum = (crc ^ extract) & 0x01;
+            crc >>= 1;
+            if (sum) {
+                crc ^= 0x8C;
+            }
+            extract >>= 1;
+        }
+    };
+
+    update_crc(cmd);
+    update_crc((uint8_t)len);
+    for(size_t i=0; i<len; i++) {
+        update_crc(payload[i]);
+    }
+
+    if (_txMutex) xSemaphoreTake(_txMutex, portMAX_DELAY);
+    Serial1.write(header, 3);
+    if(len > 0) Serial1.write(payload, len);
+    Serial1.write(crc);
+    if (_txMutex) xSemaphoreGive(_txMutex);
+}
+
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
 
-    if (cmd == CMD_HANDSHAKE) {
-        // Reply with ACK and then send the device list
-        uint8_t ack[4];
-        int l = pack_handshake_ack_message(ack);
-        Serial1.write(ack, l);
+    if (cmd == PROTOCOL_CMD_HANDSHAKE) {
+        sendPacket(PROTOCOL_CMD_HANDSHAKE_ACK, NULL, 0);
         sendDeviceList();
-    } else if (cmd == CMD_GET_DEVICE_STATUS) {
-        // STM32 is requesting status for a specific device
-        uint8_t dev_id;
-        if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
-            sendDeviceStatus(dev_id);
-        }
-    } else if (cmd == CMD_SET_WAVE2) {
-        // Handle Wave 2 control commands (Temp, Mode, Fan, Power)
-        uint8_t type, value;
-        if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
-            EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
-            if (w2 && w2->isAuthenticated()) {
-                switch(type) {
-                    case W2_PARAM_TEMP: w2->setTemperature(value); break;
-                    case W2_PARAM_MODE: w2->setMainMode(value); break;
-                    case W2_PARAM_SUB_MODE: w2->setSubMode(value); break;
-                    case W2_PARAM_FAN: w2->setFanSpeed(value); break;
-                    case W2_PARAM_POWER: w2->setPowerState(value); break;
-                }
+    } else if (cmd == PROTOCOL_CMD_OTA_ACK) {
+        ota_ack_received = true;
+        ESP_LOGI(TAG, "OTA ACK Received");
+    } else if (cmd == PROTOCOL_CMD_OTA_NACK) {
+        ota_ack_received = false;
+        ESP_LOGE(TAG, "OTA NACK Received");
+    } else if (cmd == PROTOCOL_CMD_GET_DEVICE_STATUS) {
+        uint8_t dev_id = rx_buf[3];
+        sendDeviceStatus(dev_id);
+    } else if (cmd == PROTOCOL_CMD_SET_WAVE2) {
+        uint8_t type = rx_buf[3];
+        uint8_t value = rx_buf[4];
+        EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+        if (w2 && w2->isAuthenticated()) {
+            switch(type) {
+                case 1: w2->setTemperature(value); break;
+                case 2: w2->setMainMode(value); break;
+                case 3: w2->setSubMode(value); break;
+                case 4: w2->setFanSpeed(value); break;
+                case 5: w2->setPowerState(value); break;
             }
         }
-    } else if (cmd == CMD_SET_AC) {
-        // Toggle AC Power
-        uint8_t enable;
-        if (unpack_set_ac_message(rx_buf, &enable) == 0) {
-            EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-            if (d3 && d3->isAuthenticated()) d3->setAC(enable);
-
-            EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-            if (d3p && d3p->isAuthenticated()) d3p->setAC(enable);
+    } else if (cmd == PROTOCOL_CMD_SET_AC) {
+        uint8_t enable = rx_buf[3];
+        EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+        if (d3 && d3->isAuthenticated()) d3->setAC(enable);
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) d3p->setAC(enable);
+    } else if (cmd == PROTOCOL_CMD_SET_DC) {
+        uint8_t enable = rx_buf[3];
+        EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+        if (d3 && d3->isAuthenticated()) d3->setDC(enable);
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+        EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+        if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
+    } else if (cmd == PROTOCOL_CMD_SET_VALUE) {
+        uint8_t type = rx_buf[3];
+        int value = *(int*)&rx_buf[4];
+        EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+        if (d3 && d3->isAuthenticated()) {
+            if(type == 1) d3->setAcChargingLimit(value);
+            else if(type == 2) d3->setBatterySOCLimits(value, -1);
+            else if(type == 3) d3->setBatterySOCLimits(101, value);
         }
-    } else if (cmd == CMD_SET_DC) {
-        // Toggle DC Power
-        uint8_t enable;
-        if (unpack_set_dc_message(rx_buf, &enable) == 0) {
-            EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-            if (d3 && d3->isAuthenticated()) d3->setDC(enable);
-
-            EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-            if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
-
-            EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-            if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) {
+            if(type == 1) d3p->setAcChargingLimit(value);
+            else if(type == 2) d3p->setBatterySOCLimits(value, -1);
+            else if(type == 3) d3p->setBatterySOCLimits(101, value);
         }
-    } else if (cmd == CMD_SET_VALUE) {
-        // Handle generic value setting (Charge limits, SOC limits)
-        uint8_t type;
-        int value;
-        if (unpack_set_value_message(rx_buf, &type, &value) == 0) {
-             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-             if (d3 && d3->isAuthenticated()) {
-                switch(type) {
-                    case SET_VAL_AC_LIMIT: d3->setAcChargingLimit(value); break;
-                    case SET_VAL_MAX_SOC: d3->setBatterySOCLimits(value, -1); break;
-                    case SET_VAL_MIN_SOC: d3->setBatterySOCLimits(101, value); break;
-                }
-             }
-             EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-             if (d3p && d3p->isAuthenticated()) {
-                 switch(type) {
-                    case SET_VAL_AC_LIMIT: d3p->setAcChargingLimit(value); break;
-                    case SET_VAL_MAX_SOC: d3p->setBatterySOCLimits(value, -1); break;
-                    case SET_VAL_MIN_SOC: d3p->setBatterySOCLimits(101, value); break;
-                 }
-             }
-             EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-             if (alt && alt->isAuthenticated()) {
-                 switch(type) {
-                    case SET_VAL_ALT_START_VOLTAGE: alt->setBatteryVoltage((float)value / 10.0f); break;
-                    case SET_VAL_ALT_MODE: alt->setChargerMode(value); break;
-                    case SET_VAL_ALT_PROD_LIMIT: alt->setPowerLimit(value); break;
-                    case SET_VAL_ALT_REV_LIMIT: alt->setCarBatteryChargeLimit((float)value); break;
-                    case SET_VAL_ALT_CHG_LIMIT: alt->setDeviceBatteryChargeLimit((float)value); break;
-                 }
-             }
+        EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+        if (alt && alt->isAuthenticated()) {
+            if(type == 10) alt->setBatteryVoltage((float)value / 10.0f);
+            else if(type == 11) alt->setChargerMode(value);
+            else if(type == 12) alt->setPowerLimit(value);
+            else if(type == 13) alt->setCarBatteryChargeLimit((float)value);
+            else if(type == 14) alt->setDeviceBatteryChargeLimit((float)value);
         }
-    } else if (cmd == CMD_POWER_OFF) {
-        // Execute power-off sequence
-        ESP_LOGI(TAG, "Received Power OFF Command. Shutting down...");
+    } else if (cmd == PROTOCOL_CMD_POWER_OFF) {
         Serial1.end();
         pinMode(POWER_LATCH_PIN, OUTPUT);
-        digitalWrite(POWER_LATCH_PIN, HIGH); // Assumes HIGH triggers shutdown
+        digitalWrite(POWER_LATCH_PIN, HIGH);
         delay(3000);
         ESP.restart();
-    } else if (cmd == CMD_GET_DEBUG_INFO) {
-        // Reply with system debug info
+    } else if (cmd == PROTOCOL_CMD_CONNECT_DEVICE) {
+        uint8_t type = rx_buf[3];
+        DeviceManager::getInstance().scanAndConnect((DeviceType)type);
+    } else if (cmd == PROTOCOL_CMD_FORGET_DEVICE) {
+        uint8_t type = rx_buf[3];
+        DeviceManager::getInstance().forget((DeviceType)type);
+    } else if (cmd == PROTOCOL_CMD_GET_DEBUG_INFO) {
         DebugInfo info = {0};
-
-        // WiFi IP
         if(WiFi.status() == WL_CONNECTED) {
             strncpy(info.ip, WiFi.localIP().toString().c_str(), 15);
         } else {
              strncpy(info.ip, "Disconnected", 15);
         }
-
-        // Device Counts
-        DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
-        for(int i=0; i<4; i++) {
-             DeviceSlot* s = DeviceManager::getInstance().getSlot(types[i]);
-             if(s) {
-                 if(s->isConnected) info.devices_connected++;
-                 if(!s->macAddress.empty()) info.devices_paired++;
-             }
-        }
-
         uint8_t buffer[sizeof(DebugInfo) + 4];
         int len = pack_debug_info_message(buffer, &info);
         Serial1.write(buffer, len);
-    } else if (cmd == CMD_CONNECT_DEVICE) {
-        // Initiate BLE scan/connection for a device type
-        uint8_t type;
-        if (unpack_connect_device_message(rx_buf, &type) == 0) {
-            DeviceManager::getInstance().scanAndConnect((DeviceType)type);
-        }
-    } else if (cmd == CMD_FORGET_DEVICE) {
-        // Forget a bonded device
-        uint8_t type;
-        if (unpack_forget_device_message(rx_buf, &type) == 0) {
-            DeviceManager::getInstance().forget((DeviceType)type);
-        }
     }
 }
 
-/**
- * @brief Constructs and sends the Device List packet.
- *
- * Iterates through all device slots in DeviceManager and populates the
- * DeviceList structure with ID, Name, Connection Status, and Pairing Status.
- */
 void Stm32Serial::sendDeviceList() {
-    DeviceList list = {0};
-    DeviceSlot* slots[] = {
-        DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
-        DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
-        DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
-        DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
-    };
+    DeviceListMessage msg;
+    memset(&msg, 0, sizeof(msg));
 
-    uint8_t count = 0;
+    msg.count = 0;
     for (int i = 0; i < 4; i++) {
-        if (slots[i]) {
-            list.devices[count].id = (uint8_t)slots[i]->type;
-            strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
-            list.devices[count].connected = slots[i]->isConnected ? 1 : 0;
-            list.devices[count].paired = !slots[i]->macAddress.empty() ? 1 : 0;
-            count++;
+        DeviceSlot* s = DeviceManager::getInstance().getSlotByIndex(i);
+        if (s && !s->macAddress.empty()) {
+            msg.devices[msg.count].slot = i;
+            msg.devices[msg.count].type = (uint8_t)s->type;
+            strncpy(msg.devices[msg.count].sn, s->serialNumber.c_str(), 15);
+            msg.devices[msg.count].is_connected = s->isConnected ? 1 : 0;
+            msg.devices[msg.count].paired = 1;
+            if (s->instance) {
+                msg.devices[msg.count].battery_level = (uint8_t)s->instance->getBatteryLevel();
+            }
+            msg.count++;
         }
     }
-    list.count = count;
 
-    uint8_t buffer[sizeof(DeviceList) + 4];
-    int len = pack_device_list_message(buffer, &list);
-    Serial1.write(buffer, len);
+    uint8_t payload[sizeof(DeviceListMessage)];
+    pack_device_list_message(&msg, payload);
+    sendPacket(PROTOCOL_CMD_DEVICE_LIST, payload, sizeof(payload));
 }
 
-/**
- * @brief Sends the detailed status for a specific device.
- *
- * Maps the internal device data structures (Delta3Data, Wave2Data, etc.)
- * to the protocol-defined DeviceStatus structure and transmits it via UART.
- *
- * @param device_id The ID of the device to report.
- */
 void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     DeviceType type = (DeviceType)device_id;
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
 
     if (!dev || !dev->isAuthenticated()) return;
 
-    DeviceStatus status = {0};
-    status.id = device_id;
-    status.connected = 1;
+    DeviceStatusMessage status;
+    memset(&status, 0, sizeof(status));
 
-    // Set Brightness based on ambient light sensor
+    status.slot = 0;
+    status.type = (uint8_t)type;
+    status.battery_level = (uint8_t)dev->getBatteryLevel();
     status.brightness = LightSensor::getInstance().getBrightnessPercent();
 
     if (type == DeviceType::DELTA_3) {
-        strncpy(status.name, "Delta 3", 15);
         const Delta3Data& src = dev->getData().delta3;
-        Delta3DataStruct& dst = status.data.d3;
-
-        dst.batteryLevel = src.batteryLevel;
-        dst.acInputPower = src.acInputPower;
-        dst.acOutputPower = src.acOutputPower;
-        dst.inputPower = src.inputPower;
-        dst.outputPower = src.outputPower;
-        dst.dc12vOutputPower = src.dc12vOutputPower;
-        dst.dcPortInputPower = src.dcPortInputPower;
-        dst.dcPortState = src.dcPortState;
-        dst.usbcOutputPower = src.usbcOutputPower;
-        dst.usbc2OutputPower = src.usbc2OutputPower;
-        dst.usbaOutputPower = src.usbaOutputPower;
-        dst.usba2OutputPower = src.usba2OutputPower;
-        dst.pluggedInAc = src.pluggedInAc;
-        dst.energyBackup = src.energyBackup;
-        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
-        dst.batteryInputPower = src.batteryInputPower;
-        dst.batteryOutputPower = src.batteryOutputPower;
-        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
-        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
-        dst.cellTemperature = src.cellTemperature;
-        dst.dc12vPort = src.dc12vPort;
-        dst.acPorts = src.acPorts;
-        dst.solarInputPower = src.solarInputPower;
-        dst.acChargingSpeed = src.acChargingSpeed;
-        dst.maxAcChargingPower = src.maxAcChargingPower;
-        dst.acOn = src.acOn;
-        dst.dcOn = src.dcOn;
-        dst.usbOn = src.usbOn;
-
+        Delta3DataStruct& dst = status.data.delta3;
+        dst.totalInputPower = src.inputPower;
+        dst.totalOutputPower = src.outputPower;
+        dst.acSwitch = src.acOn;
+        dst.dcSwitch = src.dcOn;
+        dst.usbSwitch = src.usbOn;
+        dst.acChgLimit = src.acChgLimit;
+        dst.maxChgSoc = src.maxChgSoc;
+        dst.minDsgSoc = src.minDsgSoc;
     } else if (type == DeviceType::WAVE_2) {
-        strncpy(status.name, "Wave 2", 15);
         const Wave2Data& src = dev->getData().wave2;
-        Wave2DataStruct& dst = status.data.w2;
-
-        dst.mode = src.mode;
-        dst.subMode = src.subMode;
+        Wave2DataStruct& dst = status.data.wave2;
         dst.setTemp = src.setTemp;
-        dst.fanValue = src.fanValue;
         dst.envTemp = src.envTemp;
-        dst.tempSys = src.tempSys;
-        dst.batSoc = src.batSoc;
-        dst.remainingTime = src.remainingTime;
-        dst.powerMode = src.powerMode;
-        dst.batPwrWatt = src.batPwrWatt;
-
+        dst.mode = src.mode;
     } else if (type == DeviceType::DELTA_PRO_3) {
-        strncpy(status.name, "Delta Pro 3", 15);
         const DeltaPro3Data& src = dev->getData().deltaPro3;
-        DeltaPro3DataStruct& dst = status.data.d3p;
-
-        dst.batteryLevel = src.batteryLevel;
-        dst.batteryLevelMain = src.batteryLevelMain;
+        DeltaPro3DataStruct& dst = status.data.deltaPro3;
         dst.acInputPower = src.acInputPower;
-        dst.acLvOutputPower = src.acLvOutputPower;
-        dst.acHvOutputPower = src.acHvOutputPower;
-        dst.inputPower = src.inputPower;
-        dst.outputPower = src.outputPower;
-        dst.dc12vOutputPower = src.dc12vOutputPower;
-        dst.dcLvInputPower = src.dcLvInputPower;
-        dst.dcHvInputPower = src.dcHvInputPower;
-        dst.dcLvInputState = src.dcLvInputState;
-        dst.dcHvInputState = src.dcHvInputState;
-        dst.usbcOutputPower = src.usbcOutputPower;
-        dst.usbc2OutputPower = src.usbc2OutputPower;
-        dst.usbaOutputPower = src.usbaOutputPower;
-        dst.usba2OutputPower = src.usba2OutputPower;
-        dst.acChargingSpeed = src.acChargingSpeed;
-        dst.maxAcChargingPower = src.maxAcChargingPower;
-        dst.pluggedInAc = src.pluggedInAc;
-        dst.energyBackup = src.energyBackup;
-        dst.energyBackupBatteryLevel = src.energyBackupBatteryLevel;
-        dst.batteryChargeLimitMin = src.batteryChargeLimitMin;
-        dst.batteryChargeLimitMax = src.batteryChargeLimitMax;
-        dst.cellTemperature = src.cellTemperature;
-        dst.dc12vPort = src.dc12vPort;
-        dst.acLvPort = src.acLvPort;
-        dst.acHvPort = src.acHvPort;
-        dst.solarLvPower = src.solarLvPower;
-        dst.solarHvPower = src.solarHvPower;
-        dst.gfiMode = src.gfiMode;
-
-    } else if (type == DeviceType::ALTERNATOR_CHARGER) {
-        strncpy(status.name, "Alt Charger", 15);
-        const AlternatorChargerData& src = dev->getData().alternatorCharger;
-        AlternatorChargerDataStruct& dst = status.data.ac;
-
         dst.batteryLevel = src.batteryLevel;
-        dst.dcPower = src.dcPower;
-        dst.chargerMode = src.chargerMode;
-        dst.chargerOpen = src.chargerOpen;
+    } else if (type == DeviceType::ALTERNATOR_CHARGER) {
+        const AlternatorChargerData& src = dev->getData().alternatorCharger;
+        AlternatorChargerDataStruct& dst = status.data.alternatorCharger;
         dst.carBatteryVoltage = src.carBatteryVoltage;
-        dst.startVoltage = src.startVoltage;
-        dst.powerLimit = src.powerLimit;
-        dst.reverseChargingCurrentLimit = src.reverseChargingCurrentLimit;
-        dst.chargingCurrentLimit = src.chargingCurrentLimit;
-        dst.startVoltageMin = src.startVoltageMin;
-        dst.startVoltageMax = src.startVoltageMax;
-        dst.powerMax = src.powerMax;
-        dst.reverseChargingCurrentMax = src.reverseChargingCurrentMax;
-        dst.chargingCurrentMax = src.chargingCurrentMax;
     }
 
-    uint8_t buffer[sizeof(DeviceStatus) + 4];
-    int len = pack_device_status_message(buffer, &status);
-    Serial1.write(buffer, len);
+    uint8_t buffer[sizeof(DeviceStatusMessage)];
+    pack_device_status_message(&status, buffer);
+    sendPacket(PROTOCOL_CMD_DEVICE_STATUS, buffer, sizeof(buffer));
+}
+
+// --- OTA Implementation ---
+
+void Stm32Serial::startOTA(size_t totalSize) {
+    uint32_t size = (uint32_t)totalSize;
+    ESP_LOGI(TAG, "Sending OTA Start: %u bytes", size);
+
+    ota_ack_received = false;
+    _ota_error = false;
+    sendPacket(PROTOCOL_CMD_OTA_START, (uint8_t*)&size, sizeof(size));
+
+    // Wait for ACK (Erase complete) with 20s timeout
+    uint32_t start = millis();
+    while(!ota_ack_received && (millis() - start < 20000)) {
+        // We do NOT call update() here anymore to prevent race condition.
+        // The main loop() calls update(), which sets ota_ack_received.
+        delay(20);
+        esp_task_wdt_reset();
+    }
+
+    if (ota_ack_received) {
+        ESP_LOGI(TAG, "OTA ACK Received. Starting Transfer.");
+    } else {
+        ESP_LOGE(TAG, "OTA ACK Timeout or NACK. Aborting.");
+        _ota_error = true;
+    }
+}
+
+void Stm32Serial::sendOtaChunk(uint8_t* data, size_t len, size_t index) {
+    if (_ota_error) return;
+
+    size_t pos = 0;
+    while(pos < len) {
+        size_t chunkSize = len - pos;
+        if(chunkSize > 230) chunkSize = 230; // Safe margin
+
+        size_t currentOffset = index + pos;
+
+        uint8_t payload[240];
+        payload[0] = (currentOffset >> 0) & 0xFF;
+        payload[1] = (currentOffset >> 8) & 0xFF;
+        payload[2] = (currentOffset >> 16) & 0xFF;
+        payload[3] = (currentOffset >> 24) & 0xFF;
+
+        memcpy(&payload[4], data + pos, chunkSize);
+
+        sendPacket(PROTOCOL_CMD_OTA_CHUNK, payload, chunkSize + 4);
+        pos += chunkSize;
+    }
+}
+
+void Stm32Serial::endOTA() {
+    if (_ota_error) return;
+    ESP_LOGI(TAG, "Sending OTA End");
+    uint8_t dummy = 0;
+    sendPacket(PROTOCOL_CMD_OTA_END, &dummy, 1);
 }

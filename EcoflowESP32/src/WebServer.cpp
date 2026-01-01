@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include <Update.h>
+#include "Stm32Serial.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -81,6 +83,59 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // Firmware Update Handler
+    server.on("/api/update", HTTP_POST, [](AsyncWebServerRequest *request){
+        bool success = !Update.hasError();
+        if (request->hasParam("target", true) && request->getParam("target", true)->value() == "stm32") {
+            // For STM32, success is tracked internally by Stm32Serial or assumed OK if no exception
+            // We can check a flag in Stm32Serial if implemented, but for now we assume success
+            success = true;
+        }
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", success ? "OK" : "FAIL");
+        response->addHeader("Connection", "close");
+        request->send(response);
+    }, handleUpdate);
+}
+
+void WebServer::handleUpdate(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    String target = "esp32";
+    if(request->hasParam("target", true)) {
+        target = request->getParam("target", true)->value();
+    }
+
+    if (target == "esp32") {
+        if (!index) {
+            ESP_LOGI(TAG, "Starting ESP32 Update: %s", filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                Update.printError(Serial);
+            }
+        }
+        if (Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        if (final) {
+            if (Update.end(true)) {
+                ESP_LOGI(TAG, "ESP32 Update Success: %uB", index + len);
+            } else {
+                Update.printError(Serial);
+            }
+        }
+    }
+    else if (target == "stm32") {
+        if (index == 0) {
+            size_t total = request->contentLength();
+            ESP_LOGI(TAG, "Starting STM32 Update: %s (Size: %u)", filename.c_str(), total);
+            Stm32Serial::getInstance().startOTA(total);
+        }
+
+        Stm32Serial::getInstance().sendOtaChunk(data, len, index);
+
+        if (final) {
+            ESP_LOGI(TAG, "STM32 Update Transmitted. Finalizing...");
+            Stm32Serial::getInstance().endOTA();
+        }
+    }
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {

@@ -23,60 +23,54 @@ uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
 }
 
 int pack_handshake_message(uint8_t *buffer) {
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_HANDSHAKE;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_HANDSHAKE;
     buffer[2] = 0;
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
 }
 
 int pack_handshake_ack_message(uint8_t *buffer) {
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_HANDSHAKE_ACK;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_HANDSHAKE_ACK;
     buffer[2] = 0;
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
 }
 
-int pack_device_list_message(uint8_t *buffer, const DeviceList *list) {
-    uint8_t len = sizeof(DeviceList);
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_DEVICE_LIST;
+int pack_device_list_message(uint8_t *buffer, const DeviceListMessage *list) {
+    uint8_t len = sizeof(DeviceListMessage);
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_DEVICE_LIST;
     buffer[2] = len;
     memcpy(&buffer[3], list, len);
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
     return 4 + len;
 }
 
-int unpack_device_list_message(const uint8_t *buffer, DeviceList *list) {
+int unpack_device_list_message(const uint8_t *buffer, DeviceListMessage *list) {
     uint8_t len = buffer[2];
-    if (len != sizeof(DeviceList)) return -2; // Size mismatch
+    if (len != sizeof(DeviceListMessage)) return -2;
 
     uint8_t received_crc = buffer[3 + len];
     uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
     if (received_crc != calculated_crc) return -1;
 
     memcpy(list, &buffer[3], len);
-
-    // Safety check: Clamp device count
-    if (list->count > MAX_DEVICES) {
-        list->count = MAX_DEVICES;
-    }
-
     return 0;
 }
 
 int pack_power_off_message(uint8_t *buffer) {
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_POWER_OFF;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_POWER_OFF;
     buffer[2] = 0; // Length
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
 }
 
 int pack_device_list_ack_message(uint8_t *buffer) {
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_DEVICE_LIST_ACK;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_DEVICE_LIST_ACK;
     buffer[2] = 0;
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
@@ -84,8 +78,8 @@ int pack_device_list_ack_message(uint8_t *buffer) {
 
 int pack_get_device_status_message(uint8_t *buffer, uint8_t device_id) {
     uint8_t len = 1;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_GET_DEVICE_STATUS;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_GET_DEVICE_STATUS;
     buffer[2] = len;
     buffer[3] = device_id;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
@@ -104,19 +98,19 @@ int unpack_get_device_status_message(const uint8_t *buffer, uint8_t *device_id) 
     return 0;
 }
 
-int pack_device_status_message(uint8_t *buffer, const DeviceStatus *status) {
-    uint8_t len = sizeof(DeviceStatus);
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_DEVICE_STATUS;
+int pack_device_status_message(uint8_t *buffer, const DeviceStatusMessage *status) {
+    uint8_t len = sizeof(DeviceStatusMessage);
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_DEVICE_STATUS;
     buffer[2] = len;
     memcpy(&buffer[3], status, len);
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
     return 4 + len;
 }
 
-int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
+int unpack_device_status_message(const uint8_t *buffer, DeviceStatusMessage *status) {
     uint8_t len = buffer[2];
-    if (len != sizeof(DeviceStatus)) return -2;
+    if (len != sizeof(DeviceStatusMessage)) return -2;
 
     uint8_t received_crc = buffer[3 + len];
     uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
@@ -128,8 +122,8 @@ int unpack_device_status_message(const uint8_t *buffer, DeviceStatus *status) {
 
 int pack_set_wave2_message(uint8_t *buffer, uint8_t type, uint8_t value) {
     uint8_t len = sizeof(Wave2SetMsg);
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_SET_WAVE2;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_SET_WAVE2;
     buffer[2] = len;
 
     Wave2SetMsg msg;
@@ -158,8 +152,8 @@ int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *valu
 
 int pack_set_ac_message(uint8_t *buffer, uint8_t enable) {
     uint8_t len = 1;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_SET_AC;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_SET_AC;
     buffer[2] = len;
     buffer[3] = enable;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
@@ -178,8 +172,8 @@ int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable) {
 
 int pack_set_dc_message(uint8_t *buffer, uint8_t enable) {
     uint8_t len = 1;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_SET_DC;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_SET_DC;
     buffer[2] = len;
     buffer[3] = enable;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
@@ -197,10 +191,9 @@ int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
 }
 
 int pack_set_value_message(uint8_t *buffer, uint8_t type, int value) {
-    // [type:1][value:4]
     uint8_t len = 5;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_SET_VALUE;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_SET_VALUE;
     buffer[2] = len;
     buffer[3] = type;
     memcpy(&buffer[4], &value, 4);
@@ -221,8 +214,8 @@ int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value) {
 }
 
 int pack_get_debug_info_message(uint8_t *buffer) {
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_GET_DEBUG_INFO;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_GET_DEBUG_INFO;
     buffer[2] = 0;
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
@@ -230,8 +223,8 @@ int pack_get_debug_info_message(uint8_t *buffer) {
 
 int pack_debug_info_message(uint8_t *buffer, const DebugInfo *info) {
     uint8_t len = sizeof(DebugInfo);
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_DEBUG_INFO;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_DEBUG_INFO;
     buffer[2] = len;
     memcpy(&buffer[3], info, len);
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
@@ -252,8 +245,8 @@ int unpack_debug_info_message(const uint8_t *buffer, DebugInfo *info) {
 
 int pack_connect_device_message(uint8_t *buffer, uint8_t device_type) {
     uint8_t len = 1;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_CONNECT_DEVICE;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_CONNECT_DEVICE;
     buffer[2] = len;
     buffer[3] = device_type;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
@@ -272,8 +265,8 @@ int unpack_connect_device_message(const uint8_t *buffer, uint8_t *device_type) {
 
 int pack_forget_device_message(uint8_t *buffer, uint8_t device_type) {
     uint8_t len = 1;
-    buffer[0] = START_BYTE;
-    buffer[1] = CMD_FORGET_DEVICE;
+    buffer[0] = PROTOCOL_START_BYTE;
+    buffer[1] = PROTOCOL_CMD_FORGET_DEVICE;
     buffer[2] = len;
     buffer[3] = device_type;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);

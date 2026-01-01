@@ -11,6 +11,7 @@
  */
 
 #include <Arduino.h>
+#include <freertos/semphr.h>
 #include "ecoflow_protocol.h"
 
 /**
@@ -55,11 +56,17 @@ public:
      */
     void sendDeviceStatus(uint8_t device_id);
 
+    // OTA Update Methods
+    void startOTA(size_t totalSize);
+    void sendOtaChunk(uint8_t* data, size_t len, size_t index);
+    void endOTA();
+    bool isOtaError() { return _ota_error; }
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
      */
-    Stm32Serial() {}
+    Stm32Serial() : _rx_idx(0), _expected_len(0), _collecting(false), _ota_error(false), _txMutex(NULL) {}
 
     /**
      * @brief Processes a fully received and validated packet.
@@ -73,6 +80,16 @@ private:
      * @return uint8_t
      */
     uint8_t calculateBrightness();
+
+    void sendPacket(uint8_t cmd, const uint8_t* payload, size_t len);
+
+    // RX State Members
+    uint8_t _rx_buf[1024];
+    uint16_t _rx_idx;
+    uint8_t _expected_len;
+    bool _collecting;
+    volatile bool _ota_error;
+    SemaphoreHandle_t _txMutex;
 };
 
 #endif

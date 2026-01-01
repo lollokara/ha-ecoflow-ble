@@ -111,6 +111,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .btn:active { transform: scale(0.95); }
         .btn-primary { background: linear-gradient(45deg, rgba(0, 243, 255, 0.2), rgba(0, 255, 157, 0.2)); border-color: var(--neon-cyan); color: var(--neon-cyan); }
         .btn-primary:hover { background: linear-gradient(45deg, rgba(0, 243, 255, 0.4), rgba(0, 255, 157, 0.4)); box-shadow: 0 0 15px var(--neon-cyan); color: #fff; }
+        .btn-danger { background: rgba(255, 50, 50, 0.2); border-color: #ff5252; color: #ff5252; }
+        .btn-danger:hover { background: rgba(255, 50, 50, 0.4); }
 
         /* Add Device Button */
         #add-device-btn {
@@ -211,6 +213,16 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         .hidden { display: none !important; }
         .intro { text-align: center; padding: 60px 20px; animation: fadeIn 1s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Update Section */
+        .update-box {
+            background: rgba(255,255,255,0.05); border: 1px dashed #444; border-radius: 8px;
+            padding: 15px; text-align: center; margin-top: 10px;
+        }
+        .progress-bar {
+            width: 100%; height: 6px; background: #333; border-radius: 3px; margin-top: 10px; overflow: hidden;
+        }
+        .progress-fill { height: 100%; width: 0%; background: var(--neon-green); transition: width 0.2s; }
     </style>
 </head>
 <body>
@@ -255,8 +267,24 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 <div class="ctrl-row"><span>Max Light (ADC): <b id="val-max-adc" style="color:var(--neon-green)">4095</b></span></div>
                 <input type="range" id="rg-max-adc" min="0" max="4095" step="1" oninput="el('val-max-adc').innerText=this.value">
 
+                <hr style="border-color:var(--glass-border); margin:15px 0">
+
+                <h4 style="margin-bottom:10px; color:var(--text-sub);">Firmware Update</h4>
+                <div class="update-box">
+                    <div class="ctrl-row">
+                         <select id="fw-target" style="width: 100%;">
+                             <option value="esp32">ESP32 Firmware</option>
+                             <option value="stm32">STM32 Firmware</option>
+                         </select>
+                    </div>
+                    <input type="file" id="fw-file" style="margin-top:10px; width:100%; color:#aaa;">
+                    <button class="btn btn-primary" style="margin-top:10px; width:100%;" onclick="uploadFw()">Start Update</button>
+                    <div id="fw-progress" class="progress-bar"><div id="fw-fill" class="progress-fill"></div></div>
+                    <div id="fw-status" style="font-size:0.8em; color:#888; margin-top:5px;"></div>
+                </div>
+
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                    <button class="btn" onclick="closeSettings()">Cancel</button>
+                    <button class="btn" onclick="closeSettings()">Close</button>
                     <button class="btn btn-primary" onclick="saveSettings()">Save</button>
                 </div>
             </div>
@@ -616,17 +644,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             else card.classList.add('offline');
         }
 
-        // Debug Power State
-        if (type === 'w2' && d.connected) {
-            console.log('W2 UI Update: pwr=', d.pwr, ' mode=', d.mode);
-        }
-
         // Render menu again to update state (Disconnect vs Forget)
         const menuContainer = card?.querySelector('.header > div');
         // We need to preserve the batt value span
         if (menuContainer) {
-             // This is a bit hacky but non-destructive to the rest of the card
-             // We find the 3-dot btn and menu and replace them
              const btn = menuContainer.querySelector('.card-menu-btn');
              const menu = menuContainer.querySelector('.card-menu');
              if(btn) btn.remove();
@@ -798,12 +819,8 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     }
 
     function toggleW2Power() {
-        // Visual toggle immediately for responsiveness
         const btn = el('pwr-btn-w2');
         const isOn = btn.classList.contains('on');
-        // If ON (1), we want to turn OFF (0/false -> backend maps to 2)
-        // If OFF (2), we want to turn ON (1/true -> backend maps to 1)
-        // Backend expects boolean in JSON: true -> 1 (ON), false -> 2 (OFF)
         cmd('w2', 'set_power', !isOn);
     }
 
@@ -879,6 +896,49 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             body:JSON.stringify({type, cmd: cmdName, val: val})
         });
     }
+
+    // --- Firmware Upload ---
+    function uploadFw() {
+        const file = el('fw-file').files[0];
+        const target = el('fw-target').value;
+        if(!file) { alert('Select a file first'); return; }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('target', target);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/update', true);
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                el('fw-fill').style.width = percent + '%';
+                el('fw-status').innerText = 'Uploading: ' + Math.round(percent) + '%';
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                el('fw-fill').style.width = '100%';
+                el('fw-status').innerText = 'Update Complete! Device rebooting...';
+                if(target === 'esp32') {
+                    setTimeout(() => location.reload(), 3000);
+                }
+            } else {
+                el('fw-status').innerText = 'Update Failed: ' + xhr.responseText;
+                el('fw-fill').style.background = '#ff5252';
+            }
+        };
+
+        xhr.onerror = function() {
+             el('fw-status').innerText = 'Upload Error';
+             el('fw-fill').style.background = '#ff5252';
+        };
+
+        xhr.send(formData);
+    }
+
 
     // --- Logs ---
     function toggleLogs() {

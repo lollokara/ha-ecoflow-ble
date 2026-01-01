@@ -36,6 +36,9 @@ private:
     static void handleLogs(AsyncWebServerRequest *request);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+
+    // OTA Update
+    static void handleUpdate(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 };
 
 #endif
