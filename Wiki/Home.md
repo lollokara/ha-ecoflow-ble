@@ -21,7 +21,7 @@ graph TD
     STM32 -->|UART Protocol| ESP32[ESP32-S3 BLE Gateway]
     STM32 -->|UART Protocol| RP2040[RP2040 Thermal Controller]
 
-    ESP32 <-->|BLE 2.4GHz| EcoFlow[EcoFlow Device\n(Delta 3 / Wave 2)]
+    ESP32 <-->|BLE 2.4GHz| EcoFlow["EcoFlow Device\n(Delta 3 / Wave 2)"]
 
     RP2040 -->|PWM| Fans[Cooling Fans]
     RP2040 <-->|OneWire| Temp[Temp Sensors]
