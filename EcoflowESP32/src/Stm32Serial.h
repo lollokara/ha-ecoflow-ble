@@ -11,6 +11,7 @@
  */
 
 #include <Arduino.h>
+#include <vector>
 #include "ecoflow_protocol.h"
 
 /**
@@ -54,6 +55,14 @@ public:
      * @param device_id The ID of the device to report.
      */
     void sendDeviceStatus(uint8_t device_id);
+
+    /**
+     * @brief Sends a raw packet with a specific command ID and payload.
+     * Used for custom protocols like OTA.
+     * @param cmd_id The command ID.
+     * @param payload The payload data.
+     */
+    void sendRaw(uint8_t cmd_id, const std::vector<uint8_t>& payload);
 
 private:
     /**

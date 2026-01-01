@@ -5,11 +5,12 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "ota/ota_core.h"
 
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 1024
+#define RING_BUFFER_SIZE 2048
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -101,7 +102,7 @@ typedef enum {
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10 + sizeof(DeviceStatus)]; // Ensure buffer is large enough for big payloads
+static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 256]; // Ensure buffer is large enough for big payloads
 static uint16_t parseIndex = 0; // Payload can be > 255
 static uint8_t expectedPayloadLen = 0;
 
@@ -282,6 +283,9 @@ void StartUARTTask(void * argument) {
     // Create TX Queue
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
 
+    // Initialize OTA
+    OTA_Init();
+
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
@@ -308,7 +312,19 @@ void StartUARTTask(void * argument) {
                 case PARSE_LEN:
                     parseBuffer[parseIndex++] = b;
                     expectedPayloadLen = b;
-                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) {
+                    if (expectedPayloadLen > MAX_PAYLOAD_LEN && expectedPayloadLen != 0 && expectedPayloadLen != 255) {
+                         // Note: OTA chunks can be large (up to 255 for standard packets,
+                         // but here we are piggybacking. If protocol allows larger, we must check).
+                         // The Memory says "STM32F4 UART packet CRC verification must exclude the Start Byte (0xAA) and the final CRC byte, calculating the checksum only over the Command, Length, and Payload bytes".
+                         // The max payload is constrained by uint8_t length in protocol?
+                         // The protocol says [START][CMD][LEN][PAYLOAD][CRC8].
+                         // If LEN is 1 byte, max payload is 255.
+                         // This is inefficient for OTA.
+                         // But if we use standard protocol, we are stuck with 255 chunks.
+                         // Or we use a special mode where LEN is 2 bytes?
+                         // Current `parseState` logic assumes 1 byte LEN.
+                         // Let's stick to 1 byte LEN (max 255 bytes payload).
+                         // This is fine, just more packets.
                         parseState = PARSE_START; // Invalid length, reset
                         parseIndex = 0;
                     } else {
@@ -335,7 +351,15 @@ void StartUARTTask(void * argument) {
 
                         if (received_crc == calcd_crc) {
                             parseBuffer[parseIndex++] = b;
-                            process_packet(parseBuffer, parseIndex);
+
+                            // Check for OTA Command first (Bypass standard processing)
+                            uint8_t cmd = parseBuffer[1];
+                            if (cmd >= 0xF0 && cmd <= 0xF2) {
+                                // Payload starts at index 3, length is in index 2
+                                OTA_ProcessCommand(cmd, &parseBuffer[3], parseBuffer[2]);
+                            } else {
+                                process_packet(parseBuffer, parseIndex);
+                            }
                         } else {
                             printf("UART: CRC Fail. Rx=%02X Calc=%02X\n", received_crc, calcd_crc);
                         }
@@ -377,48 +401,51 @@ void StartUARTTask(void * argument) {
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
 
-            switch (protocolState) {
-                case STATE_HANDSHAKE:
-                    // Only send every 1 second
-                    if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
-                        lastHandshakeTime = xTaskGetTickCount();
-                        printf("UART: Sending Handshake...\n");
-                        len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
-                        protocolState = STATE_WAIT_HANDSHAKE_ACK;
-                    }
-                    break;
+            // Pause polling during OTA
+            if (!OTA_IsActive()) {
+                switch (protocolState) {
+                    case STATE_HANDSHAKE:
+                        // Only send every 1 second
+                        if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
+                            lastHandshakeTime = xTaskGetTickCount();
+                            printf("UART: Sending Handshake...\n");
+                            len = pack_handshake_message(tx_buf);
+                            HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                            protocolState = STATE_WAIT_HANDSHAKE_ACK;
+                        }
+                        break;
 
-                case STATE_WAIT_HANDSHAKE_ACK:
-                    // Retry every 1 second
-                    if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
-                        lastHandshakeTime = xTaskGetTickCount();
-                        printf("UART: Timeout waiting for ACK, resending handshake...\n");
-                        len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
-                    }
-                    break;
-
-                case STATE_WAIT_DEVICE_LIST:
-                    // Just wait
-                     break;
-
-                case STATE_POLLING:
-                    if (knownDevices.count > 0) {
-                        // Skip if index out of bounds (safety)
-                        if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
-
-                        // Only poll if connected
-                        if (knownDevices.devices[currentDeviceIndex].connected) {
-                            uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
-                            len = pack_get_device_status_message(tx_buf, dev_id);
+                    case STATE_WAIT_HANDSHAKE_ACK:
+                        // Retry every 1 second
+                        if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
+                            lastHandshakeTime = xTaskGetTickCount();
+                            printf("UART: Timeout waiting for ACK, resending handshake...\n");
+                            len = pack_handshake_message(tx_buf);
                             HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                         }
+                        break;
 
-                        currentDeviceIndex++;
-                        if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
-                    }
-                    break;
+                    case STATE_WAIT_DEVICE_LIST:
+                        // Just wait
+                         break;
+
+                    case STATE_POLLING:
+                        if (knownDevices.count > 0) {
+                            // Skip if index out of bounds (safety)
+                            if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
+
+                            // Only poll if connected
+                            if (knownDevices.devices[currentDeviceIndex].connected) {
+                                uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
+                                len = pack_get_device_status_message(tx_buf, dev_id);
+                                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                            }
+
+                            currentDeviceIndex++;
+                            if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
+                        }
+                        break;
+                }
             }
         }
 
