@@ -21,6 +21,8 @@
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
 #include "Stm32Serial.h"
+#include "OtaManager.h"
+#include <LittleFS.h>
 
 // Hardware Pin Definitions
 #define POWER_LATCH_PIN 16 ///< GPIO pin to control the power latch (keeps device on).
@@ -72,6 +74,11 @@ void setup() {
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();
 
+    // Initialize LittleFS for OTA buffering
+    if (!LittleFS.begin(true)) {
+        ESP_LOGE(TAG, "LittleFS Mount Failed");
+    }
+
     // Initialize the Device Manager to handle BLE connections
     DeviceManager::getInstance().initialize();
 
@@ -107,6 +114,9 @@ void loop() {
 
     // Check for debug commands
     checkSerial();
+
+    // Process OTA updates
+    OtaManager::getInstance().update();
 
     // Process incoming UART packets from STM32F4
     Stm32Serial::getInstance().update();
