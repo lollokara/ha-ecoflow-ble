@@ -90,24 +90,28 @@ void Stm32Serial::update() {
                      Serial1.write(crc);
 
                      _otaLastPacketTime = millis();
+                     if(_otaOffset % 10240 == 0) ESP_LOGI(TAG, "OTA Sending chunk @ %u", _otaOffset);
                  } else {
                      // EOF?
+                     ESP_LOGI(TAG, "OTA EOF reached. Transitioning to VERIFYING.");
                      _otaState = OTAState::VERIFYING;
                  }
              } else {
                  _otaState = OTAState::ERROR;
                  _otaError = "File Read Error";
+                 ESP_LOGE(TAG, "OTA File Read Error");
              }
         } else {
             // Waiting for ACK. Timeout?
-            if (millis() - _otaLastPacketTime > 3000) {
-                ESP_LOGW(TAG, "OTA Chunk Timeout. Retrying...");
+            if (millis() - _otaLastPacketTime > 5000) {
+                ESP_LOGW(TAG, "OTA Chunk Timeout (Offset %u). Retrying...", _otaOffset);
                 _otaLastPacketTime = 0; // Retry
             }
         }
     }
     else if (_otaState == OTAState::VERIFYING) {
         // Send END/APPLY command
+        ESP_LOGI(TAG, "OTA Sending CMD_OTA_END...");
         uint8_t buf[4];
         buf[0] = START_BYTE;
         buf[1] = CMD_OTA_END;
@@ -115,8 +119,9 @@ void Stm32Serial::update() {
         buf[3] = calculate_crc8(&buf[1], 2);
         Serial1.write(buf, 4);
 
-        delay(100);
+        delay(200);
 
+        ESP_LOGI(TAG, "OTA Sending CMD_OTA_APPLY...");
         buf[1] = CMD_OTA_APPLY;
         buf[3] = calculate_crc8(&buf[1], 2);
         Serial1.write(buf, 4);

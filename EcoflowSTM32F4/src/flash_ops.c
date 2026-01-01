@@ -1,5 +1,6 @@
 #include "flash_ops.h"
 #include "stm32f4xx_hal.h"
+#include <stdio.h>
 
 // STM32F469 has 2MB Flash, organized in two banks (if dual bank mode enabled)
 // or just sectors.
@@ -71,10 +72,8 @@ uint8_t Flash_EraseSector(uint32_t address) {
     EraseInitStruct.Sector = GetSector(address);
     EraseInitStruct.NbSectors = 1;
 
-    // Protection: Don't erase if we are running from it?
-    // Not implemented here, caller must be careful.
-
     if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+        printf("Flash_EraseSector Failed! Addr: %08lX Sector: %lu Error: %lu\n", address, EraseInitStruct.Sector, SectorError);
         return 1;
     }
     return 0;
@@ -92,35 +91,36 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
 void Flash_SwapBank(void) {
     FLASH_OBProgramInitTypeDef OBInit;
 
+    printf("Flash_SwapBank: Unlocking OB...\n");
     HAL_FLASH_OB_Unlock();
+
+    OBInit.OptionType = OPTIONBYTE_USER;
     HAL_FLASHEx_OBGetConfig(&OBInit);
 
+    // STM32F469: BFB2 bit in OPTCR controls boot bank.
+    // Note: The HAL structure for STM32F469 might use `USERConfig` directly.
+    // Check if BFB2 is set.
+
+    // Safety check: Don't swap if we are already in Bank 2 (unless we want to swap back to 1).
+    // Assuming we want to swap.
+
     // Toggle BFB2
-    // If BFB2 is RESET (boot from Bank 1), we set it (boot from Bank 2)
-    // Note: BFB2 logic is inverted or specific to device.
-    // STM32F469:
-    // BFB2 = 0 -> Boot from Bank 1
-    // BFB2 = 1 -> Boot from Bank 2 (if valid)
+    if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+        printf("Flash_SwapBank: BFB2 is ENABLED. Disabling (Boot Bank 1)...\n");
+        OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
+    } else {
+        printf("Flash_SwapBank: BFB2 is DISABLED. Enabling (Boot Bank 2)...\n");
+        OBInit.USERConfig |= FLASH_OPTCR_BFB2;
+    }
 
-    // Actually, HAL_FLASHEx_OBGetConfig fills USERConfig.
-    // We toggle the bit.
+    if(HAL_FLASHEx_OBProgram(&OBInit) != HAL_OK) {
+        printf("Flash_SwapBank: OBProgram Failed!\n");
+    } else {
+        printf("Flash_SwapBank: OBProgram Success. Launching Option Byte Launch (Reset)...\n");
+        HAL_FLASH_OB_Launch(); // This triggers reset
+    }
 
-    // Note: This requires a System Reset to take effect.
-    // AND it requires that the Dual Bank mode is enabled in option bytes.
-    // We assume the board is in Dual Bank mode (default for 2MB).
-
-    // This is risky without testing on hardware.
-    // For now, we will perform a soft reset.
-    // The actual swap logic involves:
-    // OBInit.OptionType = OPTIONBYTE_USER;
-    // OBInit.USERConfig = OBInit.USERConfig ^ OB_BFB2_ENABLE; // Toggle? No, specific masks.
-
-    // Let's just reset for now, assuming the user will handle the bootloader/bank switching externally
-    // or manually. Writing the code is the first step.
-
-    // If the user wants full OTA, we should probably toggle.
-    // But if we toggle and the new firmware is bad, we brick it.
-
-    HAL_FLASH_OB_Lock();
+    HAL_FLASH_OB_Lock(); // Should not reach here if Launch works
+    printf("Flash_SwapBank: Manual Reset...\n");
     HAL_NVIC_SystemReset();
 }

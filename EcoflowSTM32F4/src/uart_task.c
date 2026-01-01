@@ -8,6 +8,7 @@
 #include "flash_ops.h"
 
 UART_HandleTypeDef huart6;
+extern IWDG_HandleTypeDef hiwdg; // External Watchdog handle from main.c
 
 // Ring Buffer Implementation
 #define RING_BUFFER_SIZE 1024
@@ -227,6 +228,8 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         // Let's assume we erase first 4 sectors (16+16+16+64 = 112KB) + others.
         // This is slow. We should send ACK first?
 
+        printf("UART: OTA Start. Size: %lu\n", ota_size);
+
         uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
         ack[3] = calculate_crc8(&ack[1], 2);
         HAL_UART_Transmit(&huart6, ack, 4, 100);
@@ -270,25 +273,51 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         // ESP32 waits 5s for ACK.
 
         if (offset == 0) {
+             printf("UART: OTA First Chunk. Erasing Flash...\n");
              // First chunk, ensure unlocked.
              Flash_Unlock();
-             // Erase Sector 12
-             Flash_EraseSector(0x08100000);
-             // ... and 13, 14, 15...
-             // We really should calculate which sectors based on size.
-             // For now, let's just erase Sector 12 (16KB) for testing.
-             // If firmware > 16KB, it will fail.
-             // Implementation Detail: loop through sectors covering ota_size
+
+             // Smart Erase Loop covering ota_size
              uint32_t current = 0x08100000;
              uint32_t end = current + ota_size;
+
+             // Determine start sector
+             // Iterate through 2MB space (Bank 2 starts at sector 12)
+             // We know Bank 2 sectors: 12-15 (16K), 16 (64K), 17-23 (128K)
+             // Simplified loop: Erase 128KB chunks? No, strict sectors.
+
+             // Brute force sectors 12 to 23 checking overlap
+             // Sector 12: 0x08100000 - 0x08104000 (16K)
+             // Sector 13: 0x08104000 - 0x08108000 (16K)
+             // Sector 14: 0x08108000 - 0x0810C000 (16K)
+             // Sector 15: 0x0810C000 - 0x08110000 (16K)
+             // Sector 16: 0x08110000 - 0x08120000 (64K)
+             // Sector 17: 0x08120000 - 0x08140000 (128K)
+             // ...
+
+             // For robustness against IWDG, we refresh inside this loop if we can iterate sectors.
+             // Since Flash_EraseSector takes address, let's call it for the start address of each sector.
+             // If we just loop by 16KB increments, it's safe (Flash_EraseSector determines sector from addr).
+
              while(current < end) {
+                 printf("UART: Erasing @ %08lX\n", current);
                  Flash_EraseSector(current);
-                 // Increment logic is complex due to variable sector size.
-                 // We rely on GetSector to find the sector number, then jump to next.
-                 // This is getting complex for "Flash_Ops.c".
-                 // Let's just erase everything in START.
-                 current += 131072; // +128KB (max sector size) step? No.
+                 HAL_IWDG_Refresh(&hiwdg); // KICK THE DOG!
+
+                 // Advance current address based on sector size to avoid redundant erase calls
+                 // (Though Flash_EraseSector might be idempotent if carefully written,
+                 // standard HAL erase returns error if busy or just works).
+                 // Safe increment: 4KB (smallest possible sector on some STMs, here 16KB).
+                 // Let's increment by 16KB. If we are in a large sector, GetSector returns same sector,
+                 // and we erase it again?
+                 // HAL_FLASHEx_Erase erases the sector. If we call it again, it erases again (waste of time).
+                 // Optimization: Move to next sector boundary.
+
+                 if (current < 0x08110000) current += 0x4000; // 16KB (Sectors 12-15)
+                 else if (current < 0x08120000) current += 0x10000; // 64KB (Sector 16)
+                 else current += 0x20000; // 128KB (Sectors 17-23)
              }
+             printf("UART: Flash Erase Complete.\n");
         }
 
         // Write
@@ -297,12 +326,14 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             ack[3] = calculate_crc8(&ack[1], 2);
             HAL_UART_Transmit(&huart6, ack, 4, 100);
         } else {
+            printf("UART: Flash Write Error @ %08lX\n", addr);
             uint8_t nack[] = {START_BYTE, CMD_OTA_NACK, 0, 0};
             nack[3] = calculate_crc8(&nack[1], 2);
             HAL_UART_Transmit(&huart6, nack, 4, 100);
         }
     }
     else if (cmd == CMD_OTA_END) {
+        printf("UART: OTA End received. Locking Flash.\n");
         Flash_Lock();
         // Send final ACK
         uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
@@ -310,6 +341,8 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         HAL_UART_Transmit(&huart6, ack, 4, 100);
     }
     else if (cmd == CMD_OTA_APPLY) {
+        printf("UART: OTA Apply. Swapping Bank and Resetting...\n");
+        HAL_Delay(100); // Wait for UART to flush
         Flash_SwapBank();
     }
 }
