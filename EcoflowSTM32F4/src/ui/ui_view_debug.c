@@ -125,6 +125,32 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Solar HV", buf);
                  snprintf(buf, sizeof(buf), "%d C", dev->data.d3p.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.mainBatteryLevel, "%");
+                 add_list_item(cont_list, "Main Batt Lvl", buf);
+            }
+            else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+                 fmt_float(buf, sizeof(buf), dev->data.ac.batteryLevel, "%");
+                 add_list_item(cont_list, "Batt Level", buf);
+                 snprintf(buf, sizeof(buf), "%d C", (int)dev->data.ac.batteryTemperature);
+                 add_list_item(cont_list, "Batt Temp", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.ac.dcPower, " W");
+                 add_list_item(cont_list, "DC Power", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.ac.carBatteryVoltage, " V");
+                 add_list_item(cont_list, "Car Batt V", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.ac.startVoltage, " V");
+                 add_list_item(cont_list, "Start V", buf);
+
+                 snprintf(buf, sizeof(buf), "%d", dev->data.ac.chargerMode);
+                 add_list_item(cont_list, "Mode", buf);
+                 snprintf(buf, sizeof(buf), "%s", dev->data.ac.chargerOpen ? "ON" : "OFF");
+                 add_list_item(cont_list, "Charger", buf);
+
+                 snprintf(buf, sizeof(buf), "%d W", dev->data.ac.powerLimit);
+                 add_list_item(cont_list, "Power Lim", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.ac.reverseChargingCurrentLimit, " A");
+                 add_list_item(cont_list, "Rev Chg Lim", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.ac.chargingCurrentLimit, " A");
+                 add_list_item(cont_list, "Chg Lim", buf);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
                  fmt_float(buf, sizeof(buf), dev->data.d3.batteryLevel, "%");
