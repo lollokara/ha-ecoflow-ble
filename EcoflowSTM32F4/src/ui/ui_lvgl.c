@@ -139,12 +139,17 @@ static void create_styles(void) {
 }
 
 // --- Input Interceptor for Sleep ---
-static void input_event_cb(lv_event_t * e) {
-    // Reset timer on any interaction
+void UI_ResetIdleTimer(void) {
     last_touch_time = xTaskGetTickCount();
     if (is_sleeping) {
         is_sleeping = false;
+        // Immediate Wake up
+        SetBacklight(100);
     }
+}
+
+static void input_event_cb(lv_event_t * e) {
+    UI_ResetIdleTimer();
 }
 
 // --- Navigation Callbacks ---

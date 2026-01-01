@@ -1,6 +1,7 @@
 #include "lv_port_indev.h"
 #include "stm32469i_discovery_ts.h"
 #include <stdbool.h>
+#include "ui/ui_lvgl.h"
 
 static void touchpad_init(void);
 static void touchpad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
@@ -58,6 +59,9 @@ static void touchpad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     }
 
     if(TS_State.touchDetected) {
+        // Reset Idle Timer on any physical touch detection
+        UI_ResetIdleTimer();
+
         data->state = LV_INDEV_STATE_PR;
 
         int16_t x_raw = TS_State.touchX[0];
