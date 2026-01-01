@@ -695,6 +695,152 @@ static void create_settings(void) {
     lv_obj_add_event_cb(slider_alt_pow, event_calib_touch, LV_EVENT_CLICKED, NULL);
 }
 
+// --- Alternator Charger Popup ---
+static void event_popup_alt_hide(lv_event_t * e) {
+    lv_obj_add_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void event_alt_toggle(lv_event_t * e) {
+    lv_obj_t * btn = lv_event_get_target(e);
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    UART_SendDCSet(state ? 1 : 0); // Reused CMD_SET_DC for Alt Charger Master Switch
+}
+
+static void event_alt_mode_click(lv_event_t * e) {
+    int mode = (intptr_t)lv_event_get_user_data(e);
+    UART_SendSetValue(SET_VAL_ALT_MODE, mode);
+}
+
+// Helper to open popup
+static void UI_ShowAltChargerPopup(void) {
+    if (!cont_popup_alt) {
+        cont_popup_alt = lv_obj_create(scr_dash);
+        lv_obj_set_size(cont_popup_alt, 800, 480);
+        lv_obj_center(cont_popup_alt);
+        lv_obj_set_style_bg_color(cont_popup_alt, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(cont_popup_alt, LV_OPA_70, 0);
+
+        // Add click event to background to close
+        lv_obj_add_event_cb(cont_popup_alt, event_popup_alt_hide, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * panel = lv_obj_create(cont_popup_alt);
+        lv_obj_set_size(panel, 500, 300);
+        lv_obj_center(panel);
+        lv_obj_add_style(panel, &style_panel, 0);
+        lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+        // Stop click propagation so panel clicks don't close popup
+        lv_obj_add_event_cb(panel, NULL, LV_EVENT_CLICKED, NULL);
+
+        // Header Switch
+        lv_obj_t * sw_master = lv_switch_create(panel);
+        lv_obj_align(sw_master, LV_ALIGN_TOP_RIGHT, -20, 20);
+        lv_obj_add_event_cb(sw_master, event_alt_toggle, LV_EVENT_VALUE_CHANGED, NULL);
+        lv_obj_add_style(sw_master, &style_btn_green, LV_PART_INDICATOR | LV_STATE_CHECKED);
+
+        lv_obj_t * lbl_title = lv_label_create(panel);
+        lv_label_set_text(lbl_title, "Alternator Charger");
+        lv_obj_set_style_text_font(lbl_title, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(lbl_title, lv_color_white(), 0);
+        lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 20, 25);
+
+        // Buttons Container
+        lv_obj_t * cont_btns = lv_obj_create(panel);
+        lv_obj_set_size(cont_btns, 460, 180);
+        lv_obj_align(cont_btns, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_set_style_bg_opa(cont_btns, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(cont_btns, 0, 0);
+        lv_obj_set_flex_flow(cont_btns, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(cont_btns, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+        // Mode 1: Charging (Driving)
+        lv_obj_t * btn1 = lv_btn_create(cont_btns);
+        lv_obj_set_size(btn1, 140, 140);
+        lv_obj_add_style(btn1, &style_btn_default, 0);
+        lv_obj_add_style(btn1, &style_btn_green, LV_STATE_CHECKED); // Use Green style for checked/active
+        lv_obj_add_event_cb(btn1, event_alt_mode_click, LV_EVENT_CLICKED, (void*)1); // Mode 1
+
+        lv_obj_t * ico1 = lv_label_create(btn1);
+        ui_set_icon(ico1, MDI_ICON_CHARGING_WIRELESS); // F0084
+        lv_obj_align(ico1, LV_ALIGN_CENTER, 0, -20);
+
+        lv_obj_t * txt1 = lv_label_create(btn1);
+        lv_label_set_text(txt1, "Ric.\nEcoFlow");
+        lv_obj_set_style_text_align(txt1, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(txt1, LV_ALIGN_CENTER, 0, 30);
+
+        // Mode 3: Reverse (Parking? Or specialized reverse mode)
+        // Memory said: 0=Idle, 1=Driving, 2=Maintenance, 3=Parking/Reverse
+        // User text: Ric. Van (Reverse Charging) -> Mode 3
+        lv_obj_t * btn2 = lv_btn_create(cont_btns);
+        lv_obj_set_size(btn2, 140, 140);
+        lv_obj_add_style(btn2, &style_btn_default, 0);
+        lv_obj_add_style(btn2, &style_btn_green, LV_STATE_CHECKED);
+        lv_obj_add_event_cb(btn2, event_alt_mode_click, LV_EVENT_CLICKED, (void*)3); // Mode 3
+
+        lv_obj_t * ico2 = lv_label_create(btn2);
+        ui_set_icon(ico2, MDI_ICON_VAN_UTILITY); // F05F1
+        lv_obj_align(ico2, LV_ALIGN_CENTER, 0, -20);
+
+        lv_obj_t * txt2 = lv_label_create(btn2);
+        lv_label_set_text(txt2, "Ric.\nVan");
+        lv_obj_set_style_text_align(txt2, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(txt2, LV_ALIGN_CENTER, 0, 30);
+
+        // Mode 2: Maintenance
+        lv_obj_t * btn3 = lv_btn_create(cont_btns);
+        lv_obj_set_size(btn3, 140, 140);
+        lv_obj_add_style(btn3, &style_btn_default, 0);
+        lv_obj_add_style(btn3, &style_btn_green, LV_STATE_CHECKED);
+        lv_obj_add_event_cb(btn3, event_alt_mode_click, LV_EVENT_CLICKED, (void*)2); // Mode 2
+
+        lv_obj_t * ico3 = lv_label_create(btn3);
+        ui_set_icon(ico3, MDI_ICON_CAR); // F010C
+        lv_obj_align(ico3, LV_ALIGN_CENTER, 0, -20);
+
+        lv_obj_t * txt3 = lv_label_create(btn3);
+        lv_label_set_text(txt3, "Mant.\nVan");
+        lv_obj_set_style_text_align(txt3, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(txt3, LV_ALIGN_CENTER, 0, 30);
+    }
+
+    // Refresh State
+    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER); // 1-based index 4? No, get by index.
+    // Wait, UI_GetDeviceCache takes index 0-3. DeviceType is 1-4.
+    // Index = Type - 1.
+    dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+
+    if (dev) {
+        lv_obj_t * panel = lv_obj_get_child(cont_popup_alt, 0);
+        lv_obj_t * sw = lv_obj_get_child(panel, 0); // 0th child is switch? Check creation order.
+        // Order: Switch, Title, Cont
+        // Safe way: get by type or index. Switch is created first.
+        if(lv_obj_check_type(sw, &lv_switch_class)) {
+            if (dev->data.ac.chargerOpen) lv_obj_add_state(sw, LV_STATE_CHECKED);
+            else lv_obj_clear_state(sw, LV_STATE_CHECKED);
+        }
+
+        lv_obj_t * cont_btns = lv_obj_get_child(panel, 2);
+        int mode = dev->data.ac.chargerMode;
+
+        // Buttons are 0, 1, 2 children of cont_btns
+        for(int i=0; i<3; i++) {
+            lv_obj_t * btn = lv_obj_get_child(cont_btns, i);
+            int btn_mode = 0;
+            if(i==0) btn_mode = 1;
+            if(i==1) btn_mode = 3;
+            if(i==2) btn_mode = 2;
+
+            if(mode == btn_mode) lv_obj_add_state(btn, LV_STATE_CHECKED);
+            else lv_obj_clear_state(btn, LV_STATE_CHECKED);
+        }
+    }
+
+    lv_obj_clear_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void event_car_tile_click(lv_event_t * e) {
+    UI_ShowAltChargerPopup();
+}
 
 static void create_dashboard(void) {
     scr_dash = lv_obj_create(NULL);
@@ -879,152 +1025,6 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_no);
 }
 
-// --- Alternator Charger Popup ---
-static void event_popup_alt_hide(lv_event_t * e) {
-    lv_obj_add_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void event_alt_toggle(lv_event_t * e) {
-    lv_obj_t * btn = lv_event_get_target(e);
-    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
-    UART_SendDCSet(state ? 1 : 0); // Reused CMD_SET_DC for Alt Charger Master Switch
-}
-
-static void event_alt_mode_click(lv_event_t * e) {
-    int mode = (intptr_t)lv_event_get_user_data(e);
-    UART_SendSetValue(SET_VAL_ALT_MODE, mode);
-}
-
-// Helper to open popup
-static void UI_ShowAltChargerPopup(void) {
-    if (!cont_popup_alt) {
-        cont_popup_alt = lv_obj_create(scr_dash);
-        lv_obj_set_size(cont_popup_alt, 800, 480);
-        lv_obj_center(cont_popup_alt);
-        lv_obj_set_style_bg_color(cont_popup_alt, lv_color_black(), 0);
-        lv_obj_set_style_bg_opa(cont_popup_alt, LV_OPA_70, 0);
-
-        // Add click event to background to close
-        lv_obj_add_event_cb(cont_popup_alt, event_popup_alt_hide, LV_EVENT_CLICKED, NULL);
-
-        lv_obj_t * panel = lv_obj_create(cont_popup_alt);
-        lv_obj_set_size(panel, 500, 300);
-        lv_obj_center(panel);
-        lv_obj_add_style(panel, &style_panel, 0);
-        lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
-        // Stop click propagation so panel clicks don't close popup
-        lv_obj_add_event_cb(panel, NULL, LV_EVENT_CLICKED, NULL);
-
-        // Header Switch
-        lv_obj_t * sw_master = lv_switch_create(panel);
-        lv_obj_align(sw_master, LV_ALIGN_TOP_RIGHT, -20, 20);
-        lv_obj_add_event_cb(sw_master, event_alt_toggle, LV_EVENT_VALUE_CHANGED, NULL);
-        lv_obj_add_style(sw_master, &style_btn_green, LV_PART_INDICATOR | LV_STATE_CHECKED);
-
-        lv_obj_t * lbl_title = lv_label_create(panel);
-        lv_label_set_text(lbl_title, "Alternator Charger");
-        lv_obj_set_style_text_font(lbl_title, &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(lbl_title, lv_color_white(), 0);
-        lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 20, 25);
-
-        // Buttons Container
-        lv_obj_t * cont_btns = lv_obj_create(panel);
-        lv_obj_set_size(cont_btns, 460, 180);
-        lv_obj_align(cont_btns, LV_ALIGN_BOTTOM_MID, 0, -10);
-        lv_obj_set_style_bg_opa(cont_btns, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(cont_btns, 0, 0);
-        lv_obj_set_flex_flow(cont_btns, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(cont_btns, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-        // Mode 1: Charging (Driving)
-        lv_obj_t * btn1 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn1, 140, 140);
-        lv_obj_add_style(btn1, &style_btn_default, 0);
-        lv_obj_add_style(btn1, &style_btn_green, LV_STATE_CHECKED); // Use Green style for checked/active
-        lv_obj_add_event_cb(btn1, event_alt_mode_click, LV_EVENT_CLICKED, (void*)1); // Mode 1
-
-        lv_obj_t * ico1 = lv_label_create(btn1);
-        ui_set_icon(ico1, MDI_ICON_CHARGING_WIRELESS); // F0084
-        lv_obj_align(ico1, LV_ALIGN_CENTER, 0, -20);
-
-        lv_obj_t * txt1 = lv_label_create(btn1);
-        lv_label_set_text(txt1, "Ric.\nEcoFlow");
-        lv_obj_set_style_text_align(txt1, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(txt1, LV_ALIGN_CENTER, 0, 30);
-
-        // Mode 3: Reverse (Parking? Or specialized reverse mode)
-        // Memory said: 0=Idle, 1=Driving, 2=Maintenance, 3=Parking/Reverse
-        // User text: Ric. Van (Reverse Charging) -> Mode 3
-        lv_obj_t * btn2 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn2, 140, 140);
-        lv_obj_add_style(btn2, &style_btn_default, 0);
-        lv_obj_add_style(btn2, &style_btn_green, LV_STATE_CHECKED);
-        lv_obj_add_event_cb(btn2, event_alt_mode_click, LV_EVENT_CLICKED, (void*)3); // Mode 3
-
-        lv_obj_t * ico2 = lv_label_create(btn2);
-        ui_set_icon(ico2, MDI_ICON_VAN_UTILITY); // F05F1
-        lv_obj_align(ico2, LV_ALIGN_CENTER, 0, -20);
-
-        lv_obj_t * txt2 = lv_label_create(btn2);
-        lv_label_set_text(txt2, "Ric.\nVan");
-        lv_obj_set_style_text_align(txt2, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(txt2, LV_ALIGN_CENTER, 0, 30);
-
-        // Mode 2: Maintenance
-        lv_obj_t * btn3 = lv_btn_create(cont_btns);
-        lv_obj_set_size(btn3, 140, 140);
-        lv_obj_add_style(btn3, &style_btn_default, 0);
-        lv_obj_add_style(btn3, &style_btn_green, LV_STATE_CHECKED);
-        lv_obj_add_event_cb(btn3, event_alt_mode_click, LV_EVENT_CLICKED, (void*)2); // Mode 2
-
-        lv_obj_t * ico3 = lv_label_create(btn3);
-        ui_set_icon(ico3, MDI_ICON_CAR); // F010C
-        lv_obj_align(ico3, LV_ALIGN_CENTER, 0, -20);
-
-        lv_obj_t * txt3 = lv_label_create(btn3);
-        lv_label_set_text(txt3, "Mant.\nVan");
-        lv_obj_set_style_text_align(txt3, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(txt3, LV_ALIGN_CENTER, 0, 30);
-    }
-
-    // Refresh State
-    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER); // 1-based index 4? No, get by index.
-    // Wait, UI_GetDeviceCache takes index 0-3. DeviceType is 1-4.
-    // Index = Type - 1.
-    dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
-
-    if (dev) {
-        lv_obj_t * panel = lv_obj_get_child(cont_popup_alt, 0);
-        lv_obj_t * sw = lv_obj_get_child(panel, 0); // 0th child is switch? Check creation order.
-        // Order: Switch, Title, Cont
-        // Safe way: get by type or index. Switch is created first.
-        if(lv_obj_check_type(sw, &lv_switch_class)) {
-            if (dev->data.ac.chargerOpen) lv_obj_add_state(sw, LV_STATE_CHECKED);
-            else lv_obj_clear_state(sw, LV_STATE_CHECKED);
-        }
-
-        lv_obj_t * cont_btns = lv_obj_get_child(panel, 2);
-        int mode = dev->data.ac.chargerMode;
-
-        // Buttons are 0, 1, 2 children of cont_btns
-        for(int i=0; i<3; i++) {
-            lv_obj_t * btn = lv_obj_get_child(cont_btns, i);
-            int btn_mode = 0;
-            if(i==0) btn_mode = 1;
-            if(i==1) btn_mode = 3;
-            if(i==2) btn_mode = 2;
-
-            if(mode == btn_mode) lv_obj_add_state(btn, LV_STATE_CHECKED);
-            else lv_obj_clear_state(btn, LV_STATE_CHECKED);
-        }
-    }
-
-    lv_obj_clear_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void event_car_tile_click(lv_event_t * e) {
-    UI_ShowAltChargerPopup();
-}
 
 /**
  * @brief Initializes LVGL and creates the UI.
