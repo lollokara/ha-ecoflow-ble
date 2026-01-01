@@ -21,6 +21,8 @@
 #define INACTIVE_BANK_ADDR  0x08100000
 #define APP_OFFSET          0x00008000 // 32KB offset (Sector 0 + 1)
 
+extern IWDG_HandleTypeDef hiwdg;
+
 void FlashWriter_Init(void) {
     HAL_FLASH_Unlock();
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
@@ -75,14 +77,23 @@ bool FlashWriter_PrepareBank(uint32_t total_size) {
 
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
     EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3; // 3.3V
-    EraseInitStruct.Sector = start_sector;
-    EraseInitStruct.NbSectors = (end_sector - start_sector) + 1;
+    EraseInitStruct.NbSectors = 1; // Erase one by one to refresh Watchdog
 
     printf("Erasing Sectors %lu to %lu...\n", start_sector, end_sector);
 
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-        printf("Erase Error: Sector %lu\n", SectorError);
-        return false;
+    for (uint32_t i = start_sector; i <= end_sector; i++) {
+        EraseInitStruct.Sector = i;
+
+        // Refresh IWDG before erase
+        HAL_IWDG_Refresh(&hiwdg);
+
+        if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+            printf("Erase Error: Sector %lu\n", SectorError);
+            return false;
+        }
+
+        // Refresh IWDG after erase
+        HAL_IWDG_Refresh(&hiwdg);
     }
 
     return true;
