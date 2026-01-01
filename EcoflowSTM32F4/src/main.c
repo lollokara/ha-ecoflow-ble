@@ -274,6 +274,9 @@ int main(void) {
     // Relocate Vector Table to Application Start Address
     SCB->VTOR = 0x08008000;
 
+    // Enable Interrupts (Bootloader disabled them)
+    __enable_irq();
+
     HAL_Init();
     SystemClock_Config();
     ESP32_Reset_Init();

@@ -17,7 +17,8 @@ int main(void) {
 
     // Check if Application exists at 0x08008000 (Check Stack Pointer validity)
     // The first word of the vector table is the Stack Pointer value (usually 0x20xxxxxx)
-    if (((*(__IO uint32_t*)APP_ADDRESS) & 0x2FFE0000) == 0x20000000) {
+    uint32_t app_sp = *(__IO uint32_t*)APP_ADDRESS;
+    if (app_sp >= 0x20000000 && app_sp <= 0x20050000) {
 
         // Disable all interrupts
         __disable_irq();
