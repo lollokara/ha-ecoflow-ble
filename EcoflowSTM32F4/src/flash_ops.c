@@ -97,12 +97,19 @@ void Flash_SwapBank(void) {
     OBInit.OptionType = OPTIONBYTE_USER;
     HAL_FLASHEx_OBGetConfig(&OBInit);
 
-    // STM32F469: BFB2 bit in OPTCR controls boot bank.
-    // Note: The HAL structure for STM32F469 might use `USERConfig` directly.
-    // Check if BFB2 is set.
+    // Ensure OptionType is set correctly for Program call
+    OBInit.OptionType = OPTIONBYTE_USER;
 
-    // Safety check: Don't swap if we are already in Bank 2 (unless we want to swap back to 1).
-    // Assuming we want to swap.
+    // Check Dual Bank Mode (DB1M)
+    // On STM32F469, bit 30 of OPTCR is DB1M.
+    // If 0: Single Bank (2MB contiguous). BFB2 is ignored.
+    // If 1: Dual Bank (1MB + 1MB). BFB2 selects bank.
+    // We MUST ensure DB1M is 1.
+
+    if ((OBInit.USERConfig & FLASH_OPTCR_DB1M) == 0) {
+        printf("Flash_SwapBank: DB1M is 0 (Single Bank). Enabling Dual Bank Mode...\n");
+        OBInit.USERConfig |= FLASH_OPTCR_DB1M;
+    }
 
     // Toggle BFB2
     if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
