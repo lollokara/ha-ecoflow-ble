@@ -89,76 +89,79 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
 }
 
 void Flash_EnsureDualBank(void) {
-    FLASH_OBProgramInitTypeDef OBInit;
+    // Direct Register Access to check OPTCR
+    // Bit 30: DB1M
+    // Bit 4: BFB2
 
-    // Unlock OB
     HAL_FLASH_OB_Unlock();
-    OBInit.OptionType = OPTIONBYTE_USER;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
 
-    if ((OBInit.USERConfig & FLASH_OPTCR_DB1M) == 0) {
-        printf("Flash_Ops: Single Bank Mode Detected. Switching to Dual Bank (Mass Erase imminent)...\n");
+    uint32_t optcr = FLASH->OPTCR;
 
-        OBInit.OptionType = OPTIONBYTE_USER;
-        OBInit.USERConfig |= FLASH_OPTCR_DB1M;
+    // Check if DB1M (Bit 30) is 0
+    if ((optcr & FLASH_OPTCR_DB1M) == 0) {
+        printf("Flash_Ops: Single Bank Mode (OPTCR=%08lX). Setting DB1M (Mass Erase)...\n", optcr);
 
-        // Ensure BFB2 is OFF initially when switching modes
-        OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
+        // Wait for BSY
+        while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
-                               FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+        // Set DB1M
+        FLASH->OPTCR |= FLASH_OPTCR_DB1M;
 
-        if(HAL_FLASHEx_OBProgram(&OBInit) != HAL_OK) {
-            printf("Flash_Ops: Failed to set DB1M! Error: %lu\n", HAL_FLASH_GetError());
-        } else {
-            printf("Flash_Ops: DB1M Set. Launching Reset...\n");
-            __disable_irq();
-            HAL_FLASH_OB_Launch();
-        }
-    } else {
-        // printf("Flash_Ops: Dual Bank Mode Active.\n");
+        // Clear BFB2 to ensure we boot from Bank 1 initially
+        FLASH->OPTCR &= ~FLASH_OPTCR_BFB2;
+
+        // Start programming
+        FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+        // Wait for BSY
+        while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
+
+        printf("Flash_Ops: DB1M Programmed. Launching Reset...\n");
+        __disable_irq();
+        HAL_FLASH_OB_Launch();
     }
+
     HAL_FLASH_OB_Lock();
 }
 
 void Flash_SwapBank(void) {
-    FLASH_OBProgramInitTypeDef OBInit;
-
     printf("Flash_SwapBank: Unlocking OB...\n");
     HAL_FLASH_OB_Unlock();
 
-    OBInit.OptionType = OPTIONBYTE_USER;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
+    // Wait for BSY
+    while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-    // Toggle BFB2
-    if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-        printf("Flash_SwapBank: BFB2 is ENABLED. Disabling (Boot Bank 1)...\n");
-        OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
+    uint32_t optcr = FLASH->OPTCR;
+    uint32_t initial_optcr = optcr;
+
+    printf("Flash_SwapBank: Current OPTCR: %08lX\n", optcr);
+
+    // Toggle BFB2 (Bit 4)
+    if ((optcr & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+        printf("Flash_SwapBank: BFB2 is 1. Clearing (Boot Bank 1)...\n");
+        optcr &= ~FLASH_OPTCR_BFB2;
     } else {
-        printf("Flash_SwapBank: BFB2 is DISABLED. Enabling (Boot Bank 2)...\n");
-        OBInit.USERConfig |= FLASH_OPTCR_BFB2;
+        printf("Flash_SwapBank: BFB2 is 0. Setting (Boot Bank 2)...\n");
+        optcr |= FLASH_OPTCR_BFB2;
     }
 
-    // Clear flags before programming
-    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
-                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+    // Write new value
+    FLASH->OPTCR = optcr;
 
-    if(HAL_FLASHEx_OBProgram(&OBInit) != HAL_OK) {
-        printf("Flash_SwapBank: OBProgram Failed!\n");
-    } else {
-        // Read back verification
-        FLASH_OBProgramInitTypeDef OBCheck;
-        OBCheck.OptionType = OPTIONBYTE_USER;
-        HAL_FLASHEx_OBGetConfig(&OBCheck);
-        printf("Flash_SwapBank: Programmed. New Config: %08lX (Expected BFB2 toggle from %08lX)\n", OBCheck.USERConfig, OBInit.USERConfig);
+    // Start
+    FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
 
-        printf("Flash_SwapBank: OBProgram Success. Launching Option Byte Launch (Reset)...\n");
+    // Wait for BSY
+    while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-        // Critical Section: Disable Interrupts before Reset
-        __disable_irq();
-        HAL_FLASH_OB_Launch(); // This triggers reset
-    }
+    // Verify
+    uint32_t verify_optcr = FLASH->OPTCR;
+    printf("Flash_SwapBank: New OPTCR: %08lX (Target: %08lX)\n", verify_optcr, optcr);
 
-    // Should not reach here
+    // Launch/Reset
+    printf("Flash_SwapBank: Launching Reset...\n");
+    __disable_irq();
+    HAL_FLASH_OB_Launch();
+
     while(1);
 }
