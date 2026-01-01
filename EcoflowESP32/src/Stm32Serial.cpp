@@ -145,6 +145,9 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3 && d3->isAuthenticated()) d3->setDC(enable);
              EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+
+            EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+            if (ac && ac->isAuthenticated()) ac->setChargerOpen(enable); // Master Switch
         }
     } else if (cmd == CMD_SET_VALUE) {
         // Handle generic value setting (Charge limits, SOC limits)
