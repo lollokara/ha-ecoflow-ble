@@ -124,6 +124,41 @@ void Flash_EnsureDualBank(void) {
     HAL_FLASH_OB_Lock();
 }
 
+void Flash_CopyBootloader(void) {
+    // Copy Sector 0 (16KB) and Sector 1 (16KB) from Bank 1 to Bank 2
+    // Src: 0x08000000 -> Dst: 0x08100000 (Sector 12)
+    // Src: 0x08004000 -> Dst: 0x08104000 (Sector 13)
+
+    // We assume Flash is already unlocked by caller (Flash_Unlock)
+
+    printf("Flash_Ops: Copying Bootloader (32KB)...\n");
+
+    // 1. Erase Sector 12
+    if(Flash_EraseSector(0x08100000) != 0) return;
+
+    // 2. Erase Sector 13
+    if(Flash_EraseSector(0x08104000) != 0) return;
+
+    // 3. Copy Loop
+    // We copy byte by byte or word by word. HAL_FLASH_Program handles it.
+    // 32KB = 32 * 1024 = 32768 bytes.
+
+    for (uint32_t i = 0; i < 0x8000; i++) {
+        uint8_t b = *(__IO uint8_t*)(0x08000000 + i);
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, 0x08100000 + i, b) != HAL_OK) {
+            printf("Flash_Ops: Copy Failed at offset %lu\n", i);
+            return;
+        }
+
+        // Watchdog refresh every 1KB
+        if (i % 1024 == 0) {
+             extern IWDG_HandleTypeDef hiwdg;
+             HAL_IWDG_Refresh(&hiwdg);
+        }
+    }
+    printf("Flash_Ops: Bootloader Copied.\n");
+}
+
 void Flash_SwapBank(void) {
     printf("Flash_SwapBank: Unlocking OB...\n");
     HAL_FLASH_OB_Unlock();

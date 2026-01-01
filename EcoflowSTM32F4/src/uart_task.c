@@ -273,45 +273,23 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         // ESP32 waits 5s for ACK.
 
         if (offset == 0) {
-             printf("UART: OTA First Chunk. Erasing Flash...\n");
+             printf("UART: OTA First Chunk. Preparing Flash...\n");
              // First chunk, ensure unlocked.
              Flash_Unlock();
 
-             // Smart Erase Loop covering ota_size
-             uint32_t current = 0x08100000;
+             // Copy Bootloader to Bank 2 Start (Sector 12 & 13)
+             // This prepares the vector table area for the new bank.
+             Flash_CopyBootloader();
+
+             // Smart Erase Loop covering App Area (Starts at 0x08108000)
+             // App Offset is 32KB.
+             uint32_t current = 0x08108000;
              uint32_t end = current + ota_size;
-
-             // Determine start sector
-             // Iterate through 2MB space (Bank 2 starts at sector 12)
-             // We know Bank 2 sectors: 12-15 (16K), 16 (64K), 17-23 (128K)
-             // Simplified loop: Erase 128KB chunks? No, strict sectors.
-
-             // Brute force sectors 12 to 23 checking overlap
-             // Sector 12: 0x08100000 - 0x08104000 (16K)
-             // Sector 13: 0x08104000 - 0x08108000 (16K)
-             // Sector 14: 0x08108000 - 0x0810C000 (16K)
-             // Sector 15: 0x0810C000 - 0x08110000 (16K)
-             // Sector 16: 0x08110000 - 0x08120000 (64K)
-             // Sector 17: 0x08120000 - 0x08140000 (128K)
-             // ...
-
-             // For robustness against IWDG, we refresh inside this loop if we can iterate sectors.
-             // Since Flash_EraseSector takes address, let's call it for the start address of each sector.
-             // If we just loop by 16KB increments, it's safe (Flash_EraseSector determines sector from addr).
 
              while(current < end) {
                  printf("UART: Erasing @ %08lX\n", current);
                  Flash_EraseSector(current);
                  HAL_IWDG_Refresh(&hiwdg); // KICK THE DOG!
-
-                 // Advance current address based on sector size to avoid redundant erase calls
-                 // (Though Flash_EraseSector might be idempotent if carefully written,
-                 // standard HAL erase returns error if busy or just works).
-                 // Safe increment: 4KB (smallest possible sector on some STMs, here 16KB).
-                 // Let's increment by 16KB. If we are in a large sector, GetSector returns same sector,
-                 // and we erase it again?
-                 // HAL_FLASHEx_Erase erases the sector. If we call it again, it erases again (waste of time).
-                 // Optimization: Move to next sector boundary.
 
                  if (current < 0x08110000) current += 0x4000; // 16KB (Sectors 12-15)
                  else if (current < 0x08120000) current += 0x10000; // 64KB (Sector 16)
@@ -321,12 +299,18 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
 
         // Write
-        if (Flash_Write(addr, data, data_len) == 0) {
+        // Apply Offset 0x8000 to place app correctly in Bank 2 (Sector 14+)
+        // Incoming 'offset' is from 0 relative to app binary start.
+        // Target Physical = Bank2_Base + 0x8000 + offset
+
+        uint32_t write_addr = ota_base_addr + 0x8000 + offset;
+
+        if (Flash_Write(write_addr, data, data_len) == 0) {
             uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
             ack[3] = calculate_crc8(&ack[1], 2);
             HAL_UART_Transmit(&huart6, ack, 4, 100);
         } else {
-            printf("UART: Flash Write Error @ %08lX\n", addr);
+            printf("UART: Flash Write Error @ %08lX\n", write_addr);
             uint8_t nack[] = {START_BYTE, CMD_OTA_NACK, 0, 0};
             nack[3] = calculate_crc8(&nack[1], 2);
             HAL_UART_Transmit(&huart6, nack, 4, 100);
