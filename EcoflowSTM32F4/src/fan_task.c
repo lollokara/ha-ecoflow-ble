@@ -171,6 +171,10 @@ void Fan_GetConfig(FanConfig *config) {
     }
 }
 
+void Fan_RequestConfig(void) {
+    send_packet(FAN_CMD_GET_CONFIG, NULL, 0);
+}
+
 // --- Task ---
 void StartFanTask(void *argument) {
     dataMutex = xSemaphoreCreateMutex();
@@ -180,6 +184,10 @@ void StartFanTask(void *argument) {
 
     // Start Reception on UART4 (RX Pin)
     HAL_UART_Receive_IT(&huart4, &rxByte, 1);
+
+    // Initial config request delay
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    Fan_RequestConfig();
 
     uint8_t b;
     for(;;) {

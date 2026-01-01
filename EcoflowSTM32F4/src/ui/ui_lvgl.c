@@ -140,14 +140,10 @@ static void create_styles(void) {
 
 // --- Input Interceptor for Sleep ---
 static void input_event_cb(lv_event_t * e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED || code == LV_EVENT_VALUE_CHANGED) {
-        last_touch_time = xTaskGetTickCount();
-        if (is_sleeping) {
-            is_sleeping = false;
-            // Wake up backlight immediately handled in Update loop or here
-            // We'll let the Update loop handle it to use the brightness value
-        }
+    // Reset timer on any interaction
+    last_touch_time = xTaskGetTickCount();
+    if (is_sleeping) {
+        is_sleeping = false;
     }
 }
 
@@ -710,10 +706,18 @@ void UI_LVGL_Init(void) {
     lv_scr_load(scr_dash);
 
     // Add global input listener
-    lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_ALL, NULL);
+    // Note: LV_EVENT_ALL is broad. We specifically want press/scroll.
+    // Adding to layer_sys or layer_top captures all?
+    // Often better to use an indev feedback callback in `lv_port_indev.c` but here we do it in UI layer.
+    lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_SCROLL, NULL);
+
     // Also add to active screens
-    lv_obj_add_event_cb(scr_dash, input_event_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(scr_settings, input_event_cb, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(scr_dash, input_event_cb, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(scr_dash, input_event_cb, LV_EVENT_SCROLL, NULL);
+
+    lv_obj_add_event_cb(scr_settings, input_event_cb, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(scr_settings, input_event_cb, LV_EVENT_SCROLL, NULL);
 
     last_touch_time = xTaskGetTickCount();
 }
@@ -754,11 +758,28 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     FanStatus fanStatus;
     Fan_GetStatus(&fanStatus);
     if (fanStatus.connected) {
-        lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0); // Blue when connected
+        // Toggle Blink for Activity (Blue/DarkBlue or similar, or just static blue)
+        // User asked for "dot in home screen does not blink".
+        // Let's blink Blue/LightBlue if data is fresh.
+        // Actually, we can reuse the global toggle if we want synchronous blink.
+        // But let's check last packet time logic in fan_task.c which sets connected=false after 3s.
+        // If we want blink on packet reception, we need an event flag.
+        // For now, simpler: connected = solid blue.
+        lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
         lv_label_set_text_fmt(label_amb_temp, "Amb: %d C", (int)fanStatus.amb_temp);
     } else {
-        lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0); // Yellow when disconnected
+        lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0);
         lv_label_set_text(label_amb_temp, "Amb: -- C");
+    }
+
+    // Blink RP2040 Dot if connected (using static toggle from bottom of function)
+    // We need to move the toggle logic up or duplicate it.
+    static bool blink_toggle = false;
+    blink_toggle = !blink_toggle;
+
+    if (fanStatus.connected) {
+         if (blink_toggle) lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
+         else lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_lighten(LV_PALETTE_BLUE, 2), 0);
     }
 
     if (!dev) return;

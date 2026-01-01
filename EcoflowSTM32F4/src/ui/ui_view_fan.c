@@ -89,6 +89,14 @@ static void event_slider_change(lv_event_t * e) {
 
 static void event_save(lv_event_t * e) {
     Fan_SetConfig(&localConfig);
+
+    // Visual Confirmation
+    lv_obj_t * label_saved = lv_label_create(scr_fan);
+    lv_label_set_text(label_saved, "Config Saved!");
+    lv_obj_set_style_text_font(label_saved, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(label_saved, lv_palette_main(LV_PALETTE_GREEN), 0);
+    lv_obj_center(label_saved);
+    lv_obj_del_delayed(label_saved, 1500);
 }
 
 static void create_slider_row(lv_obj_t * parent, const char * label, int min, int max, lv_obj_t ** slider_out, lv_obj_t ** lbl_out) {
@@ -121,6 +129,7 @@ void UI_CreateFanView(void) {
     }
 
     // Load current config
+    Fan_RequestConfig();
     Fan_GetConfig(&localConfig);
 
     scr_fan = lv_obj_create(NULL);
@@ -167,6 +176,7 @@ void UI_CreateFanView(void) {
     lv_obj_align(content, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
 
     // Group Selector
     dd_group = lv_dropdown_create(content);
