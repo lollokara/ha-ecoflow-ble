@@ -1,8 +1,18 @@
 #include "lv_port_indev.h"
 #include "stm32469i_discovery_ts.h"
+#include <stdbool.h>
 
 static void touchpad_init(void);
 static void touchpad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
+
+static volatile bool touch_irq_triggered = false;
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == TS_INT_PIN) {
+        touch_irq_triggered = true;
+    }
+}
 
 void lv_port_indev_init(void)
 {
@@ -18,7 +28,9 @@ void lv_port_indev_init(void)
 
 static void touchpad_init(void)
 {
-    // BSP_TS_Init should be called in main task
+    // BSP_TS_Init is called in StartDisplayTask
+    // Configure Touch Interrupts
+    BSP_TS_ITConfig();
 }
 
 // Calibration Values
@@ -36,7 +48,14 @@ static int32_t map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, i
 static void touchpad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static TS_StateTypeDef  TS_State;
-    BSP_TS_GetState(&TS_State);
+
+    // Check if interrupt triggered or pin is active (Low)
+    if (touch_irq_triggered || HAL_GPIO_ReadPin(TS_INT_GPIO_PORT, TS_INT_PIN) == GPIO_PIN_RESET) {
+        touch_irq_triggered = false;
+        BSP_TS_GetState(&TS_State);
+    } else {
+        TS_State.touchDetected = 0;
+    }
 
     if(TS_State.touchDetected) {
         data->state = LV_INDEV_STATE_PR;

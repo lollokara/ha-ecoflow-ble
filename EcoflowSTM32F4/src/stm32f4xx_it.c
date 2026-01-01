@@ -128,3 +128,13 @@ void DSI_IRQHandler(void)
 {
   HAL_DSI_IRQHandler(&hdsi_eval);
 }
+
+/**
+  * @brief  This function handles External line 9 to 5 interrupt request.
+  * @param  None
+  * @retval None
+  */
+void EXTI9_5_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_5);
+}
