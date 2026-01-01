@@ -67,6 +67,13 @@ extern "C" {
 #define SET_VAL_MAX_SOC 2
 #define SET_VAL_MIN_SOC 3
 
+// Alternator Charger Set Types
+#define SET_VAL_ALT_START_VOLTAGE 10
+#define SET_VAL_ALT_CHARGER_MODE 11
+#define SET_VAL_ALT_POWER_LIMIT 12
+#define SET_VAL_ALT_REV_CURRENT 13
+#define SET_VAL_ALT_CHG_CURRENT 14
+
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
 #define DEV_TYPE_DELTA_PRO_3 2
@@ -185,6 +192,7 @@ typedef struct {
     bool acHvPort;
     float solarLvPower;
     float solarHvPower;
+    float mainBatteryLevel;
     bool gfiMode;
 } DeltaPro3DataStruct;
 

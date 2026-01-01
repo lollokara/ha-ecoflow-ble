@@ -145,6 +145,9 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3 && d3->isAuthenticated()) d3->setDC(enable);
              EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+
+            EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+            if (ac && ac->isAuthenticated()) ac->setChargerOpen(enable);
         }
     } else if (cmd == CMD_SET_VALUE) {
         // Handle generic value setting (Charge limits, SOC limits)
@@ -165,6 +168,16 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                     case SET_VAL_AC_LIMIT: d3p->setAcChargingLimit(value); break;
                     case SET_VAL_MAX_SOC: d3p->setBatterySOCLimits(value, -1); break;
                     case SET_VAL_MIN_SOC: d3p->setBatterySOCLimits(101, value); break;
+                 }
+             }
+             EcoflowESP32* ac = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+             if (ac && ac->isAuthenticated()) {
+                 switch(type) {
+                    case SET_VAL_ALT_START_VOLTAGE: ac->setBatteryVoltage((float)value / 10.0f); break; // Value comes as voltage * 10
+                    case SET_VAL_ALT_CHARGER_MODE: ac->setChargerMode(value); break;
+                    case SET_VAL_ALT_POWER_LIMIT: ac->setPowerLimit(value); break;
+                    case SET_VAL_ALT_REV_CURRENT: ac->setCarBatteryChargeLimit((float)value); break;
+                    case SET_VAL_ALT_CHG_CURRENT: ac->setDeviceBatteryChargeLimit((float)value); break;
                  }
              }
         }
@@ -351,6 +364,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.acHvPort = src.acHvPort;
         dst.solarLvPower = src.solarLvPower;
         dst.solarHvPower = src.solarHvPower;
+        dst.mainBatteryLevel = src.mainBatteryLevel;
         dst.gfiMode = src.gfiMode;
 
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
