@@ -40,6 +40,12 @@ static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
 static int lim_charge_p = 100;      // 50 - 100 %
 
+// --- State Variables (Alternator Charger) ---
+static int alt_start_v_x10 = 130;   // 10.0 - 14.0 V (Stored x10)
+static int alt_rev_curr = 20;       // 5 - 45 A
+static int alt_chg_curr = 20;       // 5 - 45 A
+static int alt_power_lim = 300;     // 100 - 500 W
+
 // --- Device Cache ---
 static DeviceStatus device_cache[MAX_DEVICES];
 
@@ -59,6 +65,7 @@ static lv_style_t style_icon_label;
 static lv_style_t style_btn_red;
 static lv_style_t style_btn_default;
 static lv_style_t style_btn_green;
+static lv_style_t style_btn_white; // For active mode
 
 // --- Dashboard Widgets ---
 static lv_obj_t * scr_dash;
@@ -80,6 +87,16 @@ static lv_obj_t * label_lim_chg_val;
 static lv_obj_t * slider_lim_in;
 static lv_obj_t * slider_lim_out;
 static lv_obj_t * slider_lim_chg;
+// Alternator Sliders
+static lv_obj_t * slider_alt_start_v;
+static lv_obj_t * slider_alt_rev_curr;
+static lv_obj_t * slider_alt_chg_curr;
+static lv_obj_t * slider_alt_power;
+static lv_obj_t * label_alt_start_v;
+static lv_obj_t * label_alt_rev_curr;
+static lv_obj_t * label_alt_chg_curr;
+static lv_obj_t * label_alt_power;
+
 static lv_obj_t * label_calib_debug; // For touch calibration
 
 // Indicator
@@ -97,6 +114,11 @@ static lv_obj_t * label_ac_val;
 
 // Popup
 static lv_obj_t * cont_popup;
+static lv_obj_t * cont_popup_alt;
+static lv_obj_t * sw_alt_master;
+static lv_obj_t * btn_alt_mode_eco;
+static lv_obj_t * btn_alt_mode_van;
+static lv_obj_t * btn_alt_mode_mant;
 
 // --- Helpers ---
 
@@ -136,6 +158,11 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_btn_green, lv_palette_main(LV_PALETTE_GREEN));
     lv_style_set_text_color(&style_btn_green, lv_color_white());
     lv_style_set_radius(&style_btn_green, 8);
+
+    lv_style_init(&style_btn_white);
+    lv_style_set_bg_color(&style_btn_white, lv_color_white());
+    lv_style_set_text_color(&style_btn_white, lv_color_black());
+    lv_style_set_radius(&style_btn_white, 8);
 }
 
 // --- Input Interceptor for Sleep ---
