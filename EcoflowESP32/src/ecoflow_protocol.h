@@ -79,7 +79,7 @@ typedef struct __attribute__((packed)) {
     uint8_t cellTemperature;
 } Delta3DataStruct;
 
-// Wave 2 Data Structure (V2 Binary)
+// Wave 2 Data Structure (Binary V2)
 typedef struct __attribute__((packed)) {
     float envTemp;
     float outLetTemp;

@@ -37,6 +37,9 @@ static void MX_USART3_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_IWDG_Init(void);
 
+// OTA Handler Forward Declaration
+void OTA_ProcessCommand(uint8_t cmd, uint8_t* payload, uint32_t len);
+
 /**
  * @brief  System Clock Configuration
  *         The system Clock is configured as follow :

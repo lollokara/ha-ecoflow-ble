@@ -5,11 +5,12 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "ota_handler.h"
 
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 1024
+#define RING_BUFFER_SIZE 2048 // Increased for OTA chunks
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -19,7 +20,6 @@ typedef struct {
 static RingBuffer rx_ring_buffer;
 
 // TX Queue for sending commands from UI Task to UART Task
-// Simple generic struct for TX messages
 typedef enum {
     MSG_WAVE2_SET,
     MSG_AC_SET,
@@ -57,7 +57,6 @@ static void rb_push(RingBuffer *rb, uint8_t byte) {
         rb->buffer[rb->head] = byte;
         rb->head = next_head;
     }
-    // Else: Buffer overflow, drop byte
 }
 
 static int rb_pop(RingBuffer *rb, uint8_t *byte) {
@@ -88,7 +87,7 @@ typedef enum {
 } ProtocolState;
 
 static ProtocolState protocolState = STATE_HANDSHAKE;
-static DeviceList knownDevices = {0};
+static DeviceListMessage knownDevices = {0};
 static uint8_t currentDeviceIndex = 0;
 
 // Packet Parsing State
@@ -101,11 +100,9 @@ typedef enum {
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[MAX_PAYLOAD_LEN + 10 + sizeof(DeviceStatus)]; // Ensure buffer is large enough for big payloads
-static uint16_t parseIndex = 0; // Payload can be > 255
-static uint8_t expectedPayloadLen = 0;
-
-// Moved HAL_UART_RxCpltCallback to stm32f4xx_it.c or handled globally
+static uint8_t parseBuffer[512];
+static uint16_t parseIndex = 0;
+static uint16_t expectedPayloadLen = 0;
 
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
@@ -132,35 +129,31 @@ static void UART_Init(void) {
     HAL_NVIC_SetPriority(USART6_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USART6_IRQn);
 
-    // Initialize Ring Buffer
     rb_init(&rx_ring_buffer);
-
-    // Start Reception
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
 static void process_packet(uint8_t *packet, uint16_t total_len) {
-    // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
+    uint8_t len = packet[2];
+    uint8_t* payload = &packet[3];
 
-    if (cmd == CMD_HANDSHAKE_ACK) {
+    if (cmd == PROTOCOL_CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
-            printf("UART: Handshake ACK received. State -> WAIT_DEVICE_LIST\n");
+            printf("UART: Handshake ACK received.\n");
             protocolState = STATE_WAIT_DEVICE_LIST;
         }
     }
-    else if (cmd == CMD_DEVICE_LIST) {
+    else if (cmd == PROTOCOL_CMD_DEVICE_LIST) {
         if (protocolState == STATE_WAIT_DEVICE_LIST || protocolState == STATE_POLLING) {
             printf("UART: Device List received.\n");
             unpack_device_list_message(packet, &knownDevices);
 
-            // Notify UI
             DisplayEvent event;
             event.type = DISPLAY_EVENT_UPDATE_DEVICE_LIST;
-            memcpy(&event.data.deviceList, &knownDevices, sizeof(DeviceList));
+            memcpy(&event.data.deviceList, &knownDevices, sizeof(DeviceListMessage));
             xQueueSend(displayQueue, &event, 0);
 
-            // Send Ack
             uint8_t ack[4];
             int len = pack_device_list_ack_message(ack);
             HAL_UART_Transmit(&huart6, ack, len, 100);
@@ -168,36 +161,23 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             protocolState = STATE_POLLING;
         }
     }
-    else if (cmd == CMD_DEVICE_STATUS) {
-        // printf("UART: Parsing Status...\n");
-        DeviceStatus status;
+    else if (cmd == PROTOCOL_CMD_DEVICE_STATUS) {
+        DeviceStatusMessage status;
         if (unpack_device_status_message(packet, &status) == 0) {
              DisplayEvent event;
              event.type = DISPLAY_EVENT_UPDATE_BATTERY;
-             // Pass the full structure, including ID
-             memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatus));
-
-             if(xQueueSend(displayQueue, &event, 0) == pdTRUE) {
-                 // printf("UART: Status Queued\n");
-             } else {
-                 printf("UART: Queue Full!\n");
-             }
+             memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatusMessage));
+             xQueueSend(displayQueue, &event, 0);
         } else {
-            printf("UART: Unpack Failed\n");
+            printf("UART: Unpack Status Failed\n");
         }
     }
-    else if (cmd == CMD_DEBUG_INFO) {
-        DebugInfo info;
-        if (unpack_debug_info_message(packet, &info) == 0) {
-            DisplayEvent event;
-            event.type = DISPLAY_EVENT_UPDATE_DEBUG;
-            memcpy(&event.data.debugInfo, &info, sizeof(DebugInfo));
-            xQueueSend(displayQueue, &event, 0);
-        }
+    else if (cmd >= 0x80 && cmd <= 0x82) { // OTA Commands
+        OTA_ProcessCommand(cmd, payload, len);
     }
 }
 
-// Public function to queue a Wave 2 command
+// Helper functions to queue messages
 void UART_SendWave2Set(Wave2SetMsg *msg) {
     if (uartTxQueue) {
         TxMessage tx;
@@ -269,31 +249,26 @@ void UART_SendForgetDevice(uint8_t type) {
     }
 }
 
-// Return a copy of known devices for UI
-void UART_GetKnownDevices(DeviceList *list) {
-    // Note: Not thread safe but low risk for read-only UI display
-    // Ideally use a mutex if critical
-    memcpy(list, &knownDevices, sizeof(DeviceList));
+void UART_GetKnownDevices(DeviceListMessage *list) {
+    memcpy(list, &knownDevices, sizeof(DeviceListMessage));
 }
 
 void StartUARTTask(void * argument) {
     UART_Init();
-
-    // Create TX Queue
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
 
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
     TickType_t lastActivityTime = xTaskGetTickCount();
-    TickType_t lastHandshakeTime = 0; // Non-blocking timer for handshake
+    TickType_t lastHandshakeTime = 0;
 
     for(;;) {
         // 1. Process Incoming Data
         while (rb_pop(&rx_ring_buffer, &b)) {
             switch (parseState) {
                 case PARSE_START:
-                    if (b == START_BYTE) {
+                    if (b == PROTOCOL_START_BYTE) {
                         parseBuffer[0] = b;
                         parseIndex = 1;
                         parseState = PARSE_CMD;
@@ -308,15 +283,10 @@ void StartUARTTask(void * argument) {
                 case PARSE_LEN:
                     parseBuffer[parseIndex++] = b;
                     expectedPayloadLen = b;
-                    if (expectedPayloadLen > MAX_PAYLOAD_LEN) {
-                        parseState = PARSE_START; // Invalid length, reset
-                        parseIndex = 0;
+                    if (expectedPayloadLen == 0) {
+                        parseState = PARSE_CRC;
                     } else {
-                        if (expectedPayloadLen == 0) {
-                            parseState = PARSE_CRC;
-                        } else {
-                            parseState = PARSE_PAYLOAD;
-                        }
+                        parseState = PARSE_PAYLOAD;
                     }
                     break;
 
@@ -328,12 +298,11 @@ void StartUARTTask(void * argument) {
                     break;
 
                 case PARSE_CRC:
-                    // Last byte is CRC
+                    // Validate CRC using protocol implementation
                     {
                         uint8_t received_crc = b;
                         uint8_t calcd_crc = calculate_crc8(&parseBuffer[1], parseIndex - 1);
-
-                        if (received_crc == calcd_crc) {
+                        if(received_crc == calcd_crc) {
                             parseBuffer[parseIndex++] = b;
                             process_packet(parseBuffer, parseIndex);
                         } else {
@@ -346,7 +315,7 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Check for Outgoing Commands (Priority)
+        // 2. Check for Outgoing Commands
         TxMessage tx;
         if (xQueueReceive(uartTxQueue, &tx, 0) == pdTRUE) {
             uint8_t buf[32];
@@ -373,13 +342,12 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 3. Handle State Machine (Non-blocking)
+        // 3. Handle State Machine
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
 
             switch (protocolState) {
                 case STATE_HANDSHAKE:
-                    // Only send every 1 second
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         printf("UART: Sending Handshake...\n");
@@ -390,7 +358,6 @@ void StartUARTTask(void * argument) {
                     break;
 
                 case STATE_WAIT_HANDSHAKE_ACK:
-                    // Retry every 1 second
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         printf("UART: Timeout waiting for ACK, resending handshake...\n");
@@ -400,21 +367,17 @@ void StartUARTTask(void * argument) {
                     break;
 
                 case STATE_WAIT_DEVICE_LIST:
-                    // Just wait
                      break;
 
                 case STATE_POLLING:
                     if (knownDevices.count > 0) {
-                        // Skip if index out of bounds (safety)
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
-
-                        // Only poll if connected
-                        if (knownDevices.devices[currentDeviceIndex].connected) {
-                            uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
+                        if (knownDevices.devices[currentDeviceIndex].is_connected) {
+                            uint8_t dev_id = knownDevices.devices[currentDeviceIndex].slot;
+                            // Note: ID in device list is typically slot or Type. Using slot for GetStatus.
                             len = pack_get_device_status_message(tx_buf, dev_id);
                             HAL_UART_Transmit(&huart6, tx_buf, len, 100);
                         }
-
                         currentDeviceIndex++;
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
                     }
@@ -422,6 +385,6 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5)); // Yield to allow other tasks to run
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
