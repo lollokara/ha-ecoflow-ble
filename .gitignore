@@ -65,3 +65,6 @@ Temporary Items
 EcoflowESP32/src/Credentials.h
 EcoflowESP32/src/Credentials.h
 /EcoflowESP32/.vscode
+EcoflowRP2040/.vscode/c_cpp_properties.json
+EcoflowRP2040/.vscode/extensions.json
+EcoflowRP2040/.vscode/launch.json
