@@ -277,10 +277,6 @@ int main(void) {
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
-
-    // Ensure we are in Dual Bank Mode (Triggers Reset if not)
-    Flash_EnsureDualBank();
-
     MX_TIM2_Init();
     MX_IWDG_Init();
 

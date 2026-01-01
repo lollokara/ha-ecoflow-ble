@@ -277,13 +277,8 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
              // First chunk, ensure unlocked.
              Flash_Unlock();
 
-             // Copy Bootloader to Bank 2 Start (Sector 12 & 13)
-             // This prepares the vector table area for the new bank.
-             Flash_CopyBootloader();
-
-             // Smart Erase Loop covering App Area (Starts at 0x08108000)
-             // App Offset is 32KB.
-             uint32_t current = 0x08108000;
+             // Smart Erase Loop covering ota_size
+             uint32_t current = 0x08100000; // Start of Bank 2 (No Offset)
              uint32_t end = current + ota_size;
 
              while(current < end) {
@@ -291,6 +286,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
                  Flash_EraseSector(current);
                  HAL_IWDG_Refresh(&hiwdg); // KICK THE DOG!
 
+                 // Smart increment based on sector size
                  if (current < 0x08110000) current += 0x4000; // 16KB (Sectors 12-15)
                  else if (current < 0x08120000) current += 0x10000; // 64KB (Sector 16)
                  else current += 0x20000; // 128KB (Sectors 17-23)
@@ -299,11 +295,9 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
 
         // Write
-        // Apply Offset 0x8000 to place app correctly in Bank 2 (Sector 14+)
-        // Incoming 'offset' is from 0 relative to app binary start.
-        // Target Physical = Bank2_Base + 0x8000 + offset
+        // Standard OTA: Write to Bank 2 Base + Offset
 
-        uint32_t write_addr = ota_base_addr + 0x8000 + offset;
+        uint32_t write_addr = ota_base_addr + offset;
 
         if (Flash_Write(write_addr, data, data_len) == 0) {
             uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
