@@ -324,6 +324,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         DeltaPro3DataStruct& dst = status.data.d3p;
 
         dst.batteryLevel = src.batteryLevel;
+        dst.batteryLevelMain = src.batteryLevelMain;
         dst.acInputPower = src.acInputPower;
         dst.acLvOutputPower = src.acLvOutputPower;
         dst.acHvOutputPower = src.acHvOutputPower;

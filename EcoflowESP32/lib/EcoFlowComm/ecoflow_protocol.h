@@ -66,6 +66,12 @@ extern "C" {
 #define SET_VAL_AC_LIMIT 1
 #define SET_VAL_MAX_SOC 2
 #define SET_VAL_MIN_SOC 3
+// Alternator Charger Set Values
+#define SET_VAL_ALT_START_VOLTAGE 4
+#define SET_VAL_ALT_MODE 5
+#define SET_VAL_ALT_PROD_LIMIT 6
+#define SET_VAL_ALT_REV_LIMIT 7
+#define SET_VAL_ALT_CHG_LIMIT 8
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
@@ -158,6 +164,7 @@ typedef struct {
  */
 typedef struct {
     float batteryLevel;
+    float batteryLevelMain; // Added field
     float acInputPower;
     float acLvOutputPower;
     float acHvOutputPower;

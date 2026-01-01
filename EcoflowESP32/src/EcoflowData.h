@@ -87,6 +87,7 @@ struct Wave2Data {
 
 struct DeltaPro3Data {
     float batteryLevel = 0;
+    float batteryLevelMain = 0; // Added field
     float acInputPower = 0;
     float acLvOutputPower = 0;
     float acHvOutputPower = 0;
