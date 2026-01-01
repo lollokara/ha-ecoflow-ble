@@ -113,14 +113,26 @@ void Flash_SwapBank(void) {
         OBInit.USERConfig |= FLASH_OPTCR_BFB2;
     }
 
+    // Clear flags before programming
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+
     if(HAL_FLASHEx_OBProgram(&OBInit) != HAL_OK) {
         printf("Flash_SwapBank: OBProgram Failed!\n");
     } else {
+        // Read back verification
+        FLASH_OBProgramInitTypeDef OBCheck;
+        OBCheck.OptionType = OPTIONBYTE_USER;
+        HAL_FLASHEx_OBGetConfig(&OBCheck);
+        printf("Flash_SwapBank: Programmed. New Config: %08lX (Expected BFB2 toggle from %08lX)\n", OBCheck.USERConfig, OBInit.USERConfig);
+
         printf("Flash_SwapBank: OBProgram Success. Launching Option Byte Launch (Reset)...\n");
+
+        // Critical Section: Disable Interrupts before Reset
+        __disable_irq();
         HAL_FLASH_OB_Launch(); // This triggers reset
     }
 
-    HAL_FLASH_OB_Lock(); // Should not reach here if Launch works
-    printf("Flash_SwapBank: Manual Reset...\n");
-    HAL_NVIC_SystemReset();
+    // Should not reach here
+    while(1);
 }
