@@ -450,21 +450,40 @@ void Stm32Serial::otaTask(void* parameter) {
     ESP_LOGI(TAG, "Starting OTA. Size: %d", totalSize);
 
     // 2. Send Start Command
+    // Try sending Start Command up to 3 times
+    bool startSuccess = false;
     uint8_t buf[256];
     int len = pack_ota_start_message(buf, totalSize);
-    self->sendData(buf, len);
 
-    // Wait for ACK (longer timeout for erase)
-    otaAckReceived = false;
-    otaNackReceived = false;
-    uint32_t startWait = millis();
-    while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 15000)) { // 15s timeout
-        vTaskDelay(10);
+    for(int attempt=0; attempt<3; attempt++) {
+        ESP_LOGI(TAG, "Sending OTA Start (Attempt %d)", attempt+1);
+        self->sendData(buf, len);
+
+        // Wait for ACK (longer timeout for erase: 30s)
+        otaAckReceived = false;
+        otaNackReceived = false;
+        uint32_t startWait = millis();
+        // Mass erase or large sector erase can take time.
+        // Recovery OTA erases 10 sectors (Bank 1).
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) {
+            vTaskDelay(100);
+        }
+
+        if (otaAckReceived) {
+            startSuccess = true;
+            break;
+        }
+
+        if (otaNackReceived) {
+            ESP_LOGE(TAG, "OTA Start NACK received");
+            // If NACK, maybe it's busy or invalid state. Wait before retry.
+            vTaskDelay(1000);
+        }
     }
 
-    if (!otaAckReceived) {
-        ESP_LOGE(TAG, "OTA Start NACK or Timeout");
-        ota_state = 4; ota_msg = "OTA Start Timeout";
+    if (!startSuccess) {
+        ESP_LOGE(TAG, "OTA Start Failed (Timeout/NACK)");
+        ota_state = 4; ota_msg = "Start Timeout";
         f.close();
         self->_otaRunning = false;
         vTaskDelete(NULL);
@@ -484,8 +503,8 @@ void Stm32Serial::otaTask(void* parameter) {
         // Wait for ACK
         otaAckReceived = false;
         otaNackReceived = false;
-        startWait = millis();
-        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 1000)) { // 1s timeout
+        uint32_t startWait = millis();
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) { // 2s timeout per chunk
             vTaskDelay(5);
         }
 
@@ -512,7 +531,6 @@ void Stm32Serial::otaTask(void* parameter) {
         self->sendData(buf, len);
         ota_state = 3; ota_msg = "STM32 Rebooting...";
     } else {
-        ESP_LOGE(TAG, "OTA Failed/Incomplete");
         if (ota_state != 4) { ota_state = 4; ota_msg = "Incomplete"; }
     }
 

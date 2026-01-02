@@ -51,28 +51,35 @@ void LED_Toggle() { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); }
 
 int main(void) {
     HAL_Init();
-    SystemClock_Config();
-    GPIO_Init();
-    UART_Init();
 
-    // Blink LED 3 times to indicate Bootloader Start
-    for(int i=0; i<3; i++) {
-        LED_On(); HAL_Delay(100);
-        LED_Off(); HAL_Delay(100);
+    // 1. Immediate Feedback (HSI Clock)
+    GPIO_Init();
+    LED_On(); HAL_Delay(200); LED_Off(); HAL_Delay(200); // 1 Slow Blink
+
+    // 2. Configure Clock
+    SystemClock_Config();
+
+    // 3. Confirm Clock (Fast Blinks)
+    for(int i=0; i<5; i++) {
+        LED_On(); HAL_Delay(50);
+        LED_Off(); HAL_Delay(50);
     }
+
+    UART_Init();
 
     // Check if valid stack pointer at App Address
     // Valid Range: 0x20000000 - 0x20050000 (320KB RAM)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
-    // Check for Force OTA condition (e.g. valid_app is false)
-    // Also optional: Check a GPIO button? (Skipping for now)
+    // Optional: Check User Button (PA0) for forced OTA?
+    // Not implemented to keep minimal.
 
     if (valid_app) {
         // Wait briefly for OTA START command (Safety window)
+        // 500ms window to catch "Rescue" attempts
         uint8_t buf[1];
-        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) { // 500ms wait
+        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
                 Bootloader_OTA_Loop(); // Enter OTA
             }
@@ -120,8 +127,8 @@ void Bootloader_OTA_Loop(void) {
 
     HAL_FLASH_Unlock();
 
-    // Fast Blink to indicate OTA Mode
-    for(int i=0; i<10; i++) { LED_Toggle(); HAL_Delay(50); }
+    // Heartbeat LED
+    for(int i=0; i<3; i++) { LED_Toggle(); HAL_Delay(200); }
     LED_Off();
 
     while(1) {
@@ -154,21 +161,30 @@ void Bootloader_OTA_Loop(void) {
 
         if (cmd == CMD_OTA_START) {
             // Recovery Mode: Always erase Bank 1 (Physical Sectors 2-11)
-            // Regardless of BFB2, we want to restore the Default Bank.
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-            EraseInitStruct.Sector = FLASH_SECTOR_2;
-            EraseInitStruct.NbSectors = 10; // 2 to 11
+            EraseInitStruct.NbSectors = 1;
 
-            LED_On(); // LED On during Erase
-            if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) == HAL_OK) {
+            bool error = false;
+            // Erase sequentially to avoid long blocking and provide feedback
+            for (uint32_t sec = FLASH_SECTOR_2; sec <= FLASH_SECTOR_11; sec++) {
+                LED_On();
+                EraseInitStruct.Sector = sec;
+                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                    error = true; break;
+                }
+                LED_Off();
+                // Short delay to ensure LED blink is visible? No, erase takes time anyway.
+                // Toggle state
+            }
+
+            if (!error) {
                 send_ack();
             } else {
                 send_nack();
             }
-            LED_Off();
         }
         else if (cmd == CMD_OTA_CHUNK) {
             uint32_t offset;
@@ -176,18 +192,18 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            // Write to Physical Bank 1 Address.
-            // If BFB2=0, Bank1=0x08000000.
-            // If BFB2=1, Bank1=0x08100000.
-            // We need to check BFB2 to know where to write.
+            // Force write to Bank 1 (0x08000000)
             uint32_t base_addr = 0x08000000;
-            HAL_FLASH_OB_Unlock(); // Unlock OB to read? No need to unlock to read register.
+            // If BFB2 is active, 0x08000000 is mapped to Bank 2.
+            // We want to write to *Physical* Bank 1.
+            // If BFB2=1, Physical Bank 1 is at 0x08100000.
+            // If BFB2=0, Physical Bank 1 is at 0x08000000.
+            // We check BFB2
             if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
                 base_addr = 0x08100000;
             }
-            HAL_FLASH_OB_Lock();
 
-            uint32_t addr = base_addr + offset + 0x8000; // +0x8000 offset for Bootloader/Config preservation
+            uint32_t addr = base_addr + offset + 0x8000; // +0x8000 offset for Bootloader/Config
 
             bool ok = true;
             for (uint32_t i=0; i<data_len; i+=4) {
@@ -279,7 +295,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  HAL_RCC_OscConfig(&RCC_OscInitStruct);
+  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+      // If Clock Fails, Blink Rapidly Forever
+      while(1) {
+          LED_On(); HAL_Delay(50);
+          LED_Off(); HAL_Delay(50);
+      }
+  }
 
   HAL_PWREx_EnableOverDrive();
 
