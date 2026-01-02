@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include "OtaManager.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -81,6 +82,23 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // OTA Routes
+    server.on("/api/ota/esp", HTTP_POST, [](AsyncWebServerRequest *r){
+        r->send(200, "text/plain", "OK");
+    }, [](AsyncWebServerRequest *r, const String& filename, size_t index, uint8_t *data, size_t len, bool final){
+        OtaManager::getInstance().handleEspUpdate(r, filename, index, data, len, final);
+    });
+
+    server.on("/api/ota/stm", HTTP_POST, [](AsyncWebServerRequest *r){
+        r->send(200, "text/plain", "OK");
+    }, [](AsyncWebServerRequest *r, const String& filename, size_t index, uint8_t *data, size_t len, bool final){
+        OtaManager::getInstance().handleStmUpdate(r, filename, index, data, len, final);
+    });
+
+    server.on("/api/ota/status", HTTP_GET, [](AsyncWebServerRequest *r){
+        r->send(200, "application/json", OtaManager::getInstance().getStatusJson());
+    });
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {

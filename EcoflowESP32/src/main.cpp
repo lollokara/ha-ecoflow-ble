@@ -21,6 +21,7 @@
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
 #include "Stm32Serial.h"
+#include "OtaManager.h"
 
 // Hardware Pin Definitions
 #define POWER_LATCH_PIN 16 ///< GPIO pin to control the power latch (keeps device on).
@@ -80,6 +81,9 @@ void setup() {
 
     // Initialize the UART communication with the STM32F4
     Stm32Serial::getInstance().begin();
+
+    // Initialize OTA Manager
+    OtaManager::getInstance().begin();
 }
 
 /**
@@ -110,6 +114,9 @@ void loop() {
 
     // Process incoming UART packets from STM32F4
     Stm32Serial::getInstance().update();
+
+    // Process OTA state machine
+    OtaManager::getInstance().update();
 
     // Poll connected devices for data every 2 seconds
     if (millis() - last_data_refresh > 2000) {

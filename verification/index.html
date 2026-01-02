@@ -1,9 +1,4 @@
-#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
 
-#include <Arduino.h>
-
-const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1078,8 +1073,19 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
     resize();
     draw();
 </script>
+
+<script>
+window.originalFetch = window.fetch;
+window.fetch = function(url, opts) {
+    if (url.includes("/settings")) {
+        return Promise.resolve({
+            json: () => Promise.resolve({min: 0, max: 4095}),
+            ok: true
+        });
+    }
+    return Promise.resolve({json:()=>Promise.resolve({})});
+};
+setTimeout(() => openSettings(), 500);
+</script>
 </body>
 </html>
-)rawliteral";
-
-#endif // WEB_ASSETS_H
