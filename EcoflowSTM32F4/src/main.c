@@ -19,6 +19,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "uart_protocol.h"
 #include <stdio.h>
 
 // External Handles
@@ -271,6 +272,9 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
+    // Set VTOR to Application Address (Sector 2)
+    SCB->VTOR = 0x08008000;
+
     HAL_Init();
     SystemClock_Config();
     ESP32_Reset_Init();
