@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "bootloader.h"
 
 UART_HandleTypeDef huart6;
 
@@ -143,7 +144,14 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
 
-    if (cmd == CMD_HANDSHAKE_ACK) {
+    if (cmd == 0xF0) { // CMD_OTA_START
+        printf("UART: OTA Start Received! Rebooting to Bootloader...\n");
+        // Wait a bit to ensure UART TX flush if any
+        HAL_Delay(100);
+        RebootToBootloader();
+        // Does not return
+    }
+    else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
             printf("UART: Handshake ACK received. State -> WAIT_DEVICE_LIST\n");
             protocolState = STATE_WAIT_DEVICE_LIST;
