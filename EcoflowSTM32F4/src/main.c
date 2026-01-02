@@ -292,11 +292,12 @@ int main(void) {
     // The hardware aliases 0x08000000 to 0x00000000.
     // If BFB2 is 1, it aliases Bank 2 to 0x00000000.
 
-    // Explicitly set Vector Table Offset (Safety for Dual Bank aliasing)
-    // If we are running, VTOR should point to where we are executing.
-    // If we are in Bank 2 (BFB2=1), 0x00000000 is mapped to 0x08100000.
-    // Ideally VTOR is 0x00000000.
-    SCB->VTOR = 0x00000000; // Assuming we boot from 0x00000000 alias
+    // Debug: Print OPTCR
+    uint32_t optcr = FLASH->OPTCR;
+    printf("Startup: OPTCR = %08lX\n", optcr);
+
+    // Ensure DB1M (Dual Bank Mode) is enabled.
+    Flash_EnableDualBank_IfMissing();
 
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);

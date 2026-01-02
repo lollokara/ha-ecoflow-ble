@@ -19,6 +19,71 @@
 // regardless of where we are running (unless we are running in Bank 2, then we write to Bank 1).
 // BUT: Swapping banks requires manipulating Option Bytes (BFB2).
 
+// Forward Declaration
+static uint32_t GetSector(uint32_t Address);
+
+// Copy Bootloader (Sectors 0 and 1, 32KB) from Bank 1 to Bank 2.
+// Required because we are swapping banks, and Bank 2 needs a valid bootloader at offset 0.
+int Flash_CopyBootloader(void) {
+    uint32_t src_addr = 0x08000000;
+    uint32_t dst_addr = 0x08100000;
+    uint32_t size = 0x8000; // 32KB (Sector 0 + Sector 1)
+
+    printf("Flash_Ops: Copying Bootloader (32KB) from 0x%08lX to 0x%08lX\n", src_addr, dst_addr);
+
+    HAL_FLASH_Unlock();
+
+    // Erase Destination Sectors (Sector 0 and 1 in Bank 2)
+    // In Dual Bank Mode:
+    // Bank 1: Sectors 0-11
+    // Bank 2: Sectors 12-23
+    // But Wait. F469 Sectors are contiguous 0-23 in Linear Mode?
+    // RM0386: "In Dual Bank mode... Bank 1 (0 to 11)... Bank 2 (12 to 23)"
+    // Sector 12 (16KB) maps to 0x08100000.
+    // Sector 13 (16KB) maps to 0x08104000.
+
+    // We must erase the sectors corresponding to destination (0x08100000).
+    // Note: Use GetSector to handle mapping if BFB2 is set (e.g. running from Bank 2)
+    // Actually GetSector logic handles logical mapping.
+    // If we write to 0x08100000, we want to write to "Inactive Bank".
+
+    // However, HAL_FLASHEx_Erase requires a START SECTOR index.
+    // And NbSectors must be contiguous?
+    // Physical sectors 0-11 and 12-23 are contiguous ranges.
+    // GetSector returns the correct physical start sector.
+
+    FLASH_EraseInitTypeDef erase;
+    erase.TypeErase = FLASH_TYPEERASE_SECTORS;
+    erase.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+    erase.Sector = GetSector(dst_addr); // Dynamic resolution
+    erase.NbSectors = 2; // Sector 0+1 OR 12+13
+
+    // Sanity check: If Sector is 11, NbSectors 2 would cross bank boundary?
+    // Sector 11 is last of Bank 1.
+    // But dst_addr is bank aligned. So it will return 0 or 12.
+
+    uint32_t error = 0;
+    if (HAL_FLASHEx_Erase(&erase, &error) != HAL_OK) {
+        printf("Flash_Ops: Bootloader Erase Failed. Error: %lu\n", error);
+        HAL_FLASH_Lock();
+        return -1;
+    }
+
+    // Copy Loop
+    for (uint32_t i = 0; i < size; i += 4) {
+        uint32_t data = *(volatile uint32_t*)(src_addr + i);
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, dst_addr + i, data) != HAL_OK) {
+             printf("Flash_Ops: Bootloader Copy Failed at offset %lu\n", i);
+             HAL_FLASH_Lock();
+             return -2;
+        }
+    }
+
+    HAL_FLASH_Lock();
+    printf("Flash_Ops: Bootloader Copy Success.\n");
+    return 0;
+}
+
 // Current approach: Just write to Bank 2 (Address 0x08100000).
 
 // RAM Function to safely switch to Dual Bank Mode
@@ -63,6 +128,17 @@ __attribute__((section(".data"), noinline)) void Flash_SetDualBankMode_RAM(void)
     while(1);
 }
 
+void Flash_EnableDualBank_IfMissing(void) {
+    if ((FLASH->OPTCR & FLASH_OPTCR_DB1M) == 0) {
+        printf("Flash_Ops: Enabling Dual Bank Mode (DB1M). Mass Erase Imminent.\n");
+        printf("Flash_Ops: Device will reset and stay blank. Re-flash via PIO required.\n");
+        HAL_Delay(100);
+
+        __disable_irq();
+        Flash_SetDualBankMode_RAM();
+    }
+}
+
 void Flash_Unlock(void) {
     HAL_FLASH_Unlock();
 }
@@ -74,33 +150,72 @@ void Flash_Lock(void) {
 static uint32_t GetSector(uint32_t Address) {
     uint32_t sector = 0;
 
-    // Bank 1
-    if((Address >= 0x08000000) && (Address < 0x08004000)) sector = FLASH_SECTOR_0;
-    else if((Address >= 0x08004000) && (Address < 0x08008000)) sector = FLASH_SECTOR_1;
-    else if((Address >= 0x08008000) && (Address < 0x0800C000)) sector = FLASH_SECTOR_2;
-    else if((Address >= 0x0800C000) && (Address < 0x08010000)) sector = FLASH_SECTOR_3;
-    else if((Address >= 0x08010000) && (Address < 0x08020000)) sector = FLASH_SECTOR_4;
-    else if((Address >= 0x08020000) && (Address < 0x08040000)) sector = FLASH_SECTOR_5;
-    else if((Address >= 0x08040000) && (Address < 0x08060000)) sector = FLASH_SECTOR_6;
-    else if((Address >= 0x08060000) && (Address < 0x08080000)) sector = FLASH_SECTOR_7;
-    else if((Address >= 0x08080000) && (Address < 0x080A0000)) sector = FLASH_SECTOR_8;
-    else if((Address >= 0x080A0000) && (Address < 0x080C0000)) sector = FLASH_SECTOR_9;
-    else if((Address >= 0x080C0000) && (Address < 0x080E0000)) sector = FLASH_SECTOR_10;
-    else if((Address >= 0x080E0000) && (Address < 0x08100000)) sector = FLASH_SECTOR_11;
+    // Determine Bank Base Addresses
+    // If BFB2 = 0: Bank 1 @ 0x08000000, Bank 2 @ 0x08100000 (Default)
+    // If BFB2 = 1: Bank 2 @ 0x08000000, Bank 1 @ 0x08100000 (Swapped)
 
-    // Bank 2
-    else if((Address >= 0x08100000) && (Address < 0x08104000)) sector = FLASH_SECTOR_12;
-    else if((Address >= 0x08104000) && (Address < 0x08108000)) sector = FLASH_SECTOR_13;
-    else if((Address >= 0x08108000) && (Address < 0x0810C000)) sector = FLASH_SECTOR_14;
-    else if((Address >= 0x0810C000) && (Address < 0x08110000)) sector = FLASH_SECTOR_15;
-    else if((Address >= 0x08110000) && (Address < 0x08120000)) sector = FLASH_SECTOR_16;
-    else if((Address >= 0x08120000) && (Address < 0x08140000)) sector = FLASH_SECTOR_17;
-    else if((Address >= 0x08140000) && (Address < 0x08160000)) sector = FLASH_SECTOR_18;
-    else if((Address >= 0x08160000) && (Address < 0x08180000)) sector = FLASH_SECTOR_19;
-    else if((Address >= 0x08180000) && (Address < 0x081A0000)) sector = FLASH_SECTOR_20;
-    else if((Address >= 0x081A0000) && (Address < 0x081C0000)) sector = FLASH_SECTOR_21;
-    else if((Address >= 0x081C0000) && (Address < 0x081E0000)) sector = FLASH_SECTOR_22;
-    else if((Address >= 0x081E0000) && (Address < 0x08200000)) sector = FLASH_SECTOR_23;
+    // The input 'Address' is the Virtual Address we are erasing/writing.
+    // If we write to 0x0810xxxx, we are targeting the "Second Logical Bank".
+    // If BFB2=0, that maps to Physical Sectors 12-23.
+    // If BFB2=1, that maps to Physical Sectors 0-11.
+
+    uint8_t bfb2 = (FLASH->OPTCR & FLASH_OPTCR_BFB2) ? 1 : 0;
+
+    // Normalize Address to Offset within a 1MB Bank
+    uint32_t offset = 0;
+    uint32_t bank_target = 0; // 0 for 1st Logical, 1 for 2nd Logical
+
+    if (Address >= 0x08100000) {
+        offset = Address - 0x08100000;
+        bank_target = 1;
+    } else if (Address >= 0x08000000) {
+        offset = Address - 0x08000000;
+        bank_target = 0;
+    }
+
+    // Determine Target Physical Bank (0=Sectors 0-11, 1=Sectors 12-23)
+    // Logical 0 (0x0800...) -> Active Bank
+    // Logical 1 (0x0810...) -> Inactive Bank
+
+    // If BFB2=0 (Boot Bank 1):
+    // Active (Log 0) = Phys Bank 1 (0-11)
+    // Inactive (Log 1) = Phys Bank 2 (12-23)
+
+    // If BFB2=1 (Boot Bank 2):
+    // Active (Log 0) = Phys Bank 2 (12-23)
+    // Inactive (Log 1) = Phys Bank 1 (0-11)
+
+    uint32_t target_phys_bank = 0;
+    if (bank_target == 0) {
+        // Addressing 0x0800xxxx
+        target_phys_bank = (bfb2 == 1) ? 1 : 0;
+    } else {
+        // Addressing 0x0810xxxx
+        target_phys_bank = (bfb2 == 1) ? 0 : 1;
+    }
+
+    // Map Offset to Physical Sector Index relative to Bank Start
+    uint32_t phys_sector_base = (target_phys_bank == 1) ? 12 : 0;
+    uint32_t relative_idx = 0;
+
+    if (offset < 0x4000) relative_idx = 0;
+    else if (offset < 0x8000) relative_idx = 1;
+    else if (offset < 0xC000) relative_idx = 2;
+    else if (offset < 0x10000) relative_idx = 3;
+    else if (offset < 0x20000) relative_idx = 4; // 64KB
+    else if (offset < 0x40000) relative_idx = 5; // 128KB
+    else if (offset < 0x60000) relative_idx = 6;
+    else if (offset < 0x80000) relative_idx = 7;
+    else if (offset < 0xA0000) relative_idx = 8;
+    else if (offset < 0xC0000) relative_idx = 9;
+    else if (offset < 0xE0000) relative_idx = 10;
+    else relative_idx = 11;
+
+    sector = phys_sector_base + relative_idx;
+
+    // Mapping debug
+    // printf("GetSector Addr %08lX (Offset %05lX) -> BankTarget %lu (BFB2=%d) -> PhysBank %lu -> Sector %lu\n",
+    //        Address, offset, bank_target, bfb2, target_phys_bank, sector);
 
     return sector;
 }
@@ -131,6 +246,10 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
 }
 
 void Flash_SwapBank(void) {
+    // If DB1M is 0, we must enable it first.
+    // This will wipe the device.
+    Flash_EnableDualBank_IfMissing();
+
     printf("Flash_SwapBank: Unlocking OB...\n");
     HAL_FLASH_OB_Unlock();
 
@@ -138,7 +257,6 @@ void Flash_SwapBank(void) {
     while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
     uint32_t optcr = FLASH->OPTCR;
-    uint32_t initial_optcr = optcr;
 
     printf("Flash_SwapBank: Current OPTCR: %08lX\n", optcr);
 

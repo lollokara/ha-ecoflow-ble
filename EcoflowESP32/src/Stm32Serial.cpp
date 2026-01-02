@@ -46,14 +46,8 @@ void Stm32Serial::begin() {
 void Stm32Serial::update() {
     // OTA State Machine Logic
     if (_otaState == OTAState::STARTING) {
-        // Wait for ACK of START command? Or just delay?
-        // Let's assume processPacket handles the ACK/NACK state transition.
-        // We need a timeout though.
          if (_otaLastPacketTime == 0) _otaLastPacketTime = millis();
-         if (millis() - _otaLastPacketTime > 5000) { // 5s timeout for Start
-             _otaState = OTAState::SENDING; // Assume it worked? No, dangerous. Retry.
-             startOTA(_otaFilename, _otaSize);
-         }
+         // Timeout handled in global retry block below (now set to 15s)
     }
     else if (_otaState == OTAState::SENDING) {
         // Check if we need to send a chunk
@@ -108,6 +102,13 @@ void Stm32Serial::update() {
                 _otaLastPacketTime = 0; // Retry
             }
         }
+    }
+    // Added retry logic for STARTING state to prevent deadlock if ACK is missed/ignored
+    else if (_otaState == OTAState::STARTING) {
+         if (millis() - _otaLastPacketTime > 15000) { // 15s timeout for Start (erase is slow)
+             ESP_LOGW(TAG, "OTA Start Timeout. Retrying...");
+             startOTA(_otaFilename, _otaSize);
+         }
     }
     else if (_otaState == OTAState::VERIFYING) {
         // Send END/APPLY command
@@ -313,9 +314,14 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
     } else if (cmd == CMD_OTA_ACK) {
-        if (_otaState == OTAState::SENDING) {
+        if (_otaState == OTAState::STARTING) {
+             ESP_LOGI(TAG, "OTA Start ACK Received. Switching to SENDING.");
+             _otaState = OTAState::SENDING;
+             _otaOffset = 0;
+             _otaLastPacketTime = 0; // Ready to send first chunk
+        } else if (_otaState == OTAState::SENDING) {
              _otaState = OTAState::SENDING; // Keep state
-             _otaOffset += 1024; // Assuming fixed chunk size, logic in loop handles remainder
+             _otaOffset += 240; // Increment by chunk size (must match buffer size in update())
              _otaLastPacketTime = 0; // Reset timeout
              if (_otaOffset >= _otaSize) {
                  _otaState = OTAState::VERIFYING;

@@ -218,17 +218,69 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         protocolState = STATE_OTA;
 
+        printf("UART: OTA Start. Size: %lu\n", ota_size);
+
         // Unlock Flash
         Flash_Unlock();
 
-        // Mass Erase Bank 2? Or Sector by Sector?
-        // Let's erase Sector 12 (0x08100000) for now, or just handle it in chunk write?
-        // Better to erase fully here or on demand.
-        // Erasing 1MB takes time. We will erase sector by sector as needed or do it here blocking.
-        // Let's assume we erase first 4 sectors (16+16+16+64 = 112KB) + others.
-        // This is slow. We should send ACK first?
+        // 1. Copy Bootloader to Bank 2 (Sector 12 & 13)
+        // Bank 2 base: 0x08100000.
+        // We copy 32KB (Sector 0+1 content from Bank 1) to Sector 12+13.
+        if (Flash_CopyBootloader() != 0) {
+            printf("UART: Bootloader Copy Failed!\n");
+            uint8_t nack[] = {START_BYTE, CMD_OTA_NACK, 0, 0};
+            nack[3] = calculate_crc8(&nack[1], 2);
+            HAL_UART_Transmit(&huart6, nack, 4, 100);
+            Flash_Lock();
+            return;
+        }
 
-        printf("UART: OTA Start. Size: %lu\n", ota_size);
+        // 2. Erase Application Area in Bank 2
+        // App starts at Offset 0x8000 (Sector 14).
+        // We erase from 0x08108000 upwards based on ota_size.
+
+        uint32_t current = 0x08108000; // Start of Bank 2 App Area
+        uint32_t end = current + ota_size;
+
+        printf("UART: Erasing App Area from %08lX to %08lX\n", current, end);
+
+        while(current < end) {
+             // Calculate next address boundary based on standard sector sizes
+             // Note: We use logical offsets from 0x08100000 regardless of bank swap.
+             // 0x08100000 + 0x8000 = 0x08108000
+
+             uint32_t next_addr = 0;
+             uint32_t rel_offset = current - 0x08100000;
+
+             // Map relative offset to next sector start
+             if (rel_offset < 0x4000) next_addr = 0x08100000 + 0x4000;
+             else if (rel_offset < 0x8000) next_addr = 0x08100000 + 0x8000;
+             else if (rel_offset < 0xC000) next_addr = 0x08100000 + 0xC000;
+             else if (rel_offset < 0x10000) next_addr = 0x08100000 + 0x10000;
+             else if (rel_offset < 0x20000) next_addr = 0x08100000 + 0x20000; // 64KB
+             else {
+                 // 128KB sectors
+                 // Align to next 128KB
+                 uint32_t sect_base_rel = rel_offset & ~0x1FFFF; // floor to 128KB
+                 if (sect_base_rel < 0x20000) sect_base_rel = 0x20000; // clamp min 128KB start
+                 next_addr = 0x08100000 + sect_base_rel + 0x20000;
+             }
+
+             printf("UART: Erasing @ %08lX (Next: %08lX)\n", current, next_addr);
+
+             // CRITICAL FIX: Pass ADDRESS to Flash_EraseSector, NOT INDEX.
+             // Flash_EraseSector calls GetSector(address) internally.
+             if (Flash_EraseSector(current) != 0) {
+                 printf("UART: Erase Failed!\n");
+                 uint8_t nack[] = {START_BYTE, CMD_OTA_NACK, 0, 0};
+                 nack[3] = calculate_crc8(&nack[1], 2);
+                 HAL_UART_Transmit(&huart6, nack, 4, 100);
+                 Flash_Lock();
+                 return;
+             }
+             HAL_IWDG_Refresh(&hiwdg);
+             current = next_addr;
+        }
 
         uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
         ack[3] = calculate_crc8(&ack[1], 2);
@@ -236,7 +288,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         // Notify UI to show "Updating..."
         DisplayEvent event;
-        event.type = DISPLAY_EVENT_UPDATE_DEBUG; // Abuse debug event or add new
+        event.type = DISPLAY_EVENT_UPDATE_DEBUG;
         xQueueSend(displayQueue, &event, 0);
     }
     else if (cmd == CMD_OTA_CHUNK) {
@@ -246,58 +298,10 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         uint8_t data_len = packet[2] - 4;
         uint8_t *data = &packet[7];
 
-        // Determine sector address
-        uint32_t addr = ota_base_addr + offset;
-
-        // Check if we need to erase this sector?
-        // Naive: Erase sector if offset aligns with sector start.
-        // Or track erased sectors.
-        // Safe bet: Erase sector if (addr % SECTOR_SIZE) == 0? No, sectors vary.
-        // Let's assume the Start command erased everything or we check if dirty.
-        // For robustness, we should erase.
-        // But erasing takes time (secs).
-        // Let's assume we ERASED everything in START_OTA blocking (bad for UART).
-
-        // Better: Erase the specific sector if it's the first write to it.
-        // Since we write sequentially, we can track "last erased address".
-        static uint32_t last_erased_sector_addr = 0;
-
-        // Simplification: We assume START command does the erase of the needed range.
-        // But doing it blocking inside ISR/Task might drop bytes.
-        // Since we are in OTA state, we stop polling.
-
-        // Actually, let's just write. We assume FLASH is erased.
-        // If we fail to write, we NACK.
-
-        // But we MUST erase. Let's do it in START for simplicity, even if it blocks for 2-3s.
-        // ESP32 waits 5s for ACK.
-
-        if (offset == 0) {
-             printf("UART: OTA First Chunk. Preparing Flash...\n");
-             // First chunk, ensure unlocked.
-             Flash_Unlock();
-
-             // Smart Erase Loop covering ota_size
-             uint32_t current = 0x08100000; // Start of Bank 2 (No Offset)
-             uint32_t end = current + ota_size;
-
-             while(current < end) {
-                 printf("UART: Erasing @ %08lX\n", current);
-                 Flash_EraseSector(current);
-                 HAL_IWDG_Refresh(&hiwdg); // KICK THE DOG!
-
-                 // Smart increment based on sector size
-                 if (current < 0x08110000) current += 0x4000; // 16KB (Sectors 12-15)
-                 else if (current < 0x08120000) current += 0x10000; // 64KB (Sector 16)
-                 else current += 0x20000; // 128KB (Sectors 17-23)
-             }
-             printf("UART: Flash Erase Complete.\n");
-        }
-
-        // Write
-        // Standard OTA: Write to Bank 2 Base + Offset
-
-        uint32_t write_addr = ota_base_addr + offset;
+        // Write to Bank 2 (0x08100000) + Offset + 0x8000 (App Offset)
+        // The uploaded binary is the App itself (starting at 0 relative to itself).
+        // But it belongs at 0x8000 in the bank.
+        uint32_t write_addr = ota_base_addr + 0x8000 + offset;
 
         if (Flash_Write(write_addr, data, data_len) == 0) {
             uint8_t ack[] = {START_BYTE, CMD_OTA_ACK, 0, 0};
