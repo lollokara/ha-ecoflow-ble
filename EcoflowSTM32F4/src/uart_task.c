@@ -2,6 +2,7 @@
 #include "ecoflow_protocol.h"
 #include "display_task.h"
 #include "stm32f4xx_hal.h"
+#include "uart_protocol.h"
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
@@ -143,7 +144,19 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
 
-    if (cmd == CMD_HANDSHAKE_ACK) {
+    if (cmd == OTA_CMD_START) {
+        printf("UART: OTA Start Received. Rebooting to Bootloader...\n");
+        // Write Magic to Backup Register
+        __HAL_RCC_PWR_CLK_ENABLE();
+        HAL_PWR_EnableBkUpAccess();
+        __HAL_RCC_RTC_ENABLE();
+        RTC->BKP0R = 0xDEADBEEF;
+
+        // Wait a bit and Reset
+        HAL_Delay(100);
+        HAL_NVIC_SystemReset();
+    }
+    else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
             printf("UART: Handshake ACK received. State -> WAIT_DEVICE_LIST\n");
             protocolState = STATE_WAIT_DEVICE_LIST;
