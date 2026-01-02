@@ -1,5 +1,6 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
+#include <stdbool.h>
 
 // --- Definitions ---
 // App is linked at 0x08008000 (Sector 2)
@@ -41,8 +42,8 @@ static void UART_Init(void);
 static void IWDG_Init(void);
 void JumpTo(uint32_t address);
 void ToggleBank(void);
-uint32_t crc32_update(uint32_t crc, const uint8_t *data, size_t len);
-uint8_t calc_crc8(uint8_t *data, int len);
+static uint32_t crc32_update(uint32_t crc, const uint8_t *data, size_t len);
+static uint8_t calc_crc8(uint8_t *data, int len);
 void SendAck(uint8_t cmd_id);
 void SendNack(uint8_t cmd_id);
 HAL_StatusTypeDef Flash_Erase_Target_App(void);

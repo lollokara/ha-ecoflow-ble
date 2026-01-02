@@ -71,6 +71,9 @@ private:
 
     void setState(State s);
     void sendChunk();
+    void sendStartCmd();
+    void sendEndCmd(uint32_t crc);
+    void sendDataCmd(uint32_t offset, uint8_t* data, size_t len);
 
     // UART Protocol Helpers (implemented in Stm32Serial or here if Stm32Serial exposes raw send)
     // We will assume Stm32Serial needs a sendRawPacket method.

@@ -55,6 +55,12 @@ extern "C" {
 #define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
 #define CMD_POWER_OFF 0x50           ///< Trigger System Power Off
 
+#define CMD_OTA_START 0xF0
+#define CMD_OTA_DATA  0xF1
+#define CMD_OTA_END   0xF2
+#define CMD_OTA_ACK   0xF3
+#define CMD_OTA_NACK  0xF4
+
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
 #define W2_PARAM_MODE 2

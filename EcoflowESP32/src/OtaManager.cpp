@@ -62,7 +62,7 @@ bool OtaManager::beginStm32Ota(size_t fileSize) {
 
     _isUpdating = true;
     _totalSize = fileSize;
-    _bytesWritten = 0;
+    _bytesSent = 0; // Using _bytesSent for tracking
     _progress = 0;
     _status = "Downloading...";
     return true;
@@ -78,9 +78,15 @@ bool OtaManager::writeStm32Data(uint8_t* data, size_t len) {
         _status = "Write Error";
         return false;
     }
-    _bytesWritten += written;
-    _progress = (_bytesWritten * 100) / _totalSize;
-    // Keep progress < 100 until fully streamed
+    // Note: We use _bytesSent for progress during DOWNLOAD too?
+    // Let's use a local var or reuse.
+    // _bytesSent is member.
+    _bytesSent += written;
+
+    if (_totalSize > 0) {
+        _progress = (_bytesSent * 100) / _totalSize;
+    }
+    // Keep progress < 50 until fully streamed
     if (_progress > 49) _progress = 49;
     return true;
 }
