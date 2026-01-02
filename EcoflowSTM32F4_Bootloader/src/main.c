@@ -34,6 +34,7 @@ void Error_Handler(void);
 void JumpToApplication(void);
 void EnterOTAMode(void);
 void BlinkLED(GPIO_TypeDef* port, uint16_t pin, int count, int delay);
+uint8_t calculate_crc8(uint8_t *data, int len);
 
 /* Global Variables */
 RTC_HandleTypeDef hrtc;
@@ -44,33 +45,43 @@ int main(void) {
     SystemClock_Config();
     MX_GPIO_Init();
 
+    /* 1. LEDs Init: Force All OFF */
+    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, GPIO_PIN_RESET);
+
+    /* 2. Startup Visual: Blink Blue 2x */
+    BlinkLED(LED_BLUE_PORT, LED_BLUE_PIN, 2, 200);
+
     /* Enable Power Clock and Backup Access */
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
 
-    /* Enable RTC Clock (LSI) if not enabled to access Backup Registers */
-    // Simple config just to access BKP registers
+    /* Enable RTC Clock (LSI) */
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
     RCC_OscInitStruct.LSIState = RCC_LSI_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-        // Error
+        // Clock Error: Blink Orange
+        BlinkLED(LED_ORANGE_PORT, LED_ORANGE_PIN, 5, 100);
     }
+
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
     PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-        // Error
+        // Periph Error
     }
     __HAL_RCC_RTC_ENABLE();
+
+    hrtc.Instance = RTC; // Needed for HAL_RTCEx calls
 
     /* Check Backup Register for Magic Number */
     uint32_t magic = HAL_RTCEx_BKUPRead(&hrtc, BKP_DR_OTA);
 
-    /* Check User Button (PA0) - Hold to force OTA */
-    // Note: PA0 is usually High or Low? Discovery usually has PA0 as User Button (Blue).
-    // Assuming Active High.
+    /* Check User Button (PA0) - Hold High to force OTA */
     int buttonState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0);
 
     if (magic == OTA_MAGIC || buttonState == GPIO_PIN_SET) {
@@ -86,7 +97,9 @@ int main(void) {
 
     /* Should not reach here */
     while (1) {
-        BlinkLED(LED_RED_PORT, LED_RED_PIN, 1, 100);
+        // Fatal Logic Error: Blink Red Slow
+        HAL_GPIO_TogglePin(LED_RED_PORT, LED_RED_PIN);
+        HAL_Delay(500);
     }
 }
 
@@ -94,26 +107,29 @@ void JumpToApplication(void) {
     uint32_t appStack = *(__IO uint32_t*)APP_ADDRESS;
     uint32_t appResetHandler = *(__IO uint32_t*)(APP_ADDRESS + 4);
 
-    /* Validate Stack Pointer (approximate check for RAM) */
-    if ((appStack & 0x2FFE0000) == 0x20000000) {
-        /* Valid App */
+    /* Validate Stack Pointer (RAM range 0x20000000 - 0x20050000) */
+    if ((appStack >= 0x20000000) && (appStack <= 0x20050000)) {
+        /* Visual: Green Pulse */
+        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_SET);
+        HAL_Delay(200);
+        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
 
         /* De-init Peripherals */
         HAL_RCC_DeInit();
         HAL_DeInit();
+        SysTick->CTRL = 0;
 
         /* Disable Interrupts */
         __disable_irq();
-
-        /* Set Vector Table (SCB->VTOR) is usually handled by SystemInit of the App,
-           but good practice to reset SCB state if needed. */
 
         /* Jump */
         void (*pResetHandler)(void) = (void (*)(void))appResetHandler;
         __set_MSP(appStack);
         pResetHandler();
     } else {
-        /* Invalid App - Stay in Bootloader/OTA */
+        /* Invalid App */
+        // Blink Red 3x then Enter OTA
+        BlinkLED(LED_RED_PORT, LED_RED_PIN, 3, 200);
         EnterOTAMode();
     }
 }
@@ -125,95 +141,115 @@ uint32_t GetSector(uint32_t Address) {
     if((Address >= 0x08008000) && (Address < 0x0800C000)) return FLASH_SECTOR_2;
     if((Address >= 0x0800C000) && (Address < 0x08010000)) return FLASH_SECTOR_3;
     if((Address >= 0x08010000) && (Address < 0x08020000)) return FLASH_SECTOR_4;
-    // ... add more if needed
     if((Address >= 0x08020000) && (Address < 0x08040000)) return FLASH_SECTOR_5;
     if((Address >= 0x08040000) && (Address < 0x08060000)) return FLASH_SECTOR_6;
     if((Address >= 0x08060000) && (Address < 0x08080000)) return FLASH_SECTOR_7;
-    // Bank 2
     // ...
-    return FLASH_SECTOR_5; // Default/Fallback
+    return FLASH_SECTOR_7;
+}
+
+uint8_t calculate_crc8(uint8_t *data, int len) {
+    uint8_t crc = 0;
+    for (int i = 0; i < len; i++) {
+        crc += data[i]; // Simple Checksum for now to match ESP32 OtaManager.cpp implementation
+                        // (ESP32 code: for(int i=1; i < 3 + readLen; i++) sum += buf[i];)
+                        // Note: ESP32 calc includes CMD, LEN, PAYLOAD.
+                        // My buffer passed here should be that part.
+    }
+    return crc;
 }
 
 void EnterOTAMode(void) {
     MX_USART6_UART_Init();
 
-    /* Indicate OTA Mode (Blue LED) */
-    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, GPIO_PIN_RESET); // LEDs on Disco often Active Low?
-    // Actually schematic says: PG6, PD4, PD5, PK3. Usually Active High on discovery boards but let's assume High=On for now.
-    // Wait, on F469 Discovery, LEDs are:
-    // LD1 (Green) PG6
-    // LD2 (Orange) PD4
-    // LD3 (Red) PD5
-    // LD4 (Blue) PK3
-    // Active High? Usually yes.
+    /* Indicate OTA Mode: Blue Constant ON */
+    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, GPIO_PIN_SET);
 
-    uint8_t rxBuffer[260]; // Header + 256B Payload
+    uint8_t rxBuffer[300];
     uint32_t writeAddr = APP_ADDRESS;
 
     while (1) {
         /* Poll for Start Byte (0xAA) */
         uint8_t byte = 0;
-        if (HAL_UART_Receive(&huart6, &byte, 1, 1000) == HAL_OK) {
+        if (HAL_UART_Receive(&huart6, &byte, 1, 100) == HAL_OK) {
             if (byte == 0xAA) {
-                // Packet Start
-                // [AA][CMD][LEN][PAYLOAD...][CRC]
-                uint8_t header[2]; // CMD, LEN
+                // Header: [CMD][LEN]
+                uint8_t header[2];
                 if (HAL_UART_Receive(&huart6, header, 2, 100) == HAL_OK) {
                     uint8_t cmd = header[0];
                     uint8_t len = header[1];
 
-                    if (HAL_UART_Receive(&huart6, rxBuffer, len, 1000) == HAL_OK) {
-                        uint8_t crc = 0;
-                        if (HAL_UART_Receive(&huart6, &crc, 1, 100) == HAL_OK) {
-                            // Check CRC (Simple Sum or CRC8? Use Sum for now as placeholder or check docs)
-                            // User didn't specify CRC algo for OTA, assume simple or I implement one.
-                            // I'll assume Sum of payload for now or no check if lazy, but better check.
-                            // Let's just ACK for now to establish comms.
+                    // Payload
+                    if (HAL_UART_Receive(&huart6, rxBuffer, len, 500) == HAL_OK) {
+                        // CRC
+                        uint8_t crc_rx = 0;
+                        if (HAL_UART_Receive(&huart6, &crc_rx, 1, 100) == HAL_OK) {
 
-                            if (cmd == CMD_OTA_START) {
-                                // Erase Flash
-                                HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_SET);
-                                FLASH_EraseInitTypeDef EraseInitStruct;
-                                uint32_t SectorError;
-                                HAL_FLASH_Unlock();
-                                EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-                                EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-                                EraseInitStruct.Sector = FLASH_SECTOR_2; // Start from App
-                                EraseInitStruct.NbSectors = 6; // Erase up to Sector 7 (0x08080000 - 512KB) or more?
-                                // Better to read Size from payload. Payload[0-3] = Size.
-                                // For now erase enough.
-                                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                                     // Error
-                                     HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_SET);
+                            // Validate Checksum (Sum of CMD + LEN + PAYLOAD)
+                            uint8_t sum = cmd + len;
+                            for(int i=0; i<len; i++) sum += rxBuffer[i];
+
+                            if (sum == crc_rx) {
+                                // Packet OK
+                                if (cmd == CMD_OTA_START) {
+                                    // Erase
+                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_SET);
+
+                                    HAL_FLASH_Unlock();
+                                    FLASH_EraseInitTypeDef EraseInitStruct;
+                                    uint32_t SectorError;
+                                    EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
+                                    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+                                    EraseInitStruct.Sector = FLASH_SECTOR_2;
+                                    EraseInitStruct.NbSectors = 6; // Erase 2,3,4,5,6,7 (up to 0x08080000?)
+                                    // Sector 2: 16KB
+                                    // Sector 3: 16KB
+                                    // Sector 4: 64KB
+                                    // Sector 5: 128KB
+                                    // Sector 6: 128KB
+                                    // Sector 7: 128KB
+                                    // Total: ~480KB covered. If app is larger, need more sectors.
+                                    // Assuming app fits in first 1MB bank mostly.
+
+                                    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) == HAL_OK) {
+                                        uint8_t ack = CMD_ACK;
+                                        HAL_UART_Transmit(&huart6, &ack, 1, 100);
+                                        writeAddr = APP_ADDRESS;
+                                    } else {
+                                        uint8_t nack = CMD_NACK;
+                                        HAL_UART_Transmit(&huart6, &nack, 1, 100);
+                                        BlinkLED(LED_RED_PORT, LED_RED_PIN, 2, 100);
+                                    }
+                                    HAL_FLASH_Lock();
+                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
                                 }
-                                HAL_FLASH_Lock();
-                                HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
-
-                                uint8_t ack = CMD_ACK;
-                                HAL_UART_Transmit(&huart6, &ack, 1, 100);
-                                writeAddr = APP_ADDRESS;
-                            }
-                            else if (cmd == CMD_OTA_DATA) {
-                                // Write Flash
-                                // Payload: [Offset 4B][Data...] (User said Data is Payload? Or Offset included?)
-                                // Let's assume Payload is purely Data for simple streaming, or handle offset.
-                                // Simplest: Stream is sequential.
-                                HAL_FLASH_Unlock();
-                                for (int i = 0; i < len; i++) {
-                                    HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, writeAddr++, rxBuffer[i]);
+                                else if (cmd == CMD_OTA_DATA) {
+                                    // Write
+                                    HAL_GPIO_TogglePin(LED_GREEN_PORT, LED_GREEN_PIN);
+                                    HAL_FLASH_Unlock();
+                                    for (int i = 0; i < len; i++) {
+                                        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, writeAddr++, rxBuffer[i]) != HAL_OK) {
+                                            // Write Error
+                                        }
+                                    }
+                                    HAL_FLASH_Lock();
+                                    uint8_t ack = CMD_ACK;
+                                    HAL_UART_Transmit(&huart6, &ack, 1, 100);
                                 }
-                                HAL_FLASH_Lock();
-
-                                uint8_t ack = CMD_ACK;
-                                HAL_UART_Transmit(&huart6, &ack, 1, 100);
-                                HAL_GPIO_TogglePin(LED_GREEN_PORT, LED_GREEN_PIN);
-                            }
-                            else if (cmd == CMD_OTA_END) {
-                                uint8_t ack = CMD_ACK;
-                                HAL_UART_Transmit(&huart6, &ack, 1, 100);
-                                HAL_Delay(100);
-                                NVIC_SystemReset();
+                                else if (cmd == CMD_OTA_END) {
+                                    uint8_t ack = CMD_ACK;
+                                    HAL_UART_Transmit(&huart6, &ack, 1, 100);
+                                    HAL_Delay(500);
+                                    HAL_NVIC_SystemReset();
+                                }
+                            } else {
+                                // CRC Fail
+                                uint8_t nack = CMD_NACK;
+                                HAL_UART_Transmit(&huart6, &nack, 1, 100);
+                                BlinkLED(LED_RED_PORT, LED_RED_PIN, 1, 50);
                             }
                         }
                     }
@@ -223,17 +259,13 @@ void EnterOTAMode(void) {
     }
 }
 
-/* System Clock Configuration */
 void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-    /** Configure the main internal regulator output voltage */
     __HAL_RCC_PWR_CLK_ENABLE();
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    /** Initializes the RCC Oscillators according to the specified parameters
-    * in the RCC_OscInitTypeDef structure. */
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -247,12 +279,10 @@ void SystemClock_Config(void) {
         Error_Handler();
     }
 
-    /** Activate the Over-Drive mode */
     if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
         Error_Handler();
     }
 
-    /** Initializes the CPU, AHB and APB buses clocks */
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                                 |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
@@ -282,52 +312,46 @@ static void MX_USART6_UART_Init(void) {
 static void MX_GPIO_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    /* GPIO Ports Clock Enable */
     __HAL_RCC_GPIOG_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOK_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE(); // For Button
+    __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /* Configure GPIO pin Output Level */
+    /* Configure LEDs */
     HAL_GPIO_WritePin(GPIOG, LED_GREEN_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN|LED_RED_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOK, LED_BLUE_PIN, GPIO_PIN_RESET);
 
-    /* Configure GPIO pin : LED_GREEN_PIN */
     GPIO_InitStruct.Pin = LED_GREEN_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-    /* Configure GPIO pins : LED_ORANGE_PIN LED_RED_PIN */
     GPIO_InitStruct.Pin = LED_ORANGE_PIN|LED_RED_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-    /* Configure GPIO pin : LED_BLUE_PIN */
     GPIO_InitStruct.Pin = LED_BLUE_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
 
-    /* Configure GPIO pin : PA0 (User Button) */
+    /* Button */
     GPIO_InitStruct.Pin = GPIO_PIN_0;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL; // Externally pulled usually? Or Pull Down?
-    // PA0 on Discovery is User Button. Usually floating or Pulldown.
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 void Error_Handler(void) {
     __disable_irq();
     while (1) {
-        // Blink Red Fast
         HAL_GPIO_TogglePin(LED_RED_PORT, LED_RED_PIN);
-        HAL_Delay(50);
+        HAL_Delay(100);
     }
 }
 

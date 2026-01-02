@@ -167,9 +167,11 @@ void OtaManager::processStmUpdate() {
     }
     else if (stmState == WAIT_ACK) {
         // Poll for ACK
-        if (Serial1.available()) {
+        while (Serial1.available()) {
             uint8_t b = Serial1.read();
+            ESP_LOGI(TAG, "RX: %02X", b); // DEBUG: Log all RX bytes
             if (b == CMD_ACK) {
+                ESP_LOGI(TAG, "ACK Received");
                 if (bytesSent == 0) {
                     stmState = SENDING;
                     statusMsg = "Flashing...";
@@ -180,13 +182,15 @@ void OtaManager::processStmUpdate() {
                 }
                 lastStateTime = millis();
                 retryCount = 0;
+                return; // State changed, exit loop
             } else if (b == CMD_NACK) {
                 ESP_LOGE(TAG, "NACK Received");
                 retryCount++;
             }
         }
 
-        if (millis() - lastStateTime > 5000) { // Timeout
+        if (millis() - lastStateTime > 15000) { // Timeout extended to 15s for Erase
+            ESP_LOGW(TAG, "Timeout waiting for ACK");
             retryCount++;
             lastStateTime = millis();
             if (retryCount > 5) {
