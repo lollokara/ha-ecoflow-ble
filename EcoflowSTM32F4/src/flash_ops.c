@@ -1,6 +1,7 @@
 #include "flash_ops.h"
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
+#include <string.h>
 
 // STM32F469 has 2MB Flash, organized in two banks (if dual bank mode enabled)
 // or just sectors.
@@ -237,9 +238,28 @@ uint8_t Flash_EraseSector(uint32_t address) {
 }
 
 uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
-    for (uint32_t i = 0; i < len; i++) {
+    uint32_t i = 0;
+
+    // Program in 32-bit Words (x4 faster)
+    // We assume address is 4-byte aligned (offset 0x0810xxxx is aligned)
+    // We assume len is multiple of 4 (ESP32 sends 240 bytes)
+
+    // Main loop for words
+    for (i = 0; i < (len & ~3); i += 4) {
+        uint32_t word;
+        memcpy(&word, &data[i], 4); // Handle potential unaligned input buffer safely
+
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address + i, word) != HAL_OK) {
+             printf("Flash_Write: Word Program Failed @ %08lX\n", address + i);
+             return 1;
+        }
+    }
+
+    // Handle remaining bytes (if any) byte-by-byte
+    for (; i < len; i++) {
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, address + i, data[i]) != HAL_OK) {
-            return 1;
+             printf("Flash_Write: Byte Program Failed @ %08lX\n", address + i);
+             return 1;
         }
     }
     return 0;

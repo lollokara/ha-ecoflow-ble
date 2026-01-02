@@ -220,22 +220,27 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         printf("UART: OTA Start. Size: %lu\n", ota_size);
 
-        // Unlock Flash
-        Flash_Unlock();
-
         // 1. Copy Bootloader to Bank 2 (Sector 12 & 13)
         // Bank 2 base: 0x08100000.
         // We copy 32KB (Sector 0+1 content from Bank 1) to Sector 12+13.
+        // Note: Flash_CopyBootloader handles its own Unlock/Lock sequence.
         if (Flash_CopyBootloader() != 0) {
             printf("UART: Bootloader Copy Failed!\n");
             uint8_t nack[] = {START_BYTE, CMD_OTA_NACK, 0, 0};
             nack[3] = calculate_crc8(&nack[1], 2);
             HAL_UART_Transmit(&huart6, nack, 4, 100);
-            Flash_Lock();
             return;
         }
 
         // 2. Erase Application Area in Bank 2
+        // Ensure Flash is Unlocked for Erase and subsequent Write commands.
+        // Flash_CopyBootloader locks it on exit, so we MUST unlock here.
+        Flash_Unlock();
+
+        // Clear all error flags to ensure clean write state
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                               FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+
         // App starts at Offset 0x8000 (Sector 14).
         // We erase from 0x08108000 upwards based on ota_size.
 
