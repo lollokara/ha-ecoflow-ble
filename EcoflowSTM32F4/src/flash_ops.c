@@ -78,6 +78,13 @@ int Flash_CopyBootloader(void) {
              HAL_FLASH_Lock();
              return -2;
         }
+
+        // Verify
+        if (*(volatile uint32_t*)(dst_addr + i) != data) {
+             printf("Flash_Ops: Bootloader Verify Failed at offset %lu\n", i);
+             HAL_FLASH_Lock();
+             return -3;
+        }
     }
 
     HAL_FLASH_Lock();
@@ -258,6 +265,12 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
              printf("Flash_Write: Word Program Failed @ %08lX. Error: %lu, SR: %08lX\n", address + i, err, FLASH->SR);
              return 1;
         }
+
+        // Verify
+        if (*(volatile uint32_t*)(address + i) != word) {
+             printf("Flash_Write: Verify Failed @ %08lX\n", address + i);
+             return 2;
+        }
     }
 
     // Handle remaining bytes
@@ -266,6 +279,12 @@ uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
              uint32_t err = HAL_FLASH_GetError();
              printf("Flash_Write: Byte Program Failed @ %08lX. Error: %lu, SR: %08lX\n", address + i, err, FLASH->SR);
              return 1;
+        }
+
+        // Verify
+        if (*(volatile uint8_t*)(address + i) != data[i]) {
+             printf("Flash_Write: Verify Failed @ %08lX\n", address + i);
+             return 2;
         }
     }
     return 0;
@@ -276,7 +295,9 @@ void Flash_SwapBank(void) {
     // This will wipe the device.
     Flash_EnableDualBank_IfMissing();
 
-    printf("Flash_SwapBank: Unlocking OB...\n");
+    // Disable interrupts to prevent stalls during Option Byte programming
+    __disable_irq();
+
     HAL_FLASH_OB_Unlock();
 
     // Wait for BSY
@@ -284,14 +305,10 @@ void Flash_SwapBank(void) {
 
     uint32_t optcr = FLASH->OPTCR;
 
-    printf("Flash_SwapBank: Current OPTCR: %08lX\n", optcr);
-
     // Toggle BFB2 (Bit 4)
     if ((optcr & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-        printf("Flash_SwapBank: BFB2 is 1. Clearing (Boot Bank 1)...\n");
         optcr &= ~FLASH_OPTCR_BFB2;
     } else {
-        printf("Flash_SwapBank: BFB2 is 0. Setting (Boot Bank 2)...\n");
         optcr |= FLASH_OPTCR_BFB2;
     }
 
@@ -304,14 +321,10 @@ void Flash_SwapBank(void) {
     // Wait for BSY
     while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-    // Verify
-    uint32_t verify_optcr = FLASH->OPTCR;
-    printf("Flash_SwapBank: New OPTCR: %08lX (Target: %08lX)\n", verify_optcr, optcr);
-
     // Launch/Reset
-    printf("Flash_SwapBank: Launching Reset...\n");
-    __disable_irq();
     HAL_FLASH_OB_Launch();
 
+    // Should not reach here
+    HAL_NVIC_SystemReset();
     while(1);
 }
