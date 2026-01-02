@@ -30,6 +30,7 @@ UART_HandleTypeDef huart3;
 TIM_HandleTypeDef htim2;
 IWDG_HandleTypeDef hiwdg;
 QueueHandle_t displayQueue; // Global queue for UI events
+volatile bool g_ota_active = false; // Global flag to suspend UI during OTA
 
 // Forward Declarations
 void SystemClock_Config(void);

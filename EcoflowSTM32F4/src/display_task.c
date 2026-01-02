@@ -12,6 +12,7 @@
 
 // QueueHandle_t displayQueue; // Defined in main.c
 extern IWDG_HandleTypeDef hiwdg;
+extern volatile bool g_ota_active;
 
 void StartDisplayTask(void * argument) {
     // Init Hardware
@@ -34,6 +35,12 @@ void StartDisplayTask(void * argument) {
 
     for (;;) {
         HAL_IWDG_Refresh(&hiwdg);
+
+        // If OTA is active, suspend UI operations to prevent crashes/contention
+        if (g_ota_active) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
 
         // Handle Data Updates
         while (xQueueReceive(displayQueue, &event, 0) == pdTRUE) {

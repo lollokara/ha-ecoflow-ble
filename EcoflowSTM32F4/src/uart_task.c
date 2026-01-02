@@ -73,6 +73,7 @@ static int rb_pop(RingBuffer *rb, uint8_t *byte) {
 
 // ISR Variables
 uint8_t rx_byte_isr;
+extern volatile bool g_ota_active;
 
 void UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART6) {
@@ -217,6 +218,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
 
         protocolState = STATE_OTA;
+        g_ota_active = true; // Suspend UI updates
 
         printf("UART: OTA Start. Size: %lu\n", ota_size);
 
