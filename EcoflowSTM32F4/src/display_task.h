@@ -17,6 +17,7 @@ typedef enum {
     DISPLAY_EVENT_OTA_PROGRESS
 } DisplayEventType;
 
+
 typedef struct {
     DisplayEventType type;
     union {
