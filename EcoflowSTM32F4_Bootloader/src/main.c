@@ -20,6 +20,13 @@ int main(void) {
     uint32_t app_sp = *(__IO uint32_t*)APP_ADDRESS;
     if (app_sp >= 0x20000000 && app_sp <= 0x20050000) {
 
+        // De-initialize Peripherals and Clocks to clean state
+        HAL_RCC_DeInit();
+        HAL_DeInit();
+        SysTick->CTRL = 0;
+        SysTick->LOAD = 0;
+        SysTick->VAL = 0;
+
         // Disable all interrupts
         __disable_irq();
 
