@@ -61,14 +61,17 @@ void setup() {
 
     // Initialize Power Latch to keep the device powered on
     pinMode(POWER_LATCH_PIN, OUTPUT);
-    digitalWrite(POWER_LATCH_PIN, LOW); // Active Low/High depends on hardware, assuming Low keeps it ON based on previous context or defaulting.
-                                       // Wait, memory says "switch to OUTPUT LOW only when executing the power-off sequence."
-                                       // But here it sets it LOW at startup.
-                                       // The memory said: "ESP32 GPIO 16 is the Power Latch control pin; it must be initialized as INPUT_PULLUP in setup() and switched to OUTPUT LOW only when executing the power-off sequence."
-                                       // The existing code sets it OUTPUT LOW. I must NOT alter code functionality, so I will document it as is.
+    digitalWrite(POWER_LATCH_PIN, LOW);
 
+    // Initialize both USB CDC and Hardware Serial for debugging
     Serial.begin(115200);
-    Serial.println("Starting Ecoflow Controller...");
+    Serial.setDebugOutput(true);
+
+    Serial0.begin(115200);
+    Serial0.setDebugOutput(true); // Redundant if log_v is not used, but good for esp_log
+
+    Serial.println("Starting Ecoflow Controller (USB CDC)...");
+    Serial0.println("Starting Ecoflow Controller (UART0)...");
 
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();

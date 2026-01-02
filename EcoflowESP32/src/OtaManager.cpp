@@ -15,16 +15,20 @@ OtaManager::OtaManager() : stmState(IDLE), fileSize(0), bytesSent(0), retryCount
 void OtaManager::begin() {
     if (!LittleFS.begin(true)) {
         Serial.println("OtaManager: LittleFS Mount Failed");
+        Serial0.println("OtaManager: LittleFS Mount Failed");
     } else {
         Serial.println("OtaManager: LittleFS Mounted");
+        Serial0.println("OtaManager: LittleFS Mounted");
     }
 }
 
 void OtaManager::handleEspUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
         Serial.printf("OtaManager: ESP Update Start: %s\n", filename.c_str());
+        Serial0.printf("OtaManager: ESP Update Start: %s\n", filename.c_str());
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Update.printError(Serial);
+            Update.printError(Serial0);
         }
         statusMsg = "ESP Update Started";
         progressPercent = 0;
@@ -55,9 +59,11 @@ void OtaManager::handleEspUpdate(AsyncWebServerRequest *request, const String& f
 void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
         Serial.printf("OtaManager: STM Update Upload Start: %s\n", filename.c_str());
+        Serial0.printf("OtaManager: STM Update Upload Start: %s\n", filename.c_str());
         updateFile = LittleFS.open("/stm32_update.bin", FILE_WRITE);
         if (!updateFile) {
             Serial.println("OtaManager: Failed to open file for writing");
+            Serial0.println("OtaManager: Failed to open file for writing");
             return;
         }
         stmState = IDLE;
@@ -76,6 +82,7 @@ void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& f
         if (updateFile) {
             updateFile.close();
             Serial.printf("OtaManager: STM Update Upload Complete: %uB\n", index + len);
+            Serial0.printf("OtaManager: STM Update Upload Complete: %uB\n", index + len);
             statusMsg = "Upload Complete. Starting Flash...";
             progressPercent = 0;
 
@@ -88,10 +95,12 @@ void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& f
                 lastTxTime = millis();
                 retryCount = 0;
                 Serial.printf("OtaManager: State -> STARTING. File Size: %d\n", fileSize);
+                Serial0.printf("OtaManager: State -> STARTING. File Size: %d\n", fileSize);
             } else {
                 statusMsg = "Failed to open update file";
                 stmState = FAILED;
                 Serial.println("OtaManager: Failed to reopen update file");
+                Serial0.println("OtaManager: Failed to reopen update file");
             }
         }
     }
@@ -115,6 +124,7 @@ void OtaManager::processStmUpdate() {
         if (millis() - lastStateTime > 1000) {
             lastStateTime = millis();
             Serial.println("OtaManager: Sending START Command...");
+            Serial0.println("OtaManager: Sending START Command...");
 
             // Packet: [AA][CMD][LEN][PAYLOAD...][CRC]
             // CMD_OTA_START Payload: 4 Bytes Size (Little Endian)
@@ -145,16 +155,20 @@ void OtaManager::processStmUpdate() {
         // Poll for ACK
         while (Serial1.available()) {
             uint8_t b = Serial1.read();
-            Serial.printf("RX: %02X ", b); // DEBUG: Log all RX bytes
+            Serial.printf("RX: %02X ", b);
+            Serial0.printf("RX: %02X ", b);
             if (b == CMD_ACK) {
                 Serial.println("\nOtaManager: ACK Received!");
+                Serial0.println("\nOtaManager: ACK Received!");
                 if (bytesSent == 0) {
                     stmState = SENDING;
                     statusMsg = "Flashing...";
                     Serial.println("OtaManager: State -> SENDING");
+                    Serial0.println("OtaManager: State -> SENDING");
                 } else if (bytesSent >= fileSize) {
                     stmState = ENDING;
                     Serial.println("OtaManager: State -> ENDING");
+                    Serial0.println("OtaManager: State -> ENDING");
                 } else {
                     stmState = SENDING;
                 }
@@ -163,21 +177,25 @@ void OtaManager::processStmUpdate() {
                 return; // State changed, exit loop
             } else if (b == CMD_NACK) {
                 Serial.println("\nOtaManager: NACK Received");
+                Serial0.println("\nOtaManager: NACK Received");
                 retryCount++;
             }
         }
 
         if (millis() - lastStateTime > 15000) { // Timeout extended to 15s
             Serial.println("\nOtaManager: Timeout waiting for ACK");
+            Serial0.println("\nOtaManager: Timeout waiting for ACK");
             retryCount++;
             lastStateTime = millis();
             if (retryCount > 5) {
                 stmState = FAILED;
                 statusMsg = "Timeout Waiting for ACK";
                 Serial.println("OtaManager: State -> FAILED (Too many timeouts)");
+                Serial0.println("OtaManager: State -> FAILED (Too many timeouts)");
                 updateFile.close();
             } else {
                 Serial.println("OtaManager: Retrying...");
+                Serial0.println("OtaManager: Retrying...");
                 if(bytesSent == 0) stmState = STARTING;
                 else stmState = SENDING;
             }
