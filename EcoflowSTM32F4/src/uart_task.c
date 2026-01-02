@@ -79,6 +79,27 @@ void UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+// Check if we need to enter OTA mode
+void CheckForOTACommand(uint8_t cmd) {
+    if (cmd == 0xF0) { // CMD_OTA_START
+        // Write Magic Number to Backup Register
+        HAL_PWR_EnableBkUpAccess();
+        // Assuming RTC is initialized and BKP registers are accessible.
+        // We might need to enable RTC clock here if not enabled, but main should have.
+        // Or just use a specific RAM address if we don't do full reset, but reset is safer.
+        // We'll use RTC BKP DR0 as defined in Bootloader.
+
+        // Ensure LSI/RTC is on - minimal check
+        __HAL_RCC_RTC_ENABLE();
+        RTC_HandleTypeDef hrtc = {0};
+        hrtc.Instance = RTC;
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0xDEADBEEF);
+
+        // Reset
+        HAL_NVIC_SystemReset();
+    }
+}
+
 // Protocol State
 typedef enum {
     STATE_HANDSHAKE,
@@ -335,7 +356,12 @@ void StartUARTTask(void * argument) {
 
                         if (received_crc == calcd_crc) {
                             parseBuffer[parseIndex++] = b;
-                            process_packet(parseBuffer, parseIndex);
+                            // Check for OTA Command immediately
+                            if (parseBuffer[1] == 0xF0) {
+                                CheckForOTACommand(0xF0);
+                            } else {
+                                process_packet(parseBuffer, parseIndex);
+                            }
                         } else {
                             printf("UART: CRC Fail. Rx=%02X Calc=%02X\n", received_crc, calcd_crc);
                         }
