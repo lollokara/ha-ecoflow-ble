@@ -51,9 +51,26 @@ HAL_StatusTypeDef Flash_Copy_Bootloader(void);
 
 // --- Main ---
 int main(void) {
+    // Bare-Metal LED Init (Green PG6) to verify execution start
+    // Enable GPIOG Clock (Bit 6 of AHB1ENR)
+    RCC->AHB1ENR |= (1 << 6);
+    // Set PG6 to Output (Bit 12=1, Bit 13=0)
+    GPIOG->MODER &= ~(3U << 12); // Clear
+    GPIOG->MODER |= (1U << 12);  // Set bit 12
+    // Set PG6 High (ODR)
+    GPIOG->ODR |= (1 << 6);
+
+    // Bare-Metal Delay
+    for(volatile int i=0; i<1000000; i++) { __NOP(); }
+
+    // Toggle to verify loop
+    GPIOG->ODR &= ~(1 << 6);
+    for(volatile int i=0; i<1000000; i++) { __NOP(); }
+    GPIOG->ODR |= (1 << 6);
+
     HAL_Init();
 
-    // Initialize LEDs immediately for diagnostics
+    // Initialize LEDs using HAL for rest of logic
     __HAL_RCC_GPIOG_CLK_ENABLE(); // PG6 (Green)
     __HAL_RCC_GPIOD_CLK_ENABLE(); // PD4 (Orange), PD5 (Red)
     __HAL_RCC_GPIOK_CLK_ENABLE(); // PK3 (Blue)
@@ -76,12 +93,6 @@ int main(void) {
     HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
 
     // Turn ON Red (Indicate Boot Start)
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); // LED3 Red ON (Schematic says Active High? No, usually LEDs on Disco are Active High. Wait. Manual says "LD3 (red) connected to PD5". Usually driving High turns on. Let's assume High=ON for Disco boards. Previous code used WritePin(.. RESET) for ON?
-    // F469 Disco User Manual: "LD1..LD4... connected to PG6, PD4, PD5, PK3".
-    // Schematic: PD5 -> LED -> GND. So HIGH is ON.
-    // My previous code: `HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); // ON` -> This was likely wrong if Active High.
-    // Let's assume HIGH is ON.
-
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red ON
     HAL_Delay(200);
 
