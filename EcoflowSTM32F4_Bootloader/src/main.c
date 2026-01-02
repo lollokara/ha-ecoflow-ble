@@ -19,6 +19,10 @@ UART_HandleTypeDef huart6;
 #define LED_BLUE_PIN    GPIO_PIN_3
 #define LED_BLUE_PORT   GPIOK
 
+/* LED States - Active Low Assumption based on user feedback */
+#define LED_PIN_ON      GPIO_PIN_RESET
+#define LED_PIN_OFF     GPIO_PIN_SET
+
 /* Protocol Definitions */
 #define CMD_OTA_START   0xF0
 #define CMD_OTA_DATA    0xF1
@@ -46,10 +50,10 @@ int main(void) {
     MX_GPIO_Init();
 
     /* 1. LEDs Init: Force All OFF */
-    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, LED_PIN_OFF);
 
     /* 2. Startup Visual: Blink Blue 2x */
     BlinkLED(LED_BLUE_PORT, LED_BLUE_PIN, 2, 200);
@@ -110,9 +114,9 @@ void JumpToApplication(void) {
     /* Validate Stack Pointer (RAM range 0x20000000 - 0x20050000) */
     if ((appStack >= 0x20000000) && (appStack <= 0x20050000)) {
         /* Visual: Green Pulse */
-        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, LED_PIN_ON);
         HAL_Delay(200);
-        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, LED_PIN_OFF);
 
         /* De-init Peripherals */
         HAL_RCC_DeInit();
@@ -152,9 +156,6 @@ uint8_t calculate_crc8(uint8_t *data, int len) {
     uint8_t crc = 0;
     for (int i = 0; i < len; i++) {
         crc += data[i]; // Simple Checksum for now to match ESP32 OtaManager.cpp implementation
-                        // (ESP32 code: for(int i=1; i < 3 + readLen; i++) sum += buf[i];)
-                        // Note: ESP32 calc includes CMD, LEN, PAYLOAD.
-                        // My buffer passed here should be that part.
     }
     return crc;
 }
@@ -163,10 +164,10 @@ void EnterOTAMode(void) {
     MX_USART6_UART_Init();
 
     /* Indicate OTA Mode: Blue Constant ON */
-    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, LED_PIN_ON);
 
     uint8_t rxBuffer[300];
     uint32_t writeAddr = APP_ADDRESS;
@@ -196,7 +197,7 @@ void EnterOTAMode(void) {
                                 // Packet OK
                                 if (cmd == CMD_OTA_START) {
                                     // Erase
-                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_SET);
+                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, LED_PIN_ON);
 
                                     HAL_FLASH_Unlock();
                                     FLASH_EraseInitTypeDef EraseInitStruct;
@@ -204,15 +205,7 @@ void EnterOTAMode(void) {
                                     EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
                                     EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
                                     EraseInitStruct.Sector = FLASH_SECTOR_2;
-                                    EraseInitStruct.NbSectors = 6; // Erase 2,3,4,5,6,7 (up to 0x08080000?)
-                                    // Sector 2: 16KB
-                                    // Sector 3: 16KB
-                                    // Sector 4: 64KB
-                                    // Sector 5: 128KB
-                                    // Sector 6: 128KB
-                                    // Sector 7: 128KB
-                                    // Total: ~480KB covered. If app is larger, need more sectors.
-                                    // Assuming app fits in first 1MB bank mostly.
+                                    EraseInitStruct.NbSectors = 6; // Erase 2,3,4,5,6,7
 
                                     if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) == HAL_OK) {
                                         uint8_t ack = CMD_ACK;
@@ -224,7 +217,7 @@ void EnterOTAMode(void) {
                                         BlinkLED(LED_RED_PORT, LED_RED_PIN, 2, 100);
                                     }
                                     HAL_FLASH_Lock();
-                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
+                                    HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, LED_PIN_OFF);
                                 }
                                 else if (cmd == CMD_OTA_DATA) {
                                     // Write
@@ -317,10 +310,10 @@ static void MX_GPIO_Init(void) {
     __HAL_RCC_GPIOK_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /* Configure LEDs */
-    HAL_GPIO_WritePin(GPIOG, LED_GREEN_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN|LED_RED_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOK, LED_BLUE_PIN, GPIO_PIN_RESET);
+    /* Configure LEDs - OFF Initial State */
+    HAL_GPIO_WritePin(GPIOG, LED_GREEN_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN|LED_RED_PIN, LED_PIN_OFF);
+    HAL_GPIO_WritePin(GPIOK, LED_BLUE_PIN, LED_PIN_OFF);
 
     GPIO_InitStruct.Pin = LED_GREEN_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -357,9 +350,9 @@ void Error_Handler(void) {
 
 void BlinkLED(GPIO_TypeDef* port, uint16_t pin, int count, int delay) {
     for(int i=0; i<count; i++) {
-        HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(port, pin, LED_PIN_ON);
         HAL_Delay(delay);
-        HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(port, pin, LED_PIN_OFF);
         HAL_Delay(delay);
     }
 }

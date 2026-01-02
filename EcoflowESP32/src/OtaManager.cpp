@@ -14,15 +14,15 @@ OtaManager::OtaManager() : stmState(IDLE), fileSize(0), bytesSent(0), retryCount
 
 void OtaManager::begin() {
     if (!LittleFS.begin(true)) {
-        ESP_LOGE(TAG, "LittleFS Mount Failed");
+        Serial.println("OtaManager: LittleFS Mount Failed");
     } else {
-        ESP_LOGI(TAG, "LittleFS Mounted");
+        Serial.println("OtaManager: LittleFS Mounted");
     }
 }
 
 void OtaManager::handleEspUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
-        ESP_LOGI(TAG, "ESP Update Start: %s", filename.c_str());
+        Serial.printf("OtaManager: ESP Update Start: %s\n", filename.c_str());
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Update.printError(Serial);
         }
@@ -40,7 +40,7 @@ void OtaManager::handleEspUpdate(AsyncWebServerRequest *request, const String& f
 
     if (final) {
         if (Update.end(true)) {
-            ESP_LOGI(TAG, "ESP Update Success: %uB", index + len);
+            Serial.printf("OtaManager: ESP Update Success: %uB\n", index + len);
             statusMsg = "ESP Update Success. Rebooting...";
             progressPercent = 100;
             delay(1000);
@@ -54,10 +54,10 @@ void OtaManager::handleEspUpdate(AsyncWebServerRequest *request, const String& f
 
 void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
-        ESP_LOGI(TAG, "STM Update Upload Start: %s", filename.c_str());
+        Serial.printf("OtaManager: STM Update Upload Start: %s\n", filename.c_str());
         updateFile = LittleFS.open("/stm32_update.bin", FILE_WRITE);
         if (!updateFile) {
-            ESP_LOGE(TAG, "Failed to open file for writing");
+            Serial.println("OtaManager: Failed to open file for writing");
             return;
         }
         stmState = IDLE;
@@ -75,7 +75,7 @@ void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& f
     if (final) {
         if (updateFile) {
             updateFile.close();
-            ESP_LOGI(TAG, "STM Update Upload Complete: %uB", index + len);
+            Serial.printf("OtaManager: STM Update Upload Complete: %uB\n", index + len);
             statusMsg = "Upload Complete. Starting Flash...";
             progressPercent = 0;
 
@@ -87,9 +87,11 @@ void OtaManager::handleStmUpdate(AsyncWebServerRequest *request, const String& f
                 stmState = STARTING;
                 lastTxTime = millis();
                 retryCount = 0;
+                Serial.printf("OtaManager: State -> STARTING. File Size: %d\n", fileSize);
             } else {
                 statusMsg = "Failed to open update file";
                 stmState = FAILED;
+                Serial.println("OtaManager: Failed to reopen update file");
             }
         }
     }
@@ -100,9 +102,6 @@ void OtaManager::update() {
 }
 
 void OtaManager::sendRaw(uint8_t* data, size_t len) {
-    // We assume Serial1 is initialized by Stm32Serial
-    // We bypass Stm32Serial wrapper for raw access or add friend/method there.
-    // Ideally Stm32Serial should handle this, but for simplicity here we write directly.
     Serial1.write(data, len);
 }
 
@@ -115,7 +114,7 @@ void OtaManager::processStmUpdate() {
     if (stmState == STARTING) {
         if (millis() - lastStateTime > 1000) {
             lastStateTime = millis();
-            ESP_LOGI(TAG, "Sending START Command...");
+            Serial.println("OtaManager: Sending START Command...");
 
             // Packet: [AA][CMD][LEN][PAYLOAD...][CRC]
             // CMD_OTA_START Payload: 4 Bytes Size (Little Endian)
@@ -125,58 +124,37 @@ void OtaManager::processStmUpdate() {
             payload[2] = (uint8_t)((fileSize >> 16) & 0xFF);
             payload[3] = (uint8_t)((fileSize >> 24) & 0xFF);
 
-            // But Bootloader expects simple header [CMD][LEN]... wait, look at my bootloader code.
-            // Bootloader:
-            // Receive byte -> if 0xAA ->
-            // Receive header[2] (CMD, LEN)
-            // Receive Payload (LEN)
-            // Receive CRC (1)
-
             uint8_t buf[10];
             buf[0] = 0xAA;
             buf[1] = CMD_OTA_START;
             buf[2] = 4; // Len
             memcpy(&buf[3], payload, 4);
 
-            // CRC: Sum of buf[1] to buf[2+Len] ?
-            // Bootloader: uint8_t received_crc = b; uint8_t calcd_crc = calculate_crc8(&parseBuffer[1], parseIndex - 1);
-            // So CRC is over CMD, LEN, PAYLOAD.
-            // I need calculate_crc8.
-
-            uint8_t crc = 0; // Placeholder, assuming same logic as ecoflow_protocol.c or simple sum if I implemented simple sum.
-            // Bootloader calls calculate_crc8. I need to match that.
-            // Assume standard CRC8 used in project.
-            // For now, I'll assume 0 for check or implement the function.
-            // Wait, I didn't implement calculate_crc8 in Bootloader main.c yet!
-            // I used "calculate_crc8" in the code block but didn't define it.
-            // I need to FIX Bootloader main.c to include crc function or remove check.
-
-            // Assuming I will fix bootloader to use Sum or simple XOR if I don't want to import full CRC lib.
-            // Let's use simple Sum for bootloader to save space.
-
-            // ... Back to ESP32 side ...
-            // Let's assume Sum for now.
-            uint8_t sum = 0;
-            for(int i=1; i<7; i++) sum += buf[i];
+            // Calculate Checksum (Sum of CMD + LEN + PAYLOAD) - Must match Bootloader!
+            uint8_t sum = buf[1] + buf[2];
+            for(int i=0; i<4; i++) sum += payload[i];
             buf[7] = sum;
 
             sendRaw(buf, 8);
 
             stmState = WAIT_ACK;
+            Serial.println("OtaManager: State -> WAIT_ACK");
         }
     }
     else if (stmState == WAIT_ACK) {
         // Poll for ACK
         while (Serial1.available()) {
             uint8_t b = Serial1.read();
-            ESP_LOGI(TAG, "RX: %02X", b); // DEBUG: Log all RX bytes
+            Serial.printf("RX: %02X ", b); // DEBUG: Log all RX bytes
             if (b == CMD_ACK) {
-                ESP_LOGI(TAG, "ACK Received");
+                Serial.println("\nOtaManager: ACK Received!");
                 if (bytesSent == 0) {
                     stmState = SENDING;
                     statusMsg = "Flashing...";
+                    Serial.println("OtaManager: State -> SENDING");
                 } else if (bytesSent >= fileSize) {
                     stmState = ENDING;
+                    Serial.println("OtaManager: State -> ENDING");
                 } else {
                     stmState = SENDING;
                 }
@@ -184,23 +162,22 @@ void OtaManager::processStmUpdate() {
                 retryCount = 0;
                 return; // State changed, exit loop
             } else if (b == CMD_NACK) {
-                ESP_LOGE(TAG, "NACK Received");
+                Serial.println("\nOtaManager: NACK Received");
                 retryCount++;
             }
         }
 
-        if (millis() - lastStateTime > 15000) { // Timeout extended to 15s for Erase
-            ESP_LOGW(TAG, "Timeout waiting for ACK");
+        if (millis() - lastStateTime > 15000) { // Timeout extended to 15s
+            Serial.println("\nOtaManager: Timeout waiting for ACK");
             retryCount++;
             lastStateTime = millis();
             if (retryCount > 5) {
                 stmState = FAILED;
                 statusMsg = "Timeout Waiting for ACK";
+                Serial.println("OtaManager: State -> FAILED (Too many timeouts)");
                 updateFile.close();
             } else {
-                // Retransmit logic?
-                // If we were STARTING, go back to STARTING.
-                // If SENDING, go back to SENDING (resend chunk).
+                Serial.println("OtaManager: Retrying...");
                 if(bytesSent == 0) stmState = STARTING;
                 else stmState = SENDING;
             }
@@ -214,6 +191,7 @@ void OtaManager::processStmUpdate() {
 
         if (readLen == 0) {
             stmState = ENDING;
+            Serial.println("OtaManager: EOF. State -> ENDING");
             return;
         }
 
@@ -222,8 +200,9 @@ void OtaManager::processStmUpdate() {
         buf[2] = (uint8_t)readLen;
         memcpy(&buf[3], chunk, readLen);
 
-        uint8_t sum = 0;
-        for(int i=1; i < 3 + readLen; i++) sum += buf[i];
+        // Checksum
+        uint8_t sum = buf[1] + buf[2];
+        for(int i=0; i < readLen; i++) sum += chunk[i];
         buf[3 + readLen] = sum;
 
         sendRaw(buf, 3 + readLen + 1);
@@ -233,21 +212,23 @@ void OtaManager::processStmUpdate() {
 
         stmState = WAIT_ACK;
         lastStateTime = millis();
+        // Serial.printf("Sent Chunk: %d bytes\n", readLen);
     }
     else if (stmState == ENDING) {
-         ESP_LOGI(TAG, "Sending END Command...");
+         Serial.println("OtaManager: Sending END Command...");
          uint8_t buf[5];
          buf[0] = 0xAA;
          buf[1] = CMD_OTA_END;
          buf[2] = 0;
-         uint8_t sum = 0;
-         for(int i=1; i<3; i++) sum += buf[i];
+
+         uint8_t sum = buf[1] + buf[2];
          buf[3] = sum;
 
          sendRaw(buf, 4);
 
          stmState = COMPLETE; // Wait for ACK? Or just assume done.
          statusMsg = "Flash Complete. Rebooting STM32...";
+         Serial.println("OtaManager: State -> COMPLETE");
          updateFile.close();
     }
 }
