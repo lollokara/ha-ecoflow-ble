@@ -37,6 +37,9 @@ extern "C" {
 #define CMD_DEVICE_STATUS 0x24       ///< Send Device Telemetry Data
 #define CMD_DEBUG_INFO 0x61          ///< Send Debug Info (IP, uptime)
 
+#define CMD_OTA_START 0xF0           ///< Start OTA Update
+#define CMD_OTA_CHUNK 0xF1           ///< OTA Data Chunk
+#define CMD_OTA_END   0xF2           ///< End OTA Update
 
 // --- F4 -> ESP32 Command IDs ---
 #define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
