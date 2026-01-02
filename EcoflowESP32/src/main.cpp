@@ -22,6 +22,7 @@
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
 #include "Stm32Serial.h"
+#include "OtaManager.h"
 
 // Hardware Pin Definitions
 #define POWER_LATCH_PIN 16 ///< GPIO pin to control the power latch (keeps device on).
@@ -61,11 +62,7 @@ void setup() {
 
     // Initialize Power Latch to keep the device powered on
     pinMode(POWER_LATCH_PIN, OUTPUT);
-    digitalWrite(POWER_LATCH_PIN, LOW); // Active Low/High depends on hardware, assuming Low keeps it ON based on previous context or defaulting.
-                                       // Wait, memory says "switch to OUTPUT LOW only when executing the power-off sequence."
-                                       // But here it sets it LOW at startup.
-                                       // The memory said: "ESP32 GPIO 16 is the Power Latch control pin; it must be initialized as INPUT_PULLUP in setup() and switched to OUTPUT LOW only when executing the power-off sequence."
-                                       // The existing code sets it OUTPUT LOW. I must NOT alter code functionality, so I will document it as is.
+    digitalWrite(POWER_LATCH_PIN, LOW); // Active Low/High depends on hardware
 
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");
@@ -101,6 +98,15 @@ void setup() {
  */
 void loop() {
     esp_task_wdt_reset();
+
+    // Check for OTA active state
+    // If OTA is running (BUFFERING, ERASING, FLASHING), pause main loop activities
+    // to prevent UART conflict (sending DeviceList) and allow OTA task to run.
+    OtaState state = OtaManager::getState();
+    if (state != OTA_IDLE && state != OTA_COMPLETE && state != OTA_ERROR) {
+        delay(10); // Yield
+        return;
+    }
 
     static uint32_t last_data_refresh = 0;
     static uint32_t last_device_list_update = 0;
