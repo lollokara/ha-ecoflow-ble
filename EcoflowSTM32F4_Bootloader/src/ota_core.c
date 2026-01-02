@@ -1,10 +1,9 @@
 #include "ota_core.h"
 #include "flash_writer.h"
-#include "../display_task.h"
 #include "stm32f4xx_hal.h"
 #include <string.h>
 
-extern QueueHandle_t displayQueue;
+// extern QueueHandle_t displayQueue; // No UI in Bootloader
 
 #define CMD_OTA_START   0xF0
 #define CMD_OTA_DATA    0xF1
@@ -65,13 +64,16 @@ void OtaCore_HandleCmd(uint8_t cmd_id, uint8_t *data, uint32_t len) {
         _receivedSize = 0;
         _runningCrc = 0xFFFFFFFF;
 
-        // Notify UI
-        DisplayEvent event;
-        event.type = DISPLAY_EVENT_OTA_PROGRESS;
-        event.data.otaPercent = 0;
-        xQueueSend(displayQueue, &event, 0);
+        // Notify UI (Not available in Bootloader)
 
         Flash_Unlock();
+        // Erase Bank 1 (Sectors 5-11 for App)
+        // Need to modify Flash_EraseBank2 to erase App area
+        // Let's assume Flash_EraseBank2 in bootloader now erases App area (0x08020000+)
+        // Actually, we need to adapt flash_writer.c in bootloader.
+        // For now, let's assume Flash_EraseBank2 is updated or we update it here.
+        // Wait, I updated WriteChunk but not EraseBank2 in previous step.
+        // I will fix Flash_EraseBank2 in next step via file edit.
         if (!Flash_EraseBank2()) {
             // Error handling?
             return;
@@ -100,10 +102,8 @@ void OtaCore_HandleCmd(uint8_t cmd_id, uint8_t *data, uint32_t len) {
 
         // Update UI
         int percent = (_receivedSize * 100) / _totalSize;
-        DisplayEvent event;
-        event.type = DISPLAY_EVENT_OTA_PROGRESS;
-        event.data.otaPercent = (uint8_t)percent;
-        xQueueSend(displayQueue, &event, 0);
+        // Blink LED to show progress?
+        HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
 
     } else if (cmd_id == CMD_OTA_END) {
         if (_state != OTA_STATE_RECEIVING) return;
@@ -118,11 +118,9 @@ void OtaCore_HandleCmd(uint8_t cmd_id, uint8_t *data, uint32_t len) {
              return;
         }
 
-        if (Flash_SetUpdateFlag(_totalSize, _checksum)) { // Use the received checksum which matches Bootloader expectation
-             Flash_Lock();
-             // UI Update is handled via DisplayQueue
-             HAL_Delay(1000);
-             NVIC_SystemReset();
-        }
+        // In this architecture, we don't set a flag for copy-back. We just wrote the app.
+        // We can just reset.
+        Flash_Lock();
+        NVIC_SystemReset();
     }
 }

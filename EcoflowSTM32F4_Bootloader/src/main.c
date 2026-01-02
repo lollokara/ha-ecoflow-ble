@@ -1,100 +1,48 @@
 #include "stm32f4xx_hal.h"
-#include "boot_shared.h"
+#include "ota_core.h"
 #include <string.h>
 
 /*
- * Bootloader Logic:
- * 1. Initialize HAL and Flash.
- * 2. Check Config Sector (0x08004000).
- * 3. If Magic == UPDATE_PENDING:
- *    a. Validate Checksum of Bank 2 (0x08100000).
- *    b. Erase Bank 1 (App A).
- *    c. Copy Bank 2 -> Bank 1.
- *    d. Erase Config Sector (Clear Magic).
- * 4. Jump to App A (0x08008000).
+ * Bootloader Logic (Polling Mode):
+ * 1. Init System.
+ * 2. Init UART6 (for ESP32).
+ * 3. Wait 2 seconds for OTA Command.
+ * 4. If OTA: Enter OTA Loop (Receive -> Flash).
+ * 5. If Timeout: Jump to App (0x08020000).
  */
+
+#define APP_ADDR 0x08020000
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
 uint32_t JumpAddress;
 
+UART_HandleTypeDef huart6;
 void SystemClock_Config(void);
 void Error_Handler(void);
 
-// STM32 Hardware Compatible CRC32
-// Matches App/ESP32 implementation
-uint32_t CalculateCRC32(uint32_t *pData, uint32_t len) {
-    uint32_t crc = 0xFFFFFFFF;
-    // len is in bytes, loop over words
-    uint32_t n_words = len / 4;
+// Init UART6
+static void UART_Init(void) {
+    __HAL_RCC_USART6_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
 
-    for (uint32_t i = 0; i < n_words; i++) {
-        uint32_t val = pData[i];
-        // pData is word aligned in flash, so direct access is fine
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-        crc ^= val;
-        for (int j = 0; j < 32; j++) {
-            if (crc & 0x80000000) crc = (crc << 1) ^ 0x04C11DB7;
-            else crc <<= 1;
-        }
-    }
-    return crc;
-}
-
-void PerformUpdate(BootConfig *cfg) {
-    FLASH_EraseInitTypeDef EraseInitStruct;
-    uint32_t SectorError;
-
-    HAL_FLASH_Unlock();
-
-    // 1. Validate Source (Bank 2)
-    uint32_t calcCrc = CalculateCRC32((uint32_t*)ADDR_APP_B, cfg->size);
-    if (calcCrc != cfg->checksum) {
-        // Validation Failed!
-        // Do not update. Clear flag so we don't loop forever?
-        // Or keep flag and do nothing, relying on WDT reset loop to eventually manual recovery?
-        // Better: Clear flag to allow booting old app if valid.
-
-        // Erase Config
-        EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-        EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-        EraseInitStruct.Sector = FLASH_SECTOR_1;
-        EraseInitStruct.NbSectors = 1;
-        HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
-        HAL_FLASH_Lock();
-        return;
-    }
-
-    // 2. Erase Bank 1 (App A: Sectors 2-11)
-    EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-    EraseInitStruct.Sector = FLASH_SECTOR_2;
-    EraseInitStruct.NbSectors = 10; // 2 to 11
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-        Error_Handler();
-    }
-
-    // 3. Copy Bank 2 -> Bank 1
-    uint32_t *pSrc = (uint32_t *)ADDR_APP_B;
-    uint32_t destAddr = ADDR_APP_A;
-    uint32_t lenWords = cfg->size / 4 + ((cfg->size % 4) ? 1 : 0);
-
-    for (uint32_t i = 0; i < lenWords; i++) {
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, destAddr, *pSrc) != HAL_OK) {
-            Error_Handler();
-        }
-        destAddr += 4;
-        pSrc++;
-    }
-
-    // 4. Clear Config
-    EraseInitStruct.Sector = FLASH_SECTOR_1;
-    EraseInitStruct.NbSectors = 1;
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-        Error_Handler();
-    }
-
-    HAL_FLASH_Lock();
+    huart6.Instance = USART6;
+    huart6.Init.BaudRate = 115200;
+    huart6.Init.WordLength = UART_WORDLENGTH_8B;
+    huart6.Init.StopBits = UART_STOPBITS_1;
+    huart6.Init.Parity = UART_PARITY_NONE;
+    huart6.Init.Mode = UART_MODE_TX_RX;
+    huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart6);
 }
 
 static void LED_Init(void) {
@@ -107,49 +55,79 @@ static void LED_Init(void) {
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 }
 
-int main(void) {
-    HAL_Init();
-    SystemClock_Config();
-    LED_Init();
-
-    BootConfig *cfg = (BootConfig *)ADDR_CONFIG;
-
-    if (cfg->magic == BOOT_MAGIC_UPDATE_PENDING) {
-        // Blink fast to indicate update start
-        for(int i=0; i<5; i++) {
-            HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
-            HAL_Delay(100);
-        }
-
-        PerformUpdate(cfg);
-        NVIC_SystemReset(); // Reset to clean state after update
-    }
-
-    // Check if valid app exists at ADDR_APP_A (Check Stack Pointer)
-    // RAM is 0x20000000 - 0x20050000. Mask 0xFFF00000 covers 0x200xxxxx range correctly.
-    if (((*(__IO uint32_t *)ADDR_APP_A) & 0xFFF00000) == 0x20000000) {
-        // Jump to Application
-        JumpAddress = *(__IO uint32_t *)(ADDR_APP_A + 4);
+static void JumpToApp(void) {
+    // Check Stack Pointer
+    if (((*(__IO uint32_t *)APP_ADDR) & 0xFFF00000) == 0x20000000) {
+        JumpAddress = *(__IO uint32_t *)(APP_ADDR + 4);
         JumpToApplication = (pFunction)JumpAddress;
 
-        // DeInit
+        HAL_UART_DeInit(&huart6);
         HAL_RCC_DeInit();
         HAL_DeInit();
         SysTick->CTRL = 0;
         SysTick->LOAD = 0;
         SysTick->VAL = 0;
 
-        // Set Vector Table (App should do this too, but good practice)
-        SCB->VTOR = ADDR_APP_A;
-
-        __set_MSP(*(__IO uint32_t *)ADDR_APP_A);
+        SCB->VTOR = APP_ADDR;
+        __set_MSP(*(__IO uint32_t *)APP_ADDR);
         JumpToApplication();
     }
+}
 
-    // No App found? Blink LED (Heartbeat)
-    while (1) {
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    LED_Init();
+    UART_Init();
+
+    // Check for OTA Command window (2000ms)
+    // ESP32 sends OTA_START if user requested update
+    uint32_t startTick = HAL_GetTick();
+
+    // Quick blink to indicate Bootloader Active
+    for(int i=0; i<3; i++) {
         HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
-        HAL_Delay(500);
+        HAL_Delay(100);
+    }
+
+    // Packet State Machine
+    uint8_t b;
+    int state = 0; // 0=Start, 1=Cmd, 2=Len, 3=Payload, 4=CRC
+    uint8_t cmd, len, idx = 0;
+    uint8_t payload[256];
+
+    OtaCore_Init();
+
+    while (1) {
+        if (HAL_UART_Receive(&huart6, &b, 1, 1) == HAL_OK) {
+            HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); // Blink on data
+
+            // Simple Parse
+            if (state == 0) {
+                if (b == 0xAA) state = 1;
+            } else if (state == 1) {
+                cmd = b; state = 2;
+            } else if (state == 2) {
+                len = b; idx = 0;
+                if (len == 0) state = 4; else state = 3;
+            } else if (state == 3) {
+                payload[idx++] = b;
+                if (idx == len) state = 4;
+            } else if (state == 4) {
+                // Ignore CRC check for simplicity in polling loop
+                OtaCore_HandleCmd(cmd, payload, len);
+                state = 0;
+                // If we got a valid command, disable timeout
+                startTick = HAL_GetTick() + 999999;
+            }
+        }
+
+        // Timeout to jump?
+        if (HAL_GetTick() - startTick > 2000) {
+            JumpToApp();
+            // If jump failed (no app), loops here
+            startTick = HAL_GetTick(); // Reset wait
+        }
     }
 }
 
@@ -168,19 +146,16 @@ void SystemClock_Config(void) {
     RCC_OscInitStruct.PLL.PLLN = 360; // 180MHz
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
     RCC_OscInitStruct.PLL.PLLQ = 7;
-    RCC_OscInitStruct.PLL.PLLR = 2; // For F469
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) Error_Handler();
-
-    if (HAL_PWREx_EnableOverDrive() != HAL_OK) Error_Handler();
+    RCC_OscInitStruct.PLL.PLLR = 2;
+    HAL_RCC_OscConfig(&RCC_OscInitStruct);
+    HAL_PWREx_EnableOverDrive();
 
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) Error_Handler();
+    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
 }
 
-void Error_Handler(void) {
-    while(1) {}
-}
+void Error_Handler(void) { while(1); }

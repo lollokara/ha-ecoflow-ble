@@ -106,12 +106,17 @@ void OtaManager::otaTask(void* param) {
         vTaskDelay(pdMS_TO_TICKS(20)); // Gentle throttle
     };
 
-    // 1. Send Start
+    // 1. Send Start (Repeatedly for 5s to catch Bootloader after Reboot)
     _state = OTA_ERASING;
     uint8_t payload[8];
     memcpy(payload, &_fwSize, 4);
     memcpy(payload + 4, &checksum, 4);
-    sendPacket(CMD_OTA_START, payload, 8);
+
+    ESP_LOGI(TAG, "Sending Start Sequence (5s)...");
+    for(int i=0; i<50; i++) {
+        sendPacket(CMD_OTA_START, payload, 8);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 
     // 2. Wait for Erase (60s for safety)
     ESP_LOGI(TAG, "Waiting 60s for erase...");

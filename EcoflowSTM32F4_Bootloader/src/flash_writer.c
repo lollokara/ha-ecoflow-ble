@@ -1,8 +1,8 @@
 #include "flash_writer.h"
 #include "stm32f4xx_hal.h"
-#include "../boot_shared.h"
+#include "boot_shared.h"
 
-extern IWDG_HandleTypeDef hiwdg;
+// extern IWDG_HandleTypeDef hiwdg; // Bootloader doesn't use IWDG yet
 
 void Flash_Unlock(void) {
     HAL_FLASH_Unlock();
@@ -13,32 +13,30 @@ void Flash_Lock(void) {
 }
 
 bool Flash_EraseBank2(void) {
+    // Actually erasing APP area (Sector 5 to 11)
     FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t SectorError;
 
-    // Erase Sectors 12 to 23 ONE BY ONE to refresh Watchdog
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
     EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
     EraseInitStruct.NbSectors = 1;
 
-    // Sector 12 (16KB) to 23 (128KB)
-    // Note: FLASH_SECTOR_12 is 12. Loop from 12 to 23.
-    for (uint32_t sector = FLASH_SECTOR_12; sector <= FLASH_SECTOR_23; sector++) {
+    // Sector 5 (128KB) to 11 (128KB)
+    for (uint32_t sector = FLASH_SECTOR_5; sector <= FLASH_SECTOR_11; sector++) {
         EraseInitStruct.Sector = sector;
 
-        HAL_IWDG_Refresh(&hiwdg);
+        // HAL_IWDG_Refresh(&hiwdg); // Bootloader might not use IWDG yet, or use it if enabled
 
         if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
             return false;
         }
     }
-
-    HAL_IWDG_Refresh(&hiwdg);
     return true;
 }
 
 bool Flash_WriteChunk(uint32_t offset, uint8_t *data, uint32_t length) {
-    uint32_t destAddr = ADDR_APP_B + offset;
+    // Write directly to App Address (0x08020000)
+    uint32_t destAddr = 0x08020000 + offset;
 
     for (uint32_t i = 0; i < length; i += 4) {
         uint32_t word = 0;

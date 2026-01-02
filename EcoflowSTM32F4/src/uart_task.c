@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
-#include "ota/ota_core.h"
 
 UART_HandleTypeDef huart6;
 
@@ -197,12 +196,18 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
     }
     // Handle OTA commands directly
-    else if (cmd == 0xF0 || cmd == 0xF1 || cmd == 0xF2) {
-        // packet[0] = Start, [1] = Cmd, [2] = Len
-        // Payload starts at packet[3]
-        uint8_t *payload = &packet[3];
-        uint32_t len = packet[2];
-        OtaCore_HandleCmd(cmd, payload, len);
+    else if (cmd == 0xF0) { // CMD_OTA_START
+        // Request Update: Just reboot to Bootloader
+        // Bootloader checks for 2s on startup for OTA commands.
+        // We can just reset. Or set a flag.
+        // Simple Reset is enough if ESP32 retries or waits.
+        // ESP32 OtaManager waits 60s for "Erase".
+        // If we reset now, we enter Bootloader. Bootloader waits 2s.
+        // ESP32 sends START. Bootloader sees START. Enters OTA.
+        // Perfect.
+        printf("UART: OTA Request. Rebooting to Bootloader...\n");
+        HAL_Delay(100);
+        NVIC_SystemReset();
     }
 }
 
