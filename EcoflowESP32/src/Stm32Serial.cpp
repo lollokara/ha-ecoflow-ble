@@ -25,6 +25,11 @@
 
 static const char* TAG = "Stm32Serial";
 
+// Variables for OTA (from WebServer.cpp)
+extern int ota_state;
+extern int ota_progress;
+extern String ota_msg;
+
 // Variables for OTA
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
@@ -435,6 +440,7 @@ void Stm32Serial::otaTask(void* parameter) {
     File f = LittleFS.open(otaFilename, "r");
     if (!f) {
         ESP_LOGE(TAG, "Failed to open firmware file");
+        ota_state = 4; ota_msg = "FS Error";
         self->_otaRunning = false;
         vTaskDelete(NULL);
         return;
@@ -452,12 +458,13 @@ void Stm32Serial::otaTask(void* parameter) {
     otaAckReceived = false;
     otaNackReceived = false;
     uint32_t startWait = millis();
-    while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 10000)) { // 10s timeout
+    while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 15000)) { // 15s timeout
         vTaskDelay(10);
     }
 
     if (!otaAckReceived) {
         ESP_LOGE(TAG, "OTA Start NACK or Timeout");
+        ota_state = 4; ota_msg = "OTA Start Timeout";
         f.close();
         self->_otaRunning = false;
         vTaskDelete(NULL);
@@ -484,11 +491,12 @@ void Stm32Serial::otaTask(void* parameter) {
 
         if (!otaAckReceived) {
             ESP_LOGE(TAG, "OTA Chunk NACK/Timeout at %d", offset);
+            ota_state = 4; ota_msg = "Chunk Timeout";
             break;
         }
 
         offset += bytesRead;
-        // Optional: Report progress globally?
+        ota_progress = (offset * 100) / totalSize;
     }
 
     f.close();
@@ -502,8 +510,10 @@ void Stm32Serial::otaTask(void* parameter) {
         ESP_LOGI(TAG, "Sending Apply...");
         len = pack_ota_apply_message(buf);
         self->sendData(buf, len);
+        ota_state = 3; ota_msg = "STM32 Rebooting...";
     } else {
         ESP_LOGE(TAG, "OTA Failed/Incomplete");
+        if (ota_state != 4) { ota_state = 4; ota_msg = "Incomplete"; }
     }
 
     self->_otaRunning = false;

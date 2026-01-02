@@ -14,6 +14,11 @@
 #define CMD_OTA_ACK   0x06
 #define CMD_OTA_NACK  0x15
 
+// Register Definitions
+#ifndef FLASH_OPTCR_BFB2
+#define FLASH_OPTCR_BFB2 (1 << 4)
+#endif
+
 UART_HandleTypeDef huart6;
 
 typedef void (*pFunction)(void);
@@ -22,11 +27,13 @@ uint32_t JumpAddress;
 
 void SystemClock_Config(void);
 void UART_Init(void);
+void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
     HAL_UART_DeInit(&huart6); // De-init UART
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6); // De-init LED
     SysTick->CTRL = 0;
     SysTick->LOAD = 0;
     SysTick->VAL  = 0;
@@ -38,32 +45,36 @@ void DeInit(void) {
     HAL_DeInit();
 }
 
+void LED_On() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); }
+void LED_Off() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); }
+void LED_Toggle() { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); }
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
+    GPIO_Init();
     UART_Init();
+
+    // Blink LED 3 times to indicate Bootloader Start
+    for(int i=0; i<3; i++) {
+        LED_On(); HAL_Delay(100);
+        LED_Off(); HAL_Delay(100);
+    }
 
     // Check if valid stack pointer at App Address
     // Valid Range: 0x20000000 - 0x20050000 (320KB RAM)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-
-    // Check if Force OTA Pin (e.g. User Button PA0) is pressed?
-    // Let's assume if SP is invalid, we go to OTA.
-    // Or if we wait 1 sec and receive "OTA START".
-
-    // Simple logic: Wait 500ms for OTA START. If not, try to boot.
-    // Ideally: If no valid app, wait forever.
-
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
+    // Check for Force OTA condition (e.g. valid_app is false)
+    // Also optional: Check a GPIO button? (Skipping for now)
+
     if (valid_app) {
-        // Try to check for OTA Entry Packet for 500ms?
-        // Blocking read with timeout?
+        // Wait briefly for OTA START command (Safety window)
         uint8_t buf[1];
-        if (HAL_UART_Receive(&huart6, buf, 1, 100) == HAL_OK) { // 100ms wait
+        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) { // 500ms wait
             if (buf[0] == START_BYTE) {
-                // Potential OTA start, enter loop
-                Bootloader_OTA_Loop();
+                Bootloader_OTA_Loop(); // Enter OTA
             }
         }
 
@@ -104,54 +115,46 @@ void send_nack() {
 }
 
 void Bootloader_OTA_Loop(void) {
-    // Protocol: [START][CMD][LEN][PAYLOAD][CRC]
-    uint8_t header[3]; // START, CMD, LEN
+    uint8_t header[3];
     uint8_t payload[256];
 
-    // Unlock Flash
     HAL_FLASH_Unlock();
 
+    // Fast Blink to indicate OTA Mode
+    for(int i=0; i<10; i++) { LED_Toggle(); HAL_Delay(50); }
+    LED_Off();
+
     while(1) {
-        // 1. Wait for START
+        // Toggle LED every second to show alive
+        static uint32_t last_tick = 0;
+        if (HAL_GetTick() - last_tick > 1000) {
+            LED_Toggle();
+            last_tick = HAL_GetTick();
+        }
+
         uint8_t b;
-        if (HAL_UART_Receive(&huart6, &b, 1, HAL_MAX_DELAY) != HAL_OK) continue;
+        if (HAL_UART_Receive(&huart6, &b, 1, 10) != HAL_OK) continue;
         if (b != START_BYTE) continue;
 
-        // 2. Read CMD, LEN
         if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) continue;
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
-        // 3. Read Payload + CRC
-        if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) continue; // +1 for CRC
+        if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) continue;
 
-        // 4. Verify CRC
-        // CRC is over CMD, LEN, PAYLOAD
-        // We construct a temp buffer to calc CRC
-        // Or calc incrementally. Simpler to put header[1..2] + payload in one buf?
-        // Optimization: Calc CRC on the fly or just use payload buf with offset.
-
-        // Checksum verification
-        // Checksum byte is payload[len]
         uint8_t recv_crc = payload[len];
-        // Calc CRC over CMD, LEN, PAYLOAD
         uint8_t check_buf[300];
         check_buf[0] = cmd;
         check_buf[1] = len;
         memcpy(&check_buf[2], payload, len);
 
         if (calculate_crc8(check_buf, 2 + len) != recv_crc) {
-            send_nack();
-            continue;
+            send_nack(); continue;
         }
 
-        // 5. Handle Command
         if (cmd == CMD_OTA_START) {
-            // Erase Application Sectors (2 to 23? Or just bank 1?)
-            // We assume simple single bank update for recovery
-            // Sectors 2 to 11 (Bank 1) usually.
-            // Or mass erase Bank 1?
-            // Let's erase Sectors 2-11 (up to 1MB)
+            // Recovery Mode: Always erase Bank 1 (Physical Sectors 2-11)
+            // Regardless of BFB2, we want to restore the Default Bank.
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
@@ -159,24 +162,39 @@ void Bootloader_OTA_Loop(void) {
             EraseInitStruct.Sector = FLASH_SECTOR_2;
             EraseInitStruct.NbSectors = 10; // 2 to 11
 
+            LED_On(); // LED On during Erase
             if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) == HAL_OK) {
                 send_ack();
             } else {
                 send_nack();
             }
+            LED_Off();
         }
         else if (cmd == CMD_OTA_CHUNK) {
-            // Payload: [OFFSET(4)][DATA(N)]
             uint32_t offset;
             memcpy(&offset, payload, 4);
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            uint32_t addr = APP_ADDRESS + offset;
+            // Write to Physical Bank 1 Address.
+            // If BFB2=0, Bank1=0x08000000.
+            // If BFB2=1, Bank1=0x08100000.
+            // We need to check BFB2 to know where to write.
+            uint32_t base_addr = 0x08000000;
+            HAL_FLASH_OB_Unlock(); // Unlock OB to read? No need to unlock to read register.
+            if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+                base_addr = 0x08100000;
+            }
+            HAL_FLASH_OB_Lock();
+
+            uint32_t addr = base_addr + offset + 0x8000; // +0x8000 offset for Bootloader/Config preservation
+
             bool ok = true;
             for (uint32_t i=0; i<data_len; i+=4) {
-                uint32_t word;
-                memcpy(&word, &data[i], 4);
+                uint32_t word = 0xFFFFFFFF;
+                uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
+                memcpy(&word, &data[i], copy_len);
+
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
                     ok = false; break;
                 }
@@ -189,6 +207,20 @@ void Bootloader_OTA_Loop(void) {
         else if (cmd == CMD_OTA_APPLY) {
             send_ack();
             HAL_Delay(100);
+
+            // Reset BFB2 to 0 (Force Boot from Bank 1)
+            HAL_FLASH_Unlock();
+            HAL_FLASH_OB_Unlock();
+            FLASH_OBProgramInitTypeDef OBInit;
+            HAL_FLASHEx_OBGetConfig(&OBInit);
+
+            if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Clear BFB2
+                OBInit.OptionType = OPTIONBYTE_USER;
+                HAL_FLASHEx_OBProgram(&OBInit);
+                HAL_FLASH_OB_Launch(); // Resets
+            }
+
             HAL_NVIC_SystemReset();
         }
     }
@@ -215,6 +247,19 @@ void UART_Init(void) {
     huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart6);
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // Default OFF (High)
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
 }
 
 void SystemClock_Config(void)

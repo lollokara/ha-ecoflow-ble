@@ -103,7 +103,7 @@ typedef enum {
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[300];
+static uint8_t parseBuffer[1024]; // Increased for safety
 static uint16_t parseIndex = 0;
 static uint8_t expectedPayloadLen = 0;
 
@@ -173,7 +173,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         // Prepare Inactive Bank: Erase, Copy Bootloader
         // This is blocking and long. We should refresh IWDG.
 
-        // 1. Copy Bootloader (Sectors 0->12)
+        // 1. Copy Bootloader (Sectors 0->12 or 12->0)
         if (!Flash_CopyBootloader()) {
             printf("OTA: Copy Bootloader Failed\n");
             send_ota_nack();
@@ -181,14 +181,10 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         }
 
         // 2. Erase Application Sectors in Inactive Bank
-        // Sectors 14-23 (Bank 2 App Area)
-        for (int i = 14; i <= 23; i++) { // Hardcoded indices based on flash_ops header
-             HAL_IWDG_Refresh(&hiwdg);
-             if (!Flash_EraseSector(i)) {
-                 printf("OTA: Erase Failed Sector %d\n", i);
-                 send_ota_nack();
-                 return;
-             }
+        if (!Flash_PrepareOTA()) {
+             printf("OTA: Erase Failed\n");
+             send_ota_nack();
+             return;
         }
 
         printf("OTA: Erase Complete. Ready for chunks.\n");

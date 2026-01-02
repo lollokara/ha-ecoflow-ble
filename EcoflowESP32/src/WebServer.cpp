@@ -9,9 +9,9 @@ static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
 
 // Global OTA State
-static int ota_progress = 0;
-static int ota_state = 0; // 0=Idle, 1=Uploading, 2=Flashing, 3=Done, 4=Error
-static String ota_msg = "";
+int ota_progress = 0;
+int ota_state = 0; // 0=Idle, 1=Uploading, 2=Flashing, 3=Done, 4=Error
+String ota_msg = "";
 
 // Helper to read internal temperature safely
 #include <esp_idf_version.h>

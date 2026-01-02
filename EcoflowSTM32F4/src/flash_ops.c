@@ -6,37 +6,22 @@
 #define BOOTLOADER_SIZE  0x4000 // 16KB
 #define CONFIG_SIZE      0x4000 // 16KB
 
-// Helper to get Sector Number from Address (Specific to F469)
-// Now used to calculate sector for erase
-uint32_t GetSector(uint32_t Address) {
-    if((Address >= 0x08000000) && (Address < 0x08004000)) return FLASH_SECTOR_0;
-    if((Address >= 0x08004000) && (Address < 0x08008000)) return FLASH_SECTOR_1;
-    if((Address >= 0x08008000) && (Address < 0x0800C000)) return FLASH_SECTOR_2;
-    if((Address >= 0x0800C000) && (Address < 0x08010000)) return FLASH_SECTOR_3;
-    if((Address >= 0x08010000) && (Address < 0x08020000)) return FLASH_SECTOR_4;
-    if((Address >= 0x08020000) && (Address < 0x08040000)) return FLASH_SECTOR_5;
-    if((Address >= 0x08040000) && (Address < 0x08060000)) return FLASH_SECTOR_6;
-    if((Address >= 0x08060000) && (Address < 0x08080000)) return FLASH_SECTOR_7;
-    if((Address >= 0x08080000) && (Address < 0x080A0000)) return FLASH_SECTOR_8;
-    if((Address >= 0x080A0000) && (Address < 0x080C0000)) return FLASH_SECTOR_9;
-    if((Address >= 0x080C0000) && (Address < 0x080E0000)) return FLASH_SECTOR_10;
-    if((Address >= 0x080E0000) && (Address < 0x08100000)) return FLASH_SECTOR_11;
+// Using Direct Register Bit Defs if HAL missing
+#ifndef FLASH_OPTCR_DB1M
+#define FLASH_OPTCR_DB1M (1 << 30)
+#endif
+#ifndef FLASH_OPTCR_BFB2
+#define FLASH_OPTCR_BFB2 (1 << 4)
+#endif
 
-    // Bank 2 (Physical 0x0810xxxx)
-    if((Address >= 0x08100000) && (Address < 0x08104000)) return FLASH_SECTOR_12;
-    if((Address >= 0x08104000) && (Address < 0x08108000)) return FLASH_SECTOR_13;
-    if((Address >= 0x08108000) && (Address < 0x0810C000)) return FLASH_SECTOR_14;
-    if((Address >= 0x0810C000) && (Address < 0x08110000)) return FLASH_SECTOR_15;
-    if((Address >= 0x08110000) && (Address < 0x08120000)) return FLASH_SECTOR_16;
-    if((Address >= 0x08120000) && (Address < 0x08140000)) return FLASH_SECTOR_17;
-    if((Address >= 0x08140000) && (Address < 0x08160000)) return FLASH_SECTOR_18;
-    if((Address >= 0x08160000) && (Address < 0x08180000)) return FLASH_SECTOR_19;
-    if((Address >= 0x08180000) && (Address < 0x081A0000)) return FLASH_SECTOR_20;
-    if((Address >= 0x081A0000) && (Address < 0x081C0000)) return FLASH_SECTOR_21;
-    if((Address >= 0x081C0000) && (Address < 0x081E0000)) return FLASH_SECTOR_22;
-    if((Address >= 0x081E0000) && (Address < 0x08200000)) return FLASH_SECTOR_23;
-
-    return FLASH_SECTOR_23;
+// Returns 0 for Bank 1 (Active), 1 for Bank 2 (Active)
+// Based on BFB2 bit.
+// Note: If BFB2 is SET, Bank 2 is mapped to 0x08000000.
+static uint8_t Flash_GetActiveBank(void) {
+    if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+        return 1; // Bank 2 Active
+    }
+    return 0; // Bank 1 Active
 }
 
 void Flash_Unlock(void) {
@@ -51,24 +36,24 @@ void Flash_EnsureDualBank(void) {
     FLASH_OBProgramInitTypeDef OBInit;
     HAL_FLASHEx_OBGetConfig(&OBInit);
 
-    // Using Direct Register Bit Defs if HAL missing
-    #ifndef FLASH_OPTCR_DB1M
-    #define FLASH_OPTCR_DB1M (1 << 30)
-    #endif
-
     if ((OBInit.USERConfig & FLASH_OPTCR_DB1M) == 0) {
         // Logic to enable Dual Bank if needed
-        // For F469, this should usually be set.
     }
 }
 
 bool Flash_WriteChunk(uint32_t offset, uint8_t *data, uint32_t length) {
-    uint32_t base_addr = BANK2_START_ADDR + 0x8000; // Skip Bootloader (16k) and Config (16k)
-    uint32_t start_addr = base_addr + offset;
+    // We ALWAYS write to the INACTIVE bank address window (0x08100000).
+    // Due to aliasing:
+    // If BFB2=0 (Active=Bank1 @ 0x0800), then 0x0810 points to Bank 2 (Inactive).
+    // If BFB2=1 (Active=Bank2 @ 0x0800), then 0x0810 points to Bank 1 (Inactive).
+    uint32_t start_addr = BANK2_START_ADDR + 0x8000 + offset;
+
+    HAL_FLASH_Unlock();
 
     for (uint32_t i = 0; i < length; i += 4) {
-        uint32_t data_word;
-        memcpy(&data_word, &data[i], 4);
+        uint32_t data_word = 0xFFFFFFFF; // Init with 0xFF for padding
+        uint8_t bytes_to_copy = (length - i < 4) ? (length - i) : 4;
+        memcpy(&data_word, &data[i], bytes_to_copy); // Safe copy
 
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, start_addr + i, data_word) != HAL_OK) {
             return false;
@@ -92,13 +77,66 @@ bool Flash_EraseSector(uint32_t sector_index) {
     return true;
 }
 
-bool Flash_CopyBootloader(void) {
-    // 1. Erase Bootloader Sector (12)
-    if (!Flash_EraseSector(FLASH_SECTOR_12)) return false;
+// Erases the Inactive Bank's Application Area
+// Returns true on success
+bool Flash_PrepareOTA(void) {
+    uint8_t active_bank = Flash_GetActiveBank();
+    uint32_t first_sector, last_sector;
 
-    // 2. Copy Bootloader (Active 0 -> Inactive 12)
+    if (active_bank == 0) {
+        // Active = Bank 1. Inactive = Bank 2.
+        // Erase Physical Sectors 12 to 23.
+        // Note: App starts at offset 0x8000 in the bank.
+        // Bank 2 structure matches Bank 1.
+        // Sector 12 (16K), 13 (16K), 14 (16K)...
+        // We skip 12 (Bootloader mirror) and 13 (Config mirror).
+        // Start erasing from Sector 14.
+        first_sector = FLASH_SECTOR_14;
+        last_sector = FLASH_SECTOR_23;
+    } else {
+        // Active = Bank 2. Inactive = Bank 1.
+        // Erase Physical Sectors 0 to 11.
+        // Skip 0 (Bootloader) and 1 (Config).
+        // Start erasing from Sector 2.
+        first_sector = FLASH_SECTOR_2;
+        last_sector = FLASH_SECTOR_11;
+    }
+
+    // External Watchdog Handle
+    extern IWDG_HandleTypeDef hiwdg;
+
+    for (uint32_t i = first_sector; i <= last_sector; i++) {
+        HAL_IWDG_Refresh(&hiwdg);
+        if (!Flash_EraseSector(i)) return false;
+    }
+    return true;
+}
+
+bool Flash_CopyBootloader(void) {
+    uint8_t active_bank = Flash_GetActiveBank();
+    uint32_t boot_sector, config_sector;
+    uint32_t dst_base;
+
+    if (active_bank == 0) {
+        // Active=Bank1. Target=Bank2.
+        // Erase Physical 12 & 13.
+        boot_sector = FLASH_SECTOR_12;
+        config_sector = FLASH_SECTOR_13;
+        dst_base = 0x08100000;
+    } else {
+        // Active=Bank2. Target=Bank1.
+        // Erase Physical 0 & 1.
+        boot_sector = FLASH_SECTOR_0;
+        config_sector = FLASH_SECTOR_1;
+        dst_base = 0x08100000; // Mapped address of Inactive Bank is ALWAYS 0x08100000
+    }
+
+    // 1. Erase Bootloader Sector
+    if (!Flash_EraseSector(boot_sector)) return false;
+
+    // 2. Copy Bootloader (Active Base 0x0800 -> Inactive Base 0x0810)
     uint32_t src = 0x08000000;
-    uint32_t dst = 0x08100000;
+    uint32_t dst = dst_base;
 
     for (uint32_t i = 0; i < BOOTLOADER_SIZE; i += 4) {
         uint32_t data = *(__IO uint32_t*)(src + i);
@@ -107,14 +145,12 @@ bool Flash_CopyBootloader(void) {
         }
     }
 
-    // 3. Erase Config Sector (13)
-    if (!Flash_EraseSector(FLASH_SECTOR_13)) return false;
+    // 3. Erase Config Sector
+    if (!Flash_EraseSector(config_sector)) return false;
 
-    // 4. Copy Config (Active 1 -> Inactive 13)
-    // Note: Config is at 0x08004000 (Sector 1)
-    // Destination is 0x08104000 (Sector 13)
+    // 4. Copy Config (Active Base + 0x4000 -> Inactive Base + 0x4000)
     src = 0x08004000;
-    dst = 0x08104000;
+    dst = dst_base + 0x4000;
 
     for (uint32_t i = 0; i < CONFIG_SIZE; i += 4) {
         uint32_t data = *(__IO uint32_t*)(src + i);
@@ -134,13 +170,7 @@ void Flash_SwapBank(void) {
 
     HAL_FLASHEx_OBGetConfig(&OBInit);
 
-    // BFB2 is Bit 4 of OPTCR
-    // Use register definition directly to be safe
-    #ifndef FLASH_OPTCR_BFB2
-    #define FLASH_OPTCR_BFB2 (1 << 4)
-    #endif
-
-    // Toggle
+    // Toggle BFB2
     if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
         OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
     } else {
