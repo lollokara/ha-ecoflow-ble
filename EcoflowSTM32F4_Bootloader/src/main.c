@@ -52,35 +52,67 @@ HAL_StatusTypeDef Flash_Copy_Bootloader(void);
 // --- Main ---
 int main(void) {
     HAL_Init();
-    HAL_Delay(100); // Settle power
-    SystemClock_Config();
-    UART_Init();
-    IWDG_Init();
 
-    // LED
-    __HAL_RCC_GPIOG_CLK_ENABLE();
+    // Initialize LEDs immediately for diagnostics
+    __HAL_RCC_GPIOG_CLK_ENABLE(); // PG6 (Green)
+    __HAL_RCC_GPIOD_CLK_ENABLE(); // PD4 (Orange), PD5 (Red)
+    __HAL_RCC_GPIOK_CLK_ENABLE(); // PK3 (Blue)
+
     GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // PG6 Green
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-    // Heartbeat blink on startup
-    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); // ON
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);   // OFF
-    HAL_Delay(100);
+    // PD4 Orange, PD5 Red
+    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-    // Wait 500ms for OTA Handshake
-    // If we receive CMD_OTA_START, enter OTA mode.
-    // Else jump to App.
+    // PK3 Blue
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
+
+    // Turn ON Red (Indicate Boot Start)
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); // LED3 Red ON (Schematic says Active High? No, usually LEDs on Disco are Active High. Wait. Manual says "LD3 (red) connected to PD5". Usually driving High turns on. Let's assume High=ON for Disco boards. Previous code used WritePin(.. RESET) for ON?
+    // F469 Disco User Manual: "LD1..LD4... connected to PG6, PD4, PD5, PK3".
+    // Schematic: PD5 -> LED -> GND. So HIGH is ON.
+    // My previous code: `HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); // ON` -> This was likely wrong if Active High.
+    // Let's assume HIGH is ON.
+
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red ON
+    HAL_Delay(200);
+
+    SystemClock_Config();
+
+    // Turn ON Orange (Indicate Clock OK)
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); // Orange ON
+    HAL_Delay(200);
+
+    UART_Init();
+
+    // Turn ON Green (Indicate UART OK)
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); // Green ON
+    HAL_Delay(200);
+
+    IWDG_Init();
+
+    // Startup Sequence Complete: All ON.
+    HAL_Delay(500);
+    // All OFF
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
 
     uint8_t rx_byte;
-    uint8_t buffer[260]; // Max packet size
+    uint8_t buffer[260];
     uint16_t buf_idx = 0;
     uint8_t expected_len = 0;
     uint32_t start_tick = HAL_GetTick();
+    // Check Stack Pointer of App
     bool app_valid = (((*(__IO uint32_t*)APP_ADDR) & 0x2FFE0000) == 0x20000000);
 
     while (1) {
@@ -91,11 +123,21 @@ int main(void) {
             if (app_valid) {
                 JumpTo(APP_ADDR);
             } else {
-                // Flash LED indefinitely
-                HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+                // No App: Blink Red/Orange fast
+                HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_5); // Red
+                HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_4); // Orange
                 HAL_Delay(100);
                 continue;
             }
+        }
+
+        // Waiting for OTA: Blink Green slow
+        if (!ota_active) {
+             if ((HAL_GetTick() / 500) % 2) {
+                 HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
+             } else {
+                 HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET);
+             }
         }
 
         // Poll UART
@@ -109,7 +151,7 @@ int main(void) {
                 expected_len = rx_byte;
             } else {
                 buffer[buf_idx++] = rx_byte;
-                if (buf_idx == (3 + expected_len)) {
+                if (buf_idx == (4 + expected_len)) {
                     // Packet Complete
                     uint8_t cmd = buffer[1];
                     uint8_t crc_rx = buffer[buf_idx-1];
@@ -117,6 +159,9 @@ int main(void) {
                         // Process CMD
                         if (cmd == CMD_OTA_START) {
                             ota_active = true;
+                            // Turn ON Blue (Busy)
+                            HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_SET);
+
                             memcpy(&ota_total_size, &buffer[3], 4);
                             memcpy(&ota_crc_target, &buffer[7], 4);
 
@@ -124,11 +169,15 @@ int main(void) {
                             if (Flash_Copy_Bootloader() != HAL_OK) {
                                 SendNack(cmd);
                                 ota_active = false;
+                                HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
+                                HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red Error
                             } else {
                                 // 2. Erase App Sectors in Inactive Bank
                                 if (Flash_Erase_Target_App() != HAL_OK) {
                                     SendNack(cmd);
                                     ota_active = false;
+                                    HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
+                                    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red Error
                                 } else {
                                     ota_written_size = 0;
                                     ota_crc_current = 0xFFFFFFFF;
@@ -136,6 +185,9 @@ int main(void) {
                                 }
                             }
                         } else if (cmd == CMD_OTA_DATA && ota_active) {
+                            // Toggle Blue
+                            HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3);
+
                             uint32_t offset;
                             memcpy(&offset, &buffer[3], 4);
                             uint8_t* data = &buffer[7];
@@ -149,6 +201,7 @@ int main(void) {
                                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TARGET_APP_ADDR + offset + i, word) != HAL_OK) {
                                     HAL_FLASH_Lock();
                                     SendNack(cmd);
+                                    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red Error
                                     return 0; // Error
                                 }
                             }
@@ -164,10 +217,13 @@ int main(void) {
 
                             if (ota_crc_current == rx_crc32 && rx_crc32 == ota_crc_target) {
                                 SendAck(cmd);
+                                HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
+                                HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); // Green Success
                                 HAL_Delay(100);
                                 ToggleBank(); // Resets
                             } else {
                                 SendNack(cmd);
+                                HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); // Red Error
                             }
                         }
                     }
