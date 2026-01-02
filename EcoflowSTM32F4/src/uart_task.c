@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
-#include "ota/ota_core.h"
 
 UART_HandleTypeDef huart6;
 
@@ -141,14 +140,19 @@ static void UART_Init(void) {
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
-static void process_packet(uint8_t *packet, uint16_t total_len) {
-    // Check OTA first
-    if (OTA_ProcessPacket(packet, total_len)) {
-        return;
-    }
+#define CMD_OTA_START 0xF0
 
+static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
+
+    // If we receive OTA Start, we reset to enter Bootloader
+    if (cmd == CMD_OTA_START) {
+        printf("UART: OTA Start received. Resetting to Bootloader...\n");
+        HAL_Delay(100);
+        HAL_NVIC_SystemReset();
+        return;
+    }
 
     if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {

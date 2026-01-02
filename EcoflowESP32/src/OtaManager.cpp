@@ -194,12 +194,29 @@ void OtaManager::sendEndCmd(uint32_t crc) {
 void OtaManager::update() {
     if (!_isUpdating || _state == IDLE || _state == COMPLETE || _state == FAILED) return;
 
-    if (millis() - _lastPacketTime > TIMEOUT_MS) {
+    uint32_t now = millis();
+
+    // Special handling for START: Retry rapidly to catch Bootloader window
+    if (_state == WAIT_START_ACK) {
+        if (now - _lastPacketTime > 300) {
+            if (_retryCount++ < (60000 / 300)) { // Retry for ~60s
+                sendStartCmd();
+            } else {
+                ESP_LOGE(TAG, "OTA Failed: Start Timeout");
+                _state = FAILED;
+                _status = "Failed: No Response";
+                _isUpdating = false;
+                _fwFile.close();
+            }
+        }
+        return;
+    }
+
+    // Normal timeout for data/end
+    if (now - _lastPacketTime > TIMEOUT_MS) {
         if (_retryCount++ < MAX_RETRIES) {
             ESP_LOGW(TAG, "Timeout, retrying...");
-            if (_state == WAIT_START_ACK) sendStartCmd();
-            else if (_state == WAIT_DATA_ACK) {
-                // Rewind?
+            if (_state == WAIT_DATA_ACK) {
                 _fwFile.seek(_offset);
                 sendChunk();
             }

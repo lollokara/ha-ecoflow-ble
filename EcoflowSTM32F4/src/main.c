@@ -19,7 +19,6 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
-#include "ota/ota_core.h"
 #include <stdio.h>
 
 // External Handles
@@ -103,6 +102,9 @@ void SystemClock_Config(void) {
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
        // Error_Handler();
     }
+
+    // Set Vector Table Offset for Bootloader support
+    SCB->VTOR = 0x08008000;
 }
 
 /**
@@ -286,9 +288,6 @@ int main(void) {
         printf("Display Queue Creation Failed!\n");
         while(1);
     }
-
-    // Initialize OTA
-    OTA_Init();
 
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
