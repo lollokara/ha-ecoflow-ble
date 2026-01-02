@@ -5,7 +5,7 @@
  *
  * This file handles the serialization and deserialization of the custom protocol
  * packets, CRC verification, and dispatching of received commands to the appropriate
- * handlers (DeviceManager, LightSensor, etc.).
+ * handlers (DeviceManager, LightSensor, etc.). It also manages the OTA update process.
  */
 
 #include "Stm32Serial.h"
@@ -13,6 +13,8 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include <WiFi.h>
+#include <LittleFS.h>
+#include <esp_log.h>
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 18 (connected to F4 TX)
@@ -20,10 +22,18 @@
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 39 // Note: This seems to conflict with main.cpp definition (16).
-                           // Leaving as is to preserve functionality, but documenting the discrepancy.
-                           // Actually, main.cpp uses 16. Stm32Serial uses 39. This might be a bug in the code I received,
-                           // but I must not alter functionality.
+#define POWER_LATCH_PIN 39
+
+// OTA Commands
+#define CMD_OTA_START       0xF0
+#define CMD_OTA_CHUNK       0xF1
+#define CMD_OTA_END         0xF2
+#define CMD_ACK             0x21
+#define CMD_NACK            0x22
+
+#define OTA_CHUNK_SIZE      240
+#define OTA_TIMEOUT_MS      5000  // Timeout for ACK
+#define OTA_ERASE_TIMEOUT_MS 15000 // Extended timeout for Start/Erase
 
 static const char* TAG = "Stm32Serial";
 
@@ -41,9 +51,12 @@ void Stm32Serial::begin() {
  *
  * Reads bytes from the serial buffer, assembles packets based on the protocol
  * (START_BYTE, Header, Length, Payload, CRC), and calls processPacket() when
- * a valid packet is received.
+ * a valid packet is received. Also runs the OTA task.
  */
 void Stm32Serial::update() {
+    // Run OTA Task
+    otaTask();
+
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
@@ -92,6 +105,182 @@ void Stm32Serial::update() {
 }
 
 /**
+ * @brief Starts an OTA update for the STM32 using the provided file.
+ */
+bool Stm32Serial::startOta(const String& path) {
+    if (_otaState != OTA_IDLE && _otaState != OTA_ERROR && _otaState != OTA_DONE) {
+        ESP_LOGE(TAG, "OTA already in progress");
+        return false;
+    }
+
+    if (!LittleFS.exists(path)) {
+        ESP_LOGE(TAG, "Firmware file not found: %s", path.c_str());
+        return false;
+    }
+
+    _otaFile = LittleFS.open(path, "r");
+    if (!_otaFile) {
+        ESP_LOGE(TAG, "Failed to open firmware file");
+        return false;
+    }
+
+    _otaTotalSize = _otaFile.size();
+    _otaOffset = 0;
+    _otaRetries = 0;
+    _otaState = OTA_STARTING;
+    _ackReceived = false;
+    _nackReceived = false;
+    _otaLastMsgTime = millis();
+
+    ESP_LOGI(TAG, "Starting STM32 OTA. File: %s, Size: %u bytes", path.c_str(), _otaTotalSize);
+    return true;
+}
+
+/**
+ * @brief Manages the OTA state machine.
+ */
+void Stm32Serial::otaTask() {
+    if (_otaState == OTA_IDLE || _otaState == OTA_DONE || _otaState == OTA_ERROR) return;
+
+    // Timeout Check
+    uint32_t timeout = (_otaState == OTA_WAITING_ACK && _otaPrevState == OTA_STARTING) ? OTA_ERASE_TIMEOUT_MS : OTA_TIMEOUT_MS;
+
+    if (millis() - _otaLastMsgTime > timeout) {
+        if (_otaState == OTA_WAITING_ACK) {
+            ESP_LOGW(TAG, "OTA ACK Timeout. Retrying...");
+            _otaRetries++;
+            if (_otaRetries > 3) {
+                ESP_LOGE(TAG, "OTA Failed: Too many timeouts");
+                _otaState = OTA_ERROR;
+                if (_otaFile) _otaFile.close();
+            } else {
+                // Go back to previous state to resend
+                _otaState = _otaPrevState;
+                _otaLastMsgTime = millis(); // Reset timer to allow resend immediately
+            }
+        }
+    }
+
+    switch (_otaState) {
+        case OTA_STARTING: {
+            uint8_t buffer[4];
+            // [AA][CMD][LEN][CRC]
+            // We just send CMD_OTA_START. Payload len 0.
+            buffer[0] = START_BYTE;
+            buffer[1] = CMD_OTA_START;
+            buffer[2] = 0x00;
+            buffer[3] = calculate_crc8(&buffer[1], 2);
+            Serial1.write(buffer, 4);
+
+            ESP_LOGI(TAG, "Sending OTA Start...");
+            _otaPrevState = OTA_STARTING;
+            _otaState = OTA_WAITING_ACK;
+            _ackReceived = false;
+            _otaLastMsgTime = millis();
+            break;
+        }
+
+        case OTA_SENDING: {
+            if (_otaOffset >= _otaTotalSize) {
+                _otaState = OTA_ENDING;
+                return;
+            }
+
+            // Read Chunk
+            _otaFile.seek(_otaOffset);
+            uint8_t chunkBuf[OTA_CHUNK_SIZE];
+            int readBytes = _otaFile.read(chunkBuf, OTA_CHUNK_SIZE);
+
+            if (readBytes > 0) {
+                // Packet: [AA][CMD][LEN][OFFSET(4)][DATA...][CRC]
+                // Total length: 1(Start) + 1(Cmd) + 1(Len) + 4(Offset) + Data + 1(CRC)
+                // Payload length in protocol is LEN byte = 4 + Data
+                // Max LEN is 250. 4 + 240 = 244. Fits.
+
+                uint8_t header[7];
+                header[0] = START_BYTE;
+                header[1] = CMD_OTA_CHUNK;
+                header[2] = (uint8_t)(4 + readBytes);
+                memcpy(&header[3], &_otaOffset, 4);
+
+                // Send Header
+                Serial1.write(header, 7); // Start, Cmd, Len, Offset
+                // Send Data
+                Serial1.write(chunkBuf, readBytes);
+
+                // Calculate CRC over [Cmd, Len, Offset, Data]
+                // We need a temp buffer for CRC calc or incremental calc.
+                // Reconstruct full buffer for CRC
+                uint8_t crcBuf[255];
+                crcBuf[0] = CMD_OTA_CHUNK;
+                crcBuf[1] = (uint8_t)(4 + readBytes);
+                memcpy(&crcBuf[2], &_otaOffset, 4);
+                memcpy(&crcBuf[6], chunkBuf, readBytes);
+
+                uint8_t crc = calculate_crc8(crcBuf, 2 + 4 + readBytes);
+                Serial1.write(crc);
+
+                if (_otaOffset % (OTA_CHUNK_SIZE * 10) == 0) {
+                     ESP_LOGI(TAG, "OTA Progress: %u / %u bytes (%.1f%%)", _otaOffset, _otaTotalSize, (float)_otaOffset * 100.0 / _otaTotalSize);
+                }
+
+                _otaPrevState = OTA_SENDING;
+                _otaState = OTA_WAITING_ACK;
+                _ackReceived = false;
+                _otaLastMsgTime = millis();
+            } else {
+                _otaState = OTA_ENDING;
+            }
+            break;
+        }
+
+        case OTA_WAITING_ACK: {
+            if (_ackReceived) {
+                _ackReceived = false;
+                _otaRetries = 0;
+                if (_otaPrevState == OTA_STARTING) {
+                    _otaState = OTA_SENDING;
+                    ESP_LOGI(TAG, "OTA Start ACK received. Sending firmware...");
+                } else if (_otaPrevState == OTA_SENDING) {
+                    _otaOffset += OTA_CHUNK_SIZE; // Should ideally use actual bytes sent
+                    // If we are at end, next loop handles it
+                    _otaState = OTA_SENDING;
+                } else if (_otaPrevState == OTA_ENDING) {
+                    ESP_LOGI(TAG, "OTA Complete. Rebooting STM32...");
+                    _otaState = OTA_DONE;
+                    if (_otaFile) _otaFile.close();
+                }
+            } else if (_nackReceived) {
+                ESP_LOGE(TAG, "OTA NACK received. Retrying...");
+                _nackReceived = false;
+                _otaState = _otaPrevState;
+                _otaRetries++;
+                _otaLastMsgTime = millis(); // Reset timeout
+            }
+            break;
+        }
+
+        case OTA_ENDING: {
+            uint8_t buffer[4];
+            buffer[0] = START_BYTE;
+            buffer[1] = CMD_OTA_END;
+            buffer[2] = 0x00;
+            buffer[3] = calculate_crc8(&buffer[1], 2);
+            Serial1.write(buffer, 4);
+
+            ESP_LOGI(TAG, "Sending OTA End...");
+            _otaPrevState = OTA_ENDING;
+            _otaState = OTA_WAITING_ACK;
+            _ackReceived = false;
+            _otaLastMsgTime = millis();
+            break;
+        }
+
+        default: break;
+    }
+}
+
+/**
  * @brief Dispatches valid packets to their specific handlers.
  *
  * @param rx_buf The buffer containing the full packet.
@@ -99,6 +288,17 @@ void Stm32Serial::update() {
  */
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
+
+    // Handle OTA ACKs
+    if (_otaState != OTA_IDLE && _otaState != OTA_DONE && _otaState != OTA_ERROR) {
+        if (cmd == CMD_ACK) {
+            _ackReceived = true;
+            return;
+        } else if (cmd == CMD_NACK) {
+            _nackReceived = true;
+            return;
+        }
+    }
 
     if (cmd == CMD_HANDSHAKE) {
         // Reply with ACK and then send the device list
