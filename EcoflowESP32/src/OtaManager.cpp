@@ -80,15 +80,9 @@ void OtaManager::processStm32Update() {
 
     switch (_stm32State) {
         case OTA_STARTING:
-            // Send Handshake every 200ms
-            if (now - _lastActivity > 200) {
+            // Send Handshake every 500ms (Slowed down for robustness)
+            if (now - _lastActivity > 500) {
                 _lastActivity = now;
-
-                // [CMD][SIZE...]
-                // The Bootloader implementation handles:
-                // if (HAL_UART_Receive(&huart6, rx_buf, 5, 500) == HAL_OK)
-                // if (rx_buf[0] == CMD_OTA_START)
-                // So it expects: [CMD] [S1] [S2] [S3] [S4].
 
                 uint8_t payload[4];
                 payload[0] = (_totalSize >> 24) & 0xFF;
@@ -101,9 +95,10 @@ void OtaManager::processStm32Update() {
                 memcpy(&packet[1], payload, 4);
 
                 Stm32Serial::getInstance().sendRaw(packet, 5);
+                Serial.print(".");
 
                 _retryCount++;
-                if (_retryCount > 300) { // 60 seconds
+                if (_retryCount > 120) { // 60 seconds
                     _stm32State = OTA_ERROR;
                     _errorMsg = "Handshake Timeout";
                     _stm32File.close();
@@ -147,7 +142,7 @@ void OtaManager::sendChunk() {
     }
 
     // Read Chunk
-    uint8_t buffer[240]; // Reduced from 256 to allow header overhead in buffer if needed, and safer UART
+    uint8_t buffer[240];
     size_t toRead = 240;
     if (_totalSize - _sentBytes < 240) {
         toRead = _totalSize - _sentBytes;
@@ -155,8 +150,6 @@ void OtaManager::sendChunk() {
 
     _stm32File.read(buffer, toRead);
 
-    // Packet: [CMD 0xF1] [LEN_H] [LEN_L] [DATA...] [CRC]
-    // Bootloader expects: [CMD] [LEN_H] [LEN_L] [DATA...] [CRC]
     uint8_t header[3];
     header[0] = CMD_OTA_CHUNK;
     header[1] = (toRead >> 8) & 0xFF;
@@ -184,10 +177,15 @@ void OtaManager::sendChunk() {
 }
 
 void OtaManager::handleUartData(uint8_t* data, size_t len) {
-    // Check for ACK
-    // Bootloader sends single byte ACK (0xAA)
     if (len > 0) {
         uint8_t cmd = data[0];
+
+        // Debug Log for troubleshooting connection
+        // Only log if waiting for handshake to avoid spam during transfer
+        if (_stm32State == OTA_STARTING) {
+             Serial.printf("[Rx %02X] ", cmd);
+        }
+
         if (cmd == CMD_OTA_ACK) {
             if (_stm32State == OTA_STARTING) {
                 Serial.println("\nOTA: Handshake ACK! Sending data...");

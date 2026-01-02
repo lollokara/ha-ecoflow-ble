@@ -43,41 +43,43 @@ uint8_t CRC8(const uint8_t *data, uint16_t len);
 /* --- Main --- */
 int main(void) {
     HAL_Init();
+    // Wrap Clock Config with Error Handler
     SystemClock_Config();
+
     GPIO_Init();
 
-    // Startup Signal: Blink Rainbow
-    LED_BlinkAll();
+    // Clear LEDs first
+    LED_Set(0, 0, 0, 0);
+
+    // Startup Signal: 3 Green Blinks
+    for(int i=0; i<3; i++) {
+        LED_Set(1, 0, 0, 0); HAL_Delay(100);
+        LED_Set(0, 0, 0, 0); HAL_Delay(100);
+    }
 
     UART_Init();
 
     // Enable PWR and BKP for Magic Number check
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
-    // __HAL_RCC_RTC_ENABLE(); // Removed to prevent RTC domain reset risk
 
     // Check Backup Register 0 directly
     uint32_t bkp0 = RTC->BKP0R;
 
     if (bkp0 == OTA_MAGIC_NUMBER) {
-        // Magic Found: Blue LED
-        LED_Set(0, 0, 0, 1);
-
         // Clear magic
         RTC->BKP0R = 0;
-
         // Enter OTA Mode
         OTA_Process();
     } else {
-        // No Magic: Green LED
-        LED_Set(1, 0, 0, 0);
-        HAL_Delay(100);
         JumpToApplication();
     }
 
-    // If Jump returns (invalid app), turn on Red and halt
-    LED_Set(0, 0, 1, 0);
-    while (1);
+    // If Jump returns (invalid app), blink RED forever
+    while (1) {
+        LED_Set(0, 0, 1, 0); HAL_Delay(200);
+        LED_Set(0, 0, 0, 0); HAL_Delay(200);
+    }
 }
 
 /* --- Hardware Init --- */
@@ -96,9 +98,25 @@ void SystemClock_Config(void) {
     RCC_OscInitStruct.PLL.PLLN = 360; // 180MHz
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
     RCC_OscInitStruct.PLL.PLLQ = 7;
-    HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
-    HAL_PWREx_EnableOverDrive();
+    // If HSE fails, turn RED ON and Loop
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+        // Init GPIO manually if HAL_Init not fully done? No, GPIO_Init called later.
+        // But we need feedback. Init RED LED pin manually here.
+        __HAL_RCC_GPIOD_CLK_ENABLE();
+        GPIO_InitTypeDef GPIO_InitStruct = {0};
+        GPIO_InitStruct.Pin = LED_RED_PIN;
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        HAL_GPIO_Init(LED_RED_PORT, &GPIO_InitStruct);
+        HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_SET);
+        while(1);
+    }
+
+    if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
+        // Error
+    }
 
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                                 |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -106,7 +124,10 @@ void SystemClock_Config(void) {
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+        // Error
+    }
 }
 
 void GPIO_Init(void) {
@@ -151,24 +172,17 @@ void UART_Init(void) {
     huart6.Init.Mode = UART_MODE_TX_RX;
     huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
-    HAL_UART_Init(&huart6);
+    if (HAL_UART_Init(&huart6) != HAL_OK) {
+        // UART Init Error - Red LED
+        LED_Set(0, 0, 1, 0); while(1);
+    }
 }
 
 void LED_Set(uint8_t green, uint8_t orange, uint8_t red, uint8_t blue) {
-    // Active High
     HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, green ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, orange ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, blue ? GPIO_PIN_SET : GPIO_PIN_RESET);
-}
-
-void LED_BlinkAll(void) {
-    // Sequence: Green -> Orange -> Red -> Blue
-    LED_Set(1, 0, 0, 0); HAL_Delay(200);
-    LED_Set(0, 1, 0, 0); HAL_Delay(200);
-    LED_Set(0, 0, 1, 0); HAL_Delay(200);
-    LED_Set(0, 0, 0, 1); HAL_Delay(200);
-    LED_Set(0, 0, 0, 0); HAL_Delay(200);
 }
 
 /* --- App Jump --- */
@@ -228,19 +242,18 @@ void OTA_Process(void) {
     uint32_t total_received = 0;
     uint32_t total_expected = 0;
 
-    LED_Set(0, 1, 0, 0); // Orange = OTA Wait
+    // OTA Entry: Blue ON
+    LED_Set(0, 0, 0, 1);
 
     // Unlock Flash
     HAL_FLASH_Unlock();
 
     // Handshake Loop
-    // Flush RX buffer first to prevent stale data
     __HAL_UART_FLUSH_DRREGISTER(&huart6);
 
     while (1) {
-        // Send READY every 500ms? No, wait for ESP32 to initiate
-        // Use timeout receive
-        if (HAL_UART_Receive(&huart6, rx_buf, 5, 200) == HAL_OK) {
+        // Try receive with timeout
+        if (HAL_UART_Receive(&huart6, rx_buf, 5, 100) == HAL_OK) {
             if (rx_buf[0] == CMD_OTA_START) {
                 // rx_buf[1..4] = Size
                 total_expected = (rx_buf[1] << 24) | (rx_buf[2] << 16) | (rx_buf[3] << 8) | rx_buf[4];
@@ -248,11 +261,13 @@ void OTA_Process(void) {
                 break;
             }
         }
-        // Toggle Blue to indicate waiting life
+        // Blink Blue slowly (Wait state)
         HAL_GPIO_TogglePin(LED_BLUE_PORT, LED_BLUE_PIN);
+        HAL_Delay(200);
     }
 
-    LED_Set(1, 1, 0, 0); // Green+Orange = Erasing
+    // Erasing State: Orange ON, others OFF
+    LED_Set(0, 1, 0, 0);
 
     // Erase Sectors needed
     // 374KB -> Sectors 2 to 7.
@@ -273,7 +288,9 @@ void OTA_Process(void) {
     }
 
     UART_SendAck(); // Ready for data
-    LED_Set(0, 1, 0, 1); // Blue+Orange = Receiving
+
+    // Receiving State: Green ON
+    LED_Set(1, 0, 0, 0);
 
     // Data Loop
     while (total_received < total_expected) {
@@ -321,7 +338,8 @@ void OTA_Process(void) {
 
         total_received += len;
         UART_SendAck();
-        LED_Set(0, 1, 0, (total_received / 1024) % 2); // Toggle Blue
+        // Toggle Green to show activity
+        HAL_GPIO_TogglePin(LED_GREEN_PORT, LED_GREEN_PIN);
     }
 
     HAL_FLASH_Lock();
@@ -333,8 +351,11 @@ void OTA_Process(void) {
         }
     }
 
-    // Success
-    LED_Set(1, 1, 1, 1); // All On
-    HAL_Delay(1000);
+    // Success: Rainbow
+    LED_Set(1, 0, 0, 0); HAL_Delay(100);
+    LED_Set(0, 1, 0, 0); HAL_Delay(100);
+    LED_Set(0, 0, 1, 0); HAL_Delay(100);
+    LED_Set(0, 0, 0, 1); HAL_Delay(100);
+
     HAL_NVIC_SystemReset();
 }
