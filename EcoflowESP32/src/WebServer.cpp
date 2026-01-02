@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include <Update.h>
+#include "OtaManager.h" // Import OTA Manager
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -58,6 +60,7 @@ void WebServer::begin() {
         return;
     }
 
+    OtaManager::getInstance().begin(); // Init OTA Manager (LittleFS)
     setupRoutes();
     server.begin();
 }
@@ -81,8 +84,73 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    // OTA Endpoints
+    server.on("/api/ota/esp", HTTP_POST, [](AsyncWebServerRequest *request){
+        bool shouldReboot = !Update.hasError();
+        if (shouldReboot) {
+            AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OK");
+            response->addHeader("Connection", "close");
+            request->send(response);
+            delay(100);
+            ESP.restart();
+        } else {
+            request->send(500, "text/plain", "Update Failed");
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+        if (!index) {
+            Serial.printf("ESP OTA Start: %s\n", filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                Update.printError(Serial);
+            }
+        }
+        if (Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        if (final) {
+            if (Update.end(true)) {
+                Serial.printf("ESP OTA Success: %uB\n", index + len);
+            } else {
+                Update.printError(Serial);
+            }
+        }
+    });
+
+    server.on("/api/ota/stm", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200, "text/plain", "OK");
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+        static File uploadFile;
+        if (!index) {
+            Serial.printf("STM OTA Upload Start: %s\n", filename.c_str());
+            // Save to LittleFS first
+            uploadFile = LittleFS.open("/stm32_update.bin", "w");
+        }
+        if (uploadFile) {
+            uploadFile.write(data, len);
+        }
+        if (final) {
+            if (uploadFile) {
+                uploadFile.close();
+                Serial.printf("STM OTA Upload Done: %uB\n", index + len);
+                // Trigger Update Process
+                OtaManager::getInstance().startStm32Update("/stm32_update.bin");
+            }
+        }
+    });
+
+    server.on("/api/ota/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        DynamicJsonDocument doc(200);
+        OtaState state = OtaManager::getInstance().getStm32State();
+        doc["state"] = (int)state;
+        doc["progress"] = OtaManager::getInstance().getProgress();
+        doc["error"] = OtaManager::getInstance().getError();
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
 }
 
+// ... (Rest of handlers: handleStatus, handleHistory, handleControl, etc. remain unchanged)
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(4096);
 

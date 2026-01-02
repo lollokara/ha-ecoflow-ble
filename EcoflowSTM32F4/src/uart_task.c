@@ -9,7 +9,7 @@
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 1024
+#define RING_BUFFER_SIZE 2048 // Increased to 2048
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -79,6 +79,18 @@ void UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART6) {
+        // Clear Error Flags
+        __HAL_UART_CLEAR_OREFLAG(huart);
+        __HAL_UART_CLEAR_NEFLAG(huart);
+        __HAL_UART_CLEAR_FEFLAG(huart);
+        __HAL_UART_CLEAR_PEFLAG(huart);
+        // Restart Reception
+        HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+    }
+}
+
 // Protocol State
 typedef enum {
     STATE_HANDSHAKE,
@@ -139,6 +151,17 @@ static void UART_Init(void) {
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
+// Handler for OTA Start Command
+static void handle_ota_start(void) {
+    // Write Magic Number to RTC Backup Register 0
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    RTC->BKP0R = 0xDEADBEEF;
+
+    // Reset System
+    HAL_NVIC_SystemReset();
+}
+
 static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
@@ -194,6 +217,9 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             memcpy(&event.data.debugInfo, &info, sizeof(DebugInfo));
             xQueueSend(displayQueue, &event, 0);
         }
+    }
+    else if (cmd == CMD_OTA_START) {
+        handle_ota_start();
     }
 }
 
