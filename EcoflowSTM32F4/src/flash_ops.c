@@ -240,25 +240,31 @@ uint8_t Flash_EraseSector(uint32_t address) {
 uint8_t Flash_Write(uint32_t address, uint8_t* data, uint32_t len) {
     uint32_t i = 0;
 
-    // Program in 32-bit Words (x4 faster)
-    // We assume address is 4-byte aligned (offset 0x0810xxxx is aligned)
-    // We assume len is multiple of 4 (ESP32 sends 240 bytes)
+    // Ensure clean state before writing
+    if (FLASH->SR & (FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                     FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR)) {
+        printf("Flash_Write: Clearing Pre-existing Flags: SR=%08lX\n", FLASH->SR);
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                               FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+    }
 
-    // Main loop for words
+    // Program in 32-bit Words (x4 faster)
     for (i = 0; i < (len & ~3); i += 4) {
         uint32_t word;
-        memcpy(&word, &data[i], 4); // Handle potential unaligned input buffer safely
+        memcpy(&word, &data[i], 4);
 
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address + i, word) != HAL_OK) {
-             printf("Flash_Write: Word Program Failed @ %08lX\n", address + i);
+             uint32_t err = HAL_FLASH_GetError();
+             printf("Flash_Write: Word Program Failed @ %08lX. Error: %lu, SR: %08lX\n", address + i, err, FLASH->SR);
              return 1;
         }
     }
 
-    // Handle remaining bytes (if any) byte-by-byte
+    // Handle remaining bytes
     for (; i < len; i++) {
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE, address + i, data[i]) != HAL_OK) {
-             printf("Flash_Write: Byte Program Failed @ %08lX\n", address + i);
+             uint32_t err = HAL_FLASH_GetError();
+             printf("Flash_Write: Byte Program Failed @ %08lX. Error: %lu, SR: %08lX\n", address + i, err, FLASH->SR);
              return 1;
         }
     }
