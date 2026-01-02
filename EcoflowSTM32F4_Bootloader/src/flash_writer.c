@@ -2,7 +2,7 @@
 #include "stm32f4xx_hal.h"
 #include "boot_shared.h"
 
-// extern IWDG_HandleTypeDef hiwdg; // Bootloader doesn't use IWDG yet
+extern IWDG_HandleTypeDef hiwdg;
 
 void Flash_Unlock(void) {
     HAL_FLASH_Unlock();
@@ -25,7 +25,7 @@ bool Flash_EraseBank2(void) {
     for (uint32_t sector = FLASH_SECTOR_5; sector <= FLASH_SECTOR_11; sector++) {
         EraseInitStruct.Sector = sector;
 
-        // HAL_IWDG_Refresh(&hiwdg); // Bootloader might not use IWDG yet, or use it if enabled
+        HAL_IWDG_Refresh(&hiwdg);
 
         if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
             return false;

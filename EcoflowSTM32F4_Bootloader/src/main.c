@@ -18,10 +18,13 @@ pFunction JumpToApplication;
 uint32_t JumpAddress;
 
 UART_HandleTypeDef huart6;
+IWDG_HandleTypeDef hiwdg; // Added IWDG handle
+
 void SystemClock_Config(void);
 void Error_Handler(void);
+static void MX_IWDG_Init(void); // Added Init Prototype
 
-// Init UART6
+// Init UART6 (Connected to ESP32)
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -61,12 +64,22 @@ static void JumpToApp(void) {
         JumpAddress = *(__IO uint32_t *)(APP_ADDR + 4);
         JumpToApplication = (pFunction)JumpAddress;
 
+        // Cleanup before Jump
         HAL_UART_DeInit(&huart6);
         HAL_RCC_DeInit();
         HAL_DeInit();
         SysTick->CTRL = 0;
         SysTick->LOAD = 0;
         SysTick->VAL = 0;
+
+        // Disable all interrupts
+        __disable_irq();
+
+        // Clear all interrupt enable bits and pending bits
+        for (int i = 0; i < 8; i++) {
+            NVIC->ICER[i] = 0xFFFFFFFF;
+            NVIC->ICPR[i] = 0xFFFFFFFF;
+        }
 
         SCB->VTOR = APP_ADDR;
         __set_MSP(*(__IO uint32_t *)APP_ADDR);
@@ -79,10 +92,12 @@ int main(void) {
     SystemClock_Config();
     LED_Init();
     UART_Init();
+    MX_IWDG_Init(); // Init Watchdog
 
     // Check for OTA Command window (2000ms)
     // ESP32 sends OTA_START if user requested update
     uint32_t startTick = HAL_GetTick();
+    uint32_t ledTick = HAL_GetTick();
 
     // Quick blink to indicate Bootloader Active
     for(int i=0; i<3; i++) {
@@ -99,8 +114,19 @@ int main(void) {
     OtaCore_Init();
 
     while (1) {
-        if (HAL_UART_Receive(&huart6, &b, 1, 1) == HAL_OK) {
-            HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); // Blink on data
+        // Refresh Watchdog
+        HAL_IWDG_Refresh(&hiwdg);
+
+        // Heartbeat Blink (every 200ms)
+        if (HAL_GetTick() - ledTick > 200) {
+            HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+            ledTick = HAL_GetTick();
+        }
+
+        // UART Polling (Non-blocking)
+        if (HAL_UART_Receive(&huart6, &b, 1, 0) == HAL_OK) { // Timeout 0 for non-blocking
+            // Reset jump timeout on activity
+            startTick = HAL_GetTick();
 
             // Simple Parse
             if (state == 0) {
@@ -117,16 +143,18 @@ int main(void) {
                 // Ignore CRC check for simplicity in polling loop
                 OtaCore_HandleCmd(cmd, payload, len);
                 state = 0;
-                // If we got a valid command, disable timeout
-                startTick = HAL_GetTick() + 999999;
+                // If we got a valid command, disable jump (infinite timeout)
+                startTick = HAL_GetTick() + 9999999;
             }
         }
 
         // Timeout to jump?
-        if (HAL_GetTick() - startTick > 2000) {
+        // Only jump if we haven't received valid OTA commands recently
+        // and we are not in infinite wait.
+        if (startTick < 9999999 && (HAL_GetTick() - startTick > 2000)) {
             JumpToApp();
-            // If jump failed (no app), loops here
-            startTick = HAL_GetTick(); // Reset wait
+            // If jump failed (no app), loops here with heartbeat
+            startTick = HAL_GetTick(); // Reset wait to blink and try again
         }
     }
 }
@@ -156,6 +184,15 @@ void SystemClock_Config(void) {
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
     HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+}
+
+static void MX_IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
+    hiwdg.Init.Reload = 1250; // ~10s
+    if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
 void Error_Handler(void) { while(1); }
