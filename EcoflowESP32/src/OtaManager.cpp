@@ -100,7 +100,7 @@ void OtaManager::processStm32Update() {
                 packet[0] = CMD_OTA_START;
                 memcpy(&packet[1], payload, 4);
 
-                stm32Serial.sendRaw(packet, 5);
+                Stm32Serial::getInstance().sendRaw(packet, 5);
 
                 _retryCount++;
                 if (_retryCount > 300) { // 60 seconds
@@ -140,7 +140,7 @@ void OtaManager::sendChunk() {
         // Send End
         uint8_t packet[1];
         packet[0] = CMD_OTA_END;
-        stm32Serial.sendRaw(packet, 1);
+        Stm32Serial::getInstance().sendRaw(packet, 1);
         _stm32State = OTA_VERIFYING;
         _lastActivity = millis();
         return;
@@ -165,11 +165,11 @@ void OtaManager::sendChunk() {
     uint8_t crc = calculateCRC8(buffer, toRead);
 
     // Send Header
-    stm32Serial.sendRaw(header, 3);
+    Stm32Serial::getInstance().sendRaw(header, 3);
     // Send Data
-    stm32Serial.sendRaw(buffer, toRead);
+    Stm32Serial::getInstance().sendRaw(buffer, toRead);
     // Send CRC
-    stm32Serial.sendRaw(&crc, 1);
+    Stm32Serial::getInstance().sendRaw(&crc, 1);
 
     _sentBytes += toRead;
     _progress = (_sentBytes * 100) / _totalSize;

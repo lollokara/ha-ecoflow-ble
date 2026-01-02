@@ -13,6 +13,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include <WiFi.h>
+#include "OtaManager.h" // Include OtaManager for handleUartData
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 18 (connected to F4 TX)
@@ -20,10 +21,7 @@
 #define RX_PIN 18
 #define TX_PIN 17
 
-#define POWER_LATCH_PIN 39 // Note: This seems to conflict with main.cpp definition (16).
-                           // Leaving as is to preserve functionality, but documenting the discrepancy.
-                           // Actually, main.cpp uses 16. Stm32Serial uses 39. This might be a bug in the code I received,
-                           // but I must not alter functionality.
+#define POWER_LATCH_PIN 39
 
 static const char* TAG = "Stm32Serial";
 
@@ -36,6 +34,10 @@ void Stm32Serial::begin() {
     Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
 }
 
+void Stm32Serial::sendRaw(const uint8_t* data, size_t len) {
+    Serial1.write(data, len);
+}
+
 /**
  * @brief Main update loop for processing incoming UART data.
  *
@@ -44,6 +46,20 @@ void Stm32Serial::begin() {
  * a valid packet is received.
  */
 void Stm32Serial::update() {
+    // Check OTA state first - if OTA is active (SENDING/VERIFYING), pass data directly to OTA manager
+    // to avoid conflict with main protocol parser which expects START_BYTE structure.
+    // The bootloader protocol is simpler: ACK/NACK bytes.
+    if (OtaManager::getInstance().getStm32State() != OTA_IDLE &&
+        OtaManager::getInstance().getStm32State() != OTA_DONE &&
+        OtaManager::getInstance().getStm32State() != OTA_ERROR) {
+
+        while(Serial1.available()) {
+            uint8_t b = Serial1.read();
+            OtaManager::getInstance().handleUartData(&b, 1);
+        }
+        return;
+    }
+
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;

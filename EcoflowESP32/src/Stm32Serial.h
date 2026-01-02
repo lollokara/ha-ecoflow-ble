@@ -55,6 +55,13 @@ public:
      */
     void sendDeviceStatus(uint8_t device_id);
 
+    /**
+     * @brief Sends raw bytes to the STM32 (for OTA).
+     * @param data Pointer to the data buffer.
+     * @param len Length of the data.
+     */
+    void sendRaw(const uint8_t* data, size_t len);
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.

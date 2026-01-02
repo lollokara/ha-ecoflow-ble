@@ -160,6 +160,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
 
 void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
     if(tim_pwmHandle->Instance==TIM2) {
+        GPIO_InitTypeDef GPIO_InitStruct = {0}; // Define GPIO_InitStruct
         __HAL_RCC_TIM2_CLK_ENABLE();
         __HAL_RCC_GPIOA_CLK_ENABLE();
         GPIO_InitStruct.Pin = GPIO_PIN_3;
