@@ -206,9 +206,11 @@ void OtaManager::update() {
     if (_state == WAIT_START_ACK) {
         if (now - _lastPacketTime > 300) {
             if (_retryCount++ < (60000 / 300)) { // Retry for ~60s
+                Serial.printf("OTA: Retrying Start CMD (%d)\n", _retryCount);
                 sendStartCmd();
             } else {
                 ESP_LOGE(TAG, "OTA Failed: Start Timeout");
+                Serial.println("OTA: Start Timeout");
                 _state = FAILED;
                 _status = "Failed: No Response";
                 _isUpdating = false;

@@ -52,6 +52,7 @@ HAL_StatusTypeDef Flash_Copy_Bootloader(void);
 // --- Main ---
 int main(void) {
     HAL_Init();
+    HAL_Delay(100); // Settle power
     SystemClock_Config();
     UART_Init();
     IWDG_Init();
@@ -64,6 +65,12 @@ int main(void) {
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // Heartbeat blink on startup
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); // ON
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);   // OFF
+    HAL_Delay(100);
 
     // Wait 500ms for OTA Handshake
     // If we receive CMD_OTA_START, enter OTA mode.
@@ -328,6 +335,9 @@ static void UART_Init(void) {
     huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart6);
+
+    // Explicitly disable interrupts for Polling Mode
+    HAL_NVIC_DisableIRQ(USART6_IRQn);
 }
 
 static void IWDG_Init(void) {

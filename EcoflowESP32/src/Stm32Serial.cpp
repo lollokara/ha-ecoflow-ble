@@ -52,19 +52,29 @@ void Stm32Serial::update() {
 
     while (Serial1.available()) {
         uint8_t b = Serial1.read();
+
+        // Debug Logging for RX (Verbose)
+        // Serial.printf("RX: %02X\n", b);
+
         if (!collecting) {
             if (b == START_BYTE) {
                 collecting = true;
                 rx_idx = 0;
                 rx_buf[rx_idx++] = b;
+                Serial.print("RX START\n");
+            } else {
+                // Log unhandled bytes
+                Serial.printf("RX UNHANDLED: %02X\n", b);
             }
         } else {
             rx_buf[rx_idx++] = b;
 
             if (rx_idx == 3) { // We have START, CMD, LEN
                 expected_len = rx_buf[2];
+                Serial.printf("RX CMD: %02X LEN: %d\n", rx_buf[1], expected_len);
                 // Sanity check length
                 if (expected_len > 250) {
+                    Serial.println("RX INVALID LEN");
                     collecting = false;
                     rx_idx = 0;
                 }
@@ -75,9 +85,11 @@ void Stm32Serial::update() {
                     uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
 
                     if (received_crc == calculated_crc) {
+                        Serial.println("RX VALID PACKET");
                         processPacket(rx_buf, rx_idx);
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
+                        Serial.printf("RX CRC FAIL: Rx %02X Calc %02X\n", received_crc, calculated_crc);
                     }
                     collecting = false; // Reset for next packet
                     rx_idx = 0;
@@ -85,6 +97,7 @@ void Stm32Serial::update() {
             }
 
             if (rx_idx >= sizeof(rx_buf)) {
+                Serial.println("RX OVERFLOW");
                 collecting = false; // Overflow protection
                 rx_idx = 0;
             }
