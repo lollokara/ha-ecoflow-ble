@@ -273,6 +273,7 @@ void SetBacklight(uint8_t percent) {
 int main(void) {
     // Relocate Vector Table to Application Start Address
     SCB->VTOR = 0x08008000;
+    __DSB(); // Ensure VTOR write completes
 
     // Enable Interrupts (Bootloader disabled them)
     __enable_irq();
