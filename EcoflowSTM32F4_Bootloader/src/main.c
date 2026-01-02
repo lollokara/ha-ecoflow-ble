@@ -35,6 +35,7 @@ void SystemClock_Config(void);
 void GPIO_Init(void);
 void UART_Init(void);
 void LED_Set(uint8_t green, uint8_t orange, uint8_t red, uint8_t blue);
+void LED_BlinkAll(void);
 void JumpToApplication(void);
 void OTA_Process(void);
 uint8_t CRC8(const uint8_t *data, uint16_t len);
@@ -44,31 +45,38 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     GPIO_Init();
+
+    // Startup Signal: Blink Rainbow
+    LED_BlinkAll();
+
     UART_Init();
 
     // Enable PWR and BKP for Magic Number check
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
-    __HAL_RCC_RTC_ENABLE(); // Enable RTC Clock
+    // __HAL_RCC_RTC_ENABLE(); // Removed to prevent RTC domain reset risk
 
     // Check Backup Register 0 directly
     uint32_t bkp0 = RTC->BKP0R;
 
-    // Default to Blue LED (Bootloader Active)
-    LED_Set(0, 0, 0, 1);
-
     if (bkp0 == OTA_MAGIC_NUMBER) {
+        // Magic Found: Blue LED
+        LED_Set(0, 0, 0, 1);
+
         // Clear magic
         RTC->BKP0R = 0;
+
         // Enter OTA Mode
         OTA_Process();
     } else {
+        // No Magic: Green LED
+        LED_Set(1, 0, 0, 0);
+        HAL_Delay(100);
         JumpToApplication();
     }
 
-    // If Jump returns (invalid app), fall into OTA
-    OTA_Process();
-
+    // If Jump returns (invalid app), turn on Red and halt
+    LED_Set(0, 0, 1, 0);
     while (1);
 }
 
@@ -147,10 +155,20 @@ void UART_Init(void) {
 }
 
 void LED_Set(uint8_t green, uint8_t orange, uint8_t red, uint8_t blue) {
+    // Active High
     HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN, green ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, orange ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_BLUE_PORT, LED_BLUE_PIN, blue ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void LED_BlinkAll(void) {
+    // Sequence: Green -> Orange -> Red -> Blue
+    LED_Set(1, 0, 0, 0); HAL_Delay(200);
+    LED_Set(0, 1, 0, 0); HAL_Delay(200);
+    LED_Set(0, 0, 1, 0); HAL_Delay(200);
+    LED_Set(0, 0, 0, 1); HAL_Delay(200);
+    LED_Set(0, 0, 0, 0); HAL_Delay(200);
 }
 
 /* --- App Jump --- */
@@ -216,11 +234,13 @@ void OTA_Process(void) {
     HAL_FLASH_Unlock();
 
     // Handshake Loop
+    // Flush RX buffer first to prevent stale data
+    __HAL_UART_FLUSH_DRREGISTER(&huart6);
+
     while (1) {
-        // Send READY every 500ms
-        // If we receive OTA_START, break
+        // Send READY every 500ms? No, wait for ESP32 to initiate
         // Use timeout receive
-        if (HAL_UART_Receive(&huart6, rx_buf, 5, 500) == HAL_OK) {
+        if (HAL_UART_Receive(&huart6, rx_buf, 5, 200) == HAL_OK) {
             if (rx_buf[0] == CMD_OTA_START) {
                 // rx_buf[1..4] = Size
                 total_expected = (rx_buf[1] << 24) | (rx_buf[2] << 16) | (rx_buf[3] << 8) | rx_buf[4];
@@ -228,7 +248,8 @@ void OTA_Process(void) {
                 break;
             }
         }
-        // Send retry prompt? No, just wait.
+        // Toggle Blue to indicate waiting life
+        HAL_GPIO_TogglePin(LED_BLUE_PORT, LED_BLUE_PIN);
     }
 
     LED_Set(1, 1, 0, 0); // Green+Orange = Erasing
@@ -246,7 +267,6 @@ void OTA_Process(void) {
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
-    // Refresh watchdog if needed (not active here but good practice)
     if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
         LED_Set(0, 0, 1, 0); // Red = Error
         while(1);

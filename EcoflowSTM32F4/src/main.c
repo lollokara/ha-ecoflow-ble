@@ -10,6 +10,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "ecoflow_protocol.h" // Added include
 #include <stdio.h>
 
 // External Handles
@@ -27,6 +28,10 @@ static void ESP32_Reset_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_IWDG_Init(void);
+
+// LED Definitions for App (Orange)
+#define LED_ORANGE_PIN      GPIO_PIN_4
+#define LED_ORANGE_PORT     GPIOD
 
 // ... (Rest of SystemClock_Config, ESP32_Reset_Init, MX_ functions same as before)
 void SystemClock_Config(void) {
@@ -160,7 +165,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
 
 void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
     if(tim_pwmHandle->Instance==TIM2) {
-        GPIO_InitTypeDef GPIO_InitStruct = {0}; // Define GPIO_InitStruct
+        GPIO_InitTypeDef GPIO_InitStruct = {0};
         __HAL_RCC_TIM2_CLK_ENABLE();
         __HAL_RCC_GPIOA_CLK_ENABLE();
         GPIO_InitStruct.Pin = GPIO_PIN_3;
@@ -188,6 +193,23 @@ int main(void) {
 
     HAL_Init();
     SystemClock_Config();
+
+    // Blink Orange to signal Application Start
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_ORANGE_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_ORANGE_PORT, &GPIO_InitStruct);
+
+    for(int i=0; i<3; i++) {
+        HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_SET);
+        HAL_Delay(100);
+        HAL_GPIO_WritePin(LED_ORANGE_PORT, LED_ORANGE_PIN, GPIO_PIN_RESET);
+        HAL_Delay(100);
+    }
+
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
