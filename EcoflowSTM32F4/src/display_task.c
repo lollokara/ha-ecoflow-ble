@@ -26,7 +26,7 @@ void StartDisplayTask(void * argument) {
     UI_LVGL_Init();
 
     printf("UI Init Done\n");
-    
+
     DisplayEvent event;
     TickType_t xLastWakeTime;
     const TickType_t xPeriod = pdMS_TO_TICKS(5); // 5ms loop for smooth UI
