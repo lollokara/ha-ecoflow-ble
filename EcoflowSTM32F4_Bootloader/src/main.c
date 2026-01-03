@@ -114,9 +114,9 @@ int main(void) {
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
     debug_log("OTA Flag: %d (RTC_BKP0R=0x%08X)\r\n", ota_flag, RTC->BKP0R);
 
-    // Check App Validity
+    // Check App Validity (Check if SP is in RAM 0x20000000 - 0x20050000)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-    bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x20050000);
     debug_log("App SP: 0x%08X, Valid: %d\r\n", sp, valid_app);
 
     if (ota_flag) {
@@ -166,12 +166,12 @@ uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
 }
 
 void send_ack() {
-    debug_log("TX ACK\r\n");
+    // Remove blocking logs and delays here!
     uint8_t buf[4] = {START_BYTE, CMD_OTA_ACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Green Flash
-    LED_G_On(); HAL_Delay(50); LED_G_Off();
+    // Fast Toggle - NO DELAY
+    LED_G_Toggle();
 }
 
 void send_nack() {
@@ -179,8 +179,7 @@ void send_nack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_NACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Red Flash
-    LED_R_On(); HAL_Delay(500); LED_R_Off();
+    LED_R_Toggle();
 }
 
 void ClearFlashFlags() {
@@ -223,7 +222,7 @@ void Bootloader_OTA_Loop(void) {
     uint32_t bytes_written = 0;
 
     while(1) {
-        // Heartbeat: Blue Toggle
+        // Heartbeat: Blue Toggle (Non-blocking)
         static uint32_t last_tick = 0;
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
             LED_B_Toggle();
@@ -244,10 +243,8 @@ void Bootloader_OTA_Loop(void) {
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
-        // debug_log("RX CMD: 0x%02X LEN: %d\r\n", cmd, len);
-
         if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
-            debug_log("Payload Timeout\r\n");
+            debug_log("Payload Timeout. CMD: 0x%02X LEN: %d\r\n", cmd, len);
             LED_O_Off(); continue;
         }
 
@@ -304,8 +301,6 @@ void Bootloader_OTA_Loop(void) {
             memcpy(&offset, payload, 4);
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
-
-            // debug_log("CMD_OTA_CHUNK Offset: %d Len: %d\r\n", offset, data_len);
 
             // Write to Inactive Bank
             uint32_t addr = target_bank_addr + offset;
