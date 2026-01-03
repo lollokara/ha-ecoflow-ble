@@ -586,6 +586,21 @@ void Bootloader_OTA_Loop(void) {
 
             __enable_irq();
 
+            // Verify if BFB2 bit actually changed
+            uint32_t new_optcr = FLASH->OPTCR;
+            bool new_bfb2 = (new_optcr & FLASH_OPTCR_BFB2);
+            if (new_bfb2 != !bfb2_active) {
+                 Serial_Log("ERROR: OPTCR Write Failed! Readback: 0x%08X", new_optcr);
+                 // Check Error Flags
+                 if (FLASH->SR & (FLASH_SR_WRPERR | FLASH_SR_PGAERR | FLASH_SR_PGPERR | FLASH_SR_PGSERR)) {
+                     Serial_Log("Flash Error Flags Set: 0x%08X", FLASH->SR);
+                 }
+                 // Try HAL_FLASH_OB_Launch to be safe?
+                 HAL_FLASH_OB_Launch();
+            } else {
+                 Serial_Log("OPTCR Update Success. BFB2 is now %d.", new_bfb2);
+            }
+
             Serial_Log("OB Launch Completed. Resetting...");
             HAL_Delay(100);
             HAL_NVIC_SystemReset();
