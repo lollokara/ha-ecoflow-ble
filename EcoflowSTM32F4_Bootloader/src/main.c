@@ -230,18 +230,18 @@ int main(void) {
     __DSB(); // Data Synchronization Barrier
 
     HAL_Init();
+    SystemClock_Config(); // Clock init first for correct speed (180MHz)
     GPIO_Init();
 
     // 1. Startup Sequence with Software Delay
     // This verifies CPU execution INDEPENDENT of SysTick.
     // If these blink but subsequent HAL_Delay fails, we know it's SysTick.
-    // Delay increased to ~10M iterations for visibility (~50-100ms at 180MHz)
+    // Delay increased to ~10M iterations for visibility (~200ms at 180MHz)
     LED_B_On(); Software_Delay(10000000); LED_B_Off();
     LED_O_On(); Software_Delay(10000000); LED_O_Off();
     LED_R_On(); Software_Delay(10000000); LED_R_Off();
     LED_G_On(); Software_Delay(10000000); LED_G_Off();
 
-    SystemClock_Config();
     UART_Init();
     USART3_Init();
     MX_IWDG_Init(); // Init Watchdog
