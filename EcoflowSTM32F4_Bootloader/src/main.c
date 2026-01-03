@@ -383,9 +383,8 @@ void Bootloader_OTA_Loop(void) {
     All_LEDs_Off();
 
     // Determine Active Bank and Target Bank
-    FLASH_OBProgramInitTypeDef OBInit;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
-    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
+    // Directly read OPTCR to avoid HAL interpretation issues
+    bool bfb2_active = ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
     // Target Inactive Bank
     // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
@@ -461,8 +460,13 @@ void Bootloader_OTA_Loop(void) {
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+            // Use Voltage Range 2 (x16) to be safe against PGPERR even at 3.3V
+            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_2;
             EraseInitStruct.NbSectors = 1;
+
+            if (HAL_FLASH_Unlock() != HAL_OK) {
+                Serial_Log("Flash Unlock Failed! CR: 0x%X", FLASH->CR);
+            }
 
             ClearFlashFlags(); // Clear flags before Erase
 
@@ -475,7 +479,7 @@ void Bootloader_OTA_Loop(void) {
                 EraseInitStruct.Sector = sec;
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                    Serial_Log("Erase Error at Sector %d", sec);
+                    Serial_Log("Erase Err Sec %d. SR:0x%X Err:0x%X", sec, FLASH->SR, HAL_FLASH_GetError());
                     error = true; break;
                 }
             }
