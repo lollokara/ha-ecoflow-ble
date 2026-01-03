@@ -216,15 +216,30 @@ void Serial_Log(const char* fmt, ...) {
     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
 }
 
+// Simple Software Delay (Approximate)
+// At 16MHz (HSI default before PLL), 1 loop is approx 4-5 cycles?
+// Let's just use a large number.
+void Software_Delay(uint32_t count) {
+    for (volatile uint32_t i = 0; i < count * 2000; i++) {
+        __NOP();
+    }
+}
+
 int main(void) {
+    // 0. Set Vector Table Offset immediately
+    // When booting from Bank 2, Hardware remaps 0x08100000 to 0x00000000/0x08000000
+    // So we should always point VTOR to 0x08000000 (the active alias)
+    SCB->VTOR = 0x08000000;
+    __DSB();
+
     HAL_Init();
     GPIO_Init();
 
-    // 1. Startup Sequence
-    LED_B_On(); HAL_Delay(100); LED_B_Off();
-    LED_O_On(); HAL_Delay(100); LED_O_Off();
-    LED_R_On(); HAL_Delay(100); LED_R_Off();
-    LED_G_On(); HAL_Delay(100); LED_G_Off();
+    // 1. Startup Sequence - Use Software Delay to prevent SysTick Hangs
+    LED_B_On(); Software_Delay(100); LED_B_Off();
+    LED_O_On(); Software_Delay(100); LED_O_Off();
+    LED_R_On(); Software_Delay(100); LED_R_Off();
+    LED_G_On(); Software_Delay(100); LED_G_Off();
 
     SystemClock_Config();
     UART_Init();
