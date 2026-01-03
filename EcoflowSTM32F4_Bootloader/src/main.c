@@ -177,30 +177,49 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
 
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
-    // CRITICAL: Reset RCC to HSI and disable PLL before jumping
-    // This prevents the Application's SystemClock_Config from hanging
-    // MUST be called BEFORE __disable_irq() because it relies on HAL_GetTick() (SysTick) for timeouts!
-    HAL_RCC_DeInit();
-
-    HAL_UART_DeInit(&huart6);
-    HAL_UART_DeInit(&huart3);
-
-    // De-init LEDs
-    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
-    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
-    HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
-
-    HAL_DeInit();
-
+    // 1. Disable SysTick
     SysTick->CTRL = 0;
     SysTick->LOAD = 0;
     SysTick->VAL  = 0;
 
+    // 2. De-init Peripherals (HAL)
+    HAL_UART_DeInit(&huart6);
+    HAL_UART_DeInit(&huart3);
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
+    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
+    HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
+
+    HAL_DeInit(); // De-inits HAL internal structs
+
+    // 3. Manual RCC Reset (Replaces HAL_RCC_DeInit to avoid HAL dependencies/timeouts)
+    // Enable HSI
+    RCC->CR |= RCC_CR_HSION;
+    while(!(RCC->CR & RCC_CR_HSIRDY)); // Wait for HSI Ready
+
+    // Select HSI as SYSCLK
+    RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_SW)) | RCC_CFGR_SW_HSI;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI); // Wait for switch
+
+    // Disable PLL, HSE
+    RCC->CR &= ~(RCC_CR_PLLON | RCC_CR_HSEON);
+
+    // Reset CFGR (Prescalers etc)
+    RCC->CFGR = 0;
+
+    // Disable all RCC Interrupts
+    RCC->CIR = 0;
+
+    // 4. Disable Core Interrupts
     __disable_irq();
+
+    // 5. Clear NVIC (Enabled & Pending)
     for (int i = 0; i < 8; i++) {
         NVIC->ICER[i] = 0xFFFFFFFF;
         NVIC->ICPR[i] = 0xFFFFFFFF;
     }
+
+    // 6. Clear SysTick Pending
+    SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
 }
 
 // LED Helpers

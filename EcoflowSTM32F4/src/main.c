@@ -282,6 +282,10 @@ int main(void) {
     SCB->VTOR = 0x08008000;
     __DSB();
 
+    // Early Watchdog Kick (just in case)
+    // IWDG is already running from Bootloader
+    IWDG->KR = 0xAAAA;
+
     // 1. Initialize HAL (Configures SysTick, Priority Grouping)
     // Note: SysTick will NOT fire yet because interrupts are disabled by Bootloader.
     HAL_Init();
