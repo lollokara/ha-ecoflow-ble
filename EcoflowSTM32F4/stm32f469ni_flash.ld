@@ -47,9 +47,10 @@ MEMORY
 {
   RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 320K
   CCMRAM (xrw)   : ORIGIN = 0x10000000, LENGTH = 64K
-  /* Bank 1 Start + 32KB Offset (Sectors 0 and 1 Reserved for Bootloader/Config) */
-  /* Length restricted to 1MB - 32KB to fit in single bank */
+  /* VMA: Aliased Address + Offset (0x00008000) */
   FLASH (rx)     : ORIGIN = 0x00008000, LENGTH = 1024K - 32K
+  /* LMA: Physical Address + Offset (0x08008000) */
+  FLASH_PHYS (rx): ORIGIN = 0x08008000, LENGTH = 1024K - 32K
 }
 
 /* Sections */
@@ -61,7 +62,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -78,7 +79,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -87,14 +88,14 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH AT> FLASH_PHYS
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   .preinit_array     :
   {
@@ -103,7 +104,7 @@ SECTIONS
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   .init_array :
   {
@@ -113,7 +114,7 @@ SECTIONS
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   .fini_array :
   {
@@ -123,10 +124,13 @@ SECTIONS
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH AT> FLASH_PHYS
 
   /* used by the startup to initialize data */
-  _sidata = LOADADDR(.data);
+  /* _sidata = LOADADDR(.data); */
+  /* Fix for Dual Bank: Use Aliased Address for copy source */
+  /* FLASH_PHYS (0x08008000) - 0x08000000 = 0x00008000 (FLASH) approx offset base */
+  _sidata = LOADADDR(.data) - 0x08000000;
 
   /* Initialized data sections goes into RAM, load LMA copy after code */
   .data :
@@ -138,7 +142,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM AT> FLASH_PHYS
 
   /* Uninitialized data section */
   . = ALIGN(4);
