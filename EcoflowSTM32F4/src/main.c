@@ -282,10 +282,14 @@ int main(void) {
     SCB->VTOR = 0x08008000;
     __DSB();
 
-    // Enable Interrupts (Bootloader disables them)
+    // 1. Initialize HAL (Configures SysTick, Priority Grouping)
+    // Note: SysTick will NOT fire yet because interrupts are disabled by Bootloader.
+    HAL_Init();
+
+    // 2. Enable Interrupts (Required for SystemClock_Config timeouts)
     __enable_irq();
 
-    HAL_Init();
+    // 3. Configure Clock (Uses HAL_GetTick timeouts)
     SystemClock_Config();
 
     // Reset Boot Counter after successful boot

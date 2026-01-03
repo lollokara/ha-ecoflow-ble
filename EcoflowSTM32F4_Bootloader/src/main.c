@@ -177,6 +177,11 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
 
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
+    // CRITICAL: Reset RCC to HSI and disable PLL before jumping
+    // This prevents the Application's SystemClock_Config from hanging
+    // MUST be called BEFORE __disable_irq() because it relies on HAL_GetTick() (SysTick) for timeouts!
+    HAL_RCC_DeInit();
+
     HAL_UART_DeInit(&huart6);
     HAL_UART_DeInit(&huart3);
 
@@ -185,20 +190,17 @@ void DeInit(void) {
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
     HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
 
+    HAL_DeInit();
+
     SysTick->CTRL = 0;
     SysTick->LOAD = 0;
     SysTick->VAL  = 0;
+
     __disable_irq();
     for (int i = 0; i < 8; i++) {
         NVIC->ICER[i] = 0xFFFFFFFF;
         NVIC->ICPR[i] = 0xFFFFFFFF;
     }
-
-    // CRITICAL: Reset RCC to HSI and disable PLL before jumping
-    // This prevents the Application's SystemClock_Config from hanging
-    HAL_RCC_DeInit();
-
-    HAL_DeInit();
 }
 
 // LED Helpers
