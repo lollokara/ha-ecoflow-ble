@@ -1,6 +1,7 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 // UART Protocol
 #define START_BYTE 0xAA
@@ -18,7 +19,8 @@
 
 #define OTA_FLAG 0xDEADBEEF
 
-UART_HandleTypeDef huart6;
+UART_HandleTypeDef huart6; // OTA
+UART_HandleTypeDef huart3; // Debug
 IWDG_HandleTypeDef hiwdg;
 
 typedef void (*pFunction)(void);
@@ -27,6 +29,7 @@ uint32_t JumpAddress;
 
 void SystemClock_Config(void);
 void UART_Init(void);
+void USART3_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 
@@ -39,9 +42,16 @@ static void MX_IWDG_Init(void) {
     }
 }
 
+// Retarget printf to USART3
+int _write(int file, char *ptr, int len) {
+    HAL_UART_Transmit(&huart3, (uint8_t*)ptr, len, 100);
+    return len;
+}
+
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
     HAL_UART_DeInit(&huart6);
+    HAL_UART_DeInit(&huart3);
     // De-init LEDs
     HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
@@ -98,7 +108,15 @@ int main(void) {
 
     SystemClock_Config();
     UART_Init();
+    USART3_Init();
     MX_IWDG_Init();
+
+    printf("\n\n=== Bootloader Started ===\n");
+    if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+        printf("Bank 2 is Active (BFB2 Set)\n");
+    } else {
+        printf("Bank 1 is Active (BFB2 Clear)\n");
+    }
 
     // Enable Backup Access for RTC Flag
     __HAL_RCC_PWR_CLK_ENABLE();
@@ -106,6 +124,7 @@ int main(void) {
 
     // Check OTA Flag in RTC Backup Register 0
     if (RTC->BKP0R == OTA_FLAG) {
+        printf("OTA Flag Detected. Entering OTA Mode.\n");
         // Clear flag
         RTC->BKP0R = 0;
         // Enter OTA Mode
@@ -118,17 +137,21 @@ int main(void) {
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
     if (valid_app) {
+        printf("Valid App found at 0x%08X (SP=0x%08X)\n", app_addr, sp);
         // Wait 500ms for OTA START - Blink Blue
         uint8_t buf[1];
         LED_B_On();
+        // Peek at UART
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
+                printf("Start Byte Received during wait. Entering OTA Mode.\n");
                 Bootloader_OTA_Loop();
             }
         }
         LED_B_Off();
 
         // Jump - Green ON
+        printf("Jumping to Application...\n");
         LED_G_On();
         DeInit();
 
@@ -137,6 +160,7 @@ int main(void) {
         __set_MSP(sp);
         JumpToApplication();
     } else {
+        printf("No Valid App (SP=0x%08X). Entering OTA Mode.\n", sp);
         // No valid app, force OTA
         Bootloader_OTA_Loop();
     }
@@ -175,6 +199,8 @@ void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256];
 
+    printf("=== OTA Loop Active ===\n");
+
     HAL_FLASH_Unlock();
     All_LEDs_Off();
 
@@ -197,12 +223,14 @@ void Bootloader_OTA_Loop(void) {
         LED_O_On();
 
         if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) {
+            printf("RX Error: Header timeout\n");
             LED_O_Off(); continue;
         }
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
         if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
+             printf("RX Error: Payload timeout\n");
             LED_O_Off(); continue;
         }
 
@@ -215,21 +243,36 @@ void Bootloader_OTA_Loop(void) {
         memcpy(&check_buf[2], payload, len);
 
         if (calculate_crc8(check_buf, 2 + len) != recv_crc) {
+            printf("CRC Mismatch! CMD=0x%02X\n", cmd);
             send_nack(); continue;
         }
 
         if (cmd == CMD_OTA_START) {
+            printf("CMD_OTA_START Received.\n");
             ota_started = true;
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-            // Target Inactive Bank
-            // In Dual Bank mode, the Inactive Bank is always aliased to 0x08100000 (Sectors 12-23)
-            // regardless of BFB2 state, due to hardware remapping.
-            uint32_t start_sec = FLASH_SECTOR_12;
-            uint32_t end_sec = FLASH_SECTOR_23;
+            // Determine Target Physical Sectors based on BFB2
+            // Note: Writes target the alias 0x08100000, but Erase requires Physical Sector IDs.
+            uint32_t start_sec, end_sec;
+
+            FLASH_OBProgramInitTypeDef OBInit;
+            HAL_FLASHEx_OBGetConfig(&OBInit);
+
+            if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+                // Bank 2 is Active (Aliased to 0x0800). Inactive is Bank 1 (Physical Sectors 0-11).
+                printf("BFB2 Set (Bank 2 Active). Erasing Physical Bank 1 (Sectors 0-11).\n");
+                start_sec = FLASH_SECTOR_0;
+                end_sec = FLASH_SECTOR_11;
+            } else {
+                // Bank 1 is Active (Aliased to 0x0800). Inactive is Bank 2 (Physical Sectors 12-23).
+                printf("BFB2 Clear (Bank 1 Active). Erasing Physical Bank 2 (Sectors 12-23).\n");
+                start_sec = FLASH_SECTOR_12;
+                end_sec = FLASH_SECTOR_23;
+            }
 
             EraseInitStruct.NbSectors = 1;
 
@@ -243,6 +286,7 @@ void Bootloader_OTA_Loop(void) {
                                        FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                    printf("Erase Error at Sector %d. Code: 0x%08X\n", (int)sec, (unsigned int)SectorError);
                     error = true; break;
                 }
 
@@ -250,7 +294,12 @@ void Bootloader_OTA_Loop(void) {
                  HAL_IWDG_Refresh(&hiwdg);
             }
 
-            if (!error) send_ack(); else send_nack();
+            if (!error) {
+                printf("Erase Complete.\n");
+                send_ack();
+            } else {
+                send_nack();
+            }
             LED_O_Off();
         }
         else if (cmd == CMD_OTA_CHUNK) {
@@ -265,6 +314,11 @@ void Bootloader_OTA_Loop(void) {
             // Write Address (Assumes factory_firmware.bin starts at offset 0 of the bank)
             uint32_t addr = base_addr + offset;
 
+            // Log every 4KB (arbitrary reduction to avoid spam)
+            if (offset % 4096 == 0) {
+                 printf("Writing Chunk: Offset=%d Addr=0x%08X Len=%d\n", (int)offset, (unsigned int)addr, data_len);
+            }
+
             bool ok = true;
             for (uint32_t i=0; i<data_len; i+=4) {
                 uint32_t word = 0xFFFFFFFF;
@@ -272,28 +326,35 @@ void Bootloader_OTA_Loop(void) {
                 memcpy(&word, &data[i], copy_len);
 
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
+                    printf("Write Error at 0x%08X\n", (unsigned int)(addr+i));
                     ok = false; break;
                 }
             }
             if (ok) send_ack(); else send_nack();
         }
         else if (cmd == CMD_OTA_END) {
+             printf("CMD_OTA_END Received. Verifying...\n");
              // Verify the written bank
              uint32_t base_addr = 0x08100000;
 
             // Simple Verification: Check if App Stack Pointer is valid at target
             // App is at +0x8000 in the bank
             uint32_t app_sp = *(__IO uint32_t*)(base_addr + 0x8000);
+            printf("Target App SP: 0x%08X\n", app_sp);
+
             if ((app_sp & 0x2FFE0000) == 0x20000000) {
+                 printf("Verification Successful. Sending ACK.\n");
                  send_ack();
                  All_LEDs_Off();
                  LED_G_On(); // Green Solid (Success)
             } else {
+                 printf("Verification Failed.\n");
                  send_nack();
                  LED_R_On(); // Red Solid (Fail)
             }
         }
         else if (cmd == CMD_OTA_APPLY) {
+            printf("CMD_OTA_APPLY Received. Swapping Bank.\n");
             send_ack();
             HAL_Delay(100);
 
@@ -305,8 +366,10 @@ void Bootloader_OTA_Loop(void) {
 
             // Toggle the bit
             if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+                printf("Disabling BFB2 (Switch to Bank 1)\n");
                 OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Set to Bank 1
             } else {
+                printf("Enabling BFB2 (Switch to Bank 2)\n");
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2;  // Set to Bank 2
             }
 
@@ -316,6 +379,9 @@ void Bootloader_OTA_Loop(void) {
 
             // Should not reach here
             HAL_NVIC_SystemReset();
+        }
+        else {
+             printf("Unknown CMD: 0x%02X\n", cmd);
         }
     }
 }
@@ -341,6 +407,29 @@ void UART_Init(void) {
     huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart6);
+}
+
+void USART3_Init(void) {
+    __HAL_RCC_USART3_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11; // TX, RX
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    huart3.Instance = USART3;
+    huart3.Init.BaudRate = 115200;
+    huart3.Init.WordLength = UART_WORDLENGTH_8B;
+    huart3.Init.StopBits = UART_STOPBITS_1;
+    huart3.Init.Parity = UART_PARITY_NONE;
+    huart3.Init.Mode = UART_MODE_TX_RX;
+    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart3);
 }
 
 void GPIO_Init(void) {
