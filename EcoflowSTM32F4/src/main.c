@@ -277,6 +277,11 @@ int main(void) {
 
     HAL_Init();
     SystemClock_Config();
+
+    // Notify Bootloader of successful boot by clearing Retry Counter
+    HAL_PWR_EnableBkUpAccess();
+    RTC->BKP1R = 0; // Clear Retry Counter
+
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();

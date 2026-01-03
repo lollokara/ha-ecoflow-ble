@@ -43,7 +43,7 @@ void SystemClock_Config(void);
 void UART_Init(void);
 void USART3_Init(void);
 void GPIO_Init(void);
-void Bootloader_OTA_Loop(void);
+void Bootloader_OTA_Loop(bool recovery_mode);
 void Serial_Log(const char* fmt, ...);
 
 // --- Ring Buffer Implementation ---
@@ -232,45 +232,55 @@ int main(void) {
     HAL_PWR_EnableBkUpAccess();
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
 
-    // Check App Validity
+    // Retry Counter Logic
+    if (ota_flag) {
+        RTC->BKP1R = 0; // Reset retry counter if manual OTA requested
+    } else {
+        RTC->BKP1R++; // Increment retry counter
+    }
+
+    // Check App Validity (Range Check)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-    bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x20050000);
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");
         // Clear flag
         RTC->BKP0R = 0;
-        Bootloader_OTA_Loop();
+        Bootloader_OTA_Loop(false);
     } else if (valid_app) {
-        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
-        uint8_t buf[1];
-        LED_B_On();
+        // Check for too many retries
+        if (RTC->BKP1R > 3) {
+            Serial_Log("Max Retries Exceeded (%d). Entering Recovery.", RTC->BKP1R);
+            Bootloader_OTA_Loop(true); // Recovery Mode (Red Flash)
+        } else {
+            // Wait 500ms for OTA START - Blink Blue (Scenario 1)
+            uint8_t buf[1];
+            LED_B_On();
 
-        // Use non-blocking read for start byte check
-        // Note: IRQs not yet enabled by rb_init, but HAL_UART_Receive works if no IRQ enabled
-        // Actually, we initialized UART with interrupts in mind but haven't started them.
-        // Let's rely on standard receive here for simplicity before loop.
-        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
-            if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 Bootloader_OTA_Loop();
+            // Use non-blocking read for start byte check
+            if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
+                if (buf[0] == START_BYTE) {
+                     Serial_Log("OTA Byte received on boot.");
+                     Bootloader_OTA_Loop(false);
+                }
             }
+            LED_B_Off();
+
+            // Jump - Green ON
+            LED_G_On();
+            Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
+            DeInit();
+
+            JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+            JumpToApplication = (pFunction) JumpAddress;
+            __set_MSP(sp);
+            JumpToApplication();
         }
-        LED_B_Off();
-
-        // Jump - Green ON
-        LED_G_On();
-        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
-        DeInit();
-
-        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
-        JumpToApplication = (pFunction) JumpAddress;
-        __set_MSP(sp);
-        JumpToApplication();
     } else {
-        // No valid app, force OTA
-        Serial_Log("No valid app found. Entering OTA Loop.");
-        Bootloader_OTA_Loop();
+        // No valid app, force OTA Recovery
+        Serial_Log("No valid app found (SP=0x%08X). Entering OTA Loop.", sp);
+        Bootloader_OTA_Loop(true); // Recovery Mode (Red Flash)
     }
 
     while (1) {}
@@ -308,7 +318,7 @@ void ClearFlashFlags() {
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
 }
 
-void Bootloader_OTA_Loop(void) {
+void Bootloader_OTA_Loop(bool recovery_mode) {
     uint8_t header[3];
     uint8_t payload[256];
 
@@ -349,10 +359,16 @@ void Bootloader_OTA_Loop(void) {
     uint32_t chunks_received = 0;
 
     while(1) {
-        // Heartbeat: Blue Toggle
+        // Heartbeat
         static uint32_t last_tick = 0;
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
-            LED_B_Toggle();
+            if (recovery_mode && !ota_started) {
+                // Red Toggle in Recovery Mode
+                LED_R_Toggle();
+            } else {
+                // Blue Toggle in Normal Mode or during OTA
+                LED_B_Toggle();
+            }
             last_tick = HAL_GetTick();
         }
 
@@ -391,6 +407,10 @@ void Bootloader_OTA_Loop(void) {
         if (cmd == CMD_OTA_START) {
             Serial_Log("OTA Start");
             ota_started = true;
+            // Stop Recovery Mode blinking if started
+            recovery_mode = false;
+            LED_R_Off();
+
             bytes_written = 0;
             chunks_received = 0;
             checksum_verified = false;
