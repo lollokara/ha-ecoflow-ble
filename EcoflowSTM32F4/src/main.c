@@ -28,6 +28,7 @@
 
 // External Handles
 extern UART_HandleTypeDef huart6;
+extern void xPortSysTickHandler(void);
 
 // Local Handles
 UART_HandleTypeDef huart3;

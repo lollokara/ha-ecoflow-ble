@@ -60,6 +60,7 @@ to exclude the API function. */
 #define INCLUDE_vTaskSuspend			1
 #define INCLUDE_vTaskDelayUntil			1
 #define INCLUDE_vTaskDelay				1
+#define INCLUDE_xTaskGetSchedulerState  1
 
 /* Cortex-M specific definitions. */
 #ifdef __NVIC_PRIO_BITS
@@ -91,17 +92,9 @@ standard names. */
 #define vPortSVCHandler    SVC_Handler
 #define xPortPendSVHandler PendSV_Handler
 
-/* IMPORTANT: SysTick is handled by HAL, so we need to be careful.
-   However, FreeRTOS expects to handle SysTick.
-   Usually in STM32Cube + FreeRTOS, we use a different timer for HAL timebase,
-   or we let FreeRTOS hook into SysTick.
-   Since we are not using CubeMX to generate code, we need to map xPortSysTickHandler.
-   Standard approach: Let FreeRTOS handle SysTick_Handler.
-   But HAL needs a tick too.
-   Implementation in main.c usually overrides SysTick_Handler to call both
-   or we configure HAL to use a different timer.
-   For simplicity, let's map it here and see if we can chain them or use the hook.
+/* IMPORTANT: SysTick is handled manually in main.c to support both HAL and FreeRTOS.
+   Do NOT map xPortSysTickHandler to SysTick_Handler here.
 */
-#define xPortSysTickHandler SysTick_Handler
+// #define xPortSysTickHandler SysTick_Handler
 
 #endif /* FREERTOS_CONFIG_H */
