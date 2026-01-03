@@ -88,20 +88,13 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */
-#define vPortSVCHandler    SVC_Handler
-#define xPortPendSVHandler PendSV_Handler
+// #define vPortSVCHandler    SVC_Handler
+// #define xPortPendSVHandler PendSV_Handler
 
 /* IMPORTANT: SysTick is handled by HAL, so we need to be careful.
-   However, FreeRTOS expects to handle SysTick.
-   Usually in STM32Cube + FreeRTOS, we use a different timer for HAL timebase,
-   or we let FreeRTOS hook into SysTick.
-   Since we are not using CubeMX to generate code, we need to map xPortSysTickHandler.
-   Standard approach: Let FreeRTOS handle SysTick_Handler.
-   But HAL needs a tick too.
-   Implementation in main.c usually overrides SysTick_Handler to call both
-   or we configure HAL to use a different timer.
-   For simplicity, let's map it here and see if we can chain them or use the hook.
+   We disable the mapping here so we can implement the handlers in main.c
+   and chain HAL_IncTick with xPortSysTickHandler manually.
 */
-#define xPortSysTickHandler SysTick_Handler
+// #define xPortSysTickHandler SysTick_Handler
 
 #endif /* FREERTOS_CONFIG_H */
