@@ -156,43 +156,28 @@ void send_nack() {
     LED_R_On(); HAL_Delay(500); LED_R_Off();
 }
 
+void ClearFlashFlags() {
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
+}
+
 void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256];
 
     HAL_FLASH_Unlock();
+    ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
     // Determine Active Bank and Target Bank
-    // If BFB2 is SET (1), we are booted from Bank 2 (Sectors 12-23), Target is Bank 1 (Sectors 0-11)
-    // If BFB2 is RESET (0), we are booted from Bank 1 (Sectors 0-11), Target is Bank 2 (Sectors 12-23)
     FLASH_OBProgramInitTypeDef OBInit;
     HAL_FLASHEx_OBGetConfig(&OBInit);
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
-    // If booted from Bank 2 (Active), writes map to 0x08000000 (which is physically Bank 2).
-    // So 0x08100000 maps to Bank 1 (Inactive).
-    // If booted from Bank 1 (Active), writes map to 0x08000000 (which is physically Bank 1).
-    // So 0x08100000 maps to Bank 2 (Inactive).
-    //
-    // Thus, the Inactive Bank is ALWAYS at 0x08100000 from the CPU's perspective,
-    // provided that the mapping swaps the banks.
-    //
-    // Let's verify STM32F469 mapping:
-    // When BFB2 is set, Bank 2 is aliased at 0x0000 0000 and 0x0800 0000.
-    // Bank 1 is available at 0x0810 0000.
-    // When BFB2 is reset, Bank 1 is at 0x0000 0000 and 0x0800 0000.
-    // Bank 2 is at 0x0810 0000.
-    //
-    // CONCLUSION: We always write to 0x08100000 to target the INACTIVE bank.
+    // Target Inactive Bank
+    // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
+    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
     uint32_t target_bank_addr = 0x08100000;
-
-    // However, for ERASING, we must specify the SECTORS.
-    // Sectors 0-11 are ALWAYS Physical Bank 1.
-    // Sectors 12-23 are ALWAYS Physical Bank 2.
-    //
-    // If BFB2=0 (Active Bank 1), Inactive is Bank 2 -> Erase Sectors 12-23.
-    // If BFB2=1 (Active Bank 2), Inactive is Bank 1 -> Erase Sectors 0-11.
 
     uint32_t start_sector, end_sector;
     if (bfb2_active) {
@@ -253,21 +238,25 @@ void Bootloader_OTA_Loop(void) {
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
             EraseInitStruct.NbSectors = 1;
 
+            ClearFlashFlags(); // Clear flags before Erase
+
             bool error = false;
             // Erase the ENTIRE Inactive Bank (Bootloader area included)
             for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
                 LED_O_Toggle(); // Toggle Orange during erase
                 EraseInitStruct.Sector = sec;
 
-                // Refresh IWDG
-                // HAL_IWDG_Refresh(&hiwdg);
-
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
                     error = true; break;
                 }
             }
 
-            if (!error) send_ack(); else send_nack();
+            if (!error) {
+                ClearFlashFlags(); // Clear flags after Erase, before Write
+                send_ack();
+            } else {
+                send_nack();
+            }
             LED_O_Off();
         }
         else if (cmd == CMD_OTA_CHUNK) {
@@ -277,9 +266,6 @@ void Bootloader_OTA_Loop(void) {
             uint32_t data_len = len - 4;
 
             // Write to Inactive Bank
-            // offset is from 0 of the binary.
-            // factory_firmware.bin usually starts at 0x08000000 (Sector 0)
-            // So we write to target_bank_addr + offset.
             uint32_t addr = target_bank_addr + offset;
 
             bool ok = true;
