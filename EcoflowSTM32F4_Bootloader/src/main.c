@@ -1,3 +1,8 @@
+// Ensure HSE_VALUE is defined correctly before HAL inclusion
+#ifndef HSE_VALUE
+#define HSE_VALUE 8000000
+#endif
+
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdbool.h>
@@ -325,7 +330,21 @@ void ClearFlashFlags() {
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
 }
 
+// Bit 30: DB1M (0=Dual Bank, 1=Single Bank)
+#ifndef FLASH_OPTCR_DB1M
+#define FLASH_OPTCR_DB1M (1 << 30)
+#endif
+
 void Bootloader_OTA_Loop(void) {
+    // Check for Single Bank Mode (DB1M=1)
+    if (FLASH->OPTCR & FLASH_OPTCR_DB1M) {
+        Serial_Log("CRITICAL WARNING: DB1M bit is SET (Single Bank Mode).");
+        Serial_Log("Dual Bank OTA will NOT work reliably.");
+        Serial_Log("Please use STM32CubeProgrammer to clear DB1M (Uncheck 'DB1M').");
+        // We do not abort, but we warn heavily.
+        // Flash SOS pattern on Orange LED
+        for(int i=0; i<5; i++) { LED_O_Toggle(); HAL_Delay(200); }
+    }
     uint8_t header[3];
     uint8_t payload[256];
 
@@ -519,23 +538,41 @@ void Bootloader_OTA_Loop(void) {
             RTC->BKP1R = 0;
 
             // Toggle BFB2
+            ClearFlashFlags(); // Clear flags before OB operations
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
-            FLASH_OBProgramInitTypeDef OBInit;
-            HAL_FLASHEx_OBGetConfig(&OBInit);
 
-            // Toggle
-            OBInit.OptionType = OPTIONBYTE_USER;
+            // Manual Option Byte Modification
+            uint32_t optcr = FLASH->OPTCR;
+            Serial_Log("Current OPTCR: 0x%08X", optcr);
+
+            // Toggle BFB2 (Bit 4)
             if (bfb2_active) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
+                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 1)
             } else {
-                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
+                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 2)
             }
 
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
+            // Ensure OPTSTRT is cleared before writing
+            optcr &= ~FLASH_OPTCR_OPTSTRT;
 
-            // Should not reach here
+            Serial_Log("Writing OPTCR: 0x%08X", optcr);
+
+            __disable_irq();
+
+            // 1. Write the new value
+            FLASH->OPTCR = optcr;
+
+            // 2. Set OPTSTRT to commit
+            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+            // 3. Wait for BSY
+            while (FLASH->SR & FLASH_SR_BSY);
+
+            __enable_irq();
+
+            Serial_Log("OB Launch Completed. Resetting...");
+            HAL_Delay(100);
             HAL_NVIC_SystemReset();
         }
     }
