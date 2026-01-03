@@ -49,7 +49,7 @@ MEMORY
   CCMRAM (xrw)   : ORIGIN = 0x10000000, LENGTH = 64K
   /* Bank 1 Start + 32KB Offset (Sectors 0 and 1 Reserved for Bootloader/Config) */
   /* Length restricted to 1MB - 32KB to fit in single bank */
-  FLASH (rx)     : ORIGIN = 0x08008000, LENGTH = 1024K - 32K
+  FLASH (rx)     : ORIGIN = 0x00008000, LENGTH = 1024K - 32K
 }
 
 /* Sections */
