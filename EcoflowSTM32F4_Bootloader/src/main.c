@@ -16,20 +16,6 @@
 #define CMD_OTA_ACK   0x06
 #define CMD_OTA_NACK  0x15
 
-// Register Definitions
-// For STM32F469/479, BFB2 is Bit 23. For F42xxx/43xxx, it is Bit 4.
-// PlatformIO board 'disco_f469ni' defines STM32F469xx.
-#if defined(STM32F469xx) || defined(STM32F479xx)
-    #ifndef FLASH_OPTCR_BFB2
-        #define FLASH_OPTCR_BFB2 (1 << 23)
-    #endif
-#else
-    // Fallback for F429/439 just in case (though we expect F469)
-    #ifndef FLASH_OPTCR_BFB2
-        #define FLASH_OPTCR_BFB2 (1 << 4)
-    #endif
-#endif
-
 // Ring Buffer Definition
 #define RING_BUFFER_SIZE 2048
 typedef struct {
@@ -40,6 +26,11 @@ typedef struct {
 
 RingBuffer rx_ring_buffer;
 uint8_t rx_byte_isr;
+
+// Register Definitions
+// For STM32F469, BFB2 is Bit 23.
+#undef FLASH_OPTCR_BFB2
+#define FLASH_OPTCR_BFB2 (1U << 23)
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
@@ -252,9 +243,6 @@ int main(void) {
         LED_B_On();
 
         // Use non-blocking read for start byte check
-        // Note: IRQs not yet enabled by rb_init, but HAL_UART_Receive works if no IRQ enabled
-        // Actually, we initialized UART with interrupts in mind but haven't started them.
-        // Let's rely on standard receive here for simplicity before loop.
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
                  Serial_Log("OTA Byte received on boot.");
@@ -328,9 +316,9 @@ void Bootloader_OTA_Loop(void) {
     All_LEDs_Off();
 
     // Determine Active Bank and Target Bank
-    FLASH_OBProgramInitTypeDef OBInit;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
-    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
+    // Use Direct Register Access to check BFB2 (Bit 23 on F469)
+    // FLASH->OPTCR
+    bool bfb2_active = (FLASH->OPTCR & FLASH_OPTCR_BFB2);
 
     // Target Inactive Bank
     // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
@@ -500,29 +488,39 @@ void Bootloader_OTA_Loop(void) {
             }
 
             Serial_Log("Applying Update...");
-            Serial_Log("Current USERConfig: 0x%02X, BFB2 Mask: 0x%08X", OBInit.USERConfig, FLASH_OPTCR_BFB2);
-
             send_ack();
             HAL_Delay(100);
 
-            // Toggle BFB2
+            // Unlock Option Bytes
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
-            // Get fresh config
-            HAL_FLASHEx_OBGetConfig(&OBInit);
 
-            // Toggle
-            OBInit.OptionType = OPTIONBYTE_USER;
+            uint32_t optcr = FLASH->OPTCR;
+            Serial_Log("Old OPTCR: 0x%08X", optcr);
+
+            // Toggle BFB2
             if (bfb2_active) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
+                optcr &= ~FLASH_OPTCR_BFB2; // Clear (Disable Bank 2 Boot -> Bank 1)
             } else {
-                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
+                optcr |= FLASH_OPTCR_BFB2;  // Set (Enable Bank 2 Boot)
             }
 
-            Serial_Log("New USERConfig: 0x%02X", OBInit.USERConfig);
+            // Program Option Bytes
+            // Note: We should strictly follow the programming sequence for OPTCR
+            // 1. Check no operation
+            // 2. Write OPTCR
+            // 3. Set OPTSTRT
+            // 4. Wait for BSY
 
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
+            FLASH->OPTCR = optcr;
+            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+            FLASH_WaitForLastOperation(1000);
+
+            Serial_Log("New OPTCR: 0x%08X", FLASH->OPTCR);
+
+            // Launch (System Reset)
+            HAL_FLASH_OB_Launch();
 
             // Should not reach here
             HAL_NVIC_SystemReset();
