@@ -39,13 +39,6 @@ typedef void (*pFunction)(void);
 pFunction JumpToApplication;
 uint32_t JumpAddress;
 
-void SystemClock_Config(void);
-void UART_Init(void);
-void USART3_Init(void);
-void GPIO_Init(void);
-void Bootloader_OTA_Loop(void);
-void Serial_Log(const char* fmt, ...);
-
 // --- Ring Buffer Implementation ---
 void rb_init(RingBuffer *rb) {
     rb->head = 0;
@@ -75,10 +68,6 @@ int rb_available(RingBuffer *rb) {
 }
 
 // --- Interrupt Handling ---
-// Override default HAL handler if weak, or just implement callback.
-// Since HAL_UART_IRQHandler calls HAL_UART_RxCpltCallback, we use that.
-// We must ensure the IRQ is enabled in NVIC.
-
 void USART6_IRQHandler(void) {
     HAL_UART_IRQHandler(&huart6);
 }
@@ -211,86 +200,115 @@ void Serial_Log(const char* fmt, ...) {
     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
 }
 
-int main(void) {
-    HAL_Init();
-    GPIO_Init();
+// System Clock Configuration
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-    // 1. Startup Sequence
-    LED_B_On(); HAL_Delay(100); LED_B_Off();
-    LED_O_On(); HAL_Delay(100); LED_O_Off();
-    LED_R_On(); HAL_Delay(100); LED_R_Off();
-    LED_G_On(); HAL_Delay(100); LED_G_Off();
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    SystemClock_Config();
-    UART_Init();
-    USART3_Init();
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 360;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLR = 2;
+  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+      while(1) { LED_R_On(); HAL_Delay(50); LED_R_Off(); HAL_Delay(50); }
+  }
 
-    Serial_Log("Bootloader Started. CRC & Logging Active.");
+  HAL_PWREx_EnableOverDrive();
 
-    // Enable Backup Access for OTA Flag and Boot Counter
-    __HAL_RCC_PWR_CLK_ENABLE();
-    HAL_PWR_EnableBkUpAccess();
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-    bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
-    uint32_t boot_fails = RTC->BKP1R;
+  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+}
 
-    // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
-    uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-    bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
+void SysTick_Handler(void)
+{
+  HAL_IncTick();
+}
 
-    if (ota_flag) {
-        Serial_Log("OTA Flag Detected.");
-        // Clear flag and boot counter
-        RTC->BKP0R = 0;
-        RTC->BKP1R = 0;
-        Bootloader_OTA_Loop();
-    } else if (valid_app) {
-        if (boot_fails >= 3) {
-            Serial_Log("Too many failed boots (%d). Forcing OTA.", boot_fails);
-            // Flash RED to indicate failure
-            for(int i=0; i<10; i++) { LED_R_Toggle(); HAL_Delay(100); }
-            RTC->BKP1R = 0; // Reset counter so we don't get stuck forever if they fix it? Or keep it?
-            // Actually, if we enter OTA and they don't upload, we might reboot.
-            // Let's reset it here, assuming they will upload.
-            // If they don't upload, next reboot will be attempt 0.
-            // If it crashes again 3 times, we come back here.
-            Bootloader_OTA_Loop();
-        }
+void UART_Init(void) {
+    __HAL_RCC_USART6_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
 
-        // Increment Boot Counter (App must clear it on success)
-        RTC->BKP1R = boot_fails + 1;
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
-        uint8_t buf[1];
-        LED_B_On();
+    huart6.Instance = USART6;
+    huart6.Init.BaudRate = 921600;
+    huart6.Init.WordLength = UART_WORDLENGTH_8B;
+    huart6.Init.StopBits = UART_STOPBITS_1;
+    huart6.Init.Parity = UART_PARITY_NONE;
+    huart6.Init.Mode = UART_MODE_TX_RX;
+    huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart6);
+}
 
-        // Use non-blocking read for start byte check
-        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
-            if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
-                 Bootloader_OTA_Loop();
-            }
-        }
-        LED_B_Off();
+void USART3_Init(void) {
+    __HAL_RCC_USART3_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-        // Jump - Green ON
-        LED_G_On();
-        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
-        DeInit();
+    // PB10 (TX), PB11 (RX)
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
-        JumpToApplication = (pFunction) JumpAddress;
-        __set_MSP(sp);
-        JumpToApplication();
-    } else {
-        // No valid app, force OTA
-        Serial_Log("No valid app found. Entering OTA Loop.");
-        RTC->BKP1R = 0;
-        Bootloader_OTA_Loop();
-    }
+    huart3.Instance = USART3;
+    huart3.Init.BaudRate = 115200;
+    huart3.Init.WordLength = UART_WORDLENGTH_8B;
+    huart3.Init.StopBits = UART_STOPBITS_1;
+    huart3.Init.Parity = UART_PARITY_NONE;
+    huart3.Init.Mode = UART_MODE_TX_RX;
+    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart3);
+}
 
-    while (1) {}
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOK_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // PG6 (Green)
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // PD4 (Orange), PD5 (Red)
+    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    // PK3 (Blue)
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
+
+    All_LEDs_Off();
 }
 
 uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
@@ -325,7 +343,7 @@ void ClearFlashFlags() {
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
 }
 
-void Bootloader_OTA_Loop(void) {
+void Bootloader_OTA_Loop(bool error_state) {
     uint8_t header[3];
     uint8_t payload[256];
 
@@ -364,13 +382,32 @@ void Bootloader_OTA_Loop(void) {
     bool checksum_verified = false;
     uint32_t bytes_written = 0;
     uint32_t chunks_received = 0;
+    uint32_t last_tick = HAL_GetTick();
 
     while(1) {
-        // Heartbeat: Blue Toggle
-        static uint32_t last_tick = 0;
-        if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
-            LED_B_Toggle();
-            last_tick = HAL_GetTick();
+        // Heartbeat logic
+        if (ota_started) {
+            // Fast Blue Blink when OTA active
+            if (HAL_GetTick() - last_tick > 200) {
+                LED_B_Toggle();
+                last_tick = HAL_GetTick();
+            }
+        } else {
+            // Idle State
+            if (error_state) {
+                // Red Flash for Error State
+                if (HAL_GetTick() - last_tick > 500) {
+                    LED_R_Toggle();
+                    last_tick = HAL_GetTick();
+                }
+                LED_B_Off();
+            } else {
+                // Blue Heartbeat for Normal State
+                if (HAL_GetTick() - last_tick > 1000) {
+                    LED_B_Toggle();
+                    last_tick = HAL_GetTick();
+                }
+            }
         }
 
         uint8_t b;
@@ -518,13 +555,14 @@ void Bootloader_OTA_Loop(void) {
             // Clear Boot Counter (BKP1R) for fresh start
             RTC->BKP1R = 0;
 
-            // Toggle BFB2
+            // Unlock Option Bytes
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
+
             FLASH_OBProgramInitTypeDef OBInit;
             HAL_FLASHEx_OBGetConfig(&OBInit);
 
-            // Toggle
+            // Toggle BFB2
             OBInit.OptionType = OPTIONBYTE_USER;
             if (bfb2_active) {
                 OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
@@ -532,121 +570,103 @@ void Bootloader_OTA_Loop(void) {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
 
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
+            // Disable Interrupts to ensure atomic operation
+            __disable_irq();
 
-            // Should not reach here
-            HAL_NVIC_SystemReset();
+            if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
+                Serial_Log("Launching Option Bytes (Reset)...");
+                HAL_FLASH_OB_Launch(); // Resets system
+            } else {
+                 Serial_Log("Error Programming Option Bytes!");
+                 __enable_irq(); // Re-enable if failed
+            }
+
+            while(1) {} // Wait for reset
         }
     }
 }
 
-void UART_Init(void) {
-    __HAL_RCC_USART6_CLK_ENABLE();
-    __HAL_RCC_GPIOG_CLK_ENABLE();
+int main(void) {
+    HAL_Init();
+    GPIO_Init();
 
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
-    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+    // 1. Startup Sequence
+    LED_B_On(); HAL_Delay(100); LED_B_Off();
+    LED_O_On(); HAL_Delay(100); LED_O_Off();
+    LED_R_On(); HAL_Delay(100); LED_R_Off();
+    LED_G_On(); HAL_Delay(100); LED_G_Off();
 
-    huart6.Instance = USART6;
-    huart6.Init.BaudRate = 921600; // Increased to 921600
-    huart6.Init.WordLength = UART_WORDLENGTH_8B;
-    huart6.Init.StopBits = UART_STOPBITS_1;
-    huart6.Init.Parity = UART_PARITY_NONE;
-    huart6.Init.Mode = UART_MODE_TX_RX;
-    huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart6.Init.OverSampling = UART_OVERSAMPLING_16;
-    HAL_UART_Init(&huart6);
-}
+    SystemClock_Config();
+    UART_Init();
+    USART3_Init();
 
-void USART3_Init(void) {
-    __HAL_RCC_USART3_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    Serial_Log("Bootloader Started. CRC & Logging Active.");
 
-    // PB10 (TX), PB11 (RX)
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    // Enable Backup Access for OTA Flag and Boot Counter
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
 
-    huart3.Instance = USART3;
-    huart3.Init.BaudRate = 115200; // Keep Debug logging at standard rate
-    huart3.Init.WordLength = UART_WORDLENGTH_8B;
-    huart3.Init.StopBits = UART_STOPBITS_1;
-    huart3.Init.Parity = UART_PARITY_NONE;
-    huart3.Init.Mode = UART_MODE_TX_RX;
-    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-    HAL_UART_Init(&huart3);
-}
+    bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
+    uint32_t boot_fails = RTC->BKP1R;
 
-void GPIO_Init(void) {
-    __HAL_RCC_GPIOG_CLK_ENABLE();
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOK_CLK_ENABLE();
+    // Determine Active Bank for logging
+    FLASH_OBProgramInitTypeDef OBInit;
+    HAL_FLASHEx_OBGetConfig(&OBInit);
+    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
+    uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
 
-    // PG6 (Green)
-    GPIO_InitStruct.Pin = GPIO_PIN_6;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+    Serial_Log("Active Bank: %d (BFB2=%d). Checking App at 0x%08X. SP: 0x%08X",
+               bfb2_active ? 2 : 1, bfb2_active, APP_ADDRESS, sp);
 
-    // PD4 (Orange), PD5 (Red)
-    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    if (ota_flag) {
+        Serial_Log("OTA Flag Detected.");
+        // Clear flag and boot counter
+        RTC->BKP0R = 0;
+        RTC->BKP1R = 0;
+        Bootloader_OTA_Loop(false);
+    } else if (valid_app) {
+        if (boot_fails >= 3) {
+            Serial_Log("Too many failed boots (%d). Forcing OTA.", boot_fails);
+            RTC->BKP1R = 0;
+            // Enter OTA Loop with Red LED indication
+            Bootloader_OTA_Loop(true);
+        }
 
-    // PK3 (Blue)
-    GPIO_InitStruct.Pin = GPIO_PIN_3;
-    HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
+        // Increment Boot Counter (App must clear it on success)
+        RTC->BKP1R = boot_fails + 1;
 
-    All_LEDs_Off();
-}
+        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
+        uint8_t buf[1];
+        LED_B_On();
 
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+        // Use non-blocking read for start byte check
+        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
+            if (buf[0] == START_BYTE) {
+                 Serial_Log("OTA Byte received on boot.");
+                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
+                 Bootloader_OTA_Loop(false);
+            }
+        }
+        LED_B_Off();
 
-  __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+        // Jump - Green ON
+        LED_G_On();
+        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
+        DeInit();
 
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 360;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
-  RCC_OscInitStruct.PLL.PLLR = 2;
-  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-      while(1) { LED_R_On(); HAL_Delay(50); LED_R_Off(); HAL_Delay(50); }
-  }
+        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+        JumpToApplication = (pFunction) JumpAddress;
+        __set_MSP(sp);
+        JumpToApplication();
+    } else {
+        // No valid app, force OTA with Red LED
+        Serial_Log("No valid app found. Entering OTA Loop.");
+        RTC->BKP1R = 0;
+        Bootloader_OTA_Loop(true);
+    }
 
-  HAL_PWREx_EnableOverDrive();
-
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-
-  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
-}
-
-void SysTick_Handler(void)
-{
-  HAL_IncTick();
+    while (1) {}
 }
