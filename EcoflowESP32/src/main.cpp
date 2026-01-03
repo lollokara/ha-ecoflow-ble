@@ -129,6 +129,9 @@ void loop() {
     // This ensures the STM32F4 stays in sync even if packets are lost or it restarts.
     if (millis() - last_device_list_update > 5000) {
         last_device_list_update = millis();
-        Stm32Serial::getInstance().sendDeviceList();
+        // Prevent UART spam during OTA
+        if (!Stm32Serial::getInstance().isOtaInProgress()) {
+            Stm32Serial::getInstance().sendDeviceList();
+        }
     }
 }

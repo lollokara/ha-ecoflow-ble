@@ -111,6 +111,9 @@ int main(void) {
     USART3_Init();
     MX_IWDG_Init();
 
+    // Disable buffering for printf
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     printf("\n\n=== Bootloader Started ===\n");
     if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
         printf("Bank 2 is Active (BFB2 Set)\n");
@@ -134,7 +137,8 @@ int main(void) {
     // Check App
     uint32_t app_addr = GetActiveAppAddress();
     uint32_t sp = *(__IO uint32_t*)app_addr;
-    bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
+    // Check if Stack Pointer is in valid RAM range (0x20000000 - 0x20050000)
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x20050000);
 
     if (valid_app) {
         printf("Valid App found at 0x%08X (SP=0x%08X)\n", app_addr, sp);
@@ -208,6 +212,9 @@ void Bootloader_OTA_Loop(void) {
     bool ota_started = false;
 
     while(1) {
+        // Refresh Watchdog in main loop
+        HAL_IWDG_Refresh(&hiwdg);
+
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {

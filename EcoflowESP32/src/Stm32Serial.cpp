@@ -471,6 +471,8 @@ void Stm32Serial::otaTask(void* parameter) {
 
         if (otaAckReceived) {
             startSuccess = true;
+            // Give STM32 time to loop back to RX state after sending ACK
+            vTaskDelay(pdMS_TO_TICKS(100));
             break;
         }
 
