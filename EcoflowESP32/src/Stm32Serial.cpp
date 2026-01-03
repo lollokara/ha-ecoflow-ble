@@ -585,7 +585,7 @@ void Stm32Serial::otaTask(void* parameter) {
         }
 
         if (!chunkSuccess) {
-            ESP_LOGE(TAG, "OTA Chunk Failed at %d", offset);
+            ESP_LOGE(TAG, "OTA Chunk Failed at Offset %d (Len: %d)", offset, bytesRead);
             ota_state = 4; ota_msg = "Chunk Fail";
             transferFailed = true;
             break;
@@ -593,8 +593,8 @@ void Stm32Serial::otaTask(void* parameter) {
 
         offset += bytesRead;
         ota_progress = (offset * 100) / totalSize;
-        if (ota_progress != last_log_progress && ota_progress % 10 == 0) {
-            ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d)", ota_progress, offset, totalSize);
+        if (ota_progress != last_log_progress && ota_progress % 5 == 0) {
+            ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d bytes)", ota_progress, offset, totalSize);
             last_log_progress = ota_progress;
         }
     }
@@ -602,31 +602,41 @@ void Stm32Serial::otaTask(void* parameter) {
     f.close();
 
     if (!transferFailed && offset == totalSize) {
-        ESP_LOGI(TAG, "OTA Upload Complete. Sending End (CRC: 0x%08X)...", crc);
+        ESP_LOGI(TAG, "OTA Upload Complete. Sending End Command (CRC: 0x%08X)...", crc);
         len = pack_ota_end_message(buf, crc);
 
         bool endSuccess = false;
         for(int retries=0; retries<3; retries++) {
+            ESP_LOGI(TAG, "Sending OTA End (Attempt %d)", retries+1);
             self->sendData(buf, len);
 
             otaAckReceived = false;
             otaNackReceived = false;
-             uint32_t startWait = millis();
+            uint32_t startWait = millis();
             while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout
                 vTaskDelay(50);
             }
-            if (otaAckReceived) { endSuccess = true; break; }
-            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; } // Fatal
+            if (otaAckReceived) {
+                ESP_LOGI(TAG, "OTA End ACK Received. Checksum Verified.");
+                endSuccess = true;
+                break;
+            }
+            if (otaNackReceived) {
+                ESP_LOGE(TAG, "OTA End NACK Received. Checksum Mismatch on Device!");
+                break; // Fatal, do not retry if device explicitly NACKs the checksum
+            }
         }
 
         if (endSuccess) {
             vTaskDelay(500);
-            ESP_LOGI(TAG, "Sending Apply...");
+            ESP_LOGI(TAG, "Sending Apply Command...");
             len = pack_ota_apply_message(buf);
             self->sendData(buf, len);
             ota_state = 3; ota_msg = "STM32 Rebooting...";
+            ESP_LOGI(TAG, "OTA Sequence Completed Successfully.");
         } else {
              ota_state = 4; ota_msg = "Checksum Fail";
+             ESP_LOGE(TAG, "OTA Failed at End Step.");
         }
     } else {
         if (ota_state != 4) { ota_state = 4; ota_msg = "Incomplete"; }
