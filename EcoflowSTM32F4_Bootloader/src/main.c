@@ -346,14 +346,30 @@ void ClearFlashFlags() {
 #endif
 
 void Bootloader_OTA_Loop(void) {
-    // Check for Single Bank Mode (DB1M=1)
+    // Note: STM32F469 (2MB) ignores DB1M (Bit 30), it is only for 1MB devices.
+    // However, user requested to clear it if set, to be safe.
     if (FLASH->OPTCR & FLASH_OPTCR_DB1M) {
-        Serial_Log("CRITICAL WARNING: DB1M bit is SET (Single Bank Mode).");
-        Serial_Log("Dual Bank OTA will NOT work reliably.");
-        Serial_Log("Please use STM32CubeProgrammer to clear DB1M (Uncheck 'DB1M').");
-        // We do not abort, but we warn heavily.
-        // Flash SOS pattern on Orange LED
-        for(int i=0; i<5; i++) { LED_O_Toggle(); HAL_Delay(200); }
+        Serial_Log("Notice: DB1M bit is set. Clearing it for consistency...");
+
+        HAL_FLASH_Unlock();
+        HAL_FLASH_OB_Unlock();
+
+        uint32_t optcr = FLASH->OPTCR;
+        optcr &= ~FLASH_OPTCR_DB1M; // Clear Bit 30
+        optcr &= ~FLASH_OPTCR_OPTSTRT; // Ensure Start bit is clear
+
+        __disable_irq();
+        FLASH->OPTCR = optcr;
+        FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+        while (FLASH->SR & FLASH_SR_BSY);
+        __enable_irq();
+
+        HAL_FLASH_OB_Lock();
+        HAL_FLASH_Lock();
+
+        Serial_Log("DB1M Cleared. Resetting...");
+        HAL_Delay(100);
+        HAL_NVIC_SystemReset();
     }
     uint8_t header[3];
     uint8_t payload[256];
