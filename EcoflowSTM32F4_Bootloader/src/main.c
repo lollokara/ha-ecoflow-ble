@@ -368,6 +368,64 @@ void ClearFlashFlags() {
 #define FLASH_OPTCR_DB1M (1 << 30)
 #endif
 
+// Helper function for Manual Erase
+bool Manual_Erase_Sector(uint32_t sector) {
+    // 1. Check LOCK
+    if (FLASH->CR & FLASH_CR_LOCK) {
+        Serial_Log("Flash Locked! Attempting unlock...");
+        if (HAL_FLASH_Unlock() != HAL_OK) {
+             Serial_Log("Unlock Failed! HAL: %d", HAL_FLASH_GetError());
+             return false;
+        }
+    }
+
+    // 2. Wait for BSY
+    while (FLASH->SR & FLASH_SR_BSY) { HAL_IWDG_Refresh(&hiwdg); }
+
+    // 3. Clear Flags
+    ClearFlashFlags();
+
+    // 4. Configure CR
+    // PSIZE = x32 (10) -> Bits 8,9
+    // SER = 1 (Bit 1)
+    // SNB = sector (Bits 3-7)
+    uint32_t cr_val = FLASH->CR;
+    cr_val &= ~(FLASH_CR_PSIZE | FLASH_CR_SNB | FLASH_CR_MER | FLASH_CR_MER1); // Clear bits
+    cr_val |= FLASH_PSIZE_WORD; // x32 (0x00000200)
+    cr_val |= FLASH_CR_SER;     // Sector Erase
+    cr_val |= (sector << FLASH_CR_SNB_Pos);
+
+    FLASH->CR = cr_val;
+
+    // Log CR before Start
+    Serial_Log("Erase Sec %d. CR: 0x%08X", sector, FLASH->CR);
+
+    // 5. Start
+    FLASH->CR |= FLASH_CR_STRT;
+
+    // 6. Wait for BSY
+    uint32_t start = HAL_GetTick();
+    while (FLASH->SR & FLASH_SR_BSY) {
+        HAL_IWDG_Refresh(&hiwdg);
+        if (HAL_GetTick() - start > 2000) {
+            Serial_Log("Erase Timeout!");
+            return false;
+        }
+    }
+
+    // 7. Check Errors
+    // Use HAL Flag Definitions which map to SR bits
+    if (FLASH->SR & (FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
+                     FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR)) {
+        Serial_Log("Erase Failed! SR: 0x%08X", FLASH->SR);
+        FLASH->CR &= ~FLASH_CR_SER; // Clear SER
+        return false;
+    }
+
+    FLASH->CR &= ~FLASH_CR_SER; // Clear SER
+    return true;
+}
+
 void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256];
@@ -377,6 +435,11 @@ void Bootloader_OTA_Loop(void) {
     HAL_NVIC_SetPriority(USART6_IRQn, 0, 0); // High Priority
     HAL_NVIC_EnableIRQ(USART6_IRQn);
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+
+    // Disable Caches for Flash Ops
+    __HAL_FLASH_DATA_CACHE_DISABLE();
+    __HAL_FLASH_INSTRUCTION_CACHE_DISABLE();
+    __HAL_FLASH_PREFETCH_BUFFER_DISABLE();
 
     HAL_FLASH_Unlock();
     ClearFlashFlags(); // Clear flags on entry
@@ -462,27 +525,15 @@ void Bootloader_OTA_Loop(void) {
             chunks_received = 0;
             checksum_verified = false;
 
-            FLASH_EraseInitTypeDef EraseInitStruct;
-            uint32_t SectorError;
-            EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-            EraseInitStruct.NbSectors = 1;
-
             ClearFlashFlags(); // Clear flags before Erase
 
             bool error = false;
             // Erase the ENTIRE Inactive Bank (Bootloader area included)
             for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
-                // Refresh Watchdog inside Erase Loop
-                HAL_IWDG_Refresh(&hiwdg);
-
-                EraseInitStruct.Sector = sec;
-
-                HAL_StatusTypeDef status = HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
-                if (status != HAL_OK) {
-                    uint32_t err = HAL_FLASH_GetError();
-                    Serial_Log("Erase Error at Sector %d. HAL: %d, FlashErr: 0x%08X", sec, status, err);
-                    error = true; break;
+                // Manual Erase
+                if (!Manual_Erase_Sector(sec)) {
+                     Serial_Log("Manual Erase Error at Sector %d", sec);
+                     error = true; break;
                 }
             }
 
@@ -510,7 +561,12 @@ void Bootloader_OTA_Loop(void) {
                 memcpy(&word, &data[i], copy_len);
 
                 ClearFlashFlags(); // Ensure no flags before program
+
+                // Use HAL Program but check PSIZE?
+                // HAL_FLASH_Program handles it.
+                // But let's verify CR if needed.
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
+                    Serial_Log("Prog Err: 0x%08X. SR: 0x%08X", addr+i, FLASH->SR);
                     ok = false; break;
                 }
             }
