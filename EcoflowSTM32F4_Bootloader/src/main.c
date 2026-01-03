@@ -10,7 +10,7 @@
 #include <stdarg.h>
 
 // Define Application Address (Sector 2)
-#define APP_ADDRESS 0x00008000
+#define APP_ADDRESS 0x08008000
 
 // UART Protocol
 #define START_BYTE 0xAA
@@ -253,9 +253,6 @@ void Serial_Log(const char* fmt, ...) {
 }
 
 int main(void) {
-    // Explicitly set VTOR to 0x00000000 (Aliased base)
-    SCB->VTOR = 0x00000000;
-
     // Early LED Init to debug startup
     Early_LED_Init();
 
@@ -429,6 +426,7 @@ void Bootloader_OTA_Loop(void) {
     uint32_t start_sector, end_sector;
 
     if (bfb2_active) {
+        // Revert to 0x08000000 if we assume absolute addressing again
         target_bank_addr = 0x08000000;
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
