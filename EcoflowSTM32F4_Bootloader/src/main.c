@@ -1,6 +1,8 @@
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 // Define Application Address (Sector 2)
 #define APP_ADDRESS 0x08008000
@@ -26,6 +28,7 @@
 // Bootloader + Config occupy Sectors 0/1 and 12/13.
 
 UART_HandleTypeDef huart6;
+UART_HandleTypeDef huart3; // Debug UART
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
@@ -33,12 +36,25 @@ uint32_t JumpAddress;
 
 void SystemClock_Config(void);
 void UART_Init(void);
+void UART3_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 
+// Custom printf for Bootloader
+void debug_log(const char *fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    HAL_UART_Transmit(&huart3, (uint8_t*)buf, len, 100);
+}
+
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
+    debug_log("Bootloader DeInit...\r\n");
     HAL_UART_DeInit(&huart6);
+    HAL_UART_DeInit(&huart3);
     // De-init LEDs
     HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
@@ -88,17 +104,23 @@ int main(void) {
 
     SystemClock_Config();
     UART_Init();
+    UART3_Init();
+
+    debug_log("\r\n--- STM32F4 Bootloader Start ---\r\n");
 
     // Check Backup Register for OTA Flag
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
+    debug_log("OTA Flag: %d (RTC_BKP0R=0x%08X)\r\n", ota_flag, RTC->BKP0R);
 
     // Check App Validity
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
+    debug_log("App SP: 0x%08X, Valid: %d\r\n", sp, valid_app);
 
     if (ota_flag) {
+        debug_log("Forcing OTA Loop...\r\n");
         // Clear flag
         RTC->BKP0R = 0;
         Bootloader_OTA_Loop();
@@ -108,6 +130,7 @@ int main(void) {
         LED_B_On();
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
+                 debug_log("Received START byte during timeout. Entering OTA Loop.\r\n");
                  Bootloader_OTA_Loop();
             }
         }
@@ -115,6 +138,7 @@ int main(void) {
 
         // Jump - Green ON
         LED_G_On();
+        debug_log("Jumping to Application at 0x%08X\r\n", APP_ADDRESS);
         DeInit();
 
         JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
@@ -122,6 +146,7 @@ int main(void) {
         __set_MSP(sp);
         JumpToApplication();
     } else {
+        debug_log("No valid app. Entering OTA Loop.\r\n");
         // No valid app, force OTA
         Bootloader_OTA_Loop();
     }
@@ -141,6 +166,7 @@ uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
 }
 
 void send_ack() {
+    debug_log("TX ACK\r\n");
     uint8_t buf[4] = {START_BYTE, CMD_OTA_ACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
@@ -149,6 +175,7 @@ void send_ack() {
 }
 
 void send_nack() {
+    debug_log("TX NACK\r\n");
     uint8_t buf[4] = {START_BYTE, CMD_OTA_NACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
@@ -165,6 +192,8 @@ void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256];
 
+    debug_log("Entering OTA Loop\r\n");
+
     HAL_FLASH_Unlock();
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
@@ -174,18 +203,20 @@ void Bootloader_OTA_Loop(void) {
     HAL_FLASHEx_OBGetConfig(&OBInit);
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
+    debug_log("Option Bytes: 0x%08X, BFB2: %d\r\n", OBInit.USERConfig, bfb2_active);
+
     // Target Inactive Bank
-    // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
-    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
     uint32_t target_bank_addr = 0x08100000;
 
     uint32_t start_sector, end_sector;
     if (bfb2_active) {
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
+        debug_log("Active: Bank 2. Target: Bank 1 (Sectors 0-11)\r\n");
     } else {
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
+        debug_log("Active: Bank 1. Target: Bank 2 (Sectors 12-23)\r\n");
     }
 
     bool ota_started = false;
@@ -207,12 +238,16 @@ void Bootloader_OTA_Loop(void) {
         LED_O_On();
 
         if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) {
+            debug_log("Header Timeout\r\n");
             LED_O_Off(); continue;
         }
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
+        // debug_log("RX CMD: 0x%02X LEN: %d\r\n", cmd, len);
+
         if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
+            debug_log("Payload Timeout\r\n");
             LED_O_Off(); continue;
         }
 
@@ -225,10 +260,12 @@ void Bootloader_OTA_Loop(void) {
         memcpy(&check_buf[2], payload, len);
 
         if (calculate_crc8(check_buf, 2 + len) != recv_crc) {
+            debug_log("CRC Fail. Recv: 0x%02X\r\n", recv_crc);
             send_nack(); continue;
         }
 
         if (cmd == CMD_OTA_START) {
+            debug_log("CMD_OTA_START Received\r\n");
             ota_started = true;
             bytes_written = 0;
 
@@ -246,9 +283,12 @@ void Bootloader_OTA_Loop(void) {
                 LED_O_Toggle(); // Toggle Orange during erase
                 EraseInitStruct.Sector = sec;
 
+                debug_log("Erasing Sector %d... ", sec);
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                    debug_log("Fail! Error: 0x%08X\r\n", HAL_FLASH_GetError());
                     error = true; break;
                 }
+                debug_log("OK\r\n");
             }
 
             if (!error) {
@@ -265,6 +305,8 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
+            // debug_log("CMD_OTA_CHUNK Offset: %d Len: %d\r\n", offset, data_len);
+
             // Write to Inactive Bank
             uint32_t addr = target_bank_addr + offset;
 
@@ -275,11 +317,13 @@ void Bootloader_OTA_Loop(void) {
                 memcpy(&word, &data[i], copy_len);
 
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
+                    debug_log("Write Fail at 0x%08X. Error: 0x%08X\r\n", addr+i, HAL_FLASH_GetError());
                     ok = false; break;
                 }
 
                 // Read-Back Verify
                 if (*(uint32_t*)(addr + i) != word) {
+                    debug_log("Verify Fail at 0x%08X. Read: 0x%08X Expected: 0x%08X\r\n", addr+i, *(uint32_t*)(addr+i), word);
                     ok = false; break;
                 }
             }
@@ -291,11 +335,13 @@ void Bootloader_OTA_Loop(void) {
             }
         }
         else if (cmd == CMD_OTA_END) {
+            debug_log("CMD_OTA_END. Bytes Written: %d\r\n", bytes_written);
             send_ack();
             All_LEDs_Off();
             LED_G_On(); // Green Solid
         }
         else if (cmd == CMD_OTA_APPLY) {
+            debug_log("CMD_OTA_APPLY. Swapping Bank...\r\n");
             send_ack();
             HAL_Delay(100);
 
@@ -313,6 +359,7 @@ void Bootloader_OTA_Loop(void) {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
 
+            debug_log("Writing Option Bytes...\r\n");
             HAL_FLASHEx_OBProgram(&OBInit);
             HAL_FLASH_OB_Launch(); // Resets system
 
@@ -344,6 +391,31 @@ void UART_Init(void) {
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart6);
 }
+
+void UART3_Init(void) {
+    __HAL_RCC_USART3_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    // PB10 -> TX, PB11 -> RX
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    huart3.Instance = USART3;
+    huart3.Init.BaudRate = 115200;
+    huart3.Init.WordLength = UART_WORDLENGTH_8B;
+    huart3.Init.StopBits = UART_STOPBITS_1;
+    huart3.Init.Parity = UART_PARITY_NONE;
+    huart3.Init.Mode = UART_MODE_TX_RX;
+    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart3);
+}
+
 
 void GPIO_Init(void) {
     __HAL_RCC_GPIOG_CLK_ENABLE();
