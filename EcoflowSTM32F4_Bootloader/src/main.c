@@ -34,6 +34,7 @@ uint8_t rx_byte_isr;
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
+IWDG_HandleTypeDef hiwdg;
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
@@ -42,6 +43,7 @@ uint32_t JumpAddress;
 void SystemClock_Config(void);
 void UART_Init(void);
 void USART3_Init(void);
+void IWDG_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
@@ -90,6 +92,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 HAL_StatusTypeDef UART_ReadByte(uint8_t* out, uint32_t timeout) {
     uint32_t start = HAL_GetTick();
     while (1) {
+        HAL_IWDG_Refresh(&hiwdg); // Keep alive during wait
         if (rb_pop(&rx_ring_buffer, out)) {
             return HAL_OK;
         }
@@ -220,6 +223,7 @@ int main(void) {
     SystemClock_Config();
     UART_Init();
     USART3_Init();
+    IWDG_Init(); // Init Watchdog
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
@@ -243,6 +247,9 @@ int main(void) {
         LED_B_On();
 
         // Use non-blocking read for start byte check
+        // Note: IRQs not yet enabled by rb_init, but HAL_UART_Receive works if no IRQ enabled
+        // Actually, we initialized UART with interrupts in mind but haven't started them.
+        // Let's rely on standard receive here for simplicity before loop.
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
                  Serial_Log("OTA Byte received on boot.");
@@ -266,7 +273,9 @@ int main(void) {
         Bootloader_OTA_Loop();
     }
 
-    while (1) {}
+    while (1) {
+        HAL_IWDG_Refresh(&hiwdg);
+    }
 }
 
 uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
@@ -342,6 +351,8 @@ void Bootloader_OTA_Loop(void) {
     uint32_t chunks_received = 0;
 
     while(1) {
+        HAL_IWDG_Refresh(&hiwdg); // Keep alive
+
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
@@ -399,6 +410,8 @@ void Bootloader_OTA_Loop(void) {
             bool error = false;
             // Erase the ENTIRE Inactive Bank (Bootloader area included)
             for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
+                HAL_IWDG_Refresh(&hiwdg); // Keep alive during erase
+                Serial_Log("Erasing Sector %d...", sec);
                 // LED_O_Toggle(); // Toggle Orange during erase (commented to avoid delays)
                 EraseInitStruct.Sector = sec;
 
@@ -460,6 +473,7 @@ void Bootloader_OTA_Loop(void) {
 
                 for(uint32_t i = 0; i < bytes_written; i++) {
                      calculated_crc32 = calculate_crc32(calculated_crc32, &flash_ptr[i], 1);
+                     if (i % 4096 == 0) HAL_IWDG_Refresh(&hiwdg); // Refresh during CRC
                 }
 
                 Serial_Log("Calc: 0x%08X, Recv: 0x%08X", calculated_crc32, received_crc32);
@@ -573,6 +587,13 @@ void USART3_Init(void) {
     huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart3.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart3);
+}
+
+void IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
+    hiwdg.Init.Reload = 4095; // Max period (~32s at 32kHz LSI)
+    HAL_IWDG_Init(&hiwdg);
 }
 
 void GPIO_Init(void) {
