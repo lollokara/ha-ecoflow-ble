@@ -302,13 +302,14 @@ int main(void) {
     MX_USART3_UART_Init(); // Init Debug UART Early
 
     // Simple Direct UART Debug
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T0\r\n", 4, 100);
     char *msg = "APP: STARTED\r\n";
     HAL_UART_Transmit(&huart3, (uint8_t*)msg, 14, 100);
 
     // Reset Boot Counter after successful boot
-    __HAL_RCC_PWR_CLK_ENABLE();
-    HAL_PWR_EnableBkUpAccess();
-    RTC->BKP1R = 0;
+    // __HAL_RCC_PWR_CLK_ENABLE();
+    // HAL_PWR_EnableBkUpAccess();
+    // RTC->BKP1R = 0; // Suspected Crash Point
     HAL_UART_Transmit(&huart3, (uint8_t*)"T1\r\n", 4, 100);
 
     ESP32_Reset_Init();
