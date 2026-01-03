@@ -509,13 +509,17 @@ void Stm32Serial::otaTask(void* parameter) {
         }
 
         if (!otaAckReceived) {
-            ESP_LOGE(TAG, "OTA Chunk NACK/Timeout at %d", offset);
+            ESP_LOGI(TAG, "OTA Chunk NACK/Timeout at %d", offset);
             ota_state = 4; ota_msg = "Chunk Timeout";
             break;
         }
 
         offset += bytesRead;
-        ota_progress = (offset * 100) / totalSize;
+        int new_progress = (offset * 100) / totalSize;
+        if (new_progress > ota_progress + 9) { // Log every ~10%
+             ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d bytes)", new_progress, offset, totalSize);
+        }
+        ota_progress = new_progress;
     }
 
     f.close();

@@ -273,6 +273,10 @@ void SetBacklight(uint8_t percent) {
 int main(void) {
     HAL_Init();
     SystemClock_Config();
+
+    // Enable Backup Access for RTC Flag (OTA)
+    HAL_PWR_EnableBkUpAccess();
+
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
