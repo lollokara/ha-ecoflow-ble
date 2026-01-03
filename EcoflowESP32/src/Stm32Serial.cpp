@@ -508,8 +508,14 @@ void Stm32Serial::otaTask(void* parameter) {
             vTaskDelay(5);
         }
 
+        if (otaNackReceived) {
+             ESP_LOGE(TAG, "OTA Chunk NACK at %d", offset);
+             ota_state = 4; ota_msg = "Chunk NACK";
+             break;
+        }
+
         if (!otaAckReceived) {
-            ESP_LOGI(TAG, "OTA Chunk NACK/Timeout at %d", offset);
+            ESP_LOGE(TAG, "OTA Chunk Timeout at %d", offset);
             ota_state = 4; ota_msg = "Chunk Timeout";
             break;
         }

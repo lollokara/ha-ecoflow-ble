@@ -80,8 +80,8 @@ void All_LEDs_Off() {
 }
 
 // Get the actual App Address based on the Active Bank
-// Note: Hardware aliases the Active Bank to 0x08000000 (usually) or at least 0x00000000.
-// We jump to the fixed Boot Address 0x08008000 which should map to the Active Application.
+// In Dual Bank Mode, the Active Bank is always aliased to 0x08000000.
+// So we always jump to the fixed Boot Address 0x08008000.
 uint32_t GetActiveAppAddress() {
     return 0x08008000;
 }
@@ -225,7 +225,9 @@ void Bootloader_OTA_Loop(void) {
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-            // Target Inactive Bank (Always mapped to 0x08100000 / Sectors 12-23 in Dual Bank Mode)
+            // Target Inactive Bank
+            // In Dual Bank mode, the Inactive Bank is always aliased to 0x08100000 (Sectors 12-23)
+            // regardless of BFB2 state, due to hardware remapping.
             uint32_t start_sec = FLASH_SECTOR_12;
             uint32_t end_sec = FLASH_SECTOR_23;
 
@@ -257,7 +259,7 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            // Target Inactive Bank Base Address
+            // Target Inactive Bank Base Address (Always 0x08100000)
             uint32_t base_addr = 0x08100000;
 
             // Write Address (Assumes factory_firmware.bin starts at offset 0 of the bank)
