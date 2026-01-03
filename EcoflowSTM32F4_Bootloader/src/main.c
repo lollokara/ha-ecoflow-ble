@@ -129,7 +129,7 @@ void All_LEDs_Off() {
 
 // Log to USART3
 void Serial_Log(const char* fmt, ...) {
-    char buf[128];
+    char buf[256];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
@@ -138,15 +138,25 @@ void Serial_Log(const char* fmt, ...) {
     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
 }
 
+// Dump buffer in hex for debugging
+void Hex_Dump(const uint8_t* data, uint16_t len) {
+    char buf[4];
+    for(uint16_t i=0; i<len; i++) {
+        sprintf(buf, "%02X ", data[i]);
+        HAL_UART_Transmit(&huart3, (uint8_t*)buf, 3, 10);
+    }
+    HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
+}
+
 int main(void) {
     HAL_Init();
     GPIO_Init();
 
-    // 1. Startup Sequence
-    LED_B_On(); HAL_Delay(100); LED_B_Off();
+    // 1. Startup Sequence: Green -> Orange -> Red -> Blue
+    LED_G_On(); HAL_Delay(100); LED_G_Off();
     LED_O_On(); HAL_Delay(100); LED_O_Off();
     LED_R_On(); HAL_Delay(100); LED_R_Off();
-    LED_G_On(); HAL_Delay(100); LED_G_Off();
+    LED_B_On(); HAL_Delay(100); LED_B_Off();
 
     SystemClock_Config();
     UART_Init();
@@ -252,16 +262,20 @@ void Bootloader_OTA_Loop(void) {
     if (bfb2_active) {
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
-        Serial_Log("Target Bank: 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Active: Bank 2. Target: Bank 1 (Sec 0-11). Addr: 0x%08X", target_bank_addr);
     } else {
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
-        Serial_Log("Target Bank: 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Active: Bank 1. Target: Bank 2 (Sec 12-23). Addr: 0x%08X", target_bank_addr);
     }
 
     bool ota_started = false;
     bool checksum_verified = false;
     uint32_t bytes_written = 0;
+
+    // Flush RX Buffer
+    uint8_t dummy;
+    while(HAL_UART_Receive(&huart6, &dummy, 1, 0) == HAL_OK);
 
     while(1) {
         // Heartbeat: Blue Toggle
@@ -279,12 +293,14 @@ void Bootloader_OTA_Loop(void) {
         LED_O_On();
 
         if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) {
+            Serial_Log("Header Timeout");
             LED_O_Off(); continue;
         }
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
         if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
+            Serial_Log("Payload Timeout. Cmd: %02X, Len: %d", cmd, len);
             LED_O_Off(); continue;
         }
 
@@ -299,6 +315,9 @@ void Bootloader_OTA_Loop(void) {
         uint8_t calculated_crc8_val = calculate_crc8(check_buf, 2 + len);
         if (calculated_crc8_val != recv_crc) {
             Serial_Log("CRC Err: Cmd=%02X Len=%d Calc=%02X Recv=%02X", cmd, len, calculated_crc8_val, recv_crc);
+            Serial_Log("Header Dump: AA %02X %02X", cmd, len);
+            Serial_Log("Payload First 8 bytes:");
+            Hex_Dump(payload, (len > 8) ? 8 : len);
             send_nack(); continue;
         }
 
@@ -416,7 +435,7 @@ void Bootloader_OTA_Loop(void) {
                 continue;
             }
 
-            Serial_Log("Applying Update...");
+            Serial_Log("Applying Update... Swapping Banks.");
             send_ack();
             HAL_Delay(100);
 
@@ -434,8 +453,13 @@ void Bootloader_OTA_Loop(void) {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
 
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
+            if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
+                Serial_Log("OB Programmed. Launching...");
+                __disable_irq(); // Disable interrupts before launch
+                HAL_FLASH_OB_Launch(); // Resets system
+            } else {
+                Serial_Log("OB Program Failed!");
+            }
 
             // Should not reach here
             HAL_NVIC_SystemReset();
