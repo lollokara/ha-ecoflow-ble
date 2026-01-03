@@ -12,6 +12,7 @@
 #include "DeviceManager.h"
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
+#include "OtaManager.h"
 #include <WiFi.h>
 
 // Hardware Serial pin definition (moved from main.cpp)
@@ -44,6 +45,8 @@ void Stm32Serial::begin() {
  * a valid packet is received.
  */
 void Stm32Serial::update() {
+    OtaManager::getInstance().update();
+
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
@@ -99,6 +102,12 @@ void Stm32Serial::update() {
  */
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
+
+    // Forward OTA packets
+    if (cmd == CMD_OTA_ACK || cmd == CMD_OTA_NACK) {
+        OtaManager::getInstance().handlePacket(cmd, &rx_buf[3], rx_buf[2]);
+        return;
+    }
 
     if (cmd == CMD_HANDSHAKE) {
         // Reply with ACK and then send the device list

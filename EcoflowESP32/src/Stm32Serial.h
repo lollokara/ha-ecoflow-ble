@@ -55,6 +55,13 @@ public:
      */
     void sendDeviceStatus(uint8_t device_id);
 
+    /**
+     * @brief Sends raw data to the STM32 (Used for OTA).
+     */
+    void sendRaw(uint8_t* data, size_t len) {
+        Serial1.write(data, len);
+    }
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
