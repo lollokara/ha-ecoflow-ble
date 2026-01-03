@@ -6,16 +6,16 @@
 #include <Adafruit_NeoPixel.h>
 
 // --- Config ---
-#define FAN1_PWM_PIN 10
-#define FAN2_PWM_PIN 11
-#define FAN3_PWM_PIN 12
-#define FAN4_PWM_PIN 13
+#define FAN1_PWM_PIN 26
+#define FAN2_PWM_PIN 14
+#define FAN3_PWM_PIN 6
+#define FAN4_PWM_PIN 8
 
-#define FAN1_TACH_PIN 14
+#define FAN1_TACH_PIN 27
 #define FAN2_TACH_PIN 15
 // Fan 3/4 Tach moved to 18/19 to free up 16 for WS2812 (User Request)
-#define FAN3_TACH_PIN 18
-#define FAN4_TACH_PIN 19
+#define FAN3_TACH_PIN 5
+#define FAN4_TACH_PIN 7
 
 #define TEMP_PIN 4
 
