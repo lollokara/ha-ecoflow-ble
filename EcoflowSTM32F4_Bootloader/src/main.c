@@ -556,11 +556,14 @@ void Bootloader_OTA_Loop(bool error_state) {
             RTC->BKP1R = 0;
 
             // Unlock Option Bytes
+            ClearFlashFlags(); // Ensure no error flags before OB access
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
 
-            FLASH_OBProgramInitTypeDef OBInit;
+            FLASH_OBProgramInitTypeDef OBInit = {0};
             HAL_FLASHEx_OBGetConfig(&OBInit);
+
+            Serial_Log("Current OPTCR: 0x%08X, USER: 0x%02X", FLASH->OPTCR, OBInit.USERConfig);
 
             // Toggle BFB2
             OBInit.OptionType = OPTIONBYTE_USER;
@@ -570,14 +573,29 @@ void Bootloader_OTA_Loop(bool error_state) {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
 
+            Serial_Log("New USER: 0x%02X", OBInit.USERConfig);
+
             // Disable Interrupts to ensure atomic operation
             __disable_irq();
 
-            if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
-                Serial_Log("Launching Option Bytes (Reset)...");
-                HAL_FLASH_OB_Launch(); // Resets system
+            HAL_StatusTypeDef status = HAL_FLASHEx_OBProgram(&OBInit);
+            if (status == HAL_OK) {
+                // Verify by reading register directly
+                uint32_t optcr = FLASH->OPTCR;
+                Serial_Log("Programmed. OPTCR: 0x%08X", optcr);
+
+                Serial_Log("Launching Option Bytes...");
+                // Note: HAL_FLASH_OB_Launch sets OPTSTRT again, which is redundant
+                // but ensures persistence if OBProgram only prepared it.
+                HAL_StatusTypeDef launch_status = HAL_FLASH_OB_Launch();
+                if (launch_status != HAL_OK) Serial_Log("Launch Warning: %d", launch_status);
+
+                Serial_Log("Resetting System...");
+                // Re-enable interrupts just for the reset (some handlers might need it?)
+                // Actually SystemReset sets AIRCR.
+                HAL_NVIC_SystemReset();
             } else {
-                 Serial_Log("Error Programming Option Bytes!");
+                 Serial_Log("Error Programming Option Bytes! Status: %d", status);
                  __enable_irq(); // Re-enable if failed
             }
 
