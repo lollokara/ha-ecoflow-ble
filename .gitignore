@@ -70,3 +70,4 @@ EcoflowRP2040/.vscode/extensions.json
 EcoflowRP2040/.vscode/launch.json
 .pio/
 **/.pio/
+*.bin
