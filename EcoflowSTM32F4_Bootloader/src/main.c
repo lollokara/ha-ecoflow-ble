@@ -244,12 +244,10 @@ int main(void) {
     HAL_FLASH_OB_Lock();
     HAL_FLASH_Lock();
 
-    bool db1m_enabled = (OBInit.USERConfig & FLASH_OPTCR_DB1M);
-    if (!db1m_enabled) {
-        Serial_Log("CRITICAL: DB1M (Dual Bank) NOT ENABLED! BFB2 will fail.");
-    } else {
-        Serial_Log("DB1M Enabled. Dual Bank Active.");
-    }
+    // Note: DB1M bit (Bit 30) is only for 1MB devices.
+    // STM32F469NI (2MB) is ALWAYS in Dual Bank mode.
+    // We skip the check for DB1M as it may read 0 on 2MB devices.
+    Serial_Log("Device is STM32F469NI (2MB). Dual Bank Always Active.");
 
     // Determine Active Bank and Jump Address
     // Note: BFB2 controls which physical bank is mapped to 0x00000000 (and aliased to 0x08000000).
