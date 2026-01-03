@@ -296,8 +296,9 @@ void Bootloader_OTA_Loop(void) {
         check_buf[1] = len;
         memcpy(&check_buf[2], payload, len);
 
-        if (calculate_crc8(check_buf, 2 + len) != recv_crc) {
-            Serial_Log("UART CRC Error");
+        uint8_t calculated_crc8_val = calculate_crc8(check_buf, 2 + len);
+        if (calculated_crc8_val != recv_crc) {
+            Serial_Log("CRC Err: Cmd=%02X Len=%d Calc=%02X Recv=%02X", cmd, len, calculated_crc8_val, recv_crc);
             send_nack(); continue;
         }
 
