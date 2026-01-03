@@ -271,9 +271,21 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
-    // Relocate Vector Table to Application Address (0x08008000)
-    // Note: Due to Dual Bank Aliasing, the Active Bank is always mapped to 0x08000000.
-    SCB->VTOR = 0x08008000;
+    // Relocate Vector Table to Application Address
+    // If running from Bank 2 (via 0x0000 alias or physical 0x0810), VTOR must match.
+    // However, since BFB2 remaps the active bank to 0x00000000, and our App is compiled for 0x08000000,
+    // we should use the standard offset.
+    // BUT, if BFB2 logic fails or we jump to physical address 0x0810, we need to adapt.
+
+    // Check if we are running physically in Bank 2 (0x0810xxxx)
+    uint32_t pc;
+    __ASM volatile ("MOV %0, PC" : "=r" (pc));
+
+    if (pc >= 0x08100000) {
+        SCB->VTOR = 0x08108000; // Bank 2
+    } else {
+        SCB->VTOR = 0x08008000; // Bank 1
+    }
     __DSB();
 
     HAL_Init();

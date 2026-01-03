@@ -250,13 +250,21 @@ int main(void) {
     Serial_Log("Device is STM32F469NI (2MB). Dual Bank Always Active.");
 
     // Determine Active Bank and Jump Address
+    // Note: BFB2 controls which physical bank is aliased to 0x00000000.
+    // However, the physical addresses 0x08000000 (Bank 1) and 0x08100000 (Bank 2) DO NOT SWAP.
+    // To boot the correct application, we must jump to the physical address of the active bank.
+
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
-    uint32_t app_addr_final = 0x08000000 + APP_OFFSET; // Always use Active Bank alias
+    uint32_t app_addr_final;
 
     if (bfb2_active) {
-        Serial_Log("Active: Bank 2 (BFB2=1). Aliased to 0x0800xxxx");
+        // Active: Bank 2 (Physically 0x08100000)
+        app_addr_final = BANK2_ADDR + APP_OFFSET; // 0x08108000
+        Serial_Log("Active: Bank 2 (BFB2=1). App Addr: 0x%08X", app_addr_final);
     } else {
-        Serial_Log("Active: Bank 1 (BFB2=0). Aliased to 0x0800xxxx");
+        // Active: Bank 1 (Physically 0x08000000)
+        app_addr_final = BANK1_ADDR + APP_OFFSET; // 0x08008000
+        Serial_Log("Active: Bank 1 (BFB2=0). App Addr: 0x%08X", app_addr_final);
     }
 
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
@@ -330,19 +338,31 @@ void Bootloader_OTA_Loop(bool error_mode) {
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
     // Target Bank Logic
-    // The INACTIVE bank is ALWAYS aliased to 0x08100000.
-    uint32_t target_bank_addr = 0x08100000;
+    // STM32F469 Dual Bank Addresses:
+    // Bank 1: 0x08000000 (Sectors 0-11)
+    // Bank 2: 0x08100000 (Sectors 12-23)
+    // BFB2 Status:
+    // BFB2=0: Bank 1 is Active (0x0800). Bank 2 is Inactive (0x0810).
+    // BFB2=1: Bank 2 is Active (mapped to 0x0000/0x0800 by alias). Bank 1 is Inactive (0x0810).
+    // WAIT: Physical addresses DO NOT MOVE. Only the boot alias at 0x00000000 moves.
+    // If BFB2=1 (Bank 2 Active), the CPU fetches from 0x00000000 (which is physically Bank 2).
+    // Bank 1 remains at 0x08000000. Bank 2 remains at 0x08100000.
+    // SO:
+    // If BFB2=1 (Bank 2 Active): We want to write to Bank 1. Target = 0x08000000.
+    // If BFB2=0 (Bank 1 Active): We want to write to Bank 2. Target = 0x08100000.
+
+    uint32_t target_bank_addr;
     uint32_t start_sector, end_sector;
 
     if (bfb2_active) {
-        // Active: Bank 2. Target: Bank 1 (Mapped to 0x08100000).
-        // Sectors 0-11 correspond to Bank 1 physically.
+        // Active: Bank 2. Target: Bank 1 (0x08000000).
+        target_bank_addr = BANK1_ADDR;
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
         Serial_Log("Active: Bank 2. Target: Bank 1 (Sec 0-11) @ 0x%08X", target_bank_addr);
     } else {
-        // Active: Bank 1. Target: Bank 2 (Mapped to 0x08100000).
-        // Sectors 12-23 correspond to Bank 2 physically.
+        // Active: Bank 1. Target: Bank 2 (0x08100000).
+        target_bank_addr = BANK2_ADDR;
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
         Serial_Log("Active: Bank 1. Target: Bank 2 (Sec 12-23) @ 0x%08X", target_bank_addr);
@@ -486,38 +506,49 @@ void Bootloader_OTA_Loop(bool error_mode) {
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
 
-            HAL_FLASHEx_OBGetConfig(&OBInit);
-            OBInit.OptionType = OPTIONBYTE_USER;
+            // Wait for BSY
+            while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-            Serial_Log("Old OPTCR: 0x%08X", OBInit.USERConfig);
+            // Read OPTCR directly
+            uint32_t optcr = FLASH->OPTCR;
+            Serial_Log("Current OPTCR: 0x%08X", optcr);
+
+            // Modify BFB2
             if (bfb2_active) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
+                optcr &= ~FLASH_OPTCR_BFB2; // Disable
             } else {
-                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
+                optcr |= FLASH_OPTCR_BFB2; // Enable
             }
-            Serial_Log("New OPTCR: 0x%08X", OBInit.USERConfig);
 
-            Serial_Log("Programming OB...");
-            if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
-                Serial_Log("OB Launch...");
-                if (HAL_FLASH_OB_Launch() != HAL_OK) {
-                    Serial_Log("Launch Error!");
-                }
+            Serial_Log("Target OPTCR: 0x%08X", optcr);
 
-                Serial_Log("System Reset...");
-                HAL_Delay(100);
+            // Write OPTCR
+            FLASH->OPTCR = optcr;
 
-                // Critical Section for Reset
-                __disable_irq();
-                __DSB();
-                __ISB();
-                HAL_NVIC_SystemReset();
+            // Wait for BSY
+            while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 
-                while(1);
-            } else {
-                Serial_Log("OB Program FAILED!");
+            // Verify
+            if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) != (optcr & FLASH_OPTCR_BFB2)) {
+                Serial_Log("Write Failed! Readback: 0x%08X", FLASH->OPTCR);
                 HAL_NVIC_SystemReset();
             }
+
+            Serial_Log("Write Success. Launching...");
+            HAL_Delay(100);
+
+            // Set OPTSTRT
+            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+            // Wait for BSY
+            while(__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
+
+            Serial_Log("Resetting...");
+            HAL_Delay(100);
+
+            __disable_irq();
+            HAL_NVIC_SystemReset();
+            while(1);
         }
     }
 }
