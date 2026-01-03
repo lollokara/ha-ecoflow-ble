@@ -16,16 +16,21 @@
 #define CMD_OTA_ACK   0x06
 #define CMD_OTA_NACK  0x15
 
+// Ring Buffer Definition
+#define RING_BUFFER_SIZE 2048
+typedef struct {
+    uint8_t buffer[RING_BUFFER_SIZE];
+    volatile uint16_t head;
+    volatile uint16_t tail;
+} RingBuffer;
+
+RingBuffer rx_ring_buffer;
+uint8_t rx_byte_isr;
+
 // Register Definitions
 #ifndef FLASH_OPTCR_BFB2
 #define FLASH_OPTCR_BFB2 (1 << 4)
 #endif
-
-// Sector Definitions for F469 (2MB)
-// Bank 1: Sectors 0-11
-// Bank 2: Sectors 12-23
-// We only use the Application area (Sectors 2-11 in Bank 1, Sectors 14-23 in Bank 2)
-// Bootloader + Config occupy Sectors 0/1 and 12/13.
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
@@ -40,6 +45,74 @@ void USART3_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
+
+// --- Ring Buffer Implementation ---
+void rb_init(RingBuffer *rb) {
+    rb->head = 0;
+    rb->tail = 0;
+}
+
+void rb_push(RingBuffer *rb, uint8_t byte) {
+    uint16_t next_head = (rb->head + 1) % RING_BUFFER_SIZE;
+    if (next_head != rb->tail) {
+        rb->buffer[rb->head] = byte;
+        rb->head = next_head;
+    }
+}
+
+int rb_pop(RingBuffer *rb, uint8_t *byte) {
+    if (rb->head == rb->tail) {
+        return 0; // Empty
+    }
+    *byte = rb->buffer[rb->tail];
+    rb->tail = (rb->tail + 1) % RING_BUFFER_SIZE;
+    return 1;
+}
+
+int rb_available(RingBuffer *rb) {
+    if (rb->head >= rb->tail) return rb->head - rb->tail;
+    return RING_BUFFER_SIZE - rb->tail + rb->head;
+}
+
+// --- Interrupt Handling ---
+// Override default HAL handler if weak, or just implement callback.
+// Since HAL_UART_IRQHandler calls HAL_UART_RxCpltCallback, we use that.
+// We must ensure the IRQ is enabled in NVIC.
+
+void USART6_IRQHandler(void) {
+    HAL_UART_IRQHandler(&huart6);
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART6) {
+        rb_push(&rx_ring_buffer, rx_byte_isr);
+        HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+    }
+}
+
+// Blocking Read from Ring Buffer with Timeout
+HAL_StatusTypeDef UART_ReadByte(uint8_t* out, uint32_t timeout) {
+    uint32_t start = HAL_GetTick();
+    while (1) {
+        if (rb_pop(&rx_ring_buffer, out)) {
+            return HAL_OK;
+        }
+        if (HAL_GetTick() - start > timeout) {
+            return HAL_TIMEOUT;
+        }
+    }
+}
+
+// Helper to fill buffer from Ring Buffer
+HAL_StatusTypeDef UART_ReadBuffer(uint8_t* out, uint16_t len, uint32_t timeout) {
+    for (uint16_t i = 0; i < len; i++) {
+        if (UART_ReadByte(&out[i], timeout) != HAL_OK) {
+            return HAL_TIMEOUT;
+        }
+    }
+    return HAL_OK;
+}
+
 
 // CRC32 Table (Standard Ethernet 0x04C11DB7)
 static const uint32_t crc32_table[] = {
@@ -172,6 +245,11 @@ int main(void) {
         // Wait 500ms for OTA START - Blink Blue (Scenario 1)
         uint8_t buf[1];
         LED_B_On();
+
+        // Use non-blocking read for start byte check
+        // Note: IRQs not yet enabled by rb_init, but HAL_UART_Receive works if no IRQ enabled
+        // Actually, we initialized UART with interrupts in mind but haven't started them.
+        // Let's rely on standard receive here for simplicity before loop.
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
                  Serial_Log("OTA Byte received on boot.");
@@ -234,6 +312,12 @@ void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256];
 
+    // Initialize Ring Buffer and Interrupts
+    rb_init(&rx_ring_buffer);
+    HAL_NVIC_SetPriority(USART6_IRQn, 0, 0); // High Priority
+    HAL_NVIC_EnableIRQ(USART6_IRQn);
+    HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+
     HAL_FLASH_Unlock();
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
@@ -273,19 +357,20 @@ void Bootloader_OTA_Loop(void) {
         }
 
         uint8_t b;
-        if (HAL_UART_Receive(&huart6, &b, 1, 10) != HAL_OK) continue;
+        // Non-blocking check for start byte
+        if (UART_ReadByte(&b, 10) != HAL_OK) continue;
         if (b != START_BYTE) continue;
 
         // RX Activity: Orange On
         LED_O_On();
 
-        if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) {
+        if (UART_ReadBuffer(&header[1], 2, 100) != HAL_OK) {
             LED_O_Off(); continue;
         }
         uint8_t cmd = header[1];
         uint8_t len = header[2];
 
-        if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
+        if (UART_ReadBuffer(payload, len + 1, 500) != HAL_OK) {
             LED_O_Off(); continue;
         }
 
