@@ -2,13 +2,14 @@
 #define STM32_SERIAL_H
 
 #include <Arduino.h>
-#include "OtaManager.h" // Forward declaration issue might arise
-
+// #include "OtaManager.h" // Removed to avoid circular dep in header
 class OtaManager;
 
 class Stm32Serial {
 public:
     Stm32Serial(HardwareSerial* serial, OtaManager* ota);
+    void setOtaManager(OtaManager* ota) { _ota = ota; }
+
     void begin(unsigned long baud);
     void handle();
 
@@ -20,6 +21,10 @@ public:
 
     // Basic Packet
     void sendPacket(uint8_t cmd, uint8_t* payload, uint8_t len);
+
+    // Protocol Methods
+    void sendDeviceList();
+    void sendDeviceStatus(uint8_t device_id);
 
 private:
     HardwareSerial* _serial;

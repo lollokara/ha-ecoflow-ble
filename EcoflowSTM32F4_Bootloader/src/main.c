@@ -16,7 +16,8 @@
 
 // Register Definitions
 #ifndef FLASH_OPTCR_BFB2
-#define FLASH_OPTCR_BFB2 (1 << 4)
+// STM32F469: BFB2 is Bit 23
+#define FLASH_OPTCR_BFB2 (1 << 23)
 #endif
 
 // RTC Backup Register for OTA Flag
@@ -155,7 +156,8 @@ void send_nack() {
 void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
     uint8_t payload[256]; // Max chunk size
-    uint32_t calculated_checksum = 0; // Checksum of written data
+    uint32_t total_received_checksum = 0; // Checksum of received payload data
+    uint32_t total_bytes_received = 0;
 
     // Determine Bank Status
     HAL_FLASH_Unlock();
@@ -199,6 +201,9 @@ void Bootloader_OTA_Loop(void) {
 
         if (cmd == CMD_OTA_START) {
             ota_started = true;
+            total_received_checksum = 0;
+            total_bytes_received = 0;
+
             // Erase Inactive Bank
             // If Bank 2 Active (BFB2=1) -> Erase Bank 1 (Sectors 0-11)
             // If Bank 1 Active (BFB2=0) -> Erase Bank 2 (Sectors 12-23)
@@ -224,7 +229,6 @@ void Bootloader_OTA_Loop(void) {
                 }
             }
             LED_O_Off();
-            calculated_checksum = 0; // Reset checksum
 
             if (!error) send_ack(); else send_nack();
         }
@@ -246,35 +250,41 @@ void Bootloader_OTA_Loop(void) {
                     ok = false; break;
                 }
 
-                // Accumulate Checksum
-                calculated_checksum += word; // Simple Sum for verification
+                // Add to simple checksum (sum of words)
+                // Note: This sums the *payload* as we write it.
+                // A better check is to read back.
+                // We will read back in APPLY.
             }
 
-            if (ok) send_ack(); else send_nack();
+            if (ok) {
+                // Calculate Checksum of RECEIVED data for later verification
+                for(uint32_t i=0; i<data_len; i++) {
+                    total_received_checksum += data[i];
+                }
+                total_bytes_received += data_len;
+                send_ack();
+            } else {
+                send_nack();
+            }
         }
         else if (cmd == CMD_OTA_END) {
              send_ack();
              LED_B_Off(); LED_G_On(); // Green to indicate done receiving
         }
         else if (cmd == CMD_OTA_APPLY) {
-            // Checksum Verification logic can be added here if ESP sends the expected CRC/Sum
-            // For now, if we trust the UART CRC, we proceed.
-            // The prompt asked to "verify the checksum of the bank we wrote".
-            // Since we don't receive an expected checksum from ESP in this protocol version,
-            // we can only verify internal consistency or readability.
-            // Or we could read back the bank and calculate CRC.
+            // Verify Checksum
+            // Read back flash and compare sum
+            uint32_t read_checksum = 0;
+            for (uint32_t i=0; i<total_bytes_received; i++) {
+                read_checksum += *(__IO uint8_t*)(inactive_bank_addr + i);
+            }
 
-            // To properly verify, we'd need to know the expected checksum.
-            // Assuming strict requirement: We'll implement a read-back check that ensures memory is readable.
+            bool verify_ok = (read_checksum == total_received_checksum);
 
-            bool verify_ok = true;
-            // Scan the written area (e.g. first 1MB or tracked size)
-            // Since we don't track total size here perfectly without a static var from START,
-            // we rely on the fact that FLASH writes return errors if they fail.
-            // But let's check the first word (Vector Table Pointer)
+            // Also check SP
             uint32_t *check_ptr = (uint32_t*)inactive_bank_addr;
             if ((*check_ptr & 0x2FFE0000) != 0x20000000) {
-                 verify_ok = false; // Invalid Stack Pointer
+                 verify_ok = false;
             }
 
             if (verify_ok) {

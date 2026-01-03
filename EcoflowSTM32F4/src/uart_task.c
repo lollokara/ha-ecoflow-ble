@@ -1,18 +1,18 @@
 #include "uart_task.h"
 #include "ecoflow_protocol.h"
 #include "display_task.h"
-#include "flash_ops.h" // Include Flash Ops
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
 
 extern IWDG_HandleTypeDef hiwdg; // Refresh Watchdog during long ops
+extern RTC_HandleTypeDef hrtc;   // Needs to be defined in main.c or here
 
 UART_HandleTypeDef huart6;
 
 // Ring Buffer Implementation
-#define RING_BUFFER_SIZE 2048 // Increased to support OTA Chunks (1KB payload + overhead)
+#define RING_BUFFER_SIZE 2048
 typedef struct {
     uint8_t buffer[RING_BUFFER_SIZE];
     volatile uint16_t head;
@@ -85,8 +85,7 @@ typedef enum {
     STATE_HANDSHAKE,
     STATE_WAIT_HANDSHAKE_ACK,
     STATE_WAIT_DEVICE_LIST,
-    STATE_POLLING,
-    STATE_OTA_MODE
+    STATE_POLLING
 } ProtocolState;
 
 static ProtocolState protocolState = STATE_HANDSHAKE;
@@ -103,14 +102,9 @@ typedef enum {
 } ParseState;
 
 static ParseState parseState = PARSE_START;
-static uint8_t parseBuffer[1024]; // Increased for safety
+static uint8_t parseBuffer[1024];
 static uint16_t parseIndex = 0;
 static uint8_t expectedPayloadLen = 0;
-
-// OTA State
-static bool ota_active = false;
-static uint32_t ota_bytes_received = 0;
-static uint32_t ota_total_size = 0;
 
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
@@ -141,97 +135,22 @@ static void UART_Init(void) {
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
-static void send_ota_ack(void) {
-    uint8_t buf[4];
-    int l = pack_ota_ack_message(buf);
-    HAL_UART_Transmit(&huart6, buf, l, 100);
-}
-
-static void send_ota_nack(void) {
-    uint8_t buf[4];
-    int l = pack_ota_nack_message(buf);
-    HAL_UART_Transmit(&huart6, buf, l, 100);
-}
-
 static void process_packet(uint8_t *packet, uint16_t total_len) {
     uint8_t cmd = packet[1];
-    uint8_t *payload = &packet[3];
 
-    // Check OTA Commands first
+    // Handle OTA START - Reboot to Bootloader
     if (cmd == CMD_OTA_START) {
-        printf("OTA: Start Command Received\n");
-        protocolState = STATE_OTA_MODE; // Stop polling
-        ota_active = true;
-        ota_bytes_received = 0;
+        printf("OTA START Received. Rebooting to Bootloader...\n");
+        // Write Magic Number
+        HAL_PWR_EnableBkUpAccess();
+        __HAL_RCC_RTC_ENABLE();
 
-        // Unpack size
-        OtaStartMsg msg;
-        memcpy(&msg, payload, sizeof(OtaStartMsg));
-        ota_total_size = msg.total_size;
+        // Use HAL to write Backup Register safely
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0xDEADBEEF);
 
-        Flash_Unlock();
-        // Prepare Inactive Bank: Erase, Copy Bootloader
-        // This is blocking and long. We should refresh IWDG.
-
-        // 1. Copy Bootloader (Sectors 0->12 or 12->0)
-        if (!Flash_CopyBootloader()) {
-            printf("OTA: Copy Bootloader Failed\n");
-            send_ota_nack();
-            return;
-        }
-
-        // 2. Erase Application Sectors in Inactive Bank
-        if (!Flash_PrepareOTA()) {
-             printf("OTA: Erase Failed\n");
-             send_ota_nack();
-             return;
-        }
-
-        printf("OTA: Erase Complete. Ready for chunks.\n");
-        send_ota_ack();
+        HAL_Delay(100);
+        HAL_NVIC_SystemReset();
     }
-    else if (cmd == CMD_OTA_CHUNK) {
-        if (!ota_active) { send_ota_nack(); return; }
-
-        // [Offset(4)][Data(N)]
-        uint32_t offset;
-        memcpy(&offset, payload, 4);
-        uint8_t *data = &payload[4];
-        uint8_t len = packet[2] - 4;
-
-        if (Flash_WriteChunk(offset, data, len)) {
-            ota_bytes_received += len;
-            send_ota_ack();
-            // Provide feedback to UI
-            if (ota_bytes_received % 10240 == 0) {
-                 DisplayEvent event;
-                 event.type = DISPLAY_EVENT_OTA_PROGRESS;
-                 event.data.otaProgress = (uint8_t)((ota_bytes_received * 100) / ota_total_size);
-                 xQueueSend(displayQueue, &event, 0);
-            }
-        } else {
-            printf("OTA: Write Failed at %lu\n", offset);
-            send_ota_nack();
-        }
-    }
-    else if (cmd == CMD_OTA_END) {
-        printf("OTA: End Command\n");
-        Flash_Lock();
-        ota_active = false;
-        send_ota_ack();
-
-        DisplayEvent event;
-        event.type = DISPLAY_EVENT_OTA_PROGRESS;
-        event.data.otaProgress = 100;
-        xQueueSend(displayQueue, &event, 0);
-    }
-    else if (cmd == CMD_OTA_APPLY) {
-        printf("OTA: Applying Update (Swap Bank)...\n");
-        send_ota_ack();
-        HAL_Delay(100); // Give time for ACK to transmit
-        Flash_SwapBank(); // Resets system
-    }
-    // ... Normal Commands ...
     else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
             protocolState = STATE_WAIT_DEVICE_LIST;
@@ -376,7 +295,7 @@ void StartUARTTask(void * argument) {
         }
 
         // 3. State Machine
-        if (!ota_active && (xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
+        if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
             switch (protocolState) {
                 case STATE_HANDSHAKE:

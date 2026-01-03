@@ -47,39 +47,48 @@ void setup() {
     DeviceManager::getInstance().initialize();
     WebServer::begin();
 
-    // Init Logic for Cross-Dependency
-    // We allocate them on heap or static
-    static OtaManager ota(NULL); // Temp construct
-    static Stm32Serial ser(&Serial1, &ota); // Pass hardware serial and ota ptr
-
-    // Fix circular link
-    // OtaManager constructor took Stm32Serial*
-    // I need to patch OtaManager to accept it or set it later?
-    // My previous OtaManager code: OtaManager(Stm32Serial* stm32) : _stm32(stm32) ...
-    // Stm32Serial code: Stm32Serial(HardwareSerial* serial, OtaManager* ota) ...
-    // This is a catch-22.
-    // Solution: Create Stm32Serial first, then OtaManager, then set Ota on Stm32Serial?
-    // or just use pointers.
-
-    stm32Serial = new Stm32Serial(&Serial1, NULL); // Init with NULL OTA
+    // Instantiate Serial and OTA Manager
+    stm32Serial = new Stm32Serial(&Serial1, nullptr);
     otaManager = new OtaManager(stm32Serial);
-    // I need a setOta method on Stm32Serial? Or make member public?
-    // Since I defined it private, I need to modify Stm32Serial.h/cpp to allow setting it or use a setter.
-    // For now, let's just re-instantiate or use a setter.
-    // Wait, I can't modify the files I just wrote easily without using tools again.
-    // I should have thought of this.
-    // I will modify Stm32Serial.h to add setOtaManager().
+    stm32Serial->setOtaManager(otaManager);
 
-    // But wait, I can just do this:
-    // Stm32Serial ser(&Serial1, NULL);
-    // OtaManager ota(&ser);
-    // ser.setOta(&ota);
-    // But I don't have setOta.
-
-    // I will use a dirty trick: The pointer in Stm32Serial is public? No private.
-    // I will rewrite Stm32Serial.h to add setOtaManager.
+    stm32Serial->begin(115200);
 }
 
 void loop() {
-    // Placeholder - will actuall overwrite with correct logic below
+    esp_task_wdt_reset();
+
+    static uint32_t last_data_refresh = 0;
+    static uint32_t last_device_list_update = 0;
+
+    LightSensor::getInstance().update();
+    DeviceManager::getInstance().update();
+    checkSerial();
+
+    // Update Stm32Serial and OtaManager
+    if (stm32Serial) stm32Serial->handle();
+    if (otaManager) otaManager->handle();
+
+    // Poll connected devices for data every 2 seconds
+    if (millis() - last_data_refresh > 2000) {
+        last_data_refresh = millis();
+
+        EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+        if (d3 && d3->isAuthenticated()) d3->requestData();
+
+        EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
+        if (w2 && w2->isAuthenticated()) w2->requestData();
+
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) d3p->requestData();
+    }
+
+    // Periodically broadcast the device list (every 5 seconds)
+    if (millis() - last_device_list_update > 5000) {
+        last_device_list_update = millis();
+        // Pause explicit broadcast if OTA is running to avoid UART contention
+        if (otaManager && otaManager->getState() == OtaManager::OTA_IDLE) {
+             if (stm32Serial) stm32Serial->sendDeviceList();
+        }
+    }
 }
