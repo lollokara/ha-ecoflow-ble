@@ -519,10 +519,13 @@ void Bootloader_OTA_Loop(void) {
             RTC->BKP1R = 0;
 
             // Toggle BFB2
+            ClearFlashFlags(); // Clear flags before OB operations
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
             FLASH_OBProgramInitTypeDef OBInit;
             HAL_FLASHEx_OBGetConfig(&OBInit);
+
+            Serial_Log("Current USERConfig: 0x%08X", OBInit.USERConfig);
 
             // Toggle
             OBInit.OptionType = OPTIONBYTE_USER;
@@ -532,10 +535,22 @@ void Bootloader_OTA_Loop(void) {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
 
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
+            Serial_Log("New USERConfig: 0x%08X. Programming...", OBInit.USERConfig);
 
-            // Should not reach here
+            __disable_irq(); // Critical Section
+            HAL_StatusTypeDef status = HAL_FLASHEx_OBProgram(&OBInit);
+            if (status == HAL_OK) {
+                HAL_FLASH_OB_Launch(); // Resets system if successful
+            }
+            __enable_irq();
+
+            // If we are here, it failed
+            Serial_Log("OB Program/Launch Failed! Status: %d", status);
+            HAL_FLASH_OB_Lock();
+            HAL_FLASH_Lock();
+            send_nack();
+            // Wait a bit and reset anyway? Or retry?
+            HAL_Delay(500);
             HAL_NVIC_SystemReset();
         }
     }
