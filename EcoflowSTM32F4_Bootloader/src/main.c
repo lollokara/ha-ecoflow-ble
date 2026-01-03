@@ -39,6 +39,7 @@ uint8_t rx_byte_isr;
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
+IWDG_HandleTypeDef hiwdg; // Watchdog
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
@@ -47,9 +48,18 @@ uint32_t JumpAddress;
 void SystemClock_Config(void);
 void UART_Init(void);
 void USART3_Init(void);
+void MX_IWDG_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
+void ClearFlashFlags(void);
+
+// Software Delay (Independent of SysTick)
+void Software_Delay(uint32_t count) {
+    for (volatile uint32_t i = 0; i < count; i++) {
+        __NOP();
+    }
+}
 
 // --- Ring Buffer Implementation ---
 void rb_init(RingBuffer *rb) {
@@ -80,10 +90,6 @@ int rb_available(RingBuffer *rb) {
 }
 
 // --- Interrupt Handling ---
-// Override default HAL handler if weak, or just implement callback.
-// Since HAL_UART_IRQHandler calls HAL_UART_RxCpltCallback, we use that.
-// We must ensure the IRQ is enabled in NVIC.
-
 void USART6_IRQHandler(void) {
     HAL_UART_IRQHandler(&huart6);
 }
@@ -217,18 +223,28 @@ void Serial_Log(const char* fmt, ...) {
 }
 
 int main(void) {
+    // CRITICAL: Ensure Interrupt Vector Table is set correctly.
+    // When booting from Bank 2 (aliased to 0x00), this ensures VTOR points to
+    // the alias 0x00 (or 0x08000000 alias) rather than some other random location.
+    SCB->VTOR = 0x08000000;
+    __DSB(); // Data Synchronization Barrier
+
     HAL_Init();
     GPIO_Init();
 
-    // 1. Startup Sequence
-    LED_B_On(); HAL_Delay(100); LED_B_Off();
-    LED_O_On(); HAL_Delay(100); LED_O_Off();
-    LED_R_On(); HAL_Delay(100); LED_R_Off();
-    LED_G_On(); HAL_Delay(100); LED_G_Off();
+    // 1. Startup Sequence with Software Delay
+    // This verifies CPU execution INDEPENDENT of SysTick.
+    // If these blink but subsequent HAL_Delay fails, we know it's SysTick.
+    // Delay increased to ~10M iterations for visibility (~50-100ms at 180MHz)
+    LED_B_On(); Software_Delay(10000000); LED_B_Off();
+    LED_O_On(); Software_Delay(10000000); LED_O_Off();
+    LED_R_On(); Software_Delay(10000000); LED_R_Off();
+    LED_G_On(); Software_Delay(10000000); LED_G_Off();
 
     SystemClock_Config();
     UART_Init();
     USART3_Init();
+    MX_IWDG_Init(); // Init Watchdog
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
@@ -239,9 +255,19 @@ int main(void) {
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
     uint32_t boot_fails = RTC->BKP1R;
 
+    // Determine Active Bank based on OPTCR
+    // Note: On F469, BFB2 is Bit 4.
+    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1.
+    // However, the hardware Aliases Bank 2 to 0x08000000.
+    // Let's log the full OPTCR for diagnostics.
+    Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
+
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
+    // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
+
+    Serial_Log("Checking App at 0x%08X. SP: 0x%08X. Valid: %d", APP_ADDRESS, sp, valid_app);
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");
@@ -254,11 +280,7 @@ int main(void) {
             Serial_Log("Too many failed boots (%d). Forcing OTA.", boot_fails);
             // Flash RED to indicate failure
             for(int i=0; i<10; i++) { LED_R_Toggle(); HAL_Delay(100); }
-            RTC->BKP1R = 0; // Reset counter so we don't get stuck forever if they fix it? Or keep it?
-            // Actually, if we enter OTA and they don't upload, we might reboot.
-            // Let's reset it here, assuming they will upload.
-            // If they don't upload, next reboot will be attempt 0.
-            // If it crashes again 3 times, we come back here.
+            RTC->BKP1R = 0;
             Bootloader_OTA_Loop();
         }
 
@@ -291,6 +313,13 @@ int main(void) {
     } else {
         // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
+
+        // SAFETY: If we are in Bank 2 (BFB2 set) and App is invalid,
+        // we might be stuck in a loop.
+        // We should try to revert to Bank 1?
+        // But maybe Bank 1 is also invalid.
+        // Best to stay in OTA mode.
+
         RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     }
@@ -336,15 +365,6 @@ void ClearFlashFlags() {
 #endif
 
 void Bootloader_OTA_Loop(void) {
-    // Check for Single Bank Mode (DB1M=1)
-    if (FLASH->OPTCR & FLASH_OPTCR_DB1M) {
-        Serial_Log("CRITICAL WARNING: DB1M bit is SET (Single Bank Mode).");
-        Serial_Log("Dual Bank OTA will NOT work reliably.");
-        Serial_Log("Please use STM32CubeProgrammer to clear DB1M (Uncheck 'DB1M').");
-        // We do not abort, but we warn heavily.
-        // Flash SOS pattern on Orange LED
-        for(int i=0; i<5; i++) { LED_O_Toggle(); HAL_Delay(200); }
-    }
     uint8_t header[3];
     uint8_t payload[256];
 
@@ -385,6 +405,9 @@ void Bootloader_OTA_Loop(void) {
     uint32_t chunks_received = 0;
 
     while(1) {
+        // Watchdog Refresh (Important for long waits)
+        HAL_IWDG_Refresh(&hiwdg);
+
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
@@ -442,7 +465,9 @@ void Bootloader_OTA_Loop(void) {
             bool error = false;
             // Erase the ENTIRE Inactive Bank (Bootloader area included)
             for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
-                // LED_O_Toggle(); // Toggle Orange during erase (commented to avoid delays)
+                // Refresh Watchdog inside Erase Loop
+                HAL_IWDG_Refresh(&hiwdg);
+
                 EraseInitStruct.Sector = sec;
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
@@ -474,6 +499,7 @@ void Bootloader_OTA_Loop(void) {
                 uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
                 memcpy(&word, &data[i], copy_len);
 
+                ClearFlashFlags(); // Ensure no flags before program
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
                     ok = false; break;
                 }
@@ -502,6 +528,8 @@ void Bootloader_OTA_Loop(void) {
                 uint8_t* flash_ptr = (uint8_t*)target_bank_addr;
 
                 for(uint32_t i = 0; i < bytes_written; i++) {
+                     // Refresh Watchdog during CRC Check
+                     if (i % 10000 == 0) HAL_IWDG_Refresh(&hiwdg);
                      calculated_crc32 = calculate_crc32(calculated_crc32, &flash_ptr[i], 1);
                 }
 
@@ -558,7 +586,7 @@ void Bootloader_OTA_Loop(void) {
 
             Serial_Log("Writing OPTCR: 0x%08X", optcr);
 
-            __disable_irq();
+            __disable_irq(); // Disable Interrupts for safety
 
             // 1. Write the new value
             FLASH->OPTCR = optcr;
@@ -569,10 +597,11 @@ void Bootloader_OTA_Loop(void) {
             // 3. Wait for BSY
             while (FLASH->SR & FLASH_SR_BSY);
 
-            __enable_irq();
+            // 4. Force Reload (Triggers Reset)
+            HAL_FLASH_OB_Launch();
 
-            Serial_Log("OB Launch Completed. Resetting...");
-            HAL_Delay(100);
+            // Should reset automatically, but if not:
+            Serial_Log("OB Launch Failed/Completed. Resetting...");
             HAL_NVIC_SystemReset();
         }
     }
@@ -625,6 +654,15 @@ void USART3_Init(void) {
     HAL_UART_Init(&huart3);
 }
 
+void MX_IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256; // 32kHz / 256 = 125Hz
+    hiwdg.Init.Reload = 1250; // 10s
+    if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+        // Error
+    }
+}
+
 void GPIO_Init(void) {
     __HAL_RCC_GPIOG_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -668,7 +706,8 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
   if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-      while(1) { LED_R_On(); HAL_Delay(50); LED_R_Off(); HAL_Delay(50); }
+      // Use Software Delay for Error Loop too
+      while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
   }
 
   HAL_PWREx_EnableOverDrive();

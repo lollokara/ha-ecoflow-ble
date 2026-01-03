@@ -26,12 +26,13 @@ def merge_firmware(source, target, env):
         with open(app_path, "rb") as f:
             app_bin = f.read()
 
-        # Pad Bootloader to 16KB
-        if len(boot_bin) > BOOTLOADER_SIZE:
-            print("Error: Bootloader too large!")
-            return
+        # Check Bootloader Size
+        boot_len = len(boot_bin)
+        print(f"Bootloader Size: {boot_len} bytes")
+        if boot_len > BOOTLOADER_SIZE:
+            raise Exception(f"Error: Bootloader too large! Size: {boot_len} bytes, Max: {BOOTLOADER_SIZE} bytes.")
 
-        padding1 = b'\xFF' * (BOOTLOADER_SIZE - len(boot_bin))
+        padding1 = b'\xFF' * (BOOTLOADER_SIZE - boot_len)
 
         # Empty Config (16KB)
         config_padding = b'\xFF' * CONFIG_SIZE
@@ -47,5 +48,6 @@ def merge_firmware(source, target, env):
 
     except Exception as e:
         print(f"Error merging firmware: {e}")
+        env.Exit(1)
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", merge_firmware)
