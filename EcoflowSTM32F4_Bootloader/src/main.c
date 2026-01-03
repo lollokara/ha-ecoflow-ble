@@ -1,3 +1,8 @@
+// Ensure HSE_VALUE is defined correctly before HAL inclusion
+#ifndef HSE_VALUE
+#define HSE_VALUE 8000000
+#endif
+
 #include "stm32f4xx_hal.h"
 #include <string.h>
 #include <stdbool.h>
