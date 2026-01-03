@@ -186,17 +186,26 @@ uint8_t calculate_crc8(const uint8_t *data, uint8_t len) {
 void send_ack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_ACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
-    HAL_UART_Transmit(&huart6, buf, 4, 100);
+    if (HAL_UART_Transmit(&huart6, buf, 4, 100) != HAL_OK) {
+        printf("Error sending ACK\n");
+    } else {
+        printf("ACK Sent\n");
+    }
     // Green Flash
-    LED_G_On(); HAL_Delay(50); LED_G_Off();
+    LED_G_On();
+    // No Delay to avoid UART timeout on host
+    LED_G_Off();
 }
 
 void send_nack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_NACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
+    printf("NACK Sent\n");
     // Red Flash
-    LED_R_On(); HAL_Delay(500); LED_R_Off();
+    LED_R_On();
+    // No Delay
+    LED_R_Off();
 }
 
 void Bootloader_OTA_Loop(void) {

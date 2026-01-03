@@ -133,8 +133,10 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         sendData(ack, l);
         sendDeviceList();
     } else if (cmd == CMD_OTA_ACK) {
+        // ESP_LOGI(TAG, "ACK Received");
         otaAckReceived = true;
     } else if (cmd == CMD_OTA_NACK) {
+        ESP_LOGE(TAG, "NACK Received");
         otaNackReceived = true;
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
         // STM32 is requesting status for a specific device
@@ -506,7 +508,7 @@ void Stm32Serial::otaTask(void* parameter) {
         otaAckReceived = false;
         otaNackReceived = false;
         uint32_t startWait = millis();
-        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) { // 2s timeout per chunk
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout per chunk
             vTaskDelay(5);
         }
 
