@@ -217,11 +217,20 @@ void Serial_Log(const char* fmt, ...) {
 }
 
 int main(void) {
+    // Critical: Ensure Vector Table is at Flash Base (0x08000000)
+    // When booting from Bank 2 (BFB2=1), 0x00000000 is aliased to Bank 2,
+    // but we want the CPU to use the vector table at the start of the aliased bank.
+    SCB->VTOR = 0x08000000;
+    __enable_irq(); // Ensure interrupts are enabled for SysTick
+
     HAL_Init();
     GPIO_Init();
 
-    // 1. Startup Sequence
-    LED_B_On(); HAL_Delay(100); LED_B_Off();
+    // 1. Startup Sequence (Use Loop instead of HAL_Delay to avoid SysTick dependency)
+    LED_B_On();
+    for(volatile int i=0; i<2000000; i++);
+    LED_B_Off();
+
     LED_O_On(); HAL_Delay(100); LED_O_Off();
     LED_R_On(); HAL_Delay(100); LED_R_Off();
     LED_G_On(); HAL_Delay(100); LED_G_Off();
@@ -230,7 +239,8 @@ int main(void) {
     UART_Init();
     USART3_Init();
 
-    Serial_Log("Bootloader Started. CRC & Logging Active.");
+    Serial_Log("Bootloader Started. Built: %s %s", __DATE__, __TIME__);
+    Serial_Log("CRC & Logging Active. VTOR: 0x%08X", SCB->VTOR);
 
     // Enable Backup Access for OTA Flag and Boot Counter
     __HAL_RCC_PWR_CLK_ENABLE();
