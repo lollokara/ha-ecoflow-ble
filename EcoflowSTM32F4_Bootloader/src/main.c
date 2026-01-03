@@ -508,7 +508,18 @@ void Bootloader_OTA_Loop(bool error_mode) {
             Serial_Log("Programming OB...");
             if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
                 Serial_Log("OB Launch (Reset)...");
+                // Wait for any pending UART transmission
+                HAL_Delay(100);
+
+                // Critical Section for Reset
+                __disable_irq();
+                __DSB();
+                __ISB();
+
                 HAL_FLASH_OB_Launch();
+
+                // Should not reach here
+                while(1);
             } else {
                 Serial_Log("OB Program FAILED!");
                 HAL_NVIC_SystemReset();
