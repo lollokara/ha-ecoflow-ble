@@ -261,6 +261,9 @@ int main(void) {
     // However, the hardware Aliases Bank 2 to 0x08000000.
     // Let's log the full OPTCR for diagnostics.
     Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
+    #ifdef FLASH_OPTCR1_nWRP
+    Serial_Log("OPTCR1: 0x%08X", FLASH->OPTCR1);
+    #endif
 
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
     // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
@@ -460,8 +463,7 @@ void Bootloader_OTA_Loop(void) {
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-            // Use Voltage Range 2 (x16) to be safe against PGPERR even at 3.3V
-            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_2;
+            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
             EraseInitStruct.NbSectors = 1;
 
             if (HAL_FLASH_Unlock() != HAL_OK) {
@@ -478,7 +480,11 @@ void Bootloader_OTA_Loop(void) {
 
                 EraseInitStruct.Sector = sec;
 
-                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                __disable_irq(); // Prevent Sequence Errors (PGS)
+                HAL_StatusTypeDef status = HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+                __enable_irq();
+
+                if (status != HAL_OK) {
                     Serial_Log("Erase Err Sec %d. SR:0x%X Err:0x%X", sec, FLASH->SR, HAL_FLASH_GetError());
                     error = true; break;
                 }
