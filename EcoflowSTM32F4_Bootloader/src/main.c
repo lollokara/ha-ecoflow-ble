@@ -250,17 +250,13 @@ int main(void) {
     Serial_Log("Device is STM32F469NI (2MB). Dual Bank Always Active.");
 
     // Determine Active Bank and Jump Address
-    // Note: BFB2 controls which physical bank is mapped to 0x00000000 (and aliased to 0x08000000).
-    // The Active Bank is ALWAYS accessible at 0x08000000.
-    // The Inactive Bank is ALWAYS accessible at 0x08100000.
-
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
-    uint32_t app_addr_final = BANK1_ADDR + APP_OFFSET; // Always 0x08008000 (Active Bank Alias)
+    uint32_t app_addr_final = 0x08000000 + APP_OFFSET; // Always use Active Bank alias
 
     if (bfb2_active) {
-        Serial_Log("Active: Bank 2 (BFB2=1). Mapped to 0x0800xxxx");
+        Serial_Log("Active: Bank 2 (BFB2=1). Aliased to 0x0800xxxx");
     } else {
-        Serial_Log("Active: Bank 1 (BFB2=0). Mapped to 0x0800xxxx");
+        Serial_Log("Active: Bank 1 (BFB2=0). Aliased to 0x0800xxxx");
     }
 
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
@@ -334,12 +330,8 @@ void Bootloader_OTA_Loop(bool error_mode) {
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
     // Target Bank Logic
-    // On STM32F469 with Dual Bank:
-    // If BFB2=0 (Bank 1 Active): Bank 2 is at 0x08100000. Erase Sectors 12-23.
-    // If BFB2=1 (Bank 2 Active): Bank 1 is ALIASED to 0x08100000. Erase Sectors 0-11.
-    // Conclusion: The INACTIVE bank is ALWAYS at 0x08100000.
-
-    uint32_t target_bank_addr = BANK2_ADDR; // Always 0x08100000 for Inactive Bank
+    // The INACTIVE bank is ALWAYS aliased to 0x08100000.
+    uint32_t target_bank_addr = 0x08100000;
     uint32_t start_sector, end_sector;
 
     if (bfb2_active) {
@@ -497,26 +489,30 @@ void Bootloader_OTA_Loop(bool error_mode) {
             HAL_FLASHEx_OBGetConfig(&OBInit);
             OBInit.OptionType = OPTIONBYTE_USER;
 
+            Serial_Log("Old OPTCR: 0x%08X", OBInit.USERConfig);
             if (bfb2_active) {
                 OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
             } else {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
+            Serial_Log("New OPTCR: 0x%08X", OBInit.USERConfig);
 
             Serial_Log("Programming OB...");
             if (HAL_FLASHEx_OBProgram(&OBInit) == HAL_OK) {
-                Serial_Log("OB Launch (Reset)...");
-                // Wait for any pending UART transmission
+                Serial_Log("OB Launch...");
+                if (HAL_FLASH_OB_Launch() != HAL_OK) {
+                    Serial_Log("Launch Error!");
+                }
+
+                Serial_Log("System Reset...");
                 HAL_Delay(100);
 
                 // Critical Section for Reset
                 __disable_irq();
                 __DSB();
                 __ISB();
+                HAL_NVIC_SystemReset();
 
-                HAL_FLASH_OB_Launch();
-
-                // Should not reach here
                 while(1);
             } else {
                 Serial_Log("OB Program FAILED!");

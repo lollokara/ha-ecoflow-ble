@@ -280,8 +280,11 @@ int main(void) {
     SystemClock_Config();
 
     // Reset Boot Counter after successful boot
+    // This confirms to the bootloader that the app started correctly
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
+    // Wait for Backup Domain access
+    for(volatile int i=0; i<100; i++);
     RTC->BKP1R = 0;
 
     ESP32_Reset_Init();
