@@ -26,6 +26,11 @@
 #include "fan_task.h"
 #include <stdio.h>
 
+// FreeRTOS Handler Declarations
+extern void xPortSysTickHandler(void);
+extern void vPortSVCHandler(void);
+extern void xPortPendSVHandler(void);
+
 // External Handles
 extern UART_HandleTypeDef huart6;
 
@@ -344,10 +349,33 @@ int main(void) {
 
 /**
  * @brief FreeRTOS Tick Hook.
- * Called every tick to increment the HAL tick counter.
  */
 void vApplicationTickHook(void) {
+    // HAL_IncTick is now called in SysTick_Handler
+}
+
+/**
+ * @brief SVC Handler - Forward to FreeRTOS
+ */
+void SVC_Handler(void) {
+    vPortSVCHandler();
+}
+
+/**
+ * @brief PendSV Handler - Forward to FreeRTOS
+ */
+void PendSV_Handler(void) {
+    xPortPendSVHandler();
+}
+
+/**
+ * @brief SysTick Handler - Shared by HAL and FreeRTOS
+ */
+void SysTick_Handler(void) {
     HAL_IncTick();
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        xPortSysTickHandler();
+    }
 }
 
 /**
