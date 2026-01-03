@@ -1,89 +1,31 @@
 #ifndef STM32_SERIAL_H
 #define STM32_SERIAL_H
 
-/**
- * @file Stm32Serial.h
- * @author Lollokara
- * @brief Header for the Stm32Serial class.
- *
- * Defines the singleton class responsible for managing the UART connection
- * to the STM32F4 user interface controller.
- */
-
 #include <Arduino.h>
-#include "ecoflow_protocol.h"
-#include <freertos/semphr.h>
+#include "OtaManager.h" // Forward declaration issue might arise
 
-/**
- * @class Stm32Serial
- * @brief Singleton class for ESP32-STM32 UART communication.
- *
- * This class handles:
- * - Initialization of the hardware serial port.
- * - Processing incoming packets (parsing, CRC validation).
- * - Sending outgoing packets (Handshakes, Status Updates).
- */
+class OtaManager;
+
 class Stm32Serial {
 public:
-    /**
-     * @brief Gets the singleton instance.
-     * @return Reference to the Stm32Serial instance.
-     */
-    static Stm32Serial& getInstance() {
-        static Stm32Serial instance;
-        return instance;
-    }
+    Stm32Serial(HardwareSerial* serial, OtaManager* ota);
+    void begin(unsigned long baud);
+    void handle();
 
-    /**
-     * @brief Initializes the serial interface.
-     */
-    void begin();
+    // OTA Methods
+    void sendOtaStart(uint32_t size);
+    void sendOtaChunk(uint32_t offset, uint8_t* data, uint8_t len);
+    void sendOtaEnd();
+    void sendOtaApply();
 
-    /**
-     * @brief Updates the serial handler.
-     * Must be called frequently in the main loop to process incoming data.
-     */
-    void update();
-
-    /**
-     * @brief Sends the current list of devices to the STM32.
-     */
-    void sendDeviceList();
-
-    /**
-     * @brief Sends the status of a specific device to the STM32.
-     * @param device_id The ID of the device to report.
-     */
-    void sendDeviceStatus(uint8_t device_id);
-
-    /**
-     * @brief Starts the background OTA task.
-     * @param filename Path to the firmware file in LittleFS.
-     */
-    void startOta(const String& filename);
-
-    bool isOtaInProgress() const { return _otaRunning; }
-
-    // Helper to send raw data safely
-    void sendData(const uint8_t* data, size_t len);
+    // Basic Packet
+    void sendPacket(uint8_t cmd, uint8_t* payload, uint8_t len);
 
 private:
-    /**
-     * @brief Private constructor for Singleton pattern.
-     */
-    Stm32Serial() {}
-
-    /**
-     * @brief Processes a fully received and validated packet.
-     * @param buf Pointer to the packet buffer.
-     * @param len Length of the packet.
-     */
-    void processPacket(uint8_t* buf, uint8_t len);
-
-    static void otaTask(void* parameter);
-
-    bool _otaRunning = false;
-    SemaphoreHandle_t _txMutex = NULL;
+    HardwareSerial* _serial;
+    OtaManager* _ota;
+    uint8_t crc8(uint8_t *data, int len);
+    uint8_t lastSentCmd = 0;
 };
 
 #endif
