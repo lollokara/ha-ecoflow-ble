@@ -272,6 +272,7 @@ void SetBacklight(uint8_t percent) {
  */
 int main(void) {
     // Relocate Vector Table to Application Address (0x08008000)
+    // Note: Due to Dual Bank Aliasing, the Active Bank is always mapped to 0x08000000.
     SCB->VTOR = 0x08008000;
     __DSB();
 
