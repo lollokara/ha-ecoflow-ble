@@ -282,11 +282,14 @@ int main(void) {
     SCB->VTOR = 0x08008000;
     __DSB();
 
-    // Enable Interrupts (Bootloader disables them)
-    __enable_irq();
+    // Critical: Do NOT enable interrupts here yet.
+    // Wait until HAL_Init and SystemClock_Config are done.
 
     HAL_Init();
     SystemClock_Config();
+
+    // Enable Interrupts now that the system is stable
+    __enable_irq();
 
     // Reset Boot Counter after successful boot
     __HAL_RCC_PWR_CLK_ENABLE();

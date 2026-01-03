@@ -179,9 +179,13 @@ void DeInit(void) {
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
     HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
 
+    // Reset RCC (Switches to HSI, Disables PLL)
+    HAL_RCC_DeInit();
+
     SysTick->CTRL = 0;
     SysTick->LOAD = 0;
     SysTick->VAL  = 0;
+
     __disable_irq();
     for (int i = 0; i < 8; i++) {
         NVIC->ICER[i] = 0xFFFFFFFF;
@@ -303,10 +307,12 @@ int main(void) {
 
         // Jump - Green ON
         LED_G_On();
-        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
-        DeInit();
 
         JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+        Serial_Log("Jumping to Application at 0x%08X. JumpAddress: 0x%08X", APP_ADDRESS, JumpAddress);
+
+        DeInit();
+
         JumpToApplication = (pFunction) JumpAddress;
         __set_MSP(sp);
         JumpToApplication();
