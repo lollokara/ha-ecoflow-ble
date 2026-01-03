@@ -522,35 +522,38 @@ void Bootloader_OTA_Loop(void) {
             ClearFlashFlags(); // Clear flags before OB operations
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
-            FLASH_OBProgramInitTypeDef OBInit;
-            HAL_FLASHEx_OBGetConfig(&OBInit);
 
-            Serial_Log("Current USERConfig: 0x%08X", OBInit.USERConfig);
+            // Manual Option Byte Modification
+            uint32_t optcr = FLASH->OPTCR;
+            Serial_Log("Current OPTCR: 0x%08X", optcr);
 
-            // Toggle
-            OBInit.OptionType = OPTIONBYTE_USER;
+            // Toggle BFB2 (Bit 4)
             if (bfb2_active) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
+                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 1)
             } else {
-                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
+                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 2)
             }
 
-            Serial_Log("New USERConfig: 0x%08X. Programming...", OBInit.USERConfig);
+            // Ensure OPTSTRT is cleared before writing
+            optcr &= ~FLASH_OPTCR_OPTSTRT;
 
-            __disable_irq(); // Critical Section
-            HAL_StatusTypeDef status = HAL_FLASHEx_OBProgram(&OBInit);
-            if (status == HAL_OK) {
-                HAL_FLASH_OB_Launch(); // Resets system if successful
-            }
+            Serial_Log("Writing OPTCR: 0x%08X", optcr);
+
+            __disable_irq();
+
+            // 1. Write the new value
+            FLASH->OPTCR = optcr;
+
+            // 2. Set OPTSTRT to commit
+            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+            // 3. Wait for BSY
+            while (FLASH->SR & FLASH_SR_BSY);
+
             __enable_irq();
 
-            // If we are here, it failed
-            Serial_Log("OB Program/Launch Failed! Status: %d", status);
-            HAL_FLASH_OB_Lock();
-            HAL_FLASH_Lock();
-            send_nack();
-            // Wait a bit and reset anyway? Or retry?
-            HAL_Delay(500);
+            Serial_Log("OB Launch Completed. Resetting...");
+            HAL_Delay(100);
             HAL_NVIC_SystemReset();
         }
     }
