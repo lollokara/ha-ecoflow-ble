@@ -515,27 +515,25 @@ void Stm32Serial::otaTask(void* parameter) {
     int len = pack_ota_start_message(buf, totalSize);
 
     for(int attempt=0; attempt<3; attempt++) {
-        ESP_LOGI(TAG, "Sending OTA Start (Attempt %d)", attempt+1);
+        ESP_LOGI(TAG, "Sending OTA Start (Attempt %d). Size: %d", attempt+1, totalSize);
         self->sendData(buf, len);
 
-        // Wait for ACK (longer timeout for erase: 30s)
+        // Wait for ACK (30s timeout for Flash Erase)
         otaAckReceived = false;
         otaNackReceived = false;
         uint32_t startWait = millis();
-        // Mass erase or large sector erase can take time.
-        // Recovery OTA erases 10 sectors (Bank 1).
         while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) {
             vTaskDelay(100);
         }
 
         if (otaAckReceived) {
+            ESP_LOGI(TAG, "OTA Start ACK Received");
             startSuccess = true;
             break;
         }
 
         if (otaNackReceived) {
             ESP_LOGE(TAG, "OTA Start NACK received");
-            // If NACK, maybe it's busy or invalid state. Wait before retry.
             vTaskDelay(1000);
         }
     }
@@ -548,6 +546,9 @@ void Stm32Serial::otaTask(void* parameter) {
         vTaskDelete(NULL);
         return;
     }
+
+    // Add small delay after Erase ACK to let STM32 settle
+    vTaskDelay(500);
 
     // 3. Send Chunks
     uint32_t offset = 0;
@@ -562,6 +563,7 @@ void Stm32Serial::otaTask(void* parameter) {
 
         bool chunkSuccess = false;
         for(int retries=0; retries<3; retries++) {
+            // No spam logging here, just errors
             self->sendData(buf, len);
 
             // Wait for ACK
@@ -593,7 +595,7 @@ void Stm32Serial::otaTask(void* parameter) {
 
         offset += bytesRead;
         ota_progress = (offset * 100) / totalSize;
-        if (ota_progress != last_log_progress && ota_progress % 10 == 0) {
+        if (ota_progress != last_log_progress && ota_progress % 5 == 0) { // Log every 5%
             ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d)", ota_progress, offset, totalSize);
             last_log_progress = ota_progress;
         }
@@ -611,12 +613,16 @@ void Stm32Serial::otaTask(void* parameter) {
 
             otaAckReceived = false;
             otaNackReceived = false;
-             uint32_t startWait = millis();
-            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout
-                vTaskDelay(50);
+            uint32_t startWait = millis();
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) { // 30s timeout for Checksum Verif
+                vTaskDelay(100);
             }
-            if (otaAckReceived) { endSuccess = true; break; }
-            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; } // Fatal
+            if (otaAckReceived) {
+                ESP_LOGI(TAG, "OTA End ACK (Checksum Valid).");
+                endSuccess = true;
+                break;
+            }
+            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; }
         }
 
         if (endSuccess) {
@@ -624,6 +630,14 @@ void Stm32Serial::otaTask(void* parameter) {
             ESP_LOGI(TAG, "Sending Apply...");
             len = pack_ota_apply_message(buf);
             self->sendData(buf, len);
+
+            // Wait for ACK of Apply (STM32 confirms before reset)
+            otaAckReceived = false;
+            uint32_t startWait = millis();
+            while(!otaAckReceived && (millis() - startWait < 2000)) { vTaskDelay(10); }
+
+            if(otaAckReceived) ESP_LOGI(TAG, "Apply ACK. STM32 Rebooting...");
+
             ota_state = 3; ota_msg = "STM32 Rebooting...";
         } else {
              ota_state = 4; ota_msg = "Checksum Fail";
