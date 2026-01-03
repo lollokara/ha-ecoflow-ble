@@ -6,14 +6,14 @@ def merge_firmware(source, target, env):
     # Paths
     bootloader_path = "../EcoflowSTM32F4_Bootloader/.pio/build/disco_f469ni/firmware.bin"
     app_path = str(source[0])
-    output_path = os.path.join(os.path.dirname(app_path), "factory_firmware.bin")
+    output_path = os.path.join(env.subst("$PROJECT_DIR"), "factory_firmware.bin")
 
     # Constants
     BOOTLOADER_SIZE = 0x4000 # 16KB
     CONFIG_SIZE = 0x4000     # 16KB
     APP_OFFSET = 0x8000      # 32KB
 
-    print("Merging firmware...")
+    print("Merging firmware... ")
 
     if not os.path.exists(bootloader_path):
         print(f"Warning: Bootloader not found at {bootloader_path}. Skipping merge.")
