@@ -10,7 +10,7 @@
 #include <stdarg.h>
 
 // Define Application Address (Sector 2)
-#define APP_ADDRESS 0x08008000
+#define APP_ADDRESS 0x00008000
 
 // UART Protocol
 #define START_BYTE 0xAA
@@ -217,6 +217,9 @@ void Serial_Log(const char* fmt, ...) {
 }
 
 int main(void) {
+    // Explicitly set VTOR to 0x00000000 (Aliased base)
+    SCB->VTOR = 0x00000000;
+
     HAL_Init();
     GPIO_Init();
 
@@ -365,15 +368,17 @@ void Bootloader_OTA_Loop(void) {
 
     // Target Inactive Bank
     // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
-    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
-    uint32_t target_bank_addr = 0x08100000;
-
+    // Bank 1 (Inactive when BFB2=1) mapped at 0x08000000
+    uint32_t target_bank_addr;
     uint32_t start_sector, end_sector;
+
     if (bfb2_active) {
+        target_bank_addr = 0x08000000;
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
         Serial_Log("Target Bank: 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
     } else {
+        target_bank_addr = 0x08100000;
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
         Serial_Log("Target Bank: 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
