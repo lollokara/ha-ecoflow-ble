@@ -309,24 +309,33 @@ int main(void) {
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
     RTC->BKP1R = 0;
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T1\r\n", 4, 100);
 
     ESP32_Reset_Init();
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T2\r\n", 4, 100);
+
     MX_TIM2_Init();
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T3\r\n", 4, 100);
+
     MX_IWDG_Init();
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T4\r\n", 4, 100);
 
     // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
     if (displayQueue == NULL) {
-        printf("Display Queue Creation Failed!\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)"Q Fail\r\n", 8, 100);
         while(1);
     }
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T5\r\n", 4, 100);
 
     // Create FreeRTOS Tasks
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
+    HAL_UART_Transmit(&huart3, (uint8_t*)"T6\r\n", 4, 100);
 
     // Start Scheduler
+    HAL_UART_Transmit(&huart3, (uint8_t*)"SCHED\r\n", 7, 100);
     vTaskStartScheduler();
 
     // Should never reach here
