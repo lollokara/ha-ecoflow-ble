@@ -37,6 +37,11 @@ uint8_t rx_byte_isr;
 #define FLASH_OPTCR_BFB2 (1 << 4)
 #endif
 
+// Bit 30: DB1M (0=Dual Bank, 1=Single Bank)
+#ifndef FLASH_OPTCR_DB1M
+#define FLASH_OPTCR_DB1M (1 << 30)
+#endif
+
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
 IWDG_HandleTypeDef hiwdg; // Watchdog
@@ -53,6 +58,7 @@ void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
 void ClearFlashFlags(void);
+void SwapBankAndReset(void);
 
 // Software Delay (Independent of SysTick)
 void Software_Delay(uint32_t count) {
@@ -187,6 +193,11 @@ void DeInit(void) {
         NVIC->ICER[i] = 0xFFFFFFFF;
         NVIC->ICPR[i] = 0xFFFFFFFF;
     }
+
+    // CRITICAL: Reset RCC to HSI and disable PLL before jumping
+    // This prevents the Application's SystemClock_Config from hanging
+    HAL_RCC_DeInit();
+
     HAL_DeInit();
 }
 
@@ -235,8 +246,6 @@ int main(void) {
 
     // 1. Startup Sequence with Software Delay
     // This verifies CPU execution INDEPENDENT of SysTick.
-    // If these blink but subsequent HAL_Delay fails, we know it's SysTick.
-    // Delay increased to ~10M iterations for visibility (~200ms at 180MHz)
     LED_B_On(); Software_Delay(10000000); LED_B_Off();
     LED_O_On(); Software_Delay(10000000); LED_O_Off();
     LED_R_On(); Software_Delay(10000000); LED_R_Off();
@@ -256,14 +265,9 @@ int main(void) {
     uint32_t boot_fails = RTC->BKP1R;
 
     // Determine Active Bank based on OPTCR
-    // Note: On F469, BFB2 is Bit 4.
-    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1.
-    // However, the hardware Aliases Bank 2 to 0x08000000.
-    // Let's log the full OPTCR for diagnostics.
     Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
 
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
-    // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
 
@@ -271,17 +275,18 @@ int main(void) {
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");
-        // Clear flag and boot counter
-        RTC->BKP0R = 0;
-        RTC->BKP1R = 0;
+        RTC->BKP0R = 0; // Clear OTA flag
+        RTC->BKP1R = 0; // Clear failure counter
         Bootloader_OTA_Loop();
     } else if (valid_app) {
         if (boot_fails >= 3) {
-            Serial_Log("Too many failed boots (%d). Forcing OTA.", boot_fails);
-            // Flash RED to indicate failure
-            for(int i=0; i<10; i++) { LED_R_Toggle(); HAL_Delay(100); }
+            Serial_Log("Too many failed boots (%d). Rolling back...", boot_fails);
+
+            // Revert to known good bank
+            // Reset BKP1R to 0 so the other bank gets a fair chance
             RTC->BKP1R = 0;
-            Bootloader_OTA_Loop();
+            SwapBankAndReset();
+            // SwapBankAndReset triggers a system reset, code shouldn't reach here
         }
 
         // Increment Boot Counter (App must clear it on success)
@@ -313,13 +318,6 @@ int main(void) {
     } else {
         // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
-
-        // SAFETY: If we are in Bank 2 (BFB2 set) and App is invalid,
-        // we might be stuck in a loop.
-        // We should try to revert to Bank 1?
-        // But maybe Bank 1 is also invalid.
-        // Best to stay in OTA mode.
-
         RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     }
@@ -359,10 +357,44 @@ void ClearFlashFlags() {
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
 }
 
-// Bit 30: DB1M (0=Dual Bank, 1=Single Bank)
-#ifndef FLASH_OPTCR_DB1M
-#define FLASH_OPTCR_DB1M (1 << 30)
-#endif
+void SwapBankAndReset(void) {
+    Serial_Log("Swapping Flash Bank...");
+
+    // Toggle BFB2
+    ClearFlashFlags(); // Clear flags before OB operations
+    HAL_FLASH_Unlock();
+    HAL_FLASH_OB_Unlock();
+
+    // Manual Option Byte Modification
+    uint32_t optcr = FLASH->OPTCR;
+    Serial_Log("Current OPTCR: 0x%08X", optcr);
+
+    // Toggle BFB2 (Bit 4)
+    optcr ^= FLASH_OPTCR_BFB2;
+
+    // Ensure OPTSTRT is cleared before writing
+    optcr &= ~FLASH_OPTCR_OPTSTRT;
+
+    Serial_Log("Writing OPTCR: 0x%08X", optcr);
+
+    __disable_irq(); // Disable Interrupts for safety
+
+    // 1. Write the new value
+    FLASH->OPTCR = optcr;
+
+    // 2. Set OPTSTRT to commit
+    FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
+
+    // 3. Wait for BSY
+    while (FLASH->SR & FLASH_SR_BSY);
+
+    // 4. Force Reload (Triggers Reset)
+    HAL_FLASH_OB_Launch();
+
+    // Should reset automatically, but if not:
+    Serial_Log("OB Launch Failed/Completed. Resetting...");
+    HAL_NVIC_SystemReset();
+}
 
 void Bootloader_OTA_Loop(void) {
     uint8_t header[3];
@@ -565,44 +597,7 @@ void Bootloader_OTA_Loop(void) {
             // Clear Boot Counter (BKP1R) for fresh start
             RTC->BKP1R = 0;
 
-            // Toggle BFB2
-            ClearFlashFlags(); // Clear flags before OB operations
-            HAL_FLASH_Unlock();
-            HAL_FLASH_OB_Unlock();
-
-            // Manual Option Byte Modification
-            uint32_t optcr = FLASH->OPTCR;
-            Serial_Log("Current OPTCR: 0x%08X", optcr);
-
-            // Toggle BFB2 (Bit 4)
-            if (bfb2_active) {
-                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 1)
-            } else {
-                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 2)
-            }
-
-            // Ensure OPTSTRT is cleared before writing
-            optcr &= ~FLASH_OPTCR_OPTSTRT;
-
-            Serial_Log("Writing OPTCR: 0x%08X", optcr);
-
-            __disable_irq(); // Disable Interrupts for safety
-
-            // 1. Write the new value
-            FLASH->OPTCR = optcr;
-
-            // 2. Set OPTSTRT to commit
-            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
-
-            // 3. Wait for BSY
-            while (FLASH->SR & FLASH_SR_BSY);
-
-            // 4. Force Reload (Triggers Reset)
-            HAL_FLASH_OB_Launch();
-
-            // Should reset automatically, but if not:
-            Serial_Log("OB Launch Failed/Completed. Resetting...");
-            HAL_NVIC_SystemReset();
+            SwapBankAndReset();
         }
     }
 }
