@@ -510,8 +510,14 @@ void Stm32Serial::otaTask(void* parameter) {
         }
 
         if (!otaAckReceived) {
-            ESP_LOGE(TAG, "OTA Chunk NACK/Timeout at %d", offset);
-            ota_state = 4; ota_msg = "Chunk Timeout";
+            if (otaNackReceived) {
+                ESP_LOGE(TAG, "OTA Chunk NACK at %d (Attempting to retry or abort?)", offset);
+            } else {
+                ESP_LOGE(TAG, "OTA Chunk Timeout at %d", offset);
+            }
+
+            // Retry logic could be added here, currently just aborts
+            ota_state = 4; ota_msg = "Chunk Fail";
             break;
         }
 
