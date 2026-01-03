@@ -5,13 +5,13 @@
 #include <EEPROM.h>
 
 // --- Config ---
-#define FAN1_PWM_PIN 10
-#define FAN2_PWM_PIN 11
+#define FAN1_PWM_PIN 26
+#define FAN2_PWM_PIN 15
 #define FAN3_PWM_PIN 12
 #define FAN4_PWM_PIN 13
 
-#define FAN1_TACH_PIN 14
-#define FAN2_TACH_PIN 15
+#define FAN1_TACH_PIN 27
+#define FAN2_TACH_PIN 14
 #define FAN3_TACH_PIN 16
 #define FAN4_TACH_PIN 17
 
