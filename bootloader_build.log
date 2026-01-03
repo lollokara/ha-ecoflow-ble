@@ -1,0 +1,119 @@
+Processing disco_f469ni (platform: ststm32; board: disco_f469ni; framework: stm32cube)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/ststm32/disco_f469ni.html
+PLATFORM: ST STM32 (19.4.0) > ST 32F469IDISCOVERY
+HARDWARE: STM32F469NIH6 180MHz, 384KB RAM, 2MB Flash
+DEBUG: Current (stlink) On-board (stlink) External (blackmagic, cmsis-dap, jlink)
+PACKAGES:
+ - framework-stm32cubef4 @ 1.28.1
+ - tool-ldscripts-ststm32 @ 0.2.0
+ - toolchain-gccarmnoneeabi @ 1.70201.0 (7.2.1)
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 59 compatible libraries
+Scanning dependencies...
+No dependencies
+Building in release mode
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_adc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_adc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_can.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cec.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cortex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_crc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cryp.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cryp_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dac.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dac_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dcmi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dcmi_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dfsdm.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma2d.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dsi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_eth.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_exti.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash_ramfunc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpi2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpi2c_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpsmbus.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpsmbus_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_gpio.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hash.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hash_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hcd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2c_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2s.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2s_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_irda.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_iwdg.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_lptim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_ltdc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_ltdc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_mmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_nand.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_nor.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pccard.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pcd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pcd_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pwr.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pwr_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_qspi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rcc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rcc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rng.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rtc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rtc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sai.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sai_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sdram.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_smartcard.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_smbus.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_spdifrx.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_spi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sram.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_tim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_tim_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_uart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_usart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_wwdg.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_adc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_crc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dac.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dma.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dma2d.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_exti.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fmpi2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fsmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_gpio.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_i2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_lptim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_pwr.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rcc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rng.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rtc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_sdmmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_spi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_tim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_usart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_usb.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_utils.o
+Compiling .pio/build/disco_f469ni/src/main.o
+Compiling .pio/build/disco_f469ni/FrameworkCMSISDevice/gcc/startup_stm32f469xx.o
+Compiling .pio/build/disco_f469ni/FrameworkCMSISDevice/system_stm32f4xx.o
+Archiving .pio/build/disco_f469ni/libFrameworkCMSISDevice.a
+Indexing .pio/build/disco_f469ni/libFrameworkCMSISDevice.a
+Linking .pio/build/disco_f469ni/firmware.elf
+Checking size .pio/build/disco_f469ni/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [          ]   0.0% (used 120 bytes from 393216 bytes)
+Flash: [          ]   0.3% (used 6756 bytes from 2097152 bytes)
+Building .pio/build/disco_f469ni/firmware.bin
+========================= [SUCCESS] Took 5.62 seconds =========================

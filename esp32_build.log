@@ -1,0 +1,1084 @@
+Processing esp32-s3-devkit-1 (platform: espressif32 @ 6.6.0; board: esp32-s3-devkitc-1; framework: arduino)
+--------------------------------------------------------------------------------
+Platform Manager: Installing espressif32 @ 6.6.0
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Platform Manager: espressif32@6.6.0 has been installed!
+Tool Manager: Installing espressif/toolchain-xtensa-esp32s3 @ 8.4.0+2021r2-patch5
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Tool Manager: toolchain-xtensa-esp32s3@8.4.0+2021r2-patch5 has been installed!
+Tool Manager: Installing espressif/toolchain-riscv32-esp @ 8.4.0+2021r2-patch5
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Tool Manager: toolchain-riscv32-esp@8.4.0+2021r2-patch5 has been installed!
+Tool Manager: Installing platformio/framework-arduinoespressif32 @ ~3.20014.0
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Tool Manager: framework-arduinoespressif32@3.20014.231204 has been installed!
+Tool Manager: Installing platformio/tool-esptoolpy @ ~1.40501.0
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Tool Manager: tool-esptoolpy@1.40501.0 has been installed!
+Library Manager: Installing h2zero/NimBLE-Arduino @ ^1.4.1
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: NimBLE-Arduino@1.4.3 has been installed!
+Library Manager: Installing nanopb/Nanopb @ ^0.4.7
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: Nanopb@0.4.91 has been installed!
+Library Manager: Installing adafruit/Adafruit DotStar @ ^1.2.5
+Downloading 0% 10% 20% 30% 40% 50% 60%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: Adafruit DotStar@1.2.5 has been installed!
+Library Manager: Resolving dependencies...
+Library Manager: Installing Adafruit BusIO
+Downloading 0% 10% 20% 30%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: Adafruit BusIO@1.17.4 has been installed!
+Library Manager: Installing esphome/ESPAsyncWebServer-esphome @ ^3.1.0
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ESPAsyncWebServer-esphome@3.4.0 has been installed!
+Library Manager: Resolving dependencies...
+Library Manager: Installing esphome/AsyncTCP-esphome
+Downloading 0% 10% 20% 30%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: AsyncTCP-esphome@2.1.4 has been installed!
+Library Manager: Installing bblanchon/ArduinoJson @ ^6.21.3
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ArduinoJson@6.21.5 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-s3-devkitc-1.html
+PLATFORM: Espressif 32 (6.6.0) > Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
+HARDWARE: ESP32S3 240MHz, 320KB RAM, 8MB Flash
+DEBUG: Current (esp-builtin) On-board (esp-builtin) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES:
+ - framework-arduinoespressif32 @ 3.20014.231204 (2.0.14)
+ - tool-esptoolpy @ 1.40501.0 (4.5.1)
+ - toolchain-riscv32-esp @ 8.4.0+2021r2-patch5
+ - toolchain-xtensa-esp32s3 @ 8.4.0+2021r2-patch5
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+[nanopb] Installing gRPC dependencies
+Collecting grpcio-tools>=1.43.0
+  Downloading grpcio_tools-1.76.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.3 kB)
+Requirement already satisfied: protobuf<7.0.0,>=6.31.1 in /home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages (from grpcio-tools>=1.43.0) (6.33.2)
+Collecting grpcio>=1.76.0 (from grpcio-tools>=1.43.0)
+  Downloading grpcio-1.76.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.7 kB)
+Collecting setuptools (from grpcio-tools>=1.43.0)
+  Using cached setuptools-80.9.0-py3-none-any.whl.metadata (6.6 kB)
+Requirement already satisfied: typing-extensions~=4.12 in /home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages (from grpcio>=1.76.0->grpcio-tools>=1.43.0) (4.15.0)
+Downloading grpcio_tools-1.76.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.7/2.7 MB 9.8 MB/s  0:00:00
+Downloading grpcio-1.76.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (6.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.6/6.6 MB 25.9 MB/s  0:00:00
+Using cached setuptools-80.9.0-py3-none-any.whl (1.2 MB)
+Installing collected packages: setuptools, grpcio, grpcio-tools
+
+Successfully installed grpcio-1.76.0 grpcio-tools-1.76.0 setuptools-80.9.0
+[nanopb] No generation needed.
+Found 41 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- NimBLE-Arduino @ 1.4.3
+|-- Nanopb @ 0.4.91
+|-- Adafruit DotStar @ 1.2.5
+|-- ESPAsyncWebServer-esphome @ 3.4.0
+|-- AsyncTCP-esphome @ 2.1.4
+|-- ArduinoJson @ 6.21.5
+|-- WiFi @ 2.0.0
+|-- LittleFS @ 2.0.0
+|-- EcoFlowComm @ 1.0.0
+|-- Preferences @ 2.0.0
+|-- FS @ 2.0.0
+Building in release mode
+Compiling .pio/build/esp32-s3-devkit-1/src/CmdUtils.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/DeviceManager.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEDevice.h:18,
+                 from src/EcoflowESP32.h:13,
+                 from src/DeviceManager.h:4,
+                 from src/DeviceManager.cpp:11:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/src/Display.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/EcoflowCrypto.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/EcoflowDataParser.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/EcoflowESP32.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEDevice.h:18,
+                 from src/EcoflowESP32.h:13,
+                 from src/EcoflowESP32.cpp:11:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/src/EcoflowProtocol.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/LightSensor.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/LogBuffer.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/Stm32Serial.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/WebServer.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/dc009_apl_comm.pb.c.o
+Compiling .pio/build/esp32-s3-devkit-1/src/keydata.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/main.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/src/mr521.pb.c.o
+Compiling .pio/build/esp32-s3-devkit-1/src/pd335_sys.pb.c.o
+Building .pio/build/esp32-s3-devkit-1/bootloader.bin
+Generating partitions .pio/build/esp32-s3-devkit-1/partitions.bin
+esptool.py v4.5.1
+Creating esp32s3 image...
+Merged 1 ELF section
+Successfully created esp32s3 image.
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLE2904.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEAddress.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLE2904.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEAddress.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEAdvertisedDevice.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEAdvertisedDevice.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEAdvertising.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEAdvertising.cpp:16:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEBeacon.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEBeacon.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLECharacteristic.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLECharacteristic.cpp:13:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEClient.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEClient.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEDescriptor.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEDescriptor.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEDevice.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEDevice.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEEddystoneTLM.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEEddystoneTLM.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEEddystoneURL.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEEddystoneURL.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEExtAdvertising.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEExtAdvertising.cpp:8:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEHIDDevice.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEHIDDevice.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLERemoteCharacteristic.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLERemoteCharacteristic.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLERemoteDescriptor.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLERemoteDescriptor.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLERemoteService.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLERemoteService.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEScan.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEScan.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLESecurity.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLESecurity.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEServer.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEServer.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEService.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEService.cpp:17:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEUUID.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/NimBLEUtils.cpp.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEUUID.cpp:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/NimBLEUtils.cpp:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/esp_port/esp-hci/src/esp_nimble_hci.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/esp-hci/src/esp_nimble_hci.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/esp_port/port/src/esp_nimble_mem.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_common/include/esp_attr.h:14,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/src/esp_nimble_mem.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/aes_decrypt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/aes_encrypt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/cbc_mode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ccm_mode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/cmac_mode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ctr_mode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ctr_prng.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ecc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ecc_dh.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ecc_dsa.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/ecc_platform_specific.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/hmac.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/hmac_prng.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/sha256.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/ext/tinycrypt/src/utils.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_adv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_conn.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_conn_hci.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_ctrl.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_dtm.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_hci.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_hci_ev.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_iso.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_rand.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_resolv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_rfmgmt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_scan.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_sched.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_supp_cmd.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_sync.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_trace.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_utils.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/controller/src/ble_ll_whitelist.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/drivers/nrf51/src/ble_hw.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/drivers/nrf51/src/ble_phy.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/drivers/nrf52/src/ble_hw.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/drivers/nrf52/src/ble_phy.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/drivers/nrf52/src/ble_phy_trace.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/access.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/access.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/adv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/aes-ccm.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/adv.c:10:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/app_keys.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/aes-ccm.c:8:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/beacon.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/app_keys.c:8:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/cdb.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/beacon.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/cfg.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/cdb.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/cfg_cli.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/cfg.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/cfg_srv.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/cfg_cli.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/cfg_srv.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/crypto.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/crypto.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/friend.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/glue.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/friend.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/health_cli.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/glue.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/health_srv.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/health_cli.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/health_srv.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/heartbeat.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/light_model.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/heartbeat.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/lpn.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/light_model.c:2:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/mesh.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/lpn.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/model_cli.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/mesh.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/model_cli.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/model_srv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/net.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/model_srv.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/nodes.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/net.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/nodes.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/pb_adv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/pb_gatt.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/pb_adv.c:10:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/prov.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/pb_gatt.c:11:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/prov_device.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/prov.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/provisioner.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/prov_device.c:12:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/provisioner.c:10:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/proxy.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/rpl.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/proxy.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/settings.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/rpl.c:12:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/settings.c:7:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/shell.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/subnet.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/shell.c:12:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/mesh/src/transport.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/subnet.c:8:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/transport.c:9:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/ans/src/ble_svc_ans.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/ans/src/ble_svc_ans.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/bas/src/ble_svc_bas.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/bas/src/ble_svc_bas.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/dis/src/ble_svc_dis.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/gap/src/ble_svc_gap.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/dis/src/ble_svc_dis.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/gap/src/ble_svc_gap.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/gatt/src/ble_svc_gatt.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/gatt/src/ble_svc_gatt.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/ias/src/ble_svc_ias.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/ias/src/ble_svc_ias.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/ipss/src/ble_svc_ipss.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/ipss/src/ble_svc_ipss.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/services/lls/src/ble_svc_lls.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/services/lls/src/ble_svc_lls.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_att.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_att_clt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_att_cmd.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_att_svr.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_eddystone.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_gap.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gap.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_gattc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_gatts.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_gatts_lcl.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_adv.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_atomic.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_priv.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_atomic.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_cfg.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_conn.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_cfg.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_flow.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_flow.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_hci.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_hci_cmd.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_hci_cmd.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_hci_evt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_hci_util.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_id.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_log.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/os/os.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_log.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_mbuf.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_misc.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_misc.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_mqueue.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_periodic_sync.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_priv.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_mqueue.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_pvcy.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_resolv.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_shutdown.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_resolv.c:22:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_startup.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_hs_stop.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_ibeacon.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_hs_stop.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_l2cap.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_l2cap_coc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_l2cap_sig.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_l2cap_sig_cmd.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_monitor.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/include/host/ble_monitor.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/src/ble_monitor.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_sm.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_sm_alg.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_sm_cmd.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_sm_lgcy.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_sm_sc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_store.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_store_util.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/src/ble_uuid.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/store/config/src/ble_store_config.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/store/config/src/ble_store_config_conf.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/store/config/src/ble_store_nvs.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/host/util/src/addr.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/nimble/host/store/config/src/ble_store_nvs.c:23:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/nimble/transport/ram/src/ble_hci_ram.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/endian.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/hal_timer.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/hal_uart.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/mem.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/nimble_port.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/os_cputime.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/../include/os/os.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/nimble_port.c:21:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/os_cputime_pwr2.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/../include/os/../syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/../include/os/os_cputime.h:34,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/os_cputime_pwr2.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/os_mbuf.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/os_mempool.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/../include/os/os.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/os_mbuf.c:36:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/nimble/src/os_msys_init.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/../include/os/os.h:23,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/os_mempool.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include/assert.h:20,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/npl/freertos/src/nimble_port_freertos.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/esp_additions/freertos/FreeRTOSConfig.h:10,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/FreeRTOS.h:57,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:21:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib957/NimBLE-Arduino/nimble/porting/npl/freertos/src/npl_os_freertos.c.o
+In file included from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimconfig.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h:4,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h:9,
+                 from .pio/libdeps/esp32-s3-devkit-1/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:20:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/lib250/Nanopb/pb_common.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib250/Nanopb/pb_decode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/lib250/Nanopb/pb_encode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/libb7c/SPI/SPI.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib957/libNimBLE-Arduino.a
+Indexing .pio/build/esp32-s3-devkit-1/lib957/libNimBLE-Arduino.a
+Compiling .pio/build/esp32-s3-devkit-1/lib548/Wire/Wire.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib250/libNanopb.a
+Indexing .pio/build/esp32-s3-devkit-1/lib250/libNanopb.a
+Compiling .pio/build/esp32-s3-devkit-1/lib10d/Adafruit BusIO/Adafruit_BusIO_Register.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib10d/Adafruit BusIO/Adafruit_GenericDevice.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/libb7c/libSPI.a
+Indexing .pio/build/esp32-s3-devkit-1/libb7c/libSPI.a
+Compiling .pio/build/esp32-s3-devkit-1/lib10d/Adafruit BusIO/Adafruit_I2CDevice.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib548/libWire.a
+Indexing .pio/build/esp32-s3-devkit-1/lib548/libWire.a
+Compiling .pio/build/esp32-s3-devkit-1/lib10d/Adafruit BusIO/Adafruit_SPIDevice.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/libad0/Adafruit DotStar/Adafruit_DotStar.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib9cf/AsyncTCP-esphome/AsyncTCP.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib5eb/FS/FS.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib10d/libAdafruit BusIO.a
+Indexing .pio/build/esp32-s3-devkit-1/lib10d/libAdafruit BusIO.a
+Compiling .pio/build/esp32-s3-devkit-1/lib5eb/FS/vfs_api.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/libad0/libAdafruit DotStar.a
+Indexing .pio/build/esp32-s3-devkit-1/libad0/libAdafruit DotStar.a
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFi.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiAP.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib9cf/libAsyncTCP-esphome.a
+Indexing .pio/build/esp32-s3-devkit-1/lib9cf/libAsyncTCP-esphome.a
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiClient.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiGeneric.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib5eb/libFS.a
+Indexing .pio/build/esp32-s3-devkit-1/lib5eb/libFS.a
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiMulti.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiSTA.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiScan.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiServer.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib85e/WiFi/WiFiUdp.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/AsyncEventSource.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/AsyncWebSocket.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/WebAuthentication.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib85e/libWiFi.a
+Indexing .pio/build/esp32-s3-devkit-1/lib85e/libWiFi.a
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/WebHandlers.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/WebRequest.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/WebResponses.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib081/ESPAsyncWebServer-esphome/WebServer.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/lib374/LittleFS/LittleFS.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib374/libLittleFS.a
+Indexing .pio/build/esp32-s3-devkit-1/lib374/libLittleFS.a
+Compiling .pio/build/esp32-s3-devkit-1/lib2ac/EcoFlowComm/ecoflow_protocol.c.o
+Compiling .pio/build/esp32-s3-devkit-1/liba11/Preferences/Preferences.cpp.o
+Archiving .pio/build/esp32-s3-devkit-1/lib2ac/libEcoFlowComm.a
+Archiving .pio/build/esp32-s3-devkit-1/lib081/libESPAsyncWebServer-esphome.a
+Indexing .pio/build/esp32-s3-devkit-1/lib2ac/libEcoFlowComm.a
+Indexing .pio/build/esp32-s3-devkit-1/lib081/libESPAsyncWebServer-esphome.a
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/Esp.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/FirmwareMSC.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/FunctionalInterrupt.cpp.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USBMSC.h:18,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/FirmwareMSC.h:17,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/FirmwareMSC.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/HWCDC.cpp.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USB.h:16,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/HWCDC.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Archiving .pio/build/esp32-s3-devkit-1/liba11/libPreferences.a
+Indexing .pio/build/esp32-s3-devkit-1/liba11/libPreferences.a
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/HardwareSerial.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/IPAddress.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/IPv6Address.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/MD5Builder.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/Print.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/Stream.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/StreamString.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/Tone.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/USB.cpp.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USB.h:16,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USB.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/USBCDC.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/USBMSC.cpp.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USB.h:16,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USBCDC.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/WMath.cpp.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USBMSC.h:18,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/USBMSC.cpp:14:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/WString.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/base64.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/cbuf.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-adc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-bt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-cpu.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-dac.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-gpio.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-i2c-slave.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-i2c.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-ledc.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-matrix.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-misc.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-misc.c:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-psram.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-rgb-led.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-rmt.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-sigmadelta.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-spi.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-spi.h:22,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-spi.c:15:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-time.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-timer.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-tinyusb.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-touch.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-tinyusb.c:2:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/esp32-hal-uart.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/firmware_msc_fat.c.o
+/home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c: In function 'uartSetPins':
+/home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:153:9: warning: 'return' with no value, in function returning non-void
+         return;
+         ^~~~~~
+/home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:149:6: note: declared here
+ bool uartSetPins(uint8_t uart_num, int8_t rxPin, int8_t txPin, int8_t ctsPin, int8_t rtsPin)
+      ^~~~~~~~~~~
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/libb64/cdecode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/libb64/cencode.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/main.cpp.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/stdlib_noniso.c.o
+In file included from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/esp_additions/freertos/FreeRTOSConfig.h:10,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/FreeRTOS.h:57,
+                 from /home/jules/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp:1:
+/home/jules/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h:768: warning: "CONFIG_BLUEDROID_ENABLED" redefined
+ #define CONFIG_BLUEDROID_ENABLED CONFIG_BT_BLUEDROID_ENABLED
+
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/wiring_pulse.c.o
+Compiling .pio/build/esp32-s3-devkit-1/FrameworkArduino/wiring_shift.c.o
+Archiving .pio/build/esp32-s3-devkit-1/libFrameworkArduino.a
+Indexing .pio/build/esp32-s3-devkit-1/libFrameworkArduino.a
+Linking .pio/build/esp32-s3-devkit-1/firmware.elf
+Retrieving maximum program size .pio/build/esp32-s3-devkit-1/firmware.elf
+Checking size .pio/build/esp32-s3-devkit-1/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [==        ]  16.9% (used 55276 bytes from 327680 bytes)
+Flash: [====      ]  35.9% (used 1200729 bytes from 3342336 bytes)
+Building .pio/build/esp32-s3-devkit-1/firmware.bin
+esptool.py v4.5.1
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+======================== [SUCCESS] Took 141.29 seconds ========================

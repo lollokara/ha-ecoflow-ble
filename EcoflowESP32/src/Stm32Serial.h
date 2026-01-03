@@ -98,6 +98,7 @@ private:
     File _otaFile;
     uint32_t _otaOffset = 0;
     uint32_t _otaTotalSize = 0;
+    uint32_t _otaChecksum = 0;
     uint32_t _otaLastMsgTime = 0;
     uint8_t _otaRetries = 0;
     bool _ackReceived = false;

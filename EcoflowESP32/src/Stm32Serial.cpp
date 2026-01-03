@@ -105,6 +105,33 @@ void Stm32Serial::update() {
 }
 
 /**
+ * @brief Helper to calculate 32-bit Sum Checksum for OTA file.
+ */
+uint32_t calculate_ota_checksum(File& f) {
+    uint32_t sum = 0;
+    f.seek(0);
+    size_t size = f.size();
+    size_t words = size / 4;
+
+    // Read in chunks to save memory
+    uint8_t buf[256];
+
+    // Process full words
+    for(size_t i=0; i<words; i++) {
+        uint32_t val;
+        f.read((uint8_t*)&val, 4);
+        sum += val;
+    }
+
+    // Ignore trailing bytes (STM32 flash writes are word aligned, padding assumed 0xFF or handled?)
+    // Our bootloader logic writes word-by-word. Trailing bytes < 4 are NOT written if logic relies on i+=4 and data_len.
+    // However, firmware files should be word aligned.
+
+    f.seek(0); // Reset for OTA
+    return sum;
+}
+
+/**
  * @brief Starts an OTA update for the STM32 using the provided file.
  */
 bool Stm32Serial::startOta(const String& path) {
@@ -132,7 +159,9 @@ bool Stm32Serial::startOta(const String& path) {
     _nackReceived = false;
     _otaLastMsgTime = millis();
 
-    ESP_LOGI(TAG, "Starting STM32 OTA. File: %s, Size: %u bytes", path.c_str(), _otaTotalSize);
+    _otaChecksum = calculate_ota_checksum(_otaFile);
+
+    ESP_LOGI(TAG, "Starting STM32 OTA. File: %s, Size: %u bytes, Cksum: %08X", path.c_str(), _otaTotalSize, _otaChecksum);
     return true;
 }
 
@@ -261,14 +290,17 @@ void Stm32Serial::otaTask() {
         }
 
         case OTA_ENDING: {
-            uint8_t buffer[4];
+            uint8_t buffer[8];
+            // CMD_OTA_END Payload: [Checksum(4)]
             buffer[0] = START_BYTE;
             buffer[1] = CMD_OTA_END;
-            buffer[2] = 0x00;
-            buffer[3] = calculate_crc8(&buffer[1], 2);
-            Serial1.write(buffer, 4);
+            buffer[2] = 0x04; // Len
+            memcpy(&buffer[3], &_otaChecksum, 4);
+            buffer[7] = calculate_crc8(&buffer[1], 6); // Cmd + Len + 4 Data
 
-            ESP_LOGI(TAG, "Sending OTA End...");
+            Serial1.write(buffer, 8);
+
+            ESP_LOGI(TAG, "Sending OTA End with Checksum %08X...", _otaChecksum);
             _otaPrevState = OTA_ENDING;
             _otaState = OTA_WAITING_ACK;
             _ackReceived = false;

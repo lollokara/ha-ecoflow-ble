@@ -68,3 +68,8 @@ EcoflowESP32/src/Credentials.h
 EcoflowRP2040/.vscode/c_cpp_properties.json
 EcoflowRP2040/.vscode/extensions.json
 EcoflowRP2040/.vscode/launch.json
+
+# PlatformIO
+.pio
+**/.pio
+**/.pio

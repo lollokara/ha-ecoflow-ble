@@ -1,0 +1,411 @@
+Processing disco_f469ni (platform: ststm32; board: disco_f469ni; framework: stm32cube)
+--------------------------------------------------------------------------------
+Library Manager: Installing git+https://github.com/BOJIT/PlatformIO-FreeRTOS.git
+git version 2.51.2
+Cloning into '/home/jules/.platformio/.cache/tmp/pkg-installing-8o3udfyb'...
+Library Manager: PlatformIO-FreeRTOS@2.1.4+sha.bdf2ac1 has been installed!
+Library Manager: Installing lvgl/lvgl @ ^8.3.11
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: lvgl@8.4.0 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/ststm32/disco_f469ni.html
+PLATFORM: ST STM32 (19.4.0) > ST 32F469IDISCOVERY
+HARDWARE: STM32F469NIH6 180MHz, 384KB RAM, 2MB Flash
+DEBUG: Current (stlink) On-board (stlink) External (blackmagic, cmsis-dap, jlink)
+PACKAGES:
+ - framework-stm32cubef4 @ 1.28.1
+ - tool-ldscripts-ststm32 @ 0.2.0
+ - toolchain-gccarmnoneeabi @ 1.70201.0 (7.2.1)
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+/home/jules/.pyenv/versions/3.12.12/bin/python3.12 -m pip install GitPython
+Collecting GitPython
+  Downloading gitpython-3.1.46-py3-none-any.whl.metadata (13 kB)
+Collecting gitdb<5,>=4.0.1 (from GitPython)
+  Downloading gitdb-4.0.12-py3-none-any.whl.metadata (1.2 kB)
+Collecting smmap<6,>=3.0.1 (from gitdb<5,>=4.0.1->GitPython)
+  Downloading smmap-5.0.2-py3-none-any.whl.metadata (4.3 kB)
+Downloading gitpython-3.1.46-py3-none-any.whl (208 kB)
+Downloading gitdb-4.0.12-py3-none-any.whl (62 kB)
+Downloading smmap-5.0.2-py3-none-any.whl (24 kB)
+Installing collected packages: smmap, gitdb, GitPython
+
+Successfully installed GitPython-3.1.46 gitdb-4.0.12 smmap-5.0.2
+PlatformIO-FreeRTOS: building for STM32F4
+Found 64 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- PlatformIO-FreeRTOS @ 2.1.4+sha.bdf2ac1
+|-- lvgl @ 8.4.0
+|-- bsp @ 1.0.0
+|-- EcoFlowComm @ 1.0.0
+Building in release mode
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_adc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_adc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_can.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cec.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cortex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_crc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cryp.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_cryp_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dac.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dac_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dcmi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dcmi_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dfsdm.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma2d.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dma_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_dsi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_eth.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_exti.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_flash_ramfunc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpi2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpi2c_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpsmbus.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_fmpsmbus_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_gpio.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hash.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hash_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_hcd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2c_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2s.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_i2s_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_irda.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_iwdg.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_lptim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_ltdc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_ltdc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_mmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_nand.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_nor.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pccard.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pcd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pcd_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pwr.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_pwr_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_qspi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rcc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rcc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rng.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rtc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_rtc_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sai.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sai_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sd.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sdram.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_smartcard.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_smbus.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_spdifrx.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_spi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_sram.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_tim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_tim_ex.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_uart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_usart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_hal_wwdg.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_adc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_crc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dac.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dma.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_dma2d.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_exti.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fmpi2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_fsmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_gpio.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_i2c.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_lptim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_pwr.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rcc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rng.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_rtc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_sdmmc.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_spi.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_tim.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_usart.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_usb.o
+Compiling .pio/build/disco_f469ni/FrameworkHALDriver/Src/stm32f4xx_ll_utils.o
+Compiling .pio/build/disco_f469ni/src/display_task.o
+Compiling .pio/build/disco_f469ni/src/fan_task.o
+Compiling .pio/build/disco_f469ni/src/lv_port_disp.o
+Compiling .pio/build/disco_f469ni/src/lv_port_indev.o
+Compiling .pio/build/disco_f469ni/src/main.o
+Compiling .pio/build/disco_f469ni/src/retarget.o
+Compiling .pio/build/disco_f469ni/src/stm32f4xx_it.o
+Compiling .pio/build/disco_f469ni/src/uart_callback.o
+Compiling .pio/build/disco_f469ni/src/uart_task.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_font_mdi.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_lvgl.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_primitives.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_view_connections.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_view_debug.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_view_fan.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_view_settings.o
+Compiling .pio/build/disco_f469ni/src/ui/ui_view_wave2.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/croutine.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/event_groups.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/list.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.o
+.pio/libdeps/disco_f469ni/PlatformIO-FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c: In function 'xPortStartScheduler':
+.pio/libdeps/disco_f469ni/PlatformIO-FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c:327:33: warning: unused variable 'pxVectorTable' [-Wunused-variable]
+         const portISR_t * const pxVectorTable = portSCB_VTOR_REG;
+                                 ^~~~~~~~~~~~~
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/portable/MemMang/heap_4.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/queue.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/stream_buffer.o
+src/ui/ui_view_wave2.c: In function 'ui_view_wave2_update':
+src/ui/ui_view_wave2.c:290:53: warning: format '%d' expects argument of type 'int', but argument 3 has type 'int32_t {aka long int}' [-Wformat=]
+         lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+                                                    ~^     ~~~~~~~~~~~~~
+                                                    %ld
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/tasks.o
+Compiling .pio/build/disco_f469ni/lib301/PlatformIO-FreeRTOS/FreeRTOS-Kernel/timers.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_disp.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_event.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_group.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_indev.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_indev_scroll.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj.o
+Archiving .pio/build/disco_f469ni/lib301/libPlatformIO-FreeRTOS.a
+Indexing .pio/build/disco_f469ni/lib301/libPlatformIO-FreeRTOS.a
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_class.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_draw.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_pos.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_scroll.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_style.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_style_gen.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_obj_tree.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_refr.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/core/lv_theme.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/arm2d/lv_gpu_arm2d.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_arc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_img.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_label.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_layer.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_line.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_mask.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_rect.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_transform.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_draw_triangle.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_img_buf.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_img_cache.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/lv_img_decoder.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/pxp/lv_draw_pxp.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/pxp/lv_draw_pxp_blend.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/pxp/lv_gpu_nxp_pxp.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/pxp/lv_gpu_nxp_pxp_osa.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_draw_vglite.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_draw_vglite_arc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_draw_vglite_blend.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_draw_vglite_line.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_draw_vglite_rect.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_vglite_buf.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/nxp/vglite/lv_vglite_utils.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/renesas/lv_gpu_d2_draw_label.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/renesas/lv_gpu_d2_ra6m3.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_arc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_bg.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_composite.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_img.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_label.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_layer.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_line.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_mask.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_polygon.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_rect.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_stack_blur.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_texture_cache.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sdl/lv_draw_sdl_utils.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/stm32_dma2d/lv_gpu_stm32_dma2d.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_arc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_blend.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_dither.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_gradient.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_img.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_layer.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_letter.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_line.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_polygon.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_rect.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/sw/lv_draw_sw_transform.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/draw/swm341_dma2d/lv_gpu_swm341_dma2d.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/layouts/flex/lv_flex.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/layouts/grid/lv_grid.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/bmp/lv_bmp.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/ffmpeg/lv_ffmpeg.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/freetype/lv_freetype.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/fsdrv/lv_fs_fatfs.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/fsdrv/lv_fs_littlefs.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/fsdrv/lv_fs_posix.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/fsdrv/lv_fs_stdio.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/fsdrv/lv_fs_win32.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/gif/gifdec.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/gif/lv_gif.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/png/lodepng.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/png/lv_png.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/qrcode/lv_qrcode.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/qrcode/qrcodegen.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/rlottie/lv_rlottie.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/sjpg/lv_sjpg.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/sjpg/tjpgd.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/libs/tiny_ttf/lv_tiny_ttf.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/lv_extra.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/fragment/lv_fragment.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/fragment/lv_fragment_manager.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/gridnav/lv_gridnav.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/ime/lv_ime_pinyin.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/imgfont/lv_imgfont.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/monkey/lv_monkey.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/msg/lv_msg.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/others/snapshot/lv_snapshot.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/themes/basic/lv_theme_basic.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/themes/default/lv_theme_default.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/themes/mono/lv_theme_mono.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/animimg/lv_animimg.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/calendar/lv_calendar.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/calendar/lv_calendar_header_arrow.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/calendar/lv_calendar_header_dropdown.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/chart/lv_chart.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/colorwheel/lv_colorwheel.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/imgbtn/lv_imgbtn.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/keyboard/lv_keyboard.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/led/lv_led.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/list/lv_list.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/menu/lv_menu.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/meter/lv_meter.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/msgbox/lv_msgbox.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/span/lv_span.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/spinbox/lv_spinbox.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/spinner/lv_spinner.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/tabview/lv_tabview.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/tileview/lv_tileview.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/extra/widgets/win/lv_win.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_dejavu_16_persian_hebrew.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_fmt_txt.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_loader.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_10.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_12.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_12_subpx.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_14.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_16.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_18.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_20.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_22.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_24.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_26.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_28.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_28_compressed.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_30.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_32.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_34.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_36.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_38.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_40.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_42.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_44.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_46.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_48.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_montserrat_8.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_simsun_16_cjk.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_unscii_16.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/font/lv_font_unscii_8.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/hal/lv_hal_disp.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/hal/lv_hal_indev.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/hal/lv_hal_tick.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_anim.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_anim_timeline.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_area.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_async.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_bidi.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_color.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_fs.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_gc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_ll.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_log.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_lru.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_math.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_mem.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_printf.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_style.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_style_gen.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_templ.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_timer.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_tlsf.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_txt.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_txt_ap.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/misc/lv_utils.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_arc.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_bar.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_btn.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_btnmatrix.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_canvas.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_checkbox.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_dropdown.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_img.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_label.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_line.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_objx_templ.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_roller.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_slider.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_switch.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_table.o
+Compiling .pio/build/disco_f469ni/lib424/lvgl/widgets/lv_textarea.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/cs43l22/cs43l22.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/dp83848/dp83848.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/exc7200/exc7200.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ft3x67/ft3x67.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ft6x06/ft6x06.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/i3g4250d/i3g4250d.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ili9325/ili9325.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ili9341/ili9341.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/l3gd20/l3gd20.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/lan8742/lan8742.o
+Archiving .pio/build/disco_f469ni/lib424/liblvgl.a
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/lis302dl/lis302dl.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/lis3dsh/lis3dsh.o
+Indexing .pio/build/disco_f469ni/lib424/liblvgl.a
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ls016b8uy/ls016b8uy.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/lsm303agr/lsm303agr.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/lsm303dlhc/lsm303dlhc.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/mfxstm32l152/mfxstm32l152.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/nt35510/nt35510.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/otm8009a/otm8009a.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ov2640/ov2640.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ov5640/ov5640.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/s5k5cag/s5k5cag.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/st7735/st7735.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/st7789h2/st7789h2.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/stmpe1600/stmpe1600.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/stmpe811/stmpe811.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/ts3510/ts3510.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/Components/wm8994/wm8994.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/stm32469i_discovery.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/stm32469i_discovery_lcd.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/stm32469i_discovery_sdram.o
+Compiling .pio/build/disco_f469ni/lib751/bsp/stm32469i_discovery_ts.o
+Compiling .pio/build/disco_f469ni/lib00a/EcoFlowComm/ecoflow_protocol.o
+Compiling .pio/build/disco_f469ni/FrameworkCMSISDevice/gcc/startup_stm32f469xx.o
+Compiling .pio/build/disco_f469ni/FrameworkCMSISDevice/system_stm32f4xx.o
+Archiving .pio/build/disco_f469ni/lib00a/libEcoFlowComm.a
+Indexing .pio/build/disco_f469ni/lib00a/libEcoFlowComm.a
+Archiving .pio/build/disco_f469ni/libFrameworkCMSISDevice.a
+Indexing .pio/build/disco_f469ni/libFrameworkCMSISDevice.a
+Archiving .pio/build/disco_f469ni/lib751/libbsp.a
+Indexing .pio/build/disco_f469ni/lib751/libbsp.a
+Linking .pio/build/disco_f469ni/firmware.elf
+Checking size .pio/build/disco_f469ni/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=====     ]  51.9% (used 203908 bytes from 393216 bytes)
+Flash: [==        ]  17.9% (used 374940 bytes from 2097152 bytes)
+Building .pio/build/disco_f469ni/firmware.bin
+========================= [SUCCESS] Took 31.42 seconds =========================

@@ -20,7 +20,7 @@ static void MX_USART6_UART_Init(void);
 void JumpToApplication(void);
 void Process_OTA(void);
 uint8_t Calculate_CRC8(uint8_t *data, uint16_t len);
-uint32_t GetSector(uint32_t Address);
+uint32_t Calculate_Checksum(uint32_t startAddr, uint32_t length);
 
 // Status Codes for LEDs
 // Blue Blink: Waiting/Idle
@@ -28,6 +28,20 @@ uint32_t GetSector(uint32_t Address);
 // Blue Toggle: Writing
 // Green: Success
 // Red: Error
+
+// Helper macros for LEDs
+#define LED_BLUE_TOGGLE()  HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3)
+#define LED_BLUE_OFF()     HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET)
+#define LED_BLUE_ON()      HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_SET)
+
+#define LED_ORANGE_ON()    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET)
+#define LED_ORANGE_OFF()   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET)
+
+#define LED_RED_ON()       HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET)
+#define LED_RED_OFF()      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET)
+
+#define LED_GREEN_ON()     HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET)
+#define LED_GREEN_OFF()    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET)
 
 int main(void) {
     HAL_Init();
@@ -59,7 +73,9 @@ int main(void) {
 
     // Should not reach here
     while (1) {
-        HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_5); // Blink Red
+        LED_RED_ON();
+        HAL_Delay(500);
+        LED_RED_OFF();
         HAL_Delay(500);
     }
 }
@@ -69,18 +85,6 @@ void Process_OTA(void) {
     uint8_t tx_buf[10];
     uint32_t current_offset = 0;
 
-    // Determine Inactive Bank Target Sectors
-    // F469 2MB:
-    // Bank 1: Sectors 0-11
-    // Bank 2: Sectors 12-23
-    // If BFB2 = 0 (Bank 1 active): We write to Bank 2 (Sectors 12-23).
-    // If BFB2 = 1 (Bank 2 active): We write to Bank 1 (Sectors 0-11) logic?
-    // Wait, BFB2 remaps Bank 2 to 0x0800 0000. And Bank 1 to 0x0810 0000.
-    // So writing to INACTIVE_BANK_ADDR (0x0810 0000) ALWAYS targets the inactive physical bank.
-    // HOWEVER, HAL_FLASHEx_Erase requires Physical Sector Indices.
-    // If BFB2=0: 0x0810 0000 -> Sector 12.
-    // If BFB2=1: 0x0810 0000 -> Sector 0.
-
     uint32_t first_sector = 0;
     uint32_t nb_sectors = 12; // Bank size
 
@@ -89,7 +93,6 @@ void Process_OTA(void) {
     HAL_FLASHEx_OBGetConfig(&OBInit);
     HAL_FLASH_OB_Lock();
 
-    // Check direct register because HAL struct might mask DB1M/BFB2
     uint8_t bfb2 = (FLASH->OPTCR & FLASH_OPTCR_BFB2) ? 1 : 0;
 
     if (bfb2 == 0) {
@@ -102,7 +105,7 @@ void Process_OTA(void) {
 
     // Blue Blink to indicate Ready
     while (1) {
-        HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3);
+        LED_BLUE_TOGGLE();
 
         if (HAL_UART_Receive(&huart6, rx_buf, 1, 100) == HAL_OK) {
             if (rx_buf[0] == 0xAA) {
@@ -117,13 +120,13 @@ void Process_OTA(void) {
                          if (calc_crc == recv_crc) {
                              if (cmd == CMD_OTA_START) {
                                  // Turn Orange (Erasing)
-                                 HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
-                                 HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
+                                 LED_BLUE_OFF();
+                                 LED_ORANGE_ON();
+                                 LED_RED_OFF();
 
                                  HAL_FLASH_Unlock();
                                  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
-                                 // Erase Inactive Bank
                                  FLASH_EraseInitTypeDef EraseInitStruct;
                                  EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
                                  EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
@@ -131,9 +134,20 @@ void Process_OTA(void) {
                                  EraseInitStruct.NbSectors = nb_sectors;
 
                                  uint32_t SectorError;
-                                 HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+                                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                                     // Erase Failed
+                                     LED_RED_ON();
+                                     LED_ORANGE_OFF();
 
-                                 // Prepare ACK
+                                     tx_buf[0] = 0xAA;
+                                     tx_buf[1] = CMD_NACK;
+                                     tx_buf[2] = 0x00;
+                                     tx_buf[3] = Calculate_CRC8(&tx_buf[1], 2);
+                                     HAL_UART_Transmit(&huart6, tx_buf, 4, 100);
+                                     continue;
+                                 }
+
+                                 // ACK
                                  tx_buf[0] = 0xAA;
                                  tx_buf[1] = CMD_ACK;
                                  tx_buf[2] = 0x00;
@@ -158,36 +172,77 @@ void Process_OTA(void) {
                                  uint8_t *data_ptr = &rx_buf[7];
                                  uint8_t data_len = len - 4;
 
-                                 HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3); // Blue Toggle
+                                 LED_BLUE_TOGGLE();
 
                                  uint32_t address = INACTIVE_BANK_ADDR + chunk_offset;
 
+                                 int write_err = 0;
                                  for (int i=0; i<data_len; i+=4) {
                                      uint32_t val;
                                      memcpy(&val, &data_ptr[i], 4);
-                                     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address + i, val);
+                                     if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address + i, val) != HAL_OK) {
+                                         write_err = 1;
+                                         break;
+                                     }
                                  }
 
-                                 current_offset += data_len;
+                                 if (write_err) {
+                                     LED_RED_ON();
+                                     tx_buf[0] = 0xAA;
+                                     tx_buf[1] = CMD_NACK;
+                                     tx_buf[2] = 0x00;
+                                     tx_buf[3] = Calculate_CRC8(&tx_buf[1], 2);
+                                     HAL_UART_Transmit(&huart6, tx_buf, 4, 100);
+                                 } else {
+                                     current_offset += data_len;
 
-                                 tx_buf[0] = 0xAA;
-                                 tx_buf[1] = CMD_ACK;
-                                 tx_buf[2] = 0x00;
-                                 tx_buf[3] = Calculate_CRC8(&tx_buf[1], 2);
-                                 HAL_UART_Transmit(&huart6, tx_buf, 4, 100);
+                                     tx_buf[0] = 0xAA;
+                                     tx_buf[1] = CMD_ACK;
+                                     tx_buf[2] = 0x00;
+                                     tx_buf[3] = Calculate_CRC8(&tx_buf[1], 2);
+                                     HAL_UART_Transmit(&huart6, tx_buf, 4, 100);
+                                 }
                              }
                              else if (cmd == CMD_OTA_END) {
-                                 // Swap Bank
-                                 HAL_FLASH_OB_Unlock();
-
-                                 // Toggle BFB2
-                                 if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-                                     FLASH->OPTCR &= ~FLASH_OPTCR_BFB2;
-                                 } else {
-                                     FLASH->OPTCR |= FLASH_OPTCR_BFB2;
+                                 // Expected Checksum from payload
+                                 uint32_t expected_checksum = 0;
+                                 if (len >= 4) {
+                                     memcpy(&expected_checksum, &rx_buf[3], 4);
                                  }
 
-                                 HAL_FLASH_OB_Launch();
+                                 // Verify Checksum of the WHOLE written bank
+                                 // Checksum over current_offset bytes
+                                 uint32_t calc_checksum = Calculate_Checksum(INACTIVE_BANK_ADDR, current_offset);
+
+                                 if (calc_checksum == expected_checksum) {
+                                     // Success
+                                     LED_GREEN_ON();
+                                     LED_ORANGE_OFF();
+
+                                     // Swap Bank
+                                     HAL_FLASH_OB_Unlock();
+
+                                     if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
+                                         FLASH->OPTCR &= ~FLASH_OPTCR_BFB2;
+                                     } else {
+                                         FLASH->OPTCR |= FLASH_OPTCR_BFB2;
+                                     }
+
+                                     HAL_FLASH_OB_Launch(); // Resets
+                                 } else {
+                                     // Checksum Error
+                                     LED_RED_ON();
+                                     LED_ORANGE_OFF();
+
+                                     // Send NACK or Error?
+                                     // Protocol currently expects generic ACK/NACK logic.
+                                     // We can just hang or NACK. NACK allows ESP to know it failed.
+                                     tx_buf[0] = 0xAA;
+                                     tx_buf[1] = CMD_NACK;
+                                     tx_buf[2] = 0x00;
+                                     tx_buf[3] = Calculate_CRC8(&tx_buf[1], 2);
+                                     HAL_UART_Transmit(&huart6, tx_buf, 4, 100);
+                                 }
                              }
                          }
                     }
@@ -195,6 +250,20 @@ void Process_OTA(void) {
             }
         }
     }
+}
+
+// Simple Sum Checksum for now
+uint32_t Calculate_Checksum(uint32_t startAddr, uint32_t length) {
+    uint32_t sum = 0;
+    uint32_t *p = (uint32_t*)startAddr;
+
+    // Length is in bytes, convert to words
+    uint32_t words = length / 4;
+
+    for(uint32_t i=0; i<words; i++) {
+        sum += p[i];
+    }
+    return sum;
 }
 
 void JumpToApplication(void) {
@@ -277,6 +346,12 @@ static void MX_GPIO_Init(void) {
     // PK3 Blue
     GPIO_InitStruct.Pin = GPIO_PIN_3;
     HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
+
+    // Default State: All Off
+    LED_BLUE_OFF();
+    LED_RED_OFF();
+    LED_ORANGE_OFF();
+    LED_GREEN_OFF();
 }
 
 static void MX_USART6_UART_Init(void) {

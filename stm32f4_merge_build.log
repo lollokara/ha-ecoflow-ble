@@ -1,0 +1,26 @@
+Processing disco_f469ni (platform: ststm32; board: disco_f469ni; framework: stm32cube)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/ststm32/disco_f469ni.html
+PLATFORM: ST STM32 (19.4.0) > ST 32F469IDISCOVERY
+HARDWARE: STM32F469NIH6 180MHz, 384KB RAM, 2MB Flash
+DEBUG: Current (stlink) On-board (stlink) External (blackmagic, cmsis-dap, jlink)
+PACKAGES:
+ - framework-stm32cubef4 @ 1.28.1
+ - tool-ldscripts-ststm32 @ 0.2.0
+ - toolchain-gccarmnoneeabi @ 1.70201.0 (7.2.1)
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+PlatformIO-FreeRTOS: building for STM32F4
+Found 64 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- PlatformIO-FreeRTOS @ 2.1.4+sha.bdf2ac1
+|-- lvgl @ 8.4.0
+|-- bsp @ 1.0.0
+|-- EcoFlowComm @ 1.0.0
+Building in release mode
+
+*** missing SConscript file 'merge_firmware.py'
+File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/platformio/builder/main.py", line 180, in <module>
+========================== [FAILED] Took 2.28 seconds ==========================
