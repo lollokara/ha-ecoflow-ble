@@ -16,6 +16,20 @@
 #define CMD_OTA_ACK   0x06
 #define CMD_OTA_NACK  0x15
 
+// Register Definitions
+// For STM32F469/479, BFB2 is Bit 23. For F42xxx/43xxx, it is Bit 4.
+// PlatformIO board 'disco_f469ni' defines STM32F469xx.
+#if defined(STM32F469xx) || defined(STM32F479xx)
+    #ifndef FLASH_OPTCR_BFB2
+        #define FLASH_OPTCR_BFB2 (1 << 23)
+    #endif
+#else
+    // Fallback for F429/439 just in case (though we expect F469)
+    #ifndef FLASH_OPTCR_BFB2
+        #define FLASH_OPTCR_BFB2 (1 << 4)
+    #endif
+#endif
+
 // Ring Buffer Definition
 #define RING_BUFFER_SIZE 2048
 typedef struct {
@@ -26,11 +40,6 @@ typedef struct {
 
 RingBuffer rx_ring_buffer;
 uint8_t rx_byte_isr;
-
-// Register Definitions
-#ifndef FLASH_OPTCR_BFB2
-#define FLASH_OPTCR_BFB2 (1 << 4)
-#endif
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
@@ -75,10 +84,6 @@ int rb_available(RingBuffer *rb) {
 }
 
 // --- Interrupt Handling ---
-// Override default HAL handler if weak, or just implement callback.
-// Since HAL_UART_IRQHandler calls HAL_UART_RxCpltCallback, we use that.
-// We must ensure the IRQ is enabled in NVIC.
-
 void USART6_IRQHandler(void) {
     HAL_UART_IRQHandler(&huart6);
 }
@@ -495,13 +500,15 @@ void Bootloader_OTA_Loop(void) {
             }
 
             Serial_Log("Applying Update...");
+            Serial_Log("Current USERConfig: 0x%02X, BFB2 Mask: 0x%08X", OBInit.USERConfig, FLASH_OPTCR_BFB2);
+
             send_ack();
             HAL_Delay(100);
 
             // Toggle BFB2
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
-            FLASH_OBProgramInitTypeDef OBInit;
+            // Get fresh config
             HAL_FLASHEx_OBGetConfig(&OBInit);
 
             // Toggle
@@ -511,6 +518,8 @@ void Bootloader_OTA_Loop(void) {
             } else {
                 OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
+
+            Serial_Log("New USERConfig: 0x%02X", OBInit.USERConfig);
 
             HAL_FLASHEx_OBProgram(&OBInit);
             HAL_FLASH_OB_Launch(); // Resets system
