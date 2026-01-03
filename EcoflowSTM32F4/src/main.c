@@ -323,10 +323,8 @@ int main(void) {
     xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
-    HAL_UART_Transmit(&huart3, (uint8_t*)"T6\r\n", 4, 100);
 
     // Start Scheduler
-    HAL_UART_Transmit(&huart3, (uint8_t*)"SCHED\r\n", 7, 100);
     vTaskStartScheduler();
 
     // Should never reach here
