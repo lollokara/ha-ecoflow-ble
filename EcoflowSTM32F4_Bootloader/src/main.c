@@ -227,32 +227,48 @@ int main(void) {
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
-    // Check Backup Register for OTA Flag
+    // Enable Backup Access for OTA Flag and Boot Counter
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
-    bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
 
-    // Check App Validity
+    bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
+    uint32_t boot_fails = RTC->BKP1R;
+
+    // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-    bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");
-        // Clear flag
+        // Clear flag and boot counter
         RTC->BKP0R = 0;
+        RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     } else if (valid_app) {
+        if (boot_fails >= 3) {
+            Serial_Log("Too many failed boots (%d). Forcing OTA.", boot_fails);
+            // Flash RED to indicate failure
+            for(int i=0; i<10; i++) { LED_R_Toggle(); HAL_Delay(100); }
+            RTC->BKP1R = 0; // Reset counter so we don't get stuck forever if they fix it? Or keep it?
+            // Actually, if we enter OTA and they don't upload, we might reboot.
+            // Let's reset it here, assuming they will upload.
+            // If they don't upload, next reboot will be attempt 0.
+            // If it crashes again 3 times, we come back here.
+            Bootloader_OTA_Loop();
+        }
+
+        // Increment Boot Counter (App must clear it on success)
+        RTC->BKP1R = boot_fails + 1;
+
         // Wait 500ms for OTA START - Blink Blue (Scenario 1)
         uint8_t buf[1];
         LED_B_On();
 
         // Use non-blocking read for start byte check
-        // Note: IRQs not yet enabled by rb_init, but HAL_UART_Receive works if no IRQ enabled
-        // Actually, we initialized UART with interrupts in mind but haven't started them.
-        // Let's rely on standard receive here for simplicity before loop.
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
                  Serial_Log("OTA Byte received on boot.");
+                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
                  Bootloader_OTA_Loop();
             }
         }
@@ -270,6 +286,7 @@ int main(void) {
     } else {
         // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
+        RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     }
 
@@ -497,6 +514,9 @@ void Bootloader_OTA_Loop(void) {
             Serial_Log("Applying Update...");
             send_ack();
             HAL_Delay(100);
+
+            // Clear Boot Counter (BKP1R) for fresh start
+            RTC->BKP1R = 0;
 
             // Toggle BFB2
             HAL_FLASH_Unlock();

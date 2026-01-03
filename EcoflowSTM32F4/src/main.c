@@ -277,6 +277,12 @@ int main(void) {
 
     HAL_Init();
     SystemClock_Config();
+
+    // Reset Boot Counter after successful boot
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    RTC->BKP1R = 0;
+
     ESP32_Reset_Init();
 
     MX_USART3_UART_Init();
