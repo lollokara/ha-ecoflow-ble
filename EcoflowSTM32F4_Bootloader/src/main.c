@@ -399,17 +399,20 @@ void Bootloader_OTA_Loop(void) {
 
     uint32_t start_sector, end_sector;
 
-    // Invert Logic: We must target the INACTIVE bank for updates.
+    // Correct Logic:
+    // If BFB2=1 (bfb2_active=true), we booted from Bank 2. Target Bank 1 (Inactive).
+    // If BFB2=0 (bfb2_active=false), we booted from Bank 1. Target Bank 2 (Inactive).
+
     if (bfb2_active) {
-        // Bank 1 is Active (BFB2=1). Target Bank 2 (Sectors 12-23).
-        start_sector = FLASH_SECTOR_12;
-        end_sector = FLASH_SECTOR_23;
-        Serial_Log("Active: Bank 1. Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
-    } else {
-        // Bank 2 is Active (BFB2=0). Target Bank 1 (Sectors 0-11).
+        // Active: Bank 2. Target: Bank 1.
         start_sector = FLASH_SECTOR_0;
         end_sector = FLASH_SECTOR_11;
-        Serial_Log("Active: Bank 2. Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Active: Bank 2 (BFB2=1). Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
+    } else {
+        // Active: Bank 1. Target: Bank 2.
+        start_sector = FLASH_SECTOR_12;
+        end_sector = FLASH_SECTOR_23;
+        Serial_Log("Active: Bank 1 (BFB2=0). Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
     }
 
     bool ota_started = false;
