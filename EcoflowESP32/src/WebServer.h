@@ -9,6 +9,7 @@
 #include "WebAssets.h"
 #include "CmdUtils.h"
 #include "LightSensor.h"
+#include <FS.h>
 
 class WebServer {
 public:
@@ -16,6 +17,7 @@ public:
 
 private:
     static AsyncWebServer server;
+    static File _uploadFile;
     static void setupRoutes();
 
     // API Handlers
@@ -36,6 +38,9 @@ private:
     static void handleLogs(AsyncWebServerRequest *request);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+
+    // OTA
+    static void handleUpdateStm32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 };
 
 #endif

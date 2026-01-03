@@ -195,6 +195,22 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             xQueueSend(displayQueue, &event, 0);
         }
     }
+    else if (cmd == CMD_OTA_START) {
+        printf("UART: OTA Start Received. Rebooting to Bootloader...\n");
+
+        // Enable Backup Access
+        __HAL_RCC_PWR_CLK_ENABLE();
+        HAL_PWR_EnableBkUpAccess();
+        __HAL_RCC_RTC_ENABLE(); // Ensure RTC clock is on
+
+        // Write Magic Flag to Backup Register 0
+        RTC_HandleTypeDef hrtc = {0};
+        hrtc.Instance = RTC;
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0xDEADBEEF);
+
+        // System Reset to trigger Bootloader
+        HAL_NVIC_SystemReset();
+    }
 }
 
 // Public function to queue a Wave 2 command

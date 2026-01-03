@@ -2,9 +2,12 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <esp_log.h>
+#include "OtaManager.h"
+#include <LittleFS.h>
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
+File WebServer::_uploadFile;
 
 // Helper to read internal temperature safely
 #include <esp_idf_version.h>
@@ -81,6 +84,25 @@ void WebServer::setupRoutes() {
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
+
+    server.on("/update/stm32", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200, "text/plain", "Update Started");
+    }, handleUpdateStm32);
+}
+
+void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if(!index){
+        ESP_LOGI(TAG, "STM32 Update Start: %s", filename.c_str());
+        _uploadFile = LittleFS.open("/firmware.bin", "w");
+    }
+    if(_uploadFile){
+        _uploadFile.write(data, len);
+    }
+    if(final){
+        if(_uploadFile) _uploadFile.close();
+        ESP_LOGI(TAG, "STM32 Upload Complete. Triggering Flash...");
+        OtaManager::getInstance().startStm32Update("/firmware.bin");
+    }
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {

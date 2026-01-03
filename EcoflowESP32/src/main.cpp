@@ -21,6 +21,7 @@
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
 #include "Stm32Serial.h"
+#include "OtaManager.h"
 
 // Hardware Pin Definitions
 #define POWER_LATCH_PIN 16 ///< GPIO pin to control the power latch (keeps device on).
@@ -71,6 +72,9 @@ void setup() {
 
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();
+
+    // Initialize OTA Manager
+    OtaManager::getInstance().begin();
 
     // Initialize the Device Manager to handle BLE connections
     DeviceManager::getInstance().initialize();
