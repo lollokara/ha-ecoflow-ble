@@ -2,9 +2,6 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Define Application Address (Sector 2)
-#define APP_ADDRESS 0x08008000
-
 // UART Protocol
 #define START_BYTE 0xAA
 #define CMD_OTA_START 0xA0
@@ -19,7 +16,10 @@
 #define FLASH_OPTCR_BFB2 (1 << 4)
 #endif
 
+#define OTA_FLAG 0xDEADBEEF
+
 UART_HandleTypeDef huart6;
+IWDG_HandleTypeDef hiwdg;
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
@@ -29,6 +29,15 @@ void SystemClock_Config(void);
 void UART_Init(void);
 void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
+
+static void MX_IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
+    hiwdg.Init.Reload = 1250; // 10s
+    if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+        // Error
+    }
+}
 
 // Helper to de-initialize peripherals and interrupts
 void DeInit(void) {
@@ -70,6 +79,13 @@ void All_LEDs_Off() {
     LED_G_Off(); LED_O_Off(); LED_R_Off(); LED_B_Off();
 }
 
+// Get the actual App Address based on the Active Bank
+// Note: Hardware aliases the Active Bank to 0x08000000 (usually) or at least 0x00000000.
+// We jump to the fixed Boot Address 0x08008000 which should map to the Active Application.
+uint32_t GetActiveAppAddress() {
+    return 0x08008000;
+}
+
 int main(void) {
     HAL_Init();
     GPIO_Init();
@@ -82,9 +98,23 @@ int main(void) {
 
     SystemClock_Config();
     UART_Init();
+    MX_IWDG_Init();
+
+    // Enable Backup Access for RTC Flag
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+
+    // Check OTA Flag in RTC Backup Register 0
+    if (RTC->BKP0R == OTA_FLAG) {
+        // Clear flag
+        RTC->BKP0R = 0;
+        // Enter OTA Mode
+        Bootloader_OTA_Loop();
+    }
 
     // Check App
-    uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
+    uint32_t app_addr = GetActiveAppAddress();
+    uint32_t sp = *(__IO uint32_t*)app_addr;
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
     if (valid_app) {
@@ -102,7 +132,7 @@ int main(void) {
         LED_G_On();
         DeInit();
 
-        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+        JumpAddress = *(__IO uint32_t*) (app_addr + 4);
         JumpToApplication = (pFunction) JumpAddress;
         __set_MSP(sp);
         JumpToApplication();
@@ -190,23 +220,32 @@ void Bootloader_OTA_Loop(void) {
 
         if (cmd == CMD_OTA_START) {
             ota_started = true;
-            // Erase Physical Sectors 2-11 (Bank 1)
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+
+            // Target Inactive Bank (Always mapped to 0x08100000 / Sectors 12-23 in Dual Bank Mode)
+            uint32_t start_sec = FLASH_SECTOR_12;
+            uint32_t end_sec = FLASH_SECTOR_23;
+
             EraseInitStruct.NbSectors = 1;
 
             bool error = false;
-            for (uint32_t sec = FLASH_SECTOR_2; sec <= FLASH_SECTOR_11; sec++) {
+            for (uint32_t sec = start_sec; sec <= end_sec; sec++) {
                 LED_O_Toggle(); // Toggle Orange during erase
                 EraseInitStruct.Sector = sec;
-                // Refresh IWDG if active (not initialized here but good practice if jumping back)
-                // HAL_IWDG_Refresh(&hiwdg);
+
+                // Clear flags before erase
+                __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                                       FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
                     error = true; break;
                 }
+
+                // Refresh watchdog
+                 HAL_IWDG_Refresh(&hiwdg);
             }
 
             if (!error) send_ack(); else send_nack();
@@ -218,13 +257,11 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            // Physical Bank 1 Write
-            uint32_t base_addr = 0x08000000;
-            if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-                base_addr = 0x08100000;
-            }
+            // Target Inactive Bank Base Address
+            uint32_t base_addr = 0x08100000;
 
-            uint32_t addr = base_addr + offset + 0x8000;
+            // Write Address (Assumes factory_firmware.bin starts at offset 0 of the bank)
+            uint32_t addr = base_addr + offset;
 
             bool ok = true;
             for (uint32_t i=0; i<data_len; i+=4) {
@@ -239,25 +276,43 @@ void Bootloader_OTA_Loop(void) {
             if (ok) send_ack(); else send_nack();
         }
         else if (cmd == CMD_OTA_END) {
-            send_ack();
-            All_LEDs_Off();
-            LED_G_On(); // Green Solid
+             // Verify the written bank
+             uint32_t base_addr = 0x08100000;
+
+            // Simple Verification: Check if App Stack Pointer is valid at target
+            // App is at +0x8000 in the bank
+            uint32_t app_sp = *(__IO uint32_t*)(base_addr + 0x8000);
+            if ((app_sp & 0x2FFE0000) == 0x20000000) {
+                 send_ack();
+                 All_LEDs_Off();
+                 LED_G_On(); // Green Solid (Success)
+            } else {
+                 send_nack();
+                 LED_R_On(); // Red Solid (Fail)
+            }
         }
         else if (cmd == CMD_OTA_APPLY) {
             send_ack();
             HAL_Delay(100);
 
-            // Reset BFB2
+            // Toggle BFB2
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
             FLASH_OBProgramInitTypeDef OBInit;
             HAL_FLASHEx_OBGetConfig(&OBInit);
+
+            // Toggle the bit
             if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
-                OBInit.OptionType = OPTIONBYTE_USER;
-                HAL_FLASHEx_OBProgram(&OBInit);
-                HAL_FLASH_OB_Launch();
+                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Set to Bank 1
+            } else {
+                OBInit.USERConfig |= FLASH_OPTCR_BFB2;  // Set to Bank 2
             }
+
+            OBInit.OptionType = OPTIONBYTE_USER;
+            HAL_FLASHEx_OBProgram(&OBInit);
+            HAL_FLASH_OB_Launch(); // This triggers reset
+
+            // Should not reach here
             HAL_NVIC_SystemReset();
         }
     }
