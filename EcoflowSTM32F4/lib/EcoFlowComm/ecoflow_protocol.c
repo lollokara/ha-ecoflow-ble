@@ -290,17 +290,44 @@ int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type) {
     return 0;
 }
 
-int pack_ota_ack_message(uint8_t *buffer) {
+int pack_ota_start_message(uint8_t *buffer, uint32_t total_size) {
+    uint8_t len = sizeof(OtaStartMsg);
     buffer[0] = START_BYTE;
-    buffer[1] = CMD_OTA_ACK;
-    buffer[2] = 0;
-    buffer[3] = calculate_crc8(&buffer[1], 2);
-    return 4;
+    buffer[1] = CMD_OTA_START;
+    buffer[2] = len;
+    OtaStartMsg msg = { total_size };
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
 }
 
-int pack_ota_nack_message(uint8_t *buffer) {
+int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len) {
+    // [OFFSET(4)][DATA(len)]
+    // Payload length = 4 + len. Max 255.
+    // So len must be <= 251.
+    uint8_t payload_len = 4 + len;
     buffer[0] = START_BYTE;
-    buffer[1] = CMD_OTA_NACK;
+    buffer[1] = CMD_OTA_CHUNK;
+    buffer[2] = payload_len;
+    memcpy(&buffer[3], &offset, 4);
+    memcpy(&buffer[7], data, len);
+    buffer[3 + payload_len] = calculate_crc8(&buffer[1], 2 + payload_len);
+    return 4 + payload_len;
+}
+
+int pack_ota_end_message(uint8_t *buffer, uint32_t crc32) {
+    uint8_t len = 4; // 4 bytes CRC
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_OTA_END;
+    buffer[2] = len;
+    memcpy(&buffer[3], &crc32, 4);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int pack_ota_apply_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_OTA_APPLY;
     buffer[2] = 0;
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;

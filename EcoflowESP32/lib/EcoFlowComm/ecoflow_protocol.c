@@ -315,12 +315,14 @@ int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data
     return 4 + payload_len;
 }
 
-int pack_ota_end_message(uint8_t *buffer) {
+int pack_ota_end_message(uint8_t *buffer, uint32_t crc32) {
+    uint8_t len = 4; // 4 bytes CRC
     buffer[0] = START_BYTE;
     buffer[1] = CMD_OTA_END;
-    buffer[2] = 0;
-    buffer[3] = calculate_crc8(&buffer[1], 2);
-    return 4;
+    buffer[2] = len;
+    memcpy(&buffer[3], &crc32, 4);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
 }
 
 int pack_ota_apply_message(uint8_t *buffer) {

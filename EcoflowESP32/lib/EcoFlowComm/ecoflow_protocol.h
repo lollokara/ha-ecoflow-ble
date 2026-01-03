@@ -343,7 +343,7 @@ int unpack_forget_device_message(const uint8_t *buffer, uint8_t *device_type);
 
 int pack_ota_start_message(uint8_t *buffer, uint32_t total_size);
 int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len);
-int pack_ota_end_message(uint8_t *buffer);
+int pack_ota_end_message(uint8_t *buffer, uint32_t crc32);
 int pack_ota_apply_message(uint8_t *buffer);
 
 #ifdef __cplusplus
