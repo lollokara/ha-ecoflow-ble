@@ -217,7 +217,14 @@ void Serial_Log(const char* fmt, ...) {
 }
 
 int main(void) {
+    // Explicitly set Vector Table Offset to 0x08000000 (Start of Active Bank)
+    SCB->VTOR = 0x08000000;
+    __DSB(); // Data Synchronization Barrier to ensure VTOR write completes
+    __ISB(); // Instruction Synchronization Barrier to flush pipeline using new VTOR
+
     HAL_Init();
+    __enable_irq(); // Enable interrupts after HAL init
+
     GPIO_Init();
 
     // 1. Startup Sequence
