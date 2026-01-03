@@ -304,6 +304,10 @@ int main(void) {
         // Jump - Green ON
         LED_G_On();
         Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
+
+        // Reset RCC (Clocks) to default state (HSI) before jump
+        HAL_RCC_DeInit();
+
         DeInit();
 
         JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);

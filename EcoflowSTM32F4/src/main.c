@@ -294,7 +294,16 @@ int main(void) {
     __enable_irq();
 
     HAL_Init();
+    GPIOD->ODR |= (1 << 5); // LED OFF (Active Low: Set High)
+
     SystemClock_Config();
+    GPIOD->ODR &= ~(1 << 5); // LED ON (Active Low: Set Low)
+
+    MX_USART3_UART_Init(); // Init Debug UART Early
+
+    // Simple Direct UART Debug
+    char *msg = "APP: STARTED\r\n";
+    HAL_UART_Transmit(&huart3, (uint8_t*)msg, 14, 100);
 
     // Reset Boot Counter after successful boot
     __HAL_RCC_PWR_CLK_ENABLE();
@@ -302,8 +311,6 @@ int main(void) {
     RTC->BKP1R = 0;
 
     ESP32_Reset_Init();
-
-    MX_USART3_UART_Init();
     MX_TIM2_Init();
     MX_IWDG_Init();
 
