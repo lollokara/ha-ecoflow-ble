@@ -217,6 +217,10 @@ void Bootloader_OTA_Loop(void) {
     HAL_FLASH_Unlock();
     All_LEDs_Off();
 
+    // Flush RX Buffer to clear any pending commands (e.g. 0x22 Device List)
+    uint8_t dummy;
+    while(HAL_UART_Receive(&huart6, &dummy, 1, 10) == HAL_OK);
+
     // OTA Ready: Slow Blue Blink
     bool ota_started = false;
 

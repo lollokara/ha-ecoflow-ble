@@ -500,27 +500,37 @@ void Stm32Serial::otaTask(void* parameter) {
 
     while (f.available()) {
         int bytesRead = f.read(chunk, sizeof(chunk));
+        bool chunkSuccess = false;
 
-        len = pack_ota_chunk_message(buf, offset, chunk, bytesRead);
-        self->sendData(buf, len);
+        for (int retry = 0; retry < 3; retry++) {
+            len = pack_ota_chunk_message(buf, offset, chunk, bytesRead);
+            self->sendData(buf, len);
 
-        // Wait for ACK
-        otaAckReceived = false;
-        otaNackReceived = false;
-        uint32_t startWait = millis();
-        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout per chunk
-            vTaskDelay(5);
+            // Wait for ACK
+            otaAckReceived = false;
+            otaNackReceived = false;
+            uint32_t startWait = millis();
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout per chunk
+                vTaskDelay(5);
+            }
+
+            if (otaAckReceived) {
+                chunkSuccess = true;
+                break;
+            }
+
+            if (otaNackReceived) {
+                 ESP_LOGW(TAG, "OTA Chunk NACK at %d (Retry %d)", offset, retry + 1);
+                 vTaskDelay(pdMS_TO_TICKS(100)); // Wait before retry
+            } else {
+                 ESP_LOGW(TAG, "OTA Chunk Timeout at %d (Retry %d)", offset, retry + 1);
+                 vTaskDelay(pdMS_TO_TICKS(100)); // Wait before retry
+            }
         }
 
-        if (otaNackReceived) {
-             ESP_LOGE(TAG, "OTA Chunk NACK at %d", offset);
-             ota_state = 4; ota_msg = "Chunk NACK";
-             break;
-        }
-
-        if (!otaAckReceived) {
-            ESP_LOGE(TAG, "OTA Chunk Timeout at %d", offset);
-            ota_state = 4; ota_msg = "Chunk Timeout";
+        if (!chunkSuccess) {
+            ESP_LOGE(TAG, "OTA Chunk Failed after retries at %d", offset);
+            ota_state = 4; ota_msg = "Chunk Failed";
             break;
         }
 
