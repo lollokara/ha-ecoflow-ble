@@ -18,28 +18,77 @@
 
 // Register Definitions
 #ifndef FLASH_OPTCR_BFB2
-#define FLASH_OPTCR_BFB2 (1 << 4)
+#define FLASH_OPTCR_BFB2 (1 << 4) // Note: On F469, BFB2 is bit 23, but HAL might map differently.
+                                  // Wait, F469 Reference Manual says BFB2 is Bit 23 of FLASH_OPTCR.
+                                  // HAL_FLASH_Ex.h defines FLASH_OPTCR_BFB2 as 0x00800000U (Bit 23).
+                                  // The previous code had (1 << 4) which is WRONG.
 #endif
 
-// Sector Definitions for F469 (2MB)
-// Bank 1: Sectors 0-11
-// Bank 2: Sectors 12-23
-// We only use the Application area (Sectors 2-11 in Bank 1, Sectors 14-23 in Bank 2)
-// Bootloader + Config occupy Sectors 0/1 and 12/13.
+// Correction for BFB2 based on STM32F469NI
+#undef FLASH_OPTCR_BFB2
+#define FLASH_OPTCR_BFB2 (1UL << 23)
+
+// Ring Buffer Size
+#define RING_BUFFER_SIZE 2048
 
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
+IWDG_HandleTypeDef hiwdg;
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
 uint32_t JumpAddress;
 
+// Ring Buffer
+typedef struct {
+    uint8_t buffer[RING_BUFFER_SIZE];
+    volatile uint16_t head;
+    volatile uint16_t tail;
+} RingBuffer;
+
+RingBuffer rx_ring;
+uint8_t rx_byte_isr;
+
 void SystemClock_Config(void);
 void UART_Init(void);
 void USART3_Init(void);
 void GPIO_Init(void);
+void IWDG_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
+
+// Helper to de-initialize peripherals and interrupts
+void DeInit(void) {
+    HAL_UART_DeInit(&huart6);
+    HAL_UART_DeInit(&huart3);
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
+    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
+    HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
+    SysTick->CTRL = 0;
+    SysTick->LOAD = 0;
+    SysTick->VAL  = 0;
+    __disable_irq();
+    for (int i = 0; i < 8; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFF;
+        NVIC->ICPR[i] = 0xFFFFFFFF;
+    }
+    HAL_DeInit();
+}
+
+// LED Helpers
+void LED_G_On() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); }
+void LED_G_Off() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); }
+void LED_O_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET); }
+void LED_O_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); }
+void LED_R_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); }
+void LED_R_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); }
+void LED_B_On() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET); }
+void LED_B_Off() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_SET); }
+void LED_B_Toggle() { HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3); }
+
+void All_LEDs_Off() {
+    LED_G_Off(); LED_O_Off(); LED_R_Off(); LED_B_Off();
+}
 
 // CRC32 Table (Standard Ethernet 0x04C11DB7)
 static const uint32_t crc32_table[] = {
@@ -85,48 +134,6 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
     return ~crc;
 }
 
-// Helper to de-initialize peripherals and interrupts
-void DeInit(void) {
-    HAL_UART_DeInit(&huart6);
-    HAL_UART_DeInit(&huart3);
-
-    // De-init LEDs
-    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
-    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
-    HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
-
-    SysTick->CTRL = 0;
-    SysTick->LOAD = 0;
-    SysTick->VAL  = 0;
-    __disable_irq();
-    for (int i = 0; i < 8; i++) {
-        NVIC->ICER[i] = 0xFFFFFFFF;
-        NVIC->ICPR[i] = 0xFFFFFFFF;
-    }
-    HAL_DeInit();
-}
-
-// LED Helpers
-void LED_G_On() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); }
-void LED_G_Off() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); }
-void LED_G_Toggle() { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); }
-
-void LED_O_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET); }
-void LED_O_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); }
-void LED_O_Toggle() { HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_4); }
-
-void LED_R_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); }
-void LED_R_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); }
-void LED_R_Toggle() { HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_5); }
-
-void LED_B_On() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET); }
-void LED_B_Off() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_SET); }
-void LED_B_Toggle() { HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3); }
-
-void All_LEDs_Off() {
-    LED_G_Off(); LED_O_Off(); LED_R_Off(); LED_B_Off();
-}
-
 // Log to USART3
 void Serial_Log(const char* fmt, ...) {
     char buf[128];
@@ -136,6 +143,32 @@ void Serial_Log(const char* fmt, ...) {
     va_end(args);
     HAL_UART_Transmit(&huart3, (uint8_t*)buf, strlen(buf), 100);
     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
+}
+
+void rb_init(RingBuffer *rb) {
+    rb->head = 0; rb->tail = 0;
+}
+
+void rb_push(RingBuffer *rb, uint8_t byte) {
+    uint16_t next = (rb->head + 1) % RING_BUFFER_SIZE;
+    if (next != rb->tail) {
+        rb->buffer[rb->head] = byte;
+        rb->head = next;
+    }
+}
+
+int rb_pop(RingBuffer *rb, uint8_t *byte) {
+    if (rb->head == rb->tail) return 0;
+    *byte = rb->buffer[rb->tail];
+    rb->tail = (rb->tail + 1) % RING_BUFFER_SIZE;
+    return 1;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART6) {
+        rb_push(&rx_ring, rx_byte_isr);
+        HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
+    }
 }
 
 int main(void) {
@@ -151,8 +184,9 @@ int main(void) {
     SystemClock_Config();
     UART_Init();
     USART3_Init();
+    IWDG_Init(); // 10s timeout
 
-    Serial_Log("Bootloader Started. CRC & Logging Active.");
+    Serial_Log("Bootloader Started v2.0 (DualBank Safe).");
 
     // Check Backup Register for OTA Flag
     __HAL_RCC_PWR_CLK_ENABLE();
@@ -164,33 +198,40 @@ int main(void) {
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
     if (ota_flag) {
-        Serial_Log("OTA Flag Detected.");
-        // Clear flag
+        Serial_Log("OTA Flag Detected. Entering OTA Mode.");
         RTC->BKP0R = 0;
         Bootloader_OTA_Loop();
     } else if (valid_app) {
-        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
-        uint8_t buf[1];
+        // Wait 500ms for OTA START (Scenario 1)
+        // Check Ring Buffer for START_BYTE
+        uint32_t start = HAL_GetTick();
+        bool enter_ota = false;
         LED_B_On();
-        if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
-            if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 Bootloader_OTA_Loop();
+        while ((HAL_GetTick() - start) < 500) {
+            uint8_t b;
+            if (rb_pop(&rx_ring, &b)) {
+                if (b == START_BYTE) {
+                    enter_ota = true;
+                    break;
+                }
             }
         }
         LED_B_Off();
 
-        // Jump - Green ON
+        if (enter_ota) {
+             Serial_Log("OTA Byte received on boot.");
+             Bootloader_OTA_Loop();
+        }
+
+        // Jump to App
         LED_G_On();
         Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
         DeInit();
-
         JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
         JumpToApplication = (pFunction) JumpAddress;
         __set_MSP(sp);
         JumpToApplication();
     } else {
-        // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
         Bootloader_OTA_Loop();
     }
@@ -213,16 +254,14 @@ void send_ack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_ACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Green Flash
-    LED_G_On(); HAL_Delay(50); LED_G_Off();
+    LED_G_On(); HAL_Delay(20); LED_G_Off();
 }
 
 void send_nack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_NACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Red Flash
-    LED_R_On(); HAL_Delay(500); LED_R_Off();
+    LED_R_On(); HAL_Delay(50); LED_R_Off();
 }
 
 void ClearFlashFlags() {
@@ -230,215 +269,222 @@ void ClearFlashFlags() {
                            FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
 }
 
+// Packet Parser State Machine
+typedef enum {
+    PARSE_IDLE,
+    PARSE_CMD,
+    PARSE_LEN,
+    PARSE_PAYLOAD,
+    PARSE_CRC
+} ParseState;
+
 void Bootloader_OTA_Loop(void) {
-    uint8_t header[3];
+    ParseState state = PARSE_IDLE;
+    uint8_t cmd = 0;
+    uint8_t len = 0;
     uint8_t payload[256];
+    uint16_t idx = 0;
+
+    // OTA State
+    bool ota_active = false;
+    uint32_t total_size = 0;
+    uint32_t bytes_received = 0;
+    bool checksum_verified = false;
 
     HAL_FLASH_Unlock();
-    ClearFlashFlags(); // Clear flags on entry
+    ClearFlashFlags();
     All_LEDs_Off();
 
-    // Determine Active Bank and Target Bank
+    // Determine Active Bank and Target
     FLASH_OBProgramInitTypeDef OBInit;
     HAL_FLASHEx_OBGetConfig(&OBInit);
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
-    // Target Inactive Bank
-    // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
-    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
-    uint32_t target_bank_addr = 0x08100000;
-
+    // Physical Sector Mapping
+    // If BFB2=0 (Bank 1 Active): Target Bank 2 -> Sectors 12-23
+    // If BFB2=1 (Bank 2 Active): Target Bank 1 -> Sectors 0-11
     uint32_t start_sector, end_sector;
-    if (bfb2_active) {
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_11;
-        Serial_Log("Target Bank: 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
+    if (!bfb2_active) {
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
-        Serial_Log("Target Bank: 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Status: Bank 1 Active. Target: Bank 2 (Sectors 12-23).");
+    } else {
+        start_sector = FLASH_SECTOR_0;
+        end_sector = FLASH_SECTOR_11;
+        Serial_Log("Status: Bank 2 Active. Target: Bank 1 (Sectors 0-11).");
     }
 
-    bool ota_started = false;
-    bool checksum_verified = false;
-    uint32_t bytes_written = 0;
+    // Target Address is ALWAYS 0x08100000 for the inactive bank in Dual Bank Mode (Aliased)
+    uint32_t target_addr_base = 0x08100000;
 
     while(1) {
-        // Heartbeat: Blue Toggle
+        HAL_IWDG_Refresh(&hiwdg);
+
+        // Heartbeat
         static uint32_t last_tick = 0;
-        if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
+        if (HAL_GetTick() - last_tick > (ota_active ? 100 : 1000)) {
             LED_B_Toggle();
             last_tick = HAL_GetTick();
         }
 
         uint8_t b;
-        if (HAL_UART_Receive(&huart6, &b, 1, 10) != HAL_OK) continue;
-        if (b != START_BYTE) continue;
+        while (rb_pop(&rx_ring, &b)) {
+            switch(state) {
+                case PARSE_IDLE:
+                    if (b == START_BYTE) {
+                        state = PARSE_CMD;
+                    }
+                    break;
+                case PARSE_CMD:
+                    if (b == START_BYTE) {
+                        // Resync: Found START where CMD expected
+                        state = PARSE_CMD;
+                    } else {
+                        cmd = b;
+                        state = PARSE_LEN;
+                    }
+                    break;
+                case PARSE_LEN:
+                    len = b;
+                    idx = 0;
+                    if (len == 0) state = PARSE_CRC;
+                    else state = PARSE_PAYLOAD;
+                    break;
+                case PARSE_PAYLOAD:
+                    payload[idx++] = b;
+                    if (idx == len) state = PARSE_CRC;
+                    break;
+                case PARSE_CRC:
+                    {
+                        uint8_t recv_crc = b;
+                        uint8_t check_buf[260];
+                        check_buf[0] = cmd;
+                        check_buf[1] = len;
+                        memcpy(&check_buf[2], payload, len);
+                        uint8_t calc_crc = calculate_crc8(check_buf, 2 + len);
 
-        // RX Activity: Orange On
-        LED_O_On();
+                        if (calc_crc == recv_crc) {
+                            // Valid Packet
+                            LED_O_On();
 
-        if (HAL_UART_Receive(&huart6, &header[1], 2, 100) != HAL_OK) {
-            LED_O_Off(); continue;
-        }
-        uint8_t cmd = header[1];
-        uint8_t len = header[2];
+                            if (cmd == CMD_OTA_START) {
+                                memcpy(&total_size, payload, 4);
+                                Serial_Log("OTA Start. Size: %d bytes", total_size);
+                                ota_active = true;
+                                bytes_received = 0;
+                                checksum_verified = false;
 
-        if (HAL_UART_Receive(&huart6, payload, len + 1, 500) != HAL_OK) {
-            LED_O_Off(); continue;
-        }
+                                FLASH_EraseInitTypeDef EraseInitStruct;
+                                uint32_t SectorError;
+                                EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
+                                EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+                                EraseInitStruct.NbSectors = 1;
 
-        LED_O_Off(); // RX Done
+                                bool error = false;
+                                for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
+                                    HAL_IWDG_Refresh(&hiwdg);
+                                    EraseInitStruct.Sector = sec;
+                                    if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
+                                        Serial_Log("Erase Fail: Sector %d", sec);
+                                        error = true; break;
+                                    }
+                                }
 
-        uint8_t recv_crc = payload[len];
-        uint8_t check_buf[300];
-        check_buf[0] = cmd;
-        check_buf[1] = len;
-        memcpy(&check_buf[2], payload, len);
+                                if (!error) {
+                                    Serial_Log("Erase Complete.");
+                                    send_ack();
+                                } else {
+                                    send_nack();
+                                }
+                            }
+                            else if (cmd == CMD_OTA_CHUNK) {
+                                uint32_t offset;
+                                memcpy(&offset, payload, 4);
+                                uint8_t *data = &payload[4];
+                                uint32_t data_len = len - 4;
 
-        uint8_t calculated_crc8_val = calculate_crc8(check_buf, 2 + len);
-        if (calculated_crc8_val != recv_crc) {
-            Serial_Log("CRC Err: Cmd=%02X Len=%d Calc=%02X Recv=%02X", cmd, len, calculated_crc8_val, recv_crc);
-            send_nack(); continue;
-        }
+                                uint32_t addr = target_addr_base + offset;
+                                bool ok = true;
+                                for (uint32_t i=0; i<data_len; i+=4) {
+                                    uint32_t word = 0xFFFFFFFF;
+                                    uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
+                                    memcpy(&word, &data[i], copy_len);
 
-        if (cmd == CMD_OTA_START) {
-            Serial_Log("OTA Start");
-            ota_started = true;
-            bytes_written = 0;
-            checksum_verified = false;
+                                    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
+                                        ok = false; break;
+                                    }
+                                }
 
-            FLASH_EraseInitTypeDef EraseInitStruct;
-            uint32_t SectorError;
-            EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-            EraseInitStruct.NbSectors = 1;
+                                if (ok) {
+                                    bytes_received += data_len;
+                                    send_ack();
+                                } else {
+                                    Serial_Log("Write Fail at 0x%08X", addr);
+                                    send_nack();
+                                }
+                            }
+                            else if (cmd == CMD_OTA_END) {
+                                uint32_t remote_crc;
+                                memcpy(&remote_crc, payload, 4);
+                                Serial_Log("OTA End. Verifying...");
 
-            ClearFlashFlags(); // Clear flags before Erase
+                                // Calculate CRC32 of Flash Content
+                                uint32_t calc_crc32 = 0;
+                                uint8_t *flash_ptr = (uint8_t*)target_addr_base;
 
-            bool error = false;
-            // Erase the ENTIRE Inactive Bank (Bootloader area included)
-            for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
-                // LED_O_Toggle(); // Toggle Orange during erase (commented to avoid delays)
-                EraseInitStruct.Sector = sec;
+                                for(uint32_t i=0; i<total_size; i++) {
+                                    calc_crc32 = calculate_crc32(calc_crc32, &flash_ptr[i], 1);
+                                    // Refresh IWDG every 16KB to prevent timeout during large CRC
+                                    if (i % 0x4000 == 0) HAL_IWDG_Refresh(&hiwdg);
+                                }
 
-                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                    Serial_Log("Erase Error at Sector %d", sec);
-                    error = true; break;
-                }
+                                Serial_Log("CRC: Calc=0x%08X, Remote=0x%08X", calc_crc32, remote_crc);
+
+                                if (calc_crc32 == remote_crc) {
+                                    checksum_verified = true;
+                                    send_ack();
+                                    All_LEDs_Off();
+                                    LED_G_On();
+                                } else {
+                                    Serial_Log("CRC Mismatch!");
+                                    send_nack();
+                                }
+                            }
+                            else if (cmd == CMD_OTA_APPLY) {
+                                if (checksum_verified) {
+                                    Serial_Log("Applying Update (Swapping Banks)...");
+                                    send_ack();
+                                    HAL_Delay(50);
+
+                                    HAL_FLASH_Unlock();
+                                    HAL_FLASH_OB_Unlock();
+                                    FLASH_OBProgramInitTypeDef OBInit;
+                                    HAL_FLASHEx_OBGetConfig(&OBInit);
+
+                                    OBInit.OptionType = OPTIONBYTE_USER;
+                                    if (bfb2_active) {
+                                        OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Clear BFB2 -> Boot Bank 1
+                                    } else {
+                                        OBInit.USERConfig |= FLASH_OPTCR_BFB2;  // Set BFB2 -> Boot Bank 2
+                                    }
+
+                                    HAL_FLASHEx_OBProgram(&OBInit);
+                                    HAL_FLASH_OB_Launch(); // Resets
+                                } else {
+                                    Serial_Log("Cannot Apply: Checksum Not Verified.");
+                                    send_nack();
+                                }
+                            }
+
+                            LED_O_Off();
+                        } else {
+                            Serial_Log("CRC Err: Cmd=%02X Len=%d Recv=%02X Calc=%02X", cmd, len, recv_crc, calc_crc);
+                            send_nack();
+                        }
+                        state = PARSE_IDLE;
+                    }
+                    break;
             }
-
-            if (!error) {
-                ClearFlashFlags(); // Clear flags after Erase, before Write
-                Serial_Log("Erase Complete");
-                send_ack();
-            } else {
-                send_nack();
-            }
-        }
-        else if (cmd == CMD_OTA_CHUNK) {
-            uint32_t offset;
-            memcpy(&offset, payload, 4);
-            uint8_t *data = &payload[4];
-            uint32_t data_len = len - 4;
-
-            // Write to Inactive Bank
-            uint32_t addr = target_bank_addr + offset;
-
-            bool ok = true;
-            for (uint32_t i=0; i<data_len; i+=4) {
-                uint32_t word = 0xFFFFFFFF;
-                uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
-                memcpy(&word, &data[i], copy_len);
-
-                if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
-                    ok = false; break;
-                }
-            }
-            if (ok) {
-                bytes_written += data_len;
-                send_ack();
-            } else {
-                Serial_Log("Flash Write Error at %08X", addr);
-                send_nack();
-            }
-        }
-        else if (cmd == CMD_OTA_END) {
-            // New Logic: Checksum Verification
-            uint32_t received_crc32;
-            if (len >= 4) {
-                memcpy(&received_crc32, payload, 4);
-                Serial_Log("OTA End. Verifying CRC...");
-
-                // Calculate CRC of written flash using SOFTWARE CRC
-                uint32_t calculated_crc32 = 0;
-                uint8_t* flash_ptr = (uint8_t*)target_bank_addr;
-
-                // Calculate over the exact number of bytes written
-                // Note: Flash was written as words (FF padding), but CRC should
-                // match the file sent by ESP32.
-                // However, ESP32 sends file size. We padded to words in CHUNK.
-                // The bytes_written tracks the exact bytes from chunks.
-                // Actually, in CHUNK logic:
-                // bytes_written += data_len;
-                // And we wrote padded words.
-                // If file size is not multiple of 4, the last bytes in flash
-                // will include padding 0xFFs that were NOT in the ESP32 file calculation.
-                // But ESP32 calculates CRC of the file content.
-                // So we should calculate CRC of bytes_written only.
-
-                for(uint32_t i = 0; i < bytes_written; i++) {
-                     calculated_crc32 = calculate_crc32(calculated_crc32, &flash_ptr[i], 1);
-                }
-
-                Serial_Log("Calc: 0x%08X, Recv: 0x%08X", calculated_crc32, received_crc32);
-
-                if (calculated_crc32 == received_crc32) {
-                    checksum_verified = true;
-                    send_ack();
-                    All_LEDs_Off();
-                    LED_G_On(); // Green Solid
-                } else {
-                    checksum_verified = false;
-                    Serial_Log("Checksum Mismatch!");
-                    send_nack();
-                }
-
-            } else {
-                Serial_Log("OTA End without CRC. Rejecting.");
-                send_nack();
-            }
-        }
-        else if (cmd == CMD_OTA_APPLY) {
-            if (!checksum_verified) {
-                Serial_Log("Apply requested but Checksum not verified!");
-                send_nack();
-                continue;
-            }
-
-            Serial_Log("Applying Update...");
-            send_ack();
-            HAL_Delay(100);
-
-            // Toggle BFB2
-            HAL_FLASH_Unlock();
-            HAL_FLASH_OB_Unlock();
-            FLASH_OBProgramInitTypeDef OBInit;
-            HAL_FLASHEx_OBGetConfig(&OBInit);
-
-            // Toggle
-            OBInit.OptionType = OPTIONBYTE_USER;
-            if (bfb2_active) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
-            } else {
-                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
-            }
-
-            HAL_FLASHEx_OBProgram(&OBInit);
-            HAL_FLASH_OB_Launch(); // Resets system
-
-            // Should not reach here
-            HAL_NVIC_SystemReset();
         }
     }
 }
@@ -446,7 +492,6 @@ void Bootloader_OTA_Loop(void) {
 void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
-
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -464,13 +509,18 @@ void UART_Init(void) {
     huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart6.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart6);
+
+    // Enable Interrupts
+    HAL_NVIC_SetPriority(USART6_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(USART6_IRQn);
+
+    rb_init(&rx_ring);
+    HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
 void USART3_Init(void) {
     __HAL_RCC_USART3_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    // PB10 (TX), PB11 (RX)
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -494,25 +544,24 @@ void GPIO_Init(void) {
     __HAL_RCC_GPIOG_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOK_CLK_ENABLE();
-
     GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-    // PG6 (Green)
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
-
-    // PD4 (Orange), PD5 (Red)
     GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-    // PK3 (Blue)
     GPIO_InitStruct.Pin = GPIO_PIN_3;
     HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
-
     All_LEDs_Off();
+}
+
+void IWDG_Init(void) {
+    hiwdg.Instance = IWDG;
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
+    hiwdg.Init.Reload = 1250;
+    HAL_IWDG_Init(&hiwdg);
 }
 
 void SystemClock_Config(void)
