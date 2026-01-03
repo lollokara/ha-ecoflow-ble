@@ -257,10 +257,10 @@ int main(void) {
 
     // Determine Active Bank based on OPTCR
     // Note: On F469, BFB2 is Bit 4.
-    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1.
-    // However, the hardware Aliases Bank 2 to 0x08000000.
+    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1 (Bank 1) or 0 (Bank 2).
     // Let's log the full OPTCR for diagnostics.
     Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
+    Serial_Log("OPTCR1: 0x%08X", FLASH->OPTCR1); // Check Write Protection on High Sectors
 
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
     // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
@@ -382,25 +382,29 @@ void Bootloader_OTA_Loop(void) {
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
-    // Determine Active Bank and Target Bank
-    FLASH_OBProgramInitTypeDef OBInit;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
-    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
+    // Determine Active Bank using FLASH->OPTCR directly
+    // Bit 4 (BFB2):
+    // 0: Boot from Bank 2
+    // 1: Boot from Bank 1 (Default)
+    uint32_t optcr = FLASH->OPTCR;
+    bool bank1_boot = (optcr & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2;
 
-    // Target Inactive Bank
-    // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
-    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
+    // Determine Target Bank
+    // If booting from Bank 1, we must update Bank 2.
+    // If booting from Bank 2, we must update Bank 1.
     uint32_t target_bank_addr = 0x08100000;
-
     uint32_t start_sector, end_sector;
-    if (bfb2_active) {
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_11;
-        Serial_Log("Target Bank: 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
+
+    if (bank1_boot) {
+        // Active: Bank 1. Target: Bank 2.
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
-        Serial_Log("Target Bank: 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Active: Bank 1. Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+    } else {
+        // Active: Bank 2. Target: Bank 1.
+        start_sector = FLASH_SECTOR_0;
+        end_sector = FLASH_SECTOR_11;
+        Serial_Log("Active: Bank 2. Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
     }
 
     bool ota_started = false;
@@ -474,8 +478,10 @@ void Bootloader_OTA_Loop(void) {
 
                 EraseInitStruct.Sector = sec;
 
-                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                    Serial_Log("Erase Error at Sector %d", sec);
+                HAL_StatusTypeDef status = HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+                if (status != HAL_OK) {
+                    uint32_t err = HAL_FLASH_GetError();
+                    Serial_Log("Erase Error at Sector %d. HAL: %d, FlashErr: 0x%08X", sec, status, err);
                     error = true; break;
                 }
             }
@@ -579,10 +585,10 @@ void Bootloader_OTA_Loop(void) {
             Serial_Log("Current OPTCR: 0x%08X", optcr);
 
             // Toggle BFB2 (Bit 4)
-            if (bfb2_active) {
-                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 1)
+            if (bank1_boot) {
+                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 2)
             } else {
-                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 2)
+                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 1)
             }
 
             // Ensure OPTSTRT is cleared before writing
