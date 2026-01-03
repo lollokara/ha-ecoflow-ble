@@ -140,11 +140,13 @@ static void UART_Init(void) {
     HAL_UART_Receive_IT(&huart6, &rx_byte_isr, 1);
 }
 
+#define CMD_OTA_START 0xF0
+
 static void process_packet(uint8_t *packet, uint16_t total_len) {
     // packet[0] is START, packet[1] is CMD, packet[2] is LEN
     uint8_t cmd = packet[1];
 
-    if (cmd == 0xF0) { // CMD_OTA_START
+    if (cmd == CMD_OTA_START) {
         printf("UART: OTA Start Received! Rebooting to Bootloader...\n");
         // Wait a bit to ensure UART TX flush if any
         HAL_Delay(100);

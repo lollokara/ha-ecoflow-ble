@@ -176,6 +176,7 @@ void Stm32Serial::otaTask() {
             _otaPrevState = OTA_STARTING;
             _otaState = OTA_WAITING_ACK;
             _ackReceived = false;
+            _nackReceived = false;
             _otaLastMsgTime = millis();
             break;
         }
@@ -220,13 +221,14 @@ void Stm32Serial::otaTask() {
                 uint8_t crc = calculate_crc8(crcBuf, 2 + 4 + readBytes);
                 Serial1.write(crc);
 
-                if (_otaOffset % (OTA_CHUNK_SIZE * 10) == 0) {
+                if (_otaOffset % (OTA_CHUNK_SIZE * 50) == 0) { // Log less frequently
                      ESP_LOGI(TAG, "OTA Progress: %u / %u bytes (%.1f%%)", _otaOffset, _otaTotalSize, (float)_otaOffset * 100.0 / _otaTotalSize);
                 }
 
                 _otaPrevState = OTA_SENDING;
                 _otaState = OTA_WAITING_ACK;
                 _ackReceived = false;
+                _nackReceived = false;
                 _otaLastMsgTime = millis();
             } else {
                 _otaState = OTA_ENDING;
@@ -242,8 +244,14 @@ void Stm32Serial::otaTask() {
                     _otaState = OTA_SENDING;
                     ESP_LOGI(TAG, "OTA Start ACK received. Sending firmware...");
                 } else if (_otaPrevState == OTA_SENDING) {
-                    _otaOffset += OTA_CHUNK_SIZE; // Should ideally use actual bytes sent
-                    // If we are at end, next loop handles it
+                    // Update offset by the amount actually read from file
+                    // We need to re-read or track it.
+                    // For simplicity, we re-calculate based on position
+                    // But _otaOffset hasn't changed yet.
+                    // Let's assume full chunk unless near end.
+                    uint32_t remaining = _otaTotalSize - _otaOffset;
+                    uint32_t sent = (remaining > OTA_CHUNK_SIZE) ? OTA_CHUNK_SIZE : remaining;
+                    _otaOffset += sent;
                     _otaState = OTA_SENDING;
                 } else if (_otaPrevState == OTA_ENDING) {
                     ESP_LOGI(TAG, "OTA Complete. Rebooting STM32...");
