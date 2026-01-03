@@ -346,16 +346,19 @@ void send_ack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_ACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Green Flash
-    LED_G_On(); HAL_Delay(50); LED_G_Off();
+    // REMOVED HAL_Delay(50) for performance
+    // Tiny software delay for LED visibility, negligible impact
+    LED_G_On();
+    Software_Delay(1000);
+    LED_G_Off();
 }
 
 void send_nack() {
     uint8_t buf[4] = {START_BYTE, CMD_OTA_NACK, 0, 0};
     buf[3] = calculate_crc8(&buf[1], 2);
     HAL_UART_Transmit(&huart6, buf, 4, 100);
-    // Red Flash
-    LED_R_On(); HAL_Delay(500); LED_R_Off();
+    // Red Flash - Reduced delay
+    LED_R_On(); HAL_Delay(50); LED_R_Off();
 }
 
 void ClearFlashFlags() {
@@ -387,20 +390,26 @@ void Bootloader_OTA_Loop(void) {
     HAL_FLASHEx_OBGetConfig(&OBInit);
     bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
 
+    Serial_Log("USERConfig: 0x%08X. BFB2: %d. WRPSector: 0x%08X", OBInit.USERConfig, bfb2_active, OBInit.WRPSector);
+
     // Target Inactive Bank
     // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
     // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
     uint32_t target_bank_addr = 0x08100000;
 
     uint32_t start_sector, end_sector;
+
+    // Invert Logic: We must target the INACTIVE bank for updates.
     if (bfb2_active) {
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_11;
-        Serial_Log("Target Bank: 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
+        // Bank 1 is Active (BFB2=1). Target Bank 2 (Sectors 12-23).
         start_sector = FLASH_SECTOR_12;
         end_sector = FLASH_SECTOR_23;
-        Serial_Log("Target Bank: 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+        Serial_Log("Active: Bank 1. Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+    } else {
+        // Bank 2 is Active (BFB2=0). Target Bank 1 (Sectors 0-11).
+        start_sector = FLASH_SECTOR_0;
+        end_sector = FLASH_SECTOR_11;
+        Serial_Log("Active: Bank 2. Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
     }
 
     bool ota_started = false;
@@ -459,7 +468,7 @@ void Bootloader_OTA_Loop(void) {
             checksum_verified = false;
 
             FLASH_EraseInitTypeDef EraseInitStruct;
-            uint32_t SectorError;
+            uint32_t SectorError = 0;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
             EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
             EraseInitStruct.NbSectors = 1;
@@ -475,7 +484,8 @@ void Bootloader_OTA_Loop(void) {
                 EraseInitStruct.Sector = sec;
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                    Serial_Log("Erase Error at Sector %d", sec);
+                    uint32_t err = HAL_FLASH_GetError();
+                    Serial_Log("Erase Error at Sector %d. HAL Err: %d. SecErr: %d", sec, err, SectorError);
                     error = true; break;
                 }
             }
@@ -503,7 +513,8 @@ void Bootloader_OTA_Loop(void) {
                 uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
                 memcpy(&word, &data[i], copy_len);
 
-                ClearFlashFlags(); // Ensure no flags before program
+                // ClearFlashFlags(); // Optimization: Removed for speed. Only on error?
+
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
                     ok = false; break;
                 }
@@ -516,7 +527,9 @@ void Bootloader_OTA_Loop(void) {
                 }
                 send_ack();
             } else {
-                Serial_Log("Flash Write Error at %08X", addr);
+                uint32_t err = HAL_FLASH_GetError();
+                Serial_Log("Flash Write Error at %08X. HAL Err: %d", addr, err);
+                ClearFlashFlags(); // Try to recover
                 send_nack();
             }
         }
@@ -580,9 +593,11 @@ void Bootloader_OTA_Loop(void) {
 
             // Toggle BFB2 (Bit 4)
             if (bfb2_active) {
-                optcr &= ~FLASH_OPTCR_BFB2; // Disable BFB2 (Switch to Bank 1)
+                // If BFB2 was 1 (Bank 1 Active), we want Bank 2 Active (BFB2=0).
+                optcr &= ~FLASH_OPTCR_BFB2;
             } else {
-                optcr |= FLASH_OPTCR_BFB2;  // Enable BFB2 (Switch to Bank 2)
+                // If BFB2 was 0 (Bank 2 Active), we want Bank 1 Active (BFB2=1).
+                optcr |= FLASH_OPTCR_BFB2;
             }
 
             // Ensure OPTSTRT is cleared before writing
@@ -724,6 +739,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
   HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+
+  // PERFORMANCE: Enable Cache and Prefetch
+  __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
+  __HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
+  __HAL_FLASH_DATA_CACHE_ENABLE();
 }
 
 void SysTick_Handler(void)
