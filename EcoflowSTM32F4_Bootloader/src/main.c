@@ -244,7 +244,7 @@ int main(void) {
 
     UART_Init();
     USART3_Init();
-    MX_IWDG_Init(); // Init Watchdog (Disabled for Debugging)
+    // MX_IWDG_Init(); // Init Watchdog (Disabled for Debugging)
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
@@ -422,7 +422,7 @@ void Bootloader_OTA_Loop(void) {
 
     while(1) {
         // Watchdog Refresh (Important for long waits)
-        HAL_IWDG_Refresh(&hiwdg);
+        // HAL_IWDG_Refresh(&hiwdg);
 
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;

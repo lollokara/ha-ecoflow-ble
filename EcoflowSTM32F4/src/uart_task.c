@@ -139,26 +139,23 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
     // Check OTA Commands first
     if (cmd == CMD_OTA_START) {
-        printf("OTA: Start Command Received. Rebooting to Bootloader...\n");
+        // Send NACK to force ESP32 to retry (waiting for Bootloader)
+        // This solves the "Double OTA" issue where ESP32 times out waiting for ACK from App
+        uint8_t nack[4];
+        nack[0] = 0xAA;
+        nack[1] = 0x15; // CMD_OTA_NACK
+        nack[2] = 0x00; // Length
+        nack[3] = calculate_crc8(&nack[1], 2);
+
+        HAL_UART_Transmit(&huart6, nack, 4, 100);
+        HAL_Delay(50); // Ensure transmission
 
         // Enable Backup Access
         HAL_PWR_EnableBkUpAccess();
         __HAL_RCC_BKPSRAM_CLK_ENABLE();
 
-        // Write Magic Flag to RTC Backup Register 0
-        // RTC_BKP_DR0 is defined in stm32f4xx_hal_rtc_ex.h or similar, mapped to 0x40002850
-        // But we can use the macro or direct access.
-        // On F469, BKP registers are in RTC.
-        // We need to make sure RTC clock is enabled?
-        // Or just use HAL_RTCEx_BKUPWrite if we had an RTC handle.
-        // Since we don't have RTC handle initialized in main (maybe), we can use direct register.
-        // The Backup Registers are powered by Vbat.
-        // Actually, just writing to RTC->BKP0R is enough if PWR clock is on and DBP bit is set.
-
         RTC->BKP0R = 0xDEADBEEF;
 
-        // Give some feedback?
-        HAL_Delay(100);
         HAL_NVIC_SystemReset();
     }
     // ... Normal Commands ...
