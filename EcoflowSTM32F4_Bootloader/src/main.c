@@ -221,6 +221,8 @@ int main(void) {
     SCB->VTOR = 0x00000000;
 
     HAL_Init();
+    // Configure Clock immediately to ensure correct timing (180MHz vs HSI)
+    SystemClock_Config();
     GPIO_Init();
 
     // 1. Startup Sequence
@@ -229,7 +231,6 @@ int main(void) {
     LED_R_On(); HAL_Delay(100); LED_R_Off();
     LED_G_On(); HAL_Delay(100); LED_G_Off();
 
-    SystemClock_Config();
     UART_Init();
     USART3_Init();
 
@@ -238,6 +239,11 @@ int main(void) {
     // Enable Backup Access for OTA Flag and Boot Counter
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
+    HAL_FLASH_Unlock();
+
+    uint32_t optcr = FLASH->OPTCR;
+    Serial_Log("OPTCR: 0x%08X", optcr);
+    HAL_FLASH_Lock();
 
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
     uint32_t boot_fails = RTC->BKP1R;
@@ -245,6 +251,8 @@ int main(void) {
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
+
+    Serial_Log("Checking App at 0x%08X. SP: 0x%08X. Valid: %d", APP_ADDRESS, sp, valid_app);
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");

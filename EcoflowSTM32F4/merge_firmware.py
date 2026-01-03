@@ -5,7 +5,7 @@ Import("env")
 def merge_firmware(source, target, env):
     # Paths
     bootloader_path = "../EcoflowSTM32F4_Bootloader/.pio/build/disco_f469ni/firmware.bin"
-    app_path = str(source[0])
+    app_path = str(target[0])
     output_path = os.path.join(env.subst("$PROJECT_DIR"), "factory_firmware.bin")
 
     # Constants
