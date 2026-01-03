@@ -82,10 +82,10 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
 /**
  * @brief Initializes the UART interface.
  *
- * Configures Serial1 with 115200 baud, 8N1, on defined pins.
+ * Configures Serial1 with 921600 baud, 8N1, on defined pins.
  */
 void Stm32Serial::begin() {
-    Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+    Serial1.begin(921600, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
     }

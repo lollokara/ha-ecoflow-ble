@@ -262,6 +262,7 @@ void Bootloader_OTA_Loop(void) {
     bool ota_started = false;
     bool checksum_verified = false;
     uint32_t bytes_written = 0;
+    uint32_t chunks_received = 0;
 
     while(1) {
         // Heartbeat: Blue Toggle
@@ -306,6 +307,7 @@ void Bootloader_OTA_Loop(void) {
             Serial_Log("OTA Start");
             ota_started = true;
             bytes_written = 0;
+            chunks_received = 0;
             checksum_verified = false;
 
             FLASH_EraseInitTypeDef EraseInitStruct;
@@ -357,6 +359,10 @@ void Bootloader_OTA_Loop(void) {
             }
             if (ok) {
                 bytes_written += data_len;
+                chunks_received++;
+                if (chunks_received % 64 == 0) { // Log every ~16KB
+                    Serial_Log("Written %dKB...", bytes_written / 1024);
+                }
                 send_ack();
             } else {
                 Serial_Log("Flash Write Error at %08X", addr);
@@ -373,19 +379,6 @@ void Bootloader_OTA_Loop(void) {
                 // Calculate CRC of written flash using SOFTWARE CRC
                 uint32_t calculated_crc32 = 0;
                 uint8_t* flash_ptr = (uint8_t*)target_bank_addr;
-
-                // Calculate over the exact number of bytes written
-                // Note: Flash was written as words (FF padding), but CRC should
-                // match the file sent by ESP32.
-                // However, ESP32 sends file size. We padded to words in CHUNK.
-                // The bytes_written tracks the exact bytes from chunks.
-                // Actually, in CHUNK logic:
-                // bytes_written += data_len;
-                // And we wrote padded words.
-                // If file size is not multiple of 4, the last bytes in flash
-                // will include padding 0xFFs that were NOT in the ESP32 file calculation.
-                // But ESP32 calculates CRC of the file content.
-                // So we should calculate CRC of bytes_written only.
 
                 for(uint32_t i = 0; i < bytes_written; i++) {
                      calculated_crc32 = calculate_crc32(calculated_crc32, &flash_ptr[i], 1);
@@ -456,7 +449,7 @@ void UART_Init(void) {
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
     huart6.Instance = USART6;
-    huart6.Init.BaudRate = 115200;
+    huart6.Init.BaudRate = 921600; // Increased to 921600
     huart6.Init.WordLength = UART_WORDLENGTH_8B;
     huart6.Init.StopBits = UART_STOPBITS_1;
     huart6.Init.Parity = UART_PARITY_NONE;
@@ -480,7 +473,7 @@ void USART3_Init(void) {
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     huart3.Instance = USART3;
-    huart3.Init.BaudRate = 115200;
+    huart3.Init.BaudRate = 115200; // Keep Debug logging at standard rate
     huart3.Init.WordLength = UART_WORDLENGTH_8B;
     huart3.Init.StopBits = UART_STOPBITS_1;
     huart3.Init.Parity = UART_PARITY_NONE;
