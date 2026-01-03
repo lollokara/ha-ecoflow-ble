@@ -19,6 +19,12 @@
 #define FLASH_OPTCR_BFB2 (1 << 4)
 #endif
 
+// Sector Definitions for F469 (2MB)
+// Bank 1: Sectors 0-11
+// Bank 2: Sectors 12-23
+// We only use the Application area (Sectors 2-11 in Bank 1, Sectors 14-23 in Bank 2)
+// Bootloader + Config occupy Sectors 0/1 and 12/13.
+
 UART_HandleTypeDef huart6;
 
 typedef void (*pFunction)(void);
@@ -83,17 +89,26 @@ int main(void) {
     SystemClock_Config();
     UART_Init();
 
-    // Check App
+    // Check Backup Register for OTA Flag
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
+
+    // Check App Validity
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = ((sp & 0x2FFE0000) == 0x20000000);
 
-    if (valid_app) {
-        // Wait 500ms for OTA START - Blink Blue
+    if (ota_flag) {
+        // Clear flag
+        RTC->BKP0R = 0;
+        Bootloader_OTA_Loop();
+    } else if (valid_app) {
+        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
         uint8_t buf[1];
         LED_B_On();
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
-                Bootloader_OTA_Loop();
+                 Bootloader_OTA_Loop();
             }
         }
         LED_B_Off();
@@ -148,8 +163,48 @@ void Bootloader_OTA_Loop(void) {
     HAL_FLASH_Unlock();
     All_LEDs_Off();
 
-    // OTA Ready: Slow Blue Blink
+    // Determine Active Bank and Target Bank
+    // If BFB2 is SET (1), we are booted from Bank 2 (Sectors 12-23), Target is Bank 1 (Sectors 0-11)
+    // If BFB2 is RESET (0), we are booted from Bank 1 (Sectors 0-11), Target is Bank 2 (Sectors 12-23)
+    FLASH_OBProgramInitTypeDef OBInit;
+    HAL_FLASHEx_OBGetConfig(&OBInit);
+    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
+
+    // If booted from Bank 2 (Active), writes map to 0x08000000 (which is physically Bank 2).
+    // So 0x08100000 maps to Bank 1 (Inactive).
+    // If booted from Bank 1 (Active), writes map to 0x08000000 (which is physically Bank 1).
+    // So 0x08100000 maps to Bank 2 (Inactive).
+    //
+    // Thus, the Inactive Bank is ALWAYS at 0x08100000 from the CPU's perspective,
+    // provided that the mapping swaps the banks.
+    //
+    // Let's verify STM32F469 mapping:
+    // When BFB2 is set, Bank 2 is aliased at 0x0000 0000 and 0x0800 0000.
+    // Bank 1 is available at 0x0810 0000.
+    // When BFB2 is reset, Bank 1 is at 0x0000 0000 and 0x0800 0000.
+    // Bank 2 is at 0x0810 0000.
+    //
+    // CONCLUSION: We always write to 0x08100000 to target the INACTIVE bank.
+    uint32_t target_bank_addr = 0x08100000;
+
+    // However, for ERASING, we must specify the SECTORS.
+    // Sectors 0-11 are ALWAYS Physical Bank 1.
+    // Sectors 12-23 are ALWAYS Physical Bank 2.
+    //
+    // If BFB2=0 (Active Bank 1), Inactive is Bank 2 -> Erase Sectors 12-23.
+    // If BFB2=1 (Active Bank 2), Inactive is Bank 1 -> Erase Sectors 0-11.
+
+    uint32_t start_sector, end_sector;
+    if (bfb2_active) {
+        start_sector = FLASH_SECTOR_0;
+        end_sector = FLASH_SECTOR_11;
+    } else {
+        start_sector = FLASH_SECTOR_12;
+        end_sector = FLASH_SECTOR_23;
+    }
+
     bool ota_started = false;
+    uint32_t bytes_written = 0;
 
     while(1) {
         // Heartbeat: Blue Toggle
@@ -190,7 +245,8 @@ void Bootloader_OTA_Loop(void) {
 
         if (cmd == CMD_OTA_START) {
             ota_started = true;
-            // Erase Physical Sectors 2-11 (Bank 1)
+            bytes_written = 0;
+
             FLASH_EraseInitTypeDef EraseInitStruct;
             uint32_t SectorError;
             EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
@@ -198,10 +254,12 @@ void Bootloader_OTA_Loop(void) {
             EraseInitStruct.NbSectors = 1;
 
             bool error = false;
-            for (uint32_t sec = FLASH_SECTOR_2; sec <= FLASH_SECTOR_11; sec++) {
+            // Erase the ENTIRE Inactive Bank (Bootloader area included)
+            for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
                 LED_O_Toggle(); // Toggle Orange during erase
                 EraseInitStruct.Sector = sec;
-                // Refresh IWDG if active (not initialized here but good practice if jumping back)
+
+                // Refresh IWDG
                 // HAL_IWDG_Refresh(&hiwdg);
 
                 if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
@@ -218,13 +276,11 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            // Physical Bank 1 Write
-            uint32_t base_addr = 0x08000000;
-            if ((FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-                base_addr = 0x08100000;
-            }
-
-            uint32_t addr = base_addr + offset + 0x8000;
+            // Write to Inactive Bank
+            // offset is from 0 of the binary.
+            // factory_firmware.bin usually starts at 0x08000000 (Sector 0)
+            // So we write to target_bank_addr + offset.
+            uint32_t addr = target_bank_addr + offset;
 
             bool ok = true;
             for (uint32_t i=0; i<data_len; i+=4) {
@@ -235,8 +291,18 @@ void Bootloader_OTA_Loop(void) {
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
                     ok = false; break;
                 }
+
+                // Read-Back Verify
+                if (*(uint32_t*)(addr + i) != word) {
+                    ok = false; break;
+                }
             }
-            if (ok) send_ack(); else send_nack();
+            if (ok) {
+                bytes_written += data_len;
+                send_ack();
+            } else {
+                send_nack();
+            }
         }
         else if (cmd == CMD_OTA_END) {
             send_ack();
@@ -247,17 +313,24 @@ void Bootloader_OTA_Loop(void) {
             send_ack();
             HAL_Delay(100);
 
-            // Reset BFB2
+            // Toggle BFB2
             HAL_FLASH_Unlock();
             HAL_FLASH_OB_Unlock();
             FLASH_OBProgramInitTypeDef OBInit;
             HAL_FLASHEx_OBGetConfig(&OBInit);
-            if ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2) {
-                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2;
-                OBInit.OptionType = OPTIONBYTE_USER;
-                HAL_FLASHEx_OBProgram(&OBInit);
-                HAL_FLASH_OB_Launch();
+
+            // Toggle
+            OBInit.OptionType = OPTIONBYTE_USER;
+            if (bfb2_active) {
+                OBInit.USERConfig &= ~FLASH_OPTCR_BFB2; // Disable BFB2
+            } else {
+                OBInit.USERConfig |= FLASH_OPTCR_BFB2; // Enable BFB2
             }
+
+            HAL_FLASHEx_OBProgram(&OBInit);
+            HAL_FLASH_OB_Launch(); // Resets system
+
+            // Should not reach here
             HAL_NVIC_SystemReset();
         }
     }

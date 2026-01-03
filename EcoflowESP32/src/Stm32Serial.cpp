@@ -493,6 +493,7 @@ void Stm32Serial::otaTask(void* parameter) {
     // 3. Send Chunks
     uint32_t offset = 0;
     uint8_t chunk[200]; // Keep under 255 payload limit
+    int last_log_progress = -1;
 
     while (f.available()) {
         int bytesRead = f.read(chunk, sizeof(chunk));
@@ -516,6 +517,10 @@ void Stm32Serial::otaTask(void* parameter) {
 
         offset += bytesRead;
         ota_progress = (offset * 100) / totalSize;
+        if (ota_progress != last_log_progress && ota_progress % 10 == 0) {
+            ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d)", ota_progress, offset, totalSize);
+            last_log_progress = ota_progress;
+        }
     }
 
     f.close();

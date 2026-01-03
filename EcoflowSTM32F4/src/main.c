@@ -271,6 +271,10 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
+    // Relocate Vector Table to Application Address (0x08008000)
+    SCB->VTOR = 0x08008000;
+    __DSB();
+
     HAL_Init();
     SystemClock_Config();
     ESP32_Reset_Init();
