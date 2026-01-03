@@ -51,6 +51,42 @@ void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
 
+void Early_LED_Init(void) {
+    // Manually Initialize LEDs for early diagnostics
+    // PG6 (Green), PD4 (Orange), PD5 (Red), PK3 (Blue)
+
+    // Enable Clocks
+    RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOGEN | RCC_AHB1ENR_GPIODEN | RCC_AHB1ENR_GPIOKEN);
+
+    // Configure PG6 (Green) - Output
+    GPIOG->MODER &= ~(3U << (6 * 2));
+    GPIOG->MODER |= (1U << (6 * 2));
+
+    // Configure PD4, PD5 (Orange, Red) - Output
+    GPIOD->MODER &= ~((3U << (4 * 2)) | (3U << (5 * 2)));
+    GPIOD->MODER |= ((1U << (4 * 2)) | (1U << (5 * 2)));
+
+    // Configure PK3 (Blue) - Output
+    GPIOK->MODER &= ~(3U << (3 * 2));
+    GPIOK->MODER |= (1U << (3 * 2));
+
+    // Turn all off (Active Low? No, discovery LEDs are Active High usually... wait code says LED_G_On sends RESET?)
+    // LED_G_On: WritePin(RESET). LED_G_Off: WritePin(SET).
+    // This implies Active Low?
+    // Let's check Board Manual. STM32F469I-DISCO.
+    // User Manual says:
+    // LD1 (Green) PG6. LD2 (Orange) PD4. LD3 (Red) PD5. LD4 (Blue) PK3.
+    // All connected to IO via resistor to GND? No.
+    // If WritePin(RESET) turns it on, it means Low = On. (Active Low).
+    // If WritePin(SET) turns it off, it means High = Off.
+    // But usually ST Discos are Active High.
+    // Let's stick to the existing code logic: Off = Set (High).
+
+    GPIOG->BSRR = GPIO_PIN_6; // Set (Off)
+    GPIOD->BSRR = GPIO_PIN_4 | GPIO_PIN_5; // Set (Off)
+    GPIOK->BSRR = GPIO_PIN_3; // Set (Off)
+}
+
 // --- Ring Buffer Implementation ---
 void rb_init(RingBuffer *rb) {
     rb->head = 0;
@@ -220,9 +256,21 @@ int main(void) {
     // Explicitly set VTOR to 0x00000000 (Aliased base)
     SCB->VTOR = 0x00000000;
 
+    // Early LED Init to debug startup
+    Early_LED_Init();
+
+    // Turn on Blue LED to indicate "Reached Main"
+    // Assuming Active Low (Reset = On) based on existing code
+    GPIOK->BSRR = (uint32_t)GPIO_PIN_3 << 16U;
+
     HAL_Init();
+
     // Configure Clock immediately to ensure correct timing (180MHz vs HSI)
     SystemClock_Config();
+
+    // Clock Success: Turn off Blue
+    GPIOK->BSRR = GPIO_PIN_3;
+
     GPIO_Init();
 
     // 1. Startup Sequence
