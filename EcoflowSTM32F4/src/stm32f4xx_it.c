@@ -20,8 +20,17 @@ void NMI_Handler(void)
 
 void HardFault_Handler(void)
 {
-    printf("HardFault_Handler\n");
-    while (1) { }
+    // Direct Register Red LED Blink (PD5)
+    // 1. Enable GPIOD Clock (RCC_AHB1ENR bit 3)
+    RCC->AHB1ENR |= (1 << 3);
+    // 2. Set PD5 to Output (MODER bits 11:10 = 01)
+    GPIOD->MODER &= ~(3 << 10);
+    GPIOD->MODER |= (1 << 10);
+
+    while (1) {
+        GPIOD->ODR ^= (1 << 5); // Toggle PD5
+        for(volatile int i=0; i<1000000; i++); // Delay
+    }
 }
 
 void MemManage_Handler(void)

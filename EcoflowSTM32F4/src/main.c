@@ -276,6 +276,14 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
+    // DEBUG: Turn on Red LED (PD5) immediately
+    RCC->AHB1ENR |= (1 << 3); // Enable GPIOD
+    GPIOD->MODER &= ~(3 << 10); GPIOD->MODER |= (1 << 10); // Output
+    GPIOD->ODR &= ~(1 << 5); // Set LOW (On for Active Low? No, LEDs are Active High per Bootloader)
+    // Bootloader says: LED_R_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); }
+    // So Active Low.
+    GPIOD->ODR &= ~(1 << 5); // LED ON
+
     // Relocate Vector Table to Application Address (0x08008000)
     // Note: When booting from Bank 2 (BFB2 set), 0x08000000 is the alias for Bank 2.
     // So 0x08008000 is the correct offset relative to the START of the current bank.
