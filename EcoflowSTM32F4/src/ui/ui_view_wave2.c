@@ -28,7 +28,7 @@ static lv_obj_t * btn_mode_heat;
 static lv_obj_t * btn_mode_fan;
 
 // State Tracking
-static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static int current_mode = -1; // -1=Uninitialized, 0=Cool, 1=Heat, 2=Fan
 static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
 static void create_styles(void) {
@@ -83,6 +83,7 @@ static void event_temp_change(lv_event_t * e) {
 }
 
 static void update_mode_ui(int mode) {
+    if (current_mode == mode) return;
     current_mode = mode;
 
     // Reset styles
