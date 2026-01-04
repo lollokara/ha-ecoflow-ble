@@ -314,8 +314,8 @@ void Stm32Serial::sendDeviceList() {
     DeviceList list = {0};
     DeviceSlot* slots[] = {
         DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
-        DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
         DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
+        DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
         DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
     };
 
