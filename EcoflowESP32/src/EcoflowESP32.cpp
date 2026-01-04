@@ -175,7 +175,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     self->_state = ConnectionState::DISCONNECTED;
                 }
             }
-        } else if (self->_state >= ConnectionState::CONNECTED && !self->_pClient->isConnected()){
+        } else if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTING && !self->_pClient->isConnected()){
              ESP_LOGW(TAG, "Client disconnected unexpectedly");
              self->onDisconnect(self->_pClient);
         }
@@ -265,6 +265,7 @@ void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
     _pAdvertisedDevice = new NimBLEAdvertisedDevice(*device);
     _state = ConnectionState::CREATED; // Signal task to connect
     _connectionRetries = 0;
+    _txSeq = 0;
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {

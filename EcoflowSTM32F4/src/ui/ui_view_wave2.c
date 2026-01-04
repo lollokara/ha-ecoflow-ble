@@ -350,7 +350,7 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
         lv_arc_set_value(arc_set_temp, setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", (int)setTemp);
     }
 
     if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {

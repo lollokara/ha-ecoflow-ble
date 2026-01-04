@@ -19,6 +19,7 @@
 #include "fan_task.h"  // Added for Fan/Amb Temp
 #include "ui_utils.h"  // For safe aligned access
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "stm32f4xx_hal.h"
 
@@ -26,7 +27,10 @@
 extern void SetBacklight(uint8_t percent);
 
 static uint32_t last_touch_time = 0;
+static uint32_t last_ui_interaction_time = 0; // Optimistic UI timestamp
 static bool is_sleeping = false;
+static bool global_is_charging = false; // For animation
+static uint8_t last_target_brightness = 100; // For wakeup
 
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
@@ -162,7 +166,7 @@ void UI_ResetIdleTimer(void) {
     if (is_sleeping) {
         is_sleeping = false;
         // Immediate Wake up
-        SetBacklight(100);
+        SetBacklight(last_target_brightness);
     }
 }
 
@@ -227,12 +231,14 @@ static void event_toggle_ac(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
     UART_SendACSet(state ? 1 : 0);
+    last_ui_interaction_time = xTaskGetTickCount();
 }
 
 static void event_toggle_dc(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
     UART_SendDCSet(state ? 1 : 0);
+    last_ui_interaction_time = xTaskGetTickCount();
 }
 
 // --- Calibration Debug ---
@@ -261,6 +267,7 @@ static void event_slider_input(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_AC_LIMIT, lim_input_w);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 static void event_slider_discharge(lv_event_t * e) {
@@ -275,6 +282,7 @@ static void event_slider_discharge(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_MIN_SOC, lim_discharge_p);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 static void event_slider_charge(lv_event_t * e) {
@@ -289,6 +297,7 @@ static void event_slider_charge(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_MAX_SOC, lim_charge_p);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 
@@ -302,6 +311,7 @@ static void event_slider_alt_start_v(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_ALT_START_VOLTAGE, alt_start_v);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 static void event_slider_alt_rev_curr(lv_event_t * e) {
@@ -315,6 +325,7 @@ static void event_slider_alt_rev_curr(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_ALT_REV_LIMIT, alt_rev_curr);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 static void event_slider_alt_chg_curr(lv_event_t * e) {
@@ -328,6 +339,7 @@ static void event_slider_alt_chg_curr(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_ALT_CHG_LIMIT, alt_chg_curr);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 static void event_slider_alt_pow(lv_event_t * e) {
@@ -341,6 +353,7 @@ static void event_slider_alt_pow(lv_event_t * e) {
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_ALT_PROD_LIMIT, alt_pow_limit);
+        last_ui_interaction_time = xTaskGetTickCount();
     }
 }
 
@@ -401,7 +414,7 @@ static void event_arc_draw(lv_event_t * e) {
             // Draw an arc segment that moves based on anim_phase
             // Phase goes 0.0 to 1.0. Map to Current SOC Angle -> 360 deg.
             int val = lv_arc_get_value(obj);
-            if (val < 100) {
+            if (val < 100 && global_is_charging) {
                 float start_angle = 270.0f + (val * 3.6f);
                 float end_angle = 270.0f + 360.0f; // Wraps around
                 float total_span = end_angle - start_angle;
@@ -1120,6 +1133,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (dev) {
          if (dev->brightness > 0) target_brightness = dev->brightness;
     }
+    last_target_brightness = target_brightness;
 
     if ((now - last_touch_time) > (60000 / portTICK_PERIOD_MS)) { // 60s
         if (!is_sleeping) {
@@ -1170,9 +1184,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         // Update Dashboard Button for Wave 2
         if (btn_wave2) {
             int32_t mode = get_int32_aligned(&dev->data.w2.powerMode);
-            int32_t watts = get_int32_aligned(&dev->data.w2.batPwrWatt); // Using Battery Power as proxy for now?
-            // Actually usually input power is what matters. Wave 2 has psdrPwrWatt?
-            // User requested: "power draw reported from the wave 2"
+            // Calculate Max Power
+            int32_t p_bat = abs(get_int32_aligned(&dev->data.w2.batPwrWatt));
+            int32_t p_mppt = get_int32_aligned(&dev->data.w2.mpptPwrWatt);
+            int32_t p_psdr = abs(get_int32_aligned(&dev->data.w2.psdrPwrWatt));
+            int32_t watts = p_bat;
+            if (p_mppt > watts) watts = p_mppt;
+            if (p_psdr > watts) watts = p_psdr;
 
             if (mode != 0) {
                  lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
@@ -1238,6 +1256,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3.usbaOutputPower) + get_float_aligned(&dev->data.d3.usbcOutputPower));
         temp = (float)get_int32_aligned(&dev->data.d3.cellTemperature);
     }
+
+    // Update Charging Status for Animation
+    global_is_charging = (in_solar > 0 || in_ac > 0 || in_alt > 0);
 
     // Static variables to track state and minimize redraws
     static int last_soc = -1;
@@ -1320,7 +1341,10 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             dc_on = dev->data.d3.dcOn;
         }
 
-        if (first_run || ac_on != last_ac_on) {
+        // Suppress optimistic UI updates
+        bool suppress_updates = ((now - last_ui_interaction_time) < 3000); // 3s timeout
+
+        if (!suppress_updates && (first_run || ac_on != last_ac_on)) {
             if (ac_on) {
                 lv_label_set_text(lbl_ac_t, "AC\nON");
                 lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
@@ -1331,7 +1355,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             last_ac_on = ac_on;
         }
 
-        if (first_run || dc_on != last_dc_on) {
+        if (!suppress_updates && (first_run || dc_on != last_dc_on)) {
             if (dc_on) {
                 lv_label_set_text(lbl_dc_t, "12V\nON");
                 lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
@@ -1347,6 +1371,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     // Settings Sync: Update state variables and UI if not being dragged
     if (is_main_device) {
+        bool suppress_updates = ((now - last_ui_interaction_time) < 3000);
         int new_ac_lim = 0;
         int new_max_chg = 0;
         int new_min_dsg = 0;
@@ -1361,14 +1386,14 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             new_min_dsg = dev->data.d3.batteryChargeLimitMin;
         }
 
-        if (new_ac_lim > 0 && new_ac_lim != lim_input_w) {
+        if (!suppress_updates && new_ac_lim > 0 && new_ac_lim != lim_input_w) {
             lim_input_w = new_ac_lim;
             if (label_lim_in_val) lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
             if (slider_lim_in && !lv_slider_is_dragged(slider_lim_in)) {
                 lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
             }
         }
-        if (new_max_chg > 0 && new_max_chg != lim_charge_p) {
+        if (!suppress_updates && new_max_chg > 0 && new_max_chg != lim_charge_p) {
             lim_charge_p = new_max_chg;
             if (label_lim_chg_val) lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
             if (slider_lim_chg && !lv_slider_is_dragged(slider_lim_chg)) {
@@ -1376,7 +1401,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 lv_obj_invalidate(arc_batt);
             }
         }
-        if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
+        if (!suppress_updates && new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
             lim_discharge_p = new_min_dsg;
             if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
             if (slider_lim_out && !lv_slider_is_dragged(slider_lim_out)) {
@@ -1385,8 +1410,10 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             }
         }
     } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        bool suppress_updates = ((now - last_ui_interaction_time) < 3000);
+
         // Update Alt Charger Settings
-        if (dev->data.ac.startVoltage > 0) {
+        if (!suppress_updates && dev->data.ac.startVoltage > 0) {
             int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
             if (val != alt_start_v) {
                 alt_start_v = val;
@@ -1396,7 +1423,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.reverseChargingCurrentLimit > 0) {
+        if (!suppress_updates && dev->data.ac.reverseChargingCurrentLimit > 0) {
             int val = (int)dev->data.ac.reverseChargingCurrentLimit;
             if (val != alt_rev_curr) {
                 alt_rev_curr = val;
@@ -1406,7 +1433,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.chargingCurrentLimit > 0) {
+        if (!suppress_updates && dev->data.ac.chargingCurrentLimit > 0) {
             int val = (int)dev->data.ac.chargingCurrentLimit;
             if (val != alt_chg_curr) {
                 alt_chg_curr = val;
@@ -1416,7 +1443,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.powerLimit > 0) {
+        if (!suppress_updates && dev->data.ac.powerLimit > 0) {
             int val = dev->data.ac.powerLimit;
             if (val != alt_pow_limit) {
                 alt_pow_limit = val;
