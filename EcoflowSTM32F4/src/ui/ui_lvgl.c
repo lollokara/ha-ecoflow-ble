@@ -71,6 +71,10 @@ static lv_obj_t * lbl_ac_t;
 static lv_obj_t * btn_dc_toggle;
 static lv_obj_t * lbl_dc_t;
 
+// Wave 2 Widget
+static lv_obj_t * btn_wave2;
+static lv_obj_t * lbl_wave;
+
 // --- Settings Widgets ---
 static lv_obj_t * scr_settings;
 static lv_obj_t * label_lim_in_val;
@@ -953,12 +957,13 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_set);
 
     // Wave 2 (Left of Settings)
-    lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
+    btn_wave2 = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 210, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED); // Green when ON
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
-    lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
+    lbl_wave = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave, "Wave 2");
     lv_obj_center(lbl_wave);
 
@@ -1129,6 +1134,15 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
+
+        // Update Dashboard Button
+        if (dev->data.w2.powerMode != 0) {
+            lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
+            lv_label_set_text_fmt(lbl_wave, "%d W", (int)dev->data.w2.batPwrWatt); // Show Power
+        } else {
+            lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+            lv_label_set_text(lbl_wave, "Wave 2");
+        }
         return; // Don't update dashboard with Wave 2 data
     }
 
@@ -1142,7 +1156,8 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
-        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.inputPower));
+        // Use acInputPower for Grid tile instead of total input
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acInputPower));
         in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
         in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
         out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
