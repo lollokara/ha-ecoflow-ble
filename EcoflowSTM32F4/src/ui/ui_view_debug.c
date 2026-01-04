@@ -101,41 +101,41 @@ static void populate_device_list(void) {
             add_section_header(cont_list, buf);
 
             if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.batteryLevel, "%");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.batteryLevel), "%");
                  add_list_item(cont_list, "Battery Level", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.batteryLevelMain, "%");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.batteryLevelMain), "%");
                  add_list_item(cont_list, "Main Batt Level", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.acInputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.acInputPower), " W");
                  add_list_item(cont_list, "AC Input", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.acLvOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.acLvOutputPower), " W");
                  add_list_item(cont_list, "AC LV Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.acHvOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.acHvOutputPower), " W");
                  add_list_item(cont_list, "AC HV Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.inputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.inputPower), " W");
                  add_list_item(cont_list, "Total Input", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.outputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.outputPower), " W");
                  add_list_item(cont_list, "Total Output", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.dc12vOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.dc12vOutputPower), " W");
                  add_list_item(cont_list, "DC 12V Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.dcLvInputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.dcLvInputPower), " W");
                  add_list_item(cont_list, "DC LV In", buf);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcLvInputState);
                  add_list_item(cont_list, "DC LV State", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.dcHvInputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.dcHvInputPower), " W");
                  add_list_item(cont_list, "DC HV In", buf);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcHvInputState);
                  add_list_item(cont_list, "DC HV State", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.solarLvPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.solarLvPower), " W");
                  add_list_item(cont_list, "Solar LV", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.solarHvPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.solarHvPower), " W");
                  add_list_item(cont_list, "Solar HV", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.usbaOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.usbaOutputPower), " W");
                  add_list_item(cont_list, "USB-A Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.usba2OutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.usba2OutputPower), " W");
                  add_list_item(cont_list, "USB-A(2) Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.usbcOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.usbcOutputPower), " W");
                  add_list_item(cont_list, "USB-C Out", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3p.usbc2OutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3p.usbc2OutputPower), " W");
                  add_list_item(cont_list, "USB-C(2) Out", buf);
                  snprintf(buf, sizeof(buf), "%s", dev->data.d3p.pluggedInAc ? "Yes" : "No");
                  add_list_item(cont_list, "AC Plugged", buf);
@@ -143,15 +143,15 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Cell Temp", buf);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
-                 fmt_float(buf, sizeof(buf), dev->data.d3.batteryLevel, "%");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3.batteryLevel), "%");
                  add_list_item(cont_list, "Battery Level", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3.acInputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3.acInputPower), " W");
                  add_list_item(cont_list, "AC Input", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3.acOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3.acOutputPower), " W");
                  add_list_item(cont_list, "AC Output", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3.solarInputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3.solarInputPower), " W");
                  add_list_item(cont_list, "Solar Input", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.d3.dc12vOutputPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.d3.dc12vOutputPower), " W");
                  add_list_item(cont_list, "DC 12V Out", buf);
                  snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
@@ -161,7 +161,7 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Mode", buf);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.w2.setTemp);
                  add_list_item(cont_list, "Set Temp", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.w2.envTemp, " C");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.w2.envTemp), " C");
                  add_list_item(cont_list, "Env Temp", buf);
                  snprintf(buf, sizeof(buf), "%d %%", (int)dev->data.w2.batSoc);
                  add_list_item(cont_list, "Bat SOC", buf);
@@ -169,13 +169,13 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Bat Power", buf);
             }
             else if (dev->id == DEV_TYPE_ALT_CHARGER) {
-                 fmt_float(buf, sizeof(buf), dev->data.ac.batteryLevel, "%");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.batteryLevel), "%");
                  add_list_item(cont_list, "Battery Level", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.ac.dcPower, " W");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.dcPower), " W");
                  add_list_item(cont_list, "DC Power", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.ac.carBatteryVoltage, " V");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.carBatteryVoltage), " V");
                  add_list_item(cont_list, "Car Batt Volt", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.ac.startVoltage, " V");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.startVoltage), " V");
                  add_list_item(cont_list, "Start Volt", buf);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.ac.chargerMode);
                  add_list_item(cont_list, "Mode", buf);
@@ -183,9 +183,9 @@ static void populate_device_list(void) {
                  add_list_item(cont_list, "Charger Open", buf);
                  snprintf(buf, sizeof(buf), "%d W", (int)dev->data.ac.powerLimit);
                  add_list_item(cont_list, "Power Limit", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.ac.chargingCurrentLimit, " A");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.chargingCurrentLimit), " A");
                  add_list_item(cont_list, "Chg Limit", buf);
-                 fmt_float(buf, sizeof(buf), dev->data.ac.reverseChargingCurrentLimit, " A");
+                 fmt_float(buf, sizeof(buf), get_float_aligned(&dev->data.ac.reverseChargingCurrentLimit), " A");
                  add_list_item(cont_list, "Rev Chg Limit", buf);
             }
         }
