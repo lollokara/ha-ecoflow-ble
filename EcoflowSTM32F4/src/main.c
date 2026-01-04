@@ -318,8 +318,8 @@ int main(void) {
     SCB->SHCSR |= (SCB_SHCSR_USGFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_MEMFAULTENA_Msk);
 
     // Create FreeRTOS Tasks
-    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 2048, NULL, 2, NULL);
 
     // Start Scheduler
