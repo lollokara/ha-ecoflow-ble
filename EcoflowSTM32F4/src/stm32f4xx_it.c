@@ -98,6 +98,12 @@ void USART6_IRQHandler(void)
   HAL_UART_IRQHandler(&huart6);
 }
 
+void UART4_IRQHandler(void)
+{
+  extern UART_HandleTypeDef huart4;
+  HAL_UART_IRQHandler(&huart4);
+}
+
 /******************************************************************************/
 /*                 STM32F4xx Peripherals Interrupt Handlers                   */
 /*  Add here the Interrupt Handler for the used peripheral(s) (PPP), for the  */

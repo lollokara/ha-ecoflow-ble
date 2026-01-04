@@ -2,6 +2,7 @@
 #include "ui_icons.h"
 #include "uart_task.h"
 #include "ui_lvgl.h" // For UI_LVGL_ShowDashboard
+#include "ui_utils.h" // For safe aligned access
 #include <stdio.h>
 
 static lv_obj_t * scr_wave2;
@@ -330,27 +331,35 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
         return;
     }
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
+    // Use safe aligned access helpers for packed struct members
+    float envTemp = get_float_aligned(&data->envTemp);
+    int32_t setTemp = get_int32_aligned(&data->setTemp);
+    int32_t subMode = get_int32_aligned(&data->subMode);
+    int32_t fanValue = get_int32_aligned(&data->fanValue);
+    int32_t powerMode = get_int32_aligned(&data->powerMode);
+    int32_t mode = get_int32_aligned(&data->mode);
+
+    lv_label_set_text_fmt(label_cur_temp, "%d C", safe_float_to_int(envTemp));
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+        lv_arc_set_value(arc_set_temp, setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {
-        lv_dropdown_set_selected(dd_sub_mode, data->subMode);
+    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+        lv_dropdown_set_selected(dd_sub_mode, subMode);
     }
 
     if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, data->fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)data->fanValue);
+        lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
+        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
     }
 
     // Update Power Button State
     if (btn_pwr) {
-        if (data->powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(data->mode, data->subMode, data->powerMode != 0);
+    update_visibility(mode, subMode, powerMode != 0);
 }
