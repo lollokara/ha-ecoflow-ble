@@ -35,6 +35,15 @@ static int safe_float_to_int(float f) {
     return (int)f;
 }
 
+/**
+ * @brief Helper to safely read float from packed struct (unaligned access fix).
+ */
+static float get_float_aligned(const void *ptr) {
+    float val;
+    memcpy(&val, ptr, sizeof(float));
+    return val;
+}
+
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
@@ -1148,23 +1157,23 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
-        in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
-        out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
+        soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.inputPower));
+        in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+        out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
+        out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3p.dc12vOutputPower));
+        out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3p.usbaOutputPower) + get_float_aligned(&dev->data.d3p.usbcOutputPower));
         temp = (float)dev->data.d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3.acInputPower);
-        in_solar = safe_float_to_int(dev->data.d3.solarInputPower);
-        in_alt = safe_float_to_int(dev->data.d3.dcPortInputPower);
-        out_ac = safe_float_to_int(dev->data.d3.acOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
+        soc = safe_float_to_int(get_float_aligned(&dev->data.d3.batteryLevel));
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3.acInputPower));
+        in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3.solarInputPower));
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3.dcPortInputPower));
+        out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3.acOutputPower));
+        out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3.dc12vOutputPower));
+        out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3.usbaOutputPower) + get_float_aligned(&dev->data.d3.usbcOutputPower));
         temp = (float)dev->data.d3.cellTemperature;
     }
 
@@ -1323,8 +1332,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         }
     } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
         // Update Alt Charger Settings
-        if (dev->data.ac.startVoltage > 0) {
-            int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
+        float startV = get_float_aligned(&dev->data.ac.startVoltage);
+        if (startV > 0) {
+            int val = (int)(startV * 10); // Float to Decivolt
             if (val != alt_start_v) {
                 alt_start_v = val;
                 if (label_alt_start_v) lv_label_set_text_fmt(label_alt_start_v, "%d.%d V", alt_start_v/10, alt_start_v%10);
@@ -1333,8 +1343,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.reverseChargingCurrentLimit > 0) {
-            int val = (int)dev->data.ac.reverseChargingCurrentLimit;
+        float revLim = get_float_aligned(&dev->data.ac.reverseChargingCurrentLimit);
+        if (revLim > 0) {
+            int val = (int)revLim;
             if (val != alt_rev_curr) {
                 alt_rev_curr = val;
                 if (label_alt_rev_curr) lv_label_set_text_fmt(label_alt_rev_curr, "%d A", alt_rev_curr);
@@ -1343,8 +1354,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.chargingCurrentLimit > 0) {
-            int val = (int)dev->data.ac.chargingCurrentLimit;
+        float chgLim = get_float_aligned(&dev->data.ac.chargingCurrentLimit);
+        if (chgLim > 0) {
+            int val = (int)chgLim;
             if (val != alt_chg_curr) {
                 alt_chg_curr = val;
                 if (label_alt_chg_curr) lv_label_set_text_fmt(label_alt_chg_curr, "%d A", alt_chg_curr);
