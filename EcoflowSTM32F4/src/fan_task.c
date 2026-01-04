@@ -209,9 +209,7 @@ void StartFanTask(void *argument) {
 }
 
 // --- IRQ Handlers ---
-void UART4_IRQHandler(void) {
-    HAL_UART_IRQHandler(&huart4);
-}
+// UART4_IRQHandler moved to stm32f4xx_it.c to ensure visibility
 
 void Fan_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == UART4) {

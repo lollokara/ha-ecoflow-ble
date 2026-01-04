@@ -44,6 +44,12 @@ static float get_float_aligned(const void *ptr) {
     return val;
 }
 
+static int32_t get_int32_aligned(const void *ptr) {
+    int32_t val;
+    memcpy(&val, ptr, sizeof(int32_t));
+    return val;
+}
+
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
@@ -1298,13 +1304,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         int new_min_dsg = 0;
 
         if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-            new_ac_lim = dev->data.d3p.acChargingSpeed;
-            new_max_chg = dev->data.d3p.batteryChargeLimitMax;
-            new_min_dsg = dev->data.d3p.batteryChargeLimitMin;
+            new_ac_lim = get_int32_aligned(&dev->data.d3p.acChargingSpeed);
+            new_max_chg = get_int32_aligned(&dev->data.d3p.batteryChargeLimitMax);
+            new_min_dsg = get_int32_aligned(&dev->data.d3p.batteryChargeLimitMin);
         } else {
-            new_ac_lim = dev->data.d3.acChargingSpeed;
-            new_max_chg = dev->data.d3.batteryChargeLimitMax;
-            new_min_dsg = dev->data.d3.batteryChargeLimitMin;
+            new_ac_lim = get_int32_aligned(&dev->data.d3.acChargingSpeed);
+            new_max_chg = get_int32_aligned(&dev->data.d3.batteryChargeLimitMax);
+            new_min_dsg = get_int32_aligned(&dev->data.d3.batteryChargeLimitMin);
         }
 
         if (new_ac_lim > 0 && new_ac_lim != lim_input_w) {
@@ -1365,8 +1371,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.powerLimit > 0) {
-            int val = dev->data.ac.powerLimit;
+        int32_t pLim = get_int32_aligned(&dev->data.ac.powerLimit);
+        if (pLim > 0) {
+            int val = pLim;
             if (val != alt_pow_limit) {
                 alt_pow_limit = val;
                 if (label_alt_pow) lv_label_set_text_fmt(label_alt_pow, "%d W", alt_pow_limit);
