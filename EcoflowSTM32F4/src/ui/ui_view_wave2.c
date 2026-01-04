@@ -12,6 +12,7 @@ static lv_style_t style_text_large;
 static lv_style_t style_text_small;
 static lv_style_t style_btn_default;
 static lv_style_t style_btn_selected;
+static lv_style_t style_btn_green;
 
 static lv_obj_t * label_cur_temp;
 static lv_obj_t * arc_set_temp;
@@ -59,6 +60,11 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_btn_selected, lv_palette_main(LV_PALETTE_TEAL));
     lv_style_set_text_color(&style_btn_selected, lv_color_white());
     lv_style_set_radius(&style_btn_selected, 12);
+
+    lv_style_init(&style_btn_green);
+    lv_style_set_bg_color(&style_btn_green, lv_palette_main(LV_PALETTE_GREEN));
+    lv_style_set_text_color(&style_btn_green, lv_color_white());
+    lv_style_set_radius(&style_btn_green, 12);
 }
 
 static void event_back(lv_event_t * e) {
@@ -237,7 +243,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_obj_set_size(btn_pwr, 80, 50);
     lv_obj_align(btn_pwr, LV_ALIGN_TOP_RIGHT, -20, 20);
     lv_obj_add_style(btn_pwr, &style_btn_default, 0);
-    lv_obj_add_style(btn_pwr, &style_btn_selected, LV_STATE_CHECKED);
+    lv_obj_add_style(btn_pwr, &style_btn_green, LV_STATE_CHECKED);
     lv_obj_add_flag(btn_pwr, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_pwr, event_power_toggle, LV_EVENT_CLICKED, NULL);
 

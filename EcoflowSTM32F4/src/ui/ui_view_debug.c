@@ -19,8 +19,16 @@ static lv_obj_t * cont_list = NULL;
 static lv_obj_t * label_ip = NULL;
 static lv_obj_t * label_conn_dev = NULL;
 static lv_obj_t * label_paired_dev = NULL;
+static lv_timer_t * debug_timer = NULL;
+
+static DebugInfo cached_debug_info;
+static bool has_debug_info = false;
 
 static void event_debug_cleanup(lv_event_t * e) {
+    if (debug_timer) {
+        lv_timer_del(debug_timer);
+        debug_timer = NULL;
+    }
     scr_debug = NULL;
     cont_list = NULL;
     label_ip = NULL;
@@ -46,6 +54,7 @@ static void add_list_item(lv_obj_t * parent, const char * name, const char * val
     lv_obj_set_style_bg_opa(item, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(item, 0, 0);
     lv_obj_set_style_pad_all(item, 0, 0);
+    lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE); // Fix scrolling issue
 
     lv_obj_t * l_name = lv_label_create(item);
     lv_label_set_text(l_name, name);
@@ -77,6 +86,92 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
 }
 
 static void populate_device_list(void) {
+    if (!cont_list) return;
+
+    // Clear list to avoid duplicates on refresh
+    // Note: This removes "System Info" section items too if they are children of cont_list.
+    // But "System Info" items (IP, Conn, Pair) were added to cont_list in UI_CreateDebugView directly.
+    // If we lv_obj_clean(cont_list), we lose them.
+    // Better strategy: Create a sub-container for devices or just recreate everything.
+    // For simplicity, let's just clear everything and recreate "System Info" section as well?
+    // No, label_ip is static. If we delete it, we crash on next update.
+    // Solution: Only delete children starting from index X?
+    // Or: separate dynamic list container.
+    // Let's assume UI_CreateDebugView creates static items first.
+    // We can delete children from index 4 (Header is 0, item_ip 1, item_conn 2, item_pair 3).
+
+    // Simpler: Move System Info into populate_device_list or keep them separate.
+    // If I use lv_obj_clean, I destroy label_ip.
+
+    // Let's modify UI_CreateDebugView to NOT add System Info to cont_list,
+    // or add them to a separate container 'cont_sys'.
+    // But scrolling needs one container.
+
+    // Okay, I will loop backwards and delete items that are NOT the system info items.
+    // Or simpler: Rebuild the whole list every 5s is fine, but I need to re-assign static pointers.
+
+    // Let's just delete all children and rebuild System Info + Devices.
+    // But I need to update static pointers label_ip, etc.
+
+    lv_obj_clean(cont_list);
+    label_ip = NULL;
+    label_conn_dev = NULL;
+    label_paired_dev = NULL;
+
+    // Re-add System Info Section
+    add_section_header(cont_list, "System Info");
+
+    lv_obj_t * item_ip = lv_obj_create(cont_list);
+    lv_obj_set_size(item_ip, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_ip, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_ip, 0, 0);
+    lv_obj_clear_flag(item_ip, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_ip_name = lv_label_create(item_ip);
+    lv_label_set_text(l_ip_name, "ESP32 IP");
+    lv_obj_align(l_ip_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_ip_name, lv_color_white(), 0);
+
+    label_ip = lv_label_create(item_ip);
+    if (has_debug_info) lv_label_set_text(label_ip, cached_debug_info.ip);
+    else lv_label_set_text(label_ip, "Loading...");
+    lv_obj_align(label_ip, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_ip, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+    lv_obj_t * item_conn = lv_obj_create(cont_list);
+    lv_obj_set_size(item_conn, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_conn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_conn, 0, 0);
+    lv_obj_clear_flag(item_conn, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_conn_name = lv_label_create(item_conn);
+    lv_label_set_text(l_conn_name, "Connected Devices");
+    lv_obj_align(l_conn_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_conn_name, lv_color_white(), 0);
+
+    label_conn_dev = lv_label_create(item_conn);
+    if (has_debug_info) lv_label_set_text_fmt(label_conn_dev, "%d", cached_debug_info.devices_connected);
+    else lv_label_set_text(label_conn_dev, "--");
+    lv_obj_align(label_conn_dev, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_conn_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+    lv_obj_t * item_pair = lv_obj_create(cont_list);
+    lv_obj_set_size(item_pair, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_pair, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_pair, 0, 0);
+    lv_obj_clear_flag(item_pair, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_pair_name = lv_label_create(item_pair);
+    lv_label_set_text(l_pair_name, "Paired Devices");
+    lv_obj_align(l_pair_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_pair_name, lv_color_white(), 0);
+
+    label_paired_dev = lv_label_create(item_pair);
+    if (has_debug_info) lv_label_set_text_fmt(label_paired_dev, "%d", cached_debug_info.devices_paired);
+    else lv_label_set_text(label_paired_dev, "--");
+    lv_obj_align(label_paired_dev, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_paired_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
+
     char buf[32];
 
     // Add Fan Info
@@ -256,57 +351,22 @@ void UI_CreateDebugView(void) {
     lv_obj_set_style_bg_opa(cont_list, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_flow(cont_list, LV_FLEX_FLOW_COLUMN);
 
-    // System Info Section
-    add_section_header(cont_list, "System Info");
-
-    lv_obj_t * item_ip = lv_obj_create(cont_list);
-    lv_obj_set_size(item_ip, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_ip, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_ip, 0, 0);
-
-    lv_obj_t * l_ip_name = lv_label_create(item_ip);
-    lv_label_set_text(l_ip_name, "ESP32 IP");
-    lv_obj_align(l_ip_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_ip_name, lv_color_white(), 0);
-
-    label_ip = lv_label_create(item_ip);
-    lv_label_set_text(label_ip, "Loading...");
-    lv_obj_align(label_ip, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_ip, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-
-    lv_obj_t * item_conn = lv_obj_create(cont_list);
-    lv_obj_set_size(item_conn, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_conn, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_conn, 0, 0);
-
-    lv_obj_t * l_conn_name = lv_label_create(item_conn);
-    lv_label_set_text(l_conn_name, "Connected Devices");
-    lv_obj_align(l_conn_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_conn_name, lv_color_white(), 0);
-
-    label_conn_dev = lv_label_create(item_conn);
-    lv_label_set_text(label_conn_dev, "--");
-    lv_obj_align(label_conn_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_conn_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-    lv_obj_t * item_pair = lv_obj_create(cont_list);
-    lv_obj_set_size(item_pair, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_pair, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_pair, 0, 0);
-
-    lv_obj_t * l_pair_name = lv_label_create(item_pair);
-    lv_label_set_text(l_pair_name, "Paired Devices");
-    lv_obj_align(l_pair_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_pair_name, lv_color_white(), 0);
-
-    label_paired_dev = lv_label_create(item_pair);
-    lv_label_set_text(label_paired_dev, "--");
-    lv_obj_align(label_paired_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_paired_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
+    // System Info Section handled in populate_device_list
 
     // Initial population of device list
+    // Remove manual creation of system info here, as populate_device_list now does it.
+    // But we need to remove the code above that adds them?
+    // Yes, the REPLACE block above handles populate_device_list logic.
+    // Now we need to remove the duplicate creation in UI_CreateDebugView below.
+
+    // We can't do complex multi-hunk edit that overlaps easily.
+    // Let's just call populate_device_list() which now cleans and rebuilds everything.
+    // But I need to remove the explicit creation lines from UI_CreateDebugView in a separate hunk.
+
     populate_device_list();
+
+    // Create Timer for refresh
+    debug_timer = lv_timer_create((lv_timer_cb_t)populate_device_list, 5000, NULL);
 
     lv_obj_add_event_cb(scr_debug, event_debug_cleanup, LV_EVENT_DELETE, NULL);
 
@@ -317,7 +377,12 @@ void UI_CreateDebugView(void) {
 }
 
 void UI_UpdateDebugInfo(DebugInfo* info) {
-    if (!scr_debug || !info) return;
+    if (!info) return;
+
+    cached_debug_info = *info;
+    has_debug_info = true;
+
+    if (!scr_debug) return;
 
     if (label_ip) lv_label_set_text(label_ip, info->ip);
     if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
