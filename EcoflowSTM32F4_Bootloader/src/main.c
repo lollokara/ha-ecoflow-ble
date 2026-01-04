@@ -385,33 +385,24 @@ void Bootloader_OTA_Loop(void) {
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
-    // Determine Active Bank and Target Bank (Use Direct Register Read)
+    // Determine Active Bank (Using Direct Register Read)
+    // We only need this to decide which way to toggle at the end.
+    // The OTA Target is ALWAYS the inactive bank (mapped to 0x08100000).
     bool bfb2_active = (FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2;
 
     Serial_Log("OPTCR: 0x%08X. BFB2: %d", FLASH->OPTCR, bfb2_active);
 
     // Target Inactive Bank
-    // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
-    // Bank 1 (Inactive when BFB2=1) mapped at 0x08100000
+    // On STM32F469 with Dual Bank enabled:
+    // Active Bank is ALWAYS mapped to 0x08000000 (Sectors 0-11).
+    // Inactive Bank is ALWAYS mapped to 0x08100000 (Sectors 12-23).
+    // So we ALWAYS erase Sectors 12-23 and Write to 0x08100000.
+
     uint32_t target_bank_addr = 0x08100000;
+    uint32_t start_sector = FLASH_SECTOR_12;
+    uint32_t end_sector = FLASH_SECTOR_23;
 
-    uint32_t start_sector, end_sector;
-
-    // Correct Logic:
-    // If BFB2=1 (bfb2_active=true), we booted from Bank 2. Target Bank 1 (Inactive).
-    // If BFB2=0 (bfb2_active=false), we booted from Bank 1. Target Bank 2 (Inactive).
-
-    if (bfb2_active) {
-        // Active: Bank 2. Target: Bank 1.
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_11;
-        Serial_Log("Active: Bank 2 (BFB2=1). Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
-        // Active: Bank 1. Target: Bank 2.
-        start_sector = FLASH_SECTOR_12;
-        end_sector = FLASH_SECTOR_23;
-        Serial_Log("Active: Bank 1 (BFB2=0). Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
-    }
+    Serial_Log("Target: Inactive Bank (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
 
     bool ota_started = false;
     bool checksum_verified = false;
