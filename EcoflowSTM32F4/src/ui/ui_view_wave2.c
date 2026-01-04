@@ -28,6 +28,7 @@ static lv_obj_t * btn_mode_fan;
 
 // State Tracking
 static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
 static void create_styles(void) {
     lv_style_init(&style_scr);
@@ -68,6 +69,7 @@ static void send_cmd(uint8_t type, uint8_t val) {
     msg.type = type;
     msg.value = val;
     UART_SendWave2Set(&msg);
+    last_cmd_time = HAL_GetTick(); // Update timestamp
 }
 
 static void event_temp_change(lv_event_t * e) {
@@ -102,7 +104,25 @@ static void update_mode_ui(int mode) {
     }
 }
 
-static void update_visibility(int mode, int sub) {
+static void update_visibility(int mode, int sub, bool power_on) {
+    if (!power_on) {
+        // Gray out controls
+        lv_obj_add_state(arc_set_temp, LV_STATE_DISABLED);
+        lv_obj_add_state(slider_fan, LV_STATE_DISABLED);
+        lv_obj_add_state(dd_sub_mode, LV_STATE_DISABLED);
+        lv_obj_add_state(btn_mode_cool, LV_STATE_DISABLED);
+        lv_obj_add_state(btn_mode_heat, LV_STATE_DISABLED);
+        lv_obj_add_state(btn_mode_fan, LV_STATE_DISABLED);
+    } else {
+        // Enable controls
+        lv_obj_clear_state(arc_set_temp, LV_STATE_DISABLED);
+        lv_obj_clear_state(slider_fan, LV_STATE_DISABLED);
+        lv_obj_clear_state(dd_sub_mode, LV_STATE_DISABLED);
+        lv_obj_clear_state(btn_mode_cool, LV_STATE_DISABLED);
+        lv_obj_clear_state(btn_mode_heat, LV_STATE_DISABLED);
+        lv_obj_clear_state(btn_mode_fan, LV_STATE_DISABLED);
+    }
+
     if (mode == 2) { // Fan Mode
         lv_obj_add_flag(cont_sub_mode, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(slider_fan, LV_OBJ_FLAG_HIDDEN);
@@ -126,14 +146,16 @@ static void event_mode_click(lv_event_t * e) {
 
     // Optimistic UI update
     int sub = lv_dropdown_get_selected(dd_sub_mode);
-    update_visibility(mode, sub);
+    // Assume power is on if we are clicking mode (though it should be disabled)
+    // But since we can only click if enabled, power must be true.
+    update_visibility(mode, sub, true);
 }
 
 static void event_sub_mode_change(lv_event_t * e) {
     uint16_t opt = lv_dropdown_get_selected(dd_sub_mode);
     send_cmd(W2_PARAM_SUB_MODE, (uint8_t)opt);
 
-    update_visibility(current_mode, opt);
+    update_visibility(current_mode, opt, true);
 }
 
 static void event_fan_change(lv_event_t * e) {
@@ -293,7 +315,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_label_set_text(label_fan_val, "Fan: 1");
     lv_obj_align_to(label_fan_val, slider_fan, LV_ALIGN_OUT_TOP_MID, 0, -10);
 
-    update_visibility(0, 0); // Default Cool, Max
+    update_visibility(0, 0, false); // Default Cool, Max, Off
 }
 
 lv_obj_t * ui_view_wave2_get_screen(void) {
@@ -302,6 +324,11 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
+
+    // Suppress updates for 2 seconds after user interaction to prevent UI jumping
+    if ((HAL_GetTick() - last_cmd_time) < 2000) {
+        return;
+    }
 
     lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
 
@@ -325,5 +352,5 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(data->mode, data->subMode);
+    update_visibility(data->mode, data->subMode, data->powerMode != 0);
 }
