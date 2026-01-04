@@ -1217,7 +1217,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
 
         // Alternator Charger Logic:
-        // Use Alternator Charger's own data if available/connected, otherwise D3P's input
+        // Use Alternator Charger's own data if available/connected, otherwise D3P's Expansion Ports (Sum)
         DeviceStatus* ac_dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
         int alt_power = 0;
         if (ac_dev && ac_dev->connected && ac_dev->data.ac.dcPower > 0) {
@@ -1227,8 +1227,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         if (alt_power > 0) {
             in_alt = alt_power;
         } else {
-            // Fallback to D3P DC Input
-            in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+            // Fallback to D3P Expansion Ports (Sum)
+            float exp_sum = get_float_aligned(&dev->data.d3p.expansion1_power) + get_float_aligned(&dev->data.d3p.expansion2_power);
+            in_alt = safe_float_to_int(exp_sum);
         }
 
         out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
@@ -1290,9 +1291,24 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             update_card_style(&card_solar, in_solar);
             last_solar = in_solar;
         }
-        if (first_run || in_ac != last_grid) {
+        // Grid Tile Logic (Active if Status == 2 or Power > 0)
+        int ac_stat = get_int32_aligned(&dev->data.d3p.ac_in_status);
+        bool grid_active = (ac_stat == 2) || (in_ac > 0);
+
+        if (first_run || in_ac != last_grid || grid_active != (last_grid > 0)) {
             lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
-            update_card_style(&card_grid, in_ac);
+
+            if (grid_active) {
+                lv_obj_set_style_bg_color(card_grid.card, lv_color_white(), 0);
+                lv_obj_set_style_text_color(card_grid.title, lv_color_black(), 0);
+                lv_obj_set_style_text_color(card_grid.value, lv_color_black(), 0);
+                lv_obj_set_style_text_color(card_grid.icon, lv_palette_main(LV_PALETTE_GREY), 0);
+            } else {
+                lv_obj_set_style_bg_color(card_grid.card, lv_color_hex(0xFF282828), 0);
+                lv_obj_set_style_text_color(card_grid.title, lv_palette_main(LV_PALETTE_GREY), 0);
+                lv_obj_set_style_text_color(card_grid.value, lv_color_white(), 0);
+                lv_obj_set_style_text_color(card_grid.icon, lv_palette_main(LV_PALETTE_TEAL), 0);
+            }
             last_grid = in_ac;
         }
         if (first_run || in_alt != last_car) {

@@ -90,6 +90,28 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
     snprintf(buf, len, "%d%s", (int)f, suffix);
 }
 
+// Helper to format remaining time (seconds -> D H M)
+static void fmt_rem_time(char* buf, size_t len, uint32_t seconds) {
+    if (seconds == 0) {
+        snprintf(buf, len, "--");
+        return;
+    }
+
+    int days = seconds / (24 * 3600);
+    seconds %= (24 * 3600);
+    int hours = seconds / 3600;
+    seconds %= 3600;
+    int minutes = seconds / 60;
+
+    if (days > 0) {
+        snprintf(buf, len, "%dD %dH %dM", days, hours, minutes);
+    } else if (hours > 0) {
+        snprintf(buf, len, "%dH %dM", hours, minutes);
+    } else {
+        snprintf(buf, len, "%dM", minutes);
+    }
+}
+
 static void populate_debug_view(void) {
     if (!cont_list) return;
 
@@ -187,6 +209,11 @@ static void populate_debug_view(void) {
                  add_list_item(cont_list, "Main Batt Level", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acInputPower, " W");
                  add_list_item(cont_list, "AC Input", buf);
+
+                 // New Fields
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.ac_in_status);
+                 add_list_item(cont_list, "AC Input Status", buf);
+
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acLvOutputPower, " W");
                  add_list_item(cont_list, "AC LV Out", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acHvOutputPower, " W");
@@ -205,6 +232,13 @@ static void populate_debug_view(void) {
                  add_list_item(cont_list, "DC HV In", buf);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcHvInputState);
                  add_list_item(cont_list, "DC HV State", buf);
+
+                 // Expansions
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.expansion1_power, " W");
+                 add_list_item(cont_list, "Expansion 1", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.expansion2_power, " W");
+                 add_list_item(cont_list, "Expansion 2", buf);
+
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarLvPower, " W");
                  add_list_item(cont_list, "Solar LV", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarHvPower, " W");
@@ -221,6 +255,16 @@ static void populate_debug_view(void) {
                  add_list_item(cont_list, "AC Plugged", buf);
                  snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3p.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
+
+                 // SOH & Rem Time
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.bms_batt_soh, "%");
+                 add_list_item(cont_list, "SOH", buf);
+
+                 fmt_rem_time(buf, sizeof(buf), dev->data.d3p.bms_dsg_rem_time);
+                 add_list_item(cont_list, "Dsg Rem Time", buf);
+
+                 fmt_rem_time(buf, sizeof(buf), dev->data.d3p.bms_chg_rem_time);
+                 add_list_item(cont_list, "Chg Rem Time", buf);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
                  fmt_float(buf, sizeof(buf), dev->data.d3.batteryLevel, "%");
