@@ -23,6 +23,9 @@
 #include "task.h"
 #include "display_task.h"
 #include "uart_task.h"
+
+// Allocate FreeRTOS Heap in CCMRAM to free up SRAM1 for DMA2D/LVGL
+uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__((section(".ccmram")));
 #include "fan_task.h"
 #include <stdio.h>
 
@@ -316,10 +319,11 @@ int main(void) {
     }
 
     // Create FreeRTOS Tasks
-    // Increased stack sizes to prevent overflow (especially Fan Task with printf floats)
-    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
-    xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
+    // Stack sizes optimized for CCMRAM (64KB Total Heap)
+    // Display: 32KB, UART: 8KB, Fan: 8KB. Total: 48KB.
+    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 2048, NULL, 3, NULL);
+    xTaskCreate(StartFanTask, "Fan", 2048, NULL, 2, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();

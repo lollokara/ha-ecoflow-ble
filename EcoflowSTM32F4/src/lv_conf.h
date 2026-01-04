@@ -15,7 +15,7 @@
    MEMORY SETTINGS
  *=========================*/
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (32 * 1024U)          /*[bytes]*/
+#define LV_MEM_SIZE (128 * 1024U)          /*[bytes]*/
 #define LV_MEM_ADR 0     /*0: use malloc, 1: use custom pointer*/
 
 /*====================
@@ -28,7 +28,7 @@
 /*=======================
  * FEATURE CONFIGURATION
  *=======================*/
-#define LV_USE_GPU_STM32_DMA2D 0
+#define LV_USE_GPU_STM32_DMA2D 1
 #define LV_GPU_DMA2D_CMSIS_INCLUDE "stm32f4xx.h"
 
 #define LV_USE_LOG 0
