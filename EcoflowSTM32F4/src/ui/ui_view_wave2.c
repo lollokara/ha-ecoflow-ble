@@ -323,5 +323,8 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
     if (data->powerMode != 0) lv_obj_add_state(btn_power, LV_STATE_CHECKED);
     else lv_obj_clear_state(btn_power, LV_STATE_CHECKED);
 
+    // Debug
+    printf("W2 Update: Pwr=%d, Mode=%d, Sub=%d\n", data->powerMode, data->mode, data->subMode);
+
     update_visibility(data->mode, data->subMode);
 }
