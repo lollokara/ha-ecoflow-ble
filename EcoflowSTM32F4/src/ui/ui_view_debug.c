@@ -90,6 +90,27 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
     snprintf(buf, len, "%d%s", (int)f, suffix);
 }
 
+// Helper to format time (seconds -> Xd Xh Xm or Xh Xm or Xm)
+static void fmt_time(char* buf, size_t len, uint32_t seconds) {
+    if (seconds == 0) {
+        snprintf(buf, len, "--");
+        return;
+    }
+    int days = seconds / 86400;
+    seconds %= 86400;
+    int hours = seconds / 3600;
+    seconds %= 3600;
+    int minutes = seconds / 60;
+
+    if (days > 0) {
+        snprintf(buf, len, "%dD %dH %dM", days, hours, minutes);
+    } else if (hours > 0) {
+        snprintf(buf, len, "%dH %dM", hours, minutes);
+    } else {
+        snprintf(buf, len, "%dM", minutes);
+    }
+}
+
 static void populate_debug_view(void) {
     if (!cont_list) return;
 
@@ -209,6 +230,12 @@ static void populate_debug_view(void) {
                  add_list_item(cont_list, "Solar LV", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarHvPower, " W");
                  add_list_item(cont_list, "Solar HV", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.expansion1Power, " W");
+                 add_list_item(cont_list, "Expansion 1", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.expansion2Power, " W");
+                 add_list_item(cont_list, "Expansion 2", buf);
+                 snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.acInputStatus);
+                 add_list_item(cont_list, "AC Input Status", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usbaOutputPower, " W");
                  add_list_item(cont_list, "USB-A Out", buf);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usba2OutputPower, " W");
@@ -221,6 +248,12 @@ static void populate_debug_view(void) {
                  add_list_item(cont_list, "AC Plugged", buf);
                  snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3p.cellTemperature);
                  add_list_item(cont_list, "Cell Temp", buf);
+                 fmt_float(buf, sizeof(buf), dev->data.d3p.soh, "%");
+                 add_list_item(cont_list, "SOH", buf);
+                 fmt_time(buf, sizeof(buf), dev->data.d3p.dischargeRemainingTime);
+                 add_list_item(cont_list, "Dsg Time", buf);
+                 fmt_time(buf, sizeof(buf), dev->data.d3p.chargeRemainingTime);
+                 add_list_item(cont_list, "Chg Time", buf);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
                  fmt_float(buf, sizeof(buf), dev->data.d3.batteryLevel, "%");

@@ -357,6 +357,48 @@ static void logAlternatorChargerData(const AlternatorChargerData& d) {
     ESP_LOGI(TAG, "DC Power: %.1fW", d.dcPower);
 }
 
+static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpload& msg) {
+    ESP_LOGI(TAG, "--- Full Alternator Charger Dump ---");
+    if (msg.has_errcode) ESP_LOGI(TAG, "errcode: %d", (int)msg.errcode);
+    if (msg.has_pow_in_sum_w) ESP_LOGI(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
+    if (msg.has_pow_out_sum_w) ESP_LOGI(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
+    if (msg.has_cms_batt_temp) ESP_LOGI(TAG, "cms_batt_temp: %d", (int)msg.cms_batt_temp);
+    if (msg.has_pow_get_dc_bidi) ESP_LOGI(TAG, "pow_get_dc_bidi: %.2f", msg.pow_get_dc_bidi);
+    if (msg.has_plug_in_info_dc_bidi_flag) ESP_LOGI(TAG, "plug_in_info_dc_bidi_flag: %d", (int)msg.plug_in_info_dc_bidi_flag);
+    if (msg.has_dev_online_flag) ESP_LOGI(TAG, "dev_online_flag: %d", (int)msg.dev_online_flag);
+    if (msg.has_utc_timezone) ESP_LOGI(TAG, "utc_timezone: %d", (int)msg.utc_timezone);
+    if (msg.has_sp_charger_car_batt_vol_setting) ESP_LOGI(TAG, "sp_charger_car_batt_vol_setting: %d", (int)msg.sp_charger_car_batt_vol_setting);
+    if (msg.has_sp_charger_car_batt_vol) ESP_LOGI(TAG, "sp_charger_car_batt_vol: %.2f", msg.sp_charger_car_batt_vol);
+    if (msg.has_cms_batt_soc) ESP_LOGI(TAG, "cms_batt_soc: %.2f", msg.cms_batt_soc);
+    if (msg.has_cms_dsg_rem_time) ESP_LOGI(TAG, "cms_dsg_rem_time: %d", (int)msg.cms_dsg_rem_time);
+    if (msg.has_cms_chg_rem_time) ESP_LOGI(TAG, "cms_chg_rem_time: %d", (int)msg.cms_chg_rem_time);
+    if (msg.has_cms_chg_dsg_state) ESP_LOGI(TAG, "cms_chg_dsg_state: %d", (int)msg.cms_chg_dsg_state);
+    if (msg.has_pow_get_dcp) ESP_LOGI(TAG, "pow_get_dcp: %.2f", msg.pow_get_dcp);
+    if (msg.has_plug_in_info_dcp_in_flag) ESP_LOGI(TAG, "plug_in_info_dcp_in_flag: %d", (int)msg.plug_in_info_dcp_in_flag);
+    if (msg.has_plug_in_info_dcp_type) ESP_LOGI(TAG, "plug_in_info_dcp_type: %d", (int)msg.plug_in_info_dcp_type);
+    if (msg.has_plug_in_info_dcp_detail) ESP_LOGI(TAG, "plug_in_info_dcp_detail: %d", (int)msg.plug_in_info_dcp_detail);
+    if (msg.has_plug_in_info_dcp_run_state) ESP_LOGI(TAG, "plug_in_info_dcp_run_state: %d", (int)msg.plug_in_info_dcp_run_state);
+    if (msg.has_sp_charger_chg_mode) ESP_LOGI(TAG, "sp_charger_chg_mode: %d", (int)msg.sp_charger_chg_mode);
+    if (msg.has_sp_charger_run_state) ESP_LOGI(TAG, "sp_charger_run_state: %d", (int)msg.sp_charger_run_state);
+    if (msg.has_sp_charger_is_connect_car) ESP_LOGI(TAG, "sp_charger_is_connect_car: %d", (int)msg.sp_charger_is_connect_car);
+    if (msg.has_sp_charger_chg_open) ESP_LOGI(TAG, "sp_charger_chg_open: %d", (int)msg.sp_charger_chg_open);
+    if (msg.has_sp_charger_chg_pow_limit) ESP_LOGI(TAG, "sp_charger_chg_pow_limit: %.2f", msg.sp_charger_chg_pow_limit);
+    if (msg.has_module_bluetooth_snr) ESP_LOGI(TAG, "module_bluetooth_snr: %.2f", msg.module_bluetooth_snr);
+    if (msg.has_module_bluetooth_rssi) ESP_LOGI(TAG, "module_bluetooth_rssi: %.2f", msg.module_bluetooth_rssi);
+    if (msg.has_module_wifi_snr) ESP_LOGI(TAG, "module_wifi_snr: %.2f", msg.module_wifi_snr);
+    if (msg.has_module_wifi_rssi) ESP_LOGI(TAG, "module_wifi_rssi: %.2f", msg.module_wifi_rssi);
+    if (msg.has_sp_charger_chg_pow_max) ESP_LOGI(TAG, "sp_charger_chg_pow_max: %.2f", msg.sp_charger_chg_pow_max);
+    if (msg.has_sp_charger_extension_line_p_setting) ESP_LOGI(TAG, "sp_charger_extension_line_p_setting: %.2f", msg.sp_charger_extension_line_p_setting);
+    if (msg.has_sp_charger_extension_line_n_setting) ESP_LOGI(TAG, "sp_charger_extension_line_n_setting: %.2f", msg.sp_charger_extension_line_n_setting);
+    if (msg.has_sp_charger_driving_chg_setting) ESP_LOGI(TAG, "sp_charger_driving_chg_setting: %d", (int)msg.sp_charger_driving_chg_setting);
+    if (msg.has_sp_charger_car_batt_chg_amp_limit) ESP_LOGI(TAG, "sp_charger_car_batt_chg_amp_limit: %.2f", msg.sp_charger_car_batt_chg_amp_limit);
+    if (msg.has_sp_charger_dev_batt_chg_amp_limit) ESP_LOGI(TAG, "sp_charger_dev_batt_chg_amp_limit: %.2f", msg.sp_charger_dev_batt_chg_amp_limit);
+    if (msg.has_sp_charger_car_batt_chg_amp_max) ESP_LOGI(TAG, "sp_charger_car_batt_chg_amp_max: %.2f", msg.sp_charger_car_batt_chg_amp_max);
+    if (msg.has_sp_charger_car_batt_urgent_chg_state) ESP_LOGI(TAG, "sp_charger_car_batt_urgent_chg_state: %d", (int)msg.sp_charger_car_batt_urgent_chg_state);
+    if (msg.has_sp_charger_dev_batt_chg_amp_max) ESP_LOGI(TAG, "sp_charger_dev_batt_chg_amp_max: %.2f", msg.sp_charger_dev_batt_chg_amp_max);
+    if (msg.has_sp_charger_car_batt_urgent_chg_switch) ESP_LOGI(TAG, "sp_charger_car_batt_urgent_chg_switch: %d", (int)msg.sp_charger_car_batt_urgent_chg_switch);
+}
+
 namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
@@ -436,7 +478,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
                      if (mr521_msg.has_cms_batt_soc) d3p.batteryLevel = mr521_msg.cms_batt_soc;
                      if (mr521_msg.has_bms_batt_soc) d3p.batteryLevelMain = mr521_msg.bms_batt_soc;
-                     if (mr521_msg.has_pow_get_ac) d3p.acInputPower = -mr521_msg.pow_get_ac;
+                     if (mr521_msg.has_pow_get_ac_in) d3p.acInputPower = mr521_msg.pow_get_ac_in;
                      if (mr521_msg.has_pow_get_ac_lv_out) d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out);
                      if (mr521_msg.has_pow_get_ac_hv_out) d3p.acHvOutputPower = -std::abs(mr521_msg.pow_get_ac_hv_out);
 
@@ -479,7 +521,15 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (d3p.dcHvInputState == 2 && d3p.dcHvInputPower > 0) d3p.solarHvPower = d3p.dcHvInputPower;
                      else d3p.solarHvPower = 0;
 
-                     logFullDeltaPro3Data(mr521_msg);
+                     // New mappings
+                     if (mr521_msg.has_pow_get_4p8_1) d3p.expansion1Power = mr521_msg.pow_get_4p8_1;
+                     if (mr521_msg.has_pow_get_4p8_2) d3p.expansion2Power = mr521_msg.pow_get_4p8_2;
+                     if (mr521_msg.has_flow_info_ac_in) d3p.acInputStatus = mr521_msg.flow_info_ac_in;
+                     if (mr521_msg.has_bms_batt_soh) d3p.soh = mr521_msg.bms_batt_soh;
+                     if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
+                     if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
+
+                     // logFullDeltaPro3Data(mr521_msg);
                 }
             }
             break;
@@ -512,6 +562,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
 
                     logAlternatorChargerData(ac);
+                    logFullAlternatorChargerData(msg);
                 }
             }
             break;

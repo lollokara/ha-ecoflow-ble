@@ -492,6 +492,22 @@ static void update_card_style(InfoCardObj * obj, int val) {
     }
 }
 
+static void update_card_style_active(InfoCardObj * obj, bool active) {
+    if (active) {
+        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
+        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
+        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
+        // Dark grey or black icon on white looks good.
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+    } else {
+        // Revert to Dark Theme
+        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
+    }
+}
+
 static void create_settings(void) {
     scr_settings = lv_obj_create(NULL);
     lv_obj_add_style(scr_settings, &style_scr, 0);
@@ -1207,6 +1223,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     int out_usb=0, out_12v=0, out_ac=0;
     float temp = 25.0f;
     bool is_main_device = false;
+    bool ac_plugged_in = false;
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
@@ -1216,25 +1233,17 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         // Sum Solar Inputs
         in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
 
-        // Alternator Charger Logic:
-        // Use Alternator Charger's own data if available/connected, otherwise D3P's input
-        DeviceStatus* ac_dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
-        int alt_power = 0;
-        if (ac_dev && ac_dev->connected && ac_dev->data.ac.dcPower > 0) {
-             alt_power = safe_float_to_int(ac_dev->data.ac.dcPower);
-        }
-
-        if (alt_power > 0) {
-            in_alt = alt_power;
-        } else {
-            // Fallback to D3P DC Input
-            in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
-        }
+        // Use Expansion 1 + Expansion 2 for Car Tile on D3P
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.expansion1Power) + get_float_aligned(&dev->data.d3p.expansion2Power));
 
         out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
         out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3p.dc12vOutputPower));
         out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3p.usbaOutputPower) + get_float_aligned(&dev->data.d3p.usbcOutputPower));
         temp = (float)get_int32_aligned(&dev->data.d3p.cellTemperature);
+
+        if (get_int32_aligned(&dev->data.d3p.acInputStatus) == 2) {
+             ac_plugged_in = true;
+        }
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3.batteryLevel));
@@ -1292,7 +1301,11 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         }
         if (first_run || in_ac != last_grid) {
             lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
-            update_card_style(&card_grid, in_ac);
+            if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+                update_card_style_active(&card_grid, ac_plugged_in);
+            } else {
+                update_card_style(&card_grid, in_ac);
+            }
             last_grid = in_ac;
         }
         if (first_run || in_alt != last_car) {
