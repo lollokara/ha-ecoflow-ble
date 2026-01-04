@@ -93,6 +93,9 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
 static void populate_debug_view(void) {
     if (!cont_list) return;
 
+    // Save scroll position
+    lv_coord_t scroll_y = lv_obj_get_scroll_y(cont_list);
+
     // Clear the list
     lv_obj_clean(cont_list);
 
@@ -267,6 +270,11 @@ static void populate_debug_view(void) {
             }
         }
     }
+
+    // Restore scroll position
+    if (cont_list) {
+        lv_obj_scroll_to_y(cont_list, scroll_y, LV_ANIM_OFF);
+    }
 }
 
 void UI_CreateDebugView(void) {
@@ -363,4 +371,5 @@ void UI_UpdateDebugInfo(DebugInfo* info) {
         if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
         if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
     }
+
 }
