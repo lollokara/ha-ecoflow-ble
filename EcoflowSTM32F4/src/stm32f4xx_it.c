@@ -18,19 +18,51 @@ void NMI_Handler(void)
     while (1) { }
 }
 
-void HardFault_Handler(void)
+void HardFault_Handler_C(uint32_t *args)
 {
-    // Direct Register Red LED Blink (PD5)
-    // 1. Enable GPIOD Clock (RCC_AHB1ENR bit 3)
+    uint32_t r0 = args[0];
+    uint32_t r1 = args[1];
+    uint32_t r2 = args[2];
+    uint32_t r3 = args[3];
+    uint32_t r12 = args[4];
+    uint32_t lr = args[5];
+    uint32_t pc = args[6];
+    uint32_t psr = args[7];
+
+    printf("\n[HARD FAULT]\n");
+    printf("R0 : %08lX\n", r0);
+    printf("R1 : %08lX\n", r1);
+    printf("R2 : %08lX\n", r2);
+    printf("R3 : %08lX\n", r3);
+    printf("R12: %08lX\n", r12);
+    printf("LR : %08lX\n", lr);
+    printf("PC : %08lX\n", pc);
+    printf("PSR: %08lX\n", psr);
+    printf("HFSR: %08lX\n", SCB->HFSR);
+    printf("CFSR: %08lX\n", SCB->CFSR);
+    printf("MMFAR: %08lX\n", SCB->MMFAR);
+    printf("BFAR: %08lX\n", SCB->BFAR);
+
+    // Blink Red LED (PD5)
     RCC->AHB1ENR |= (1 << 3);
-    // 2. Set PD5 to Output (MODER bits 11:10 = 01)
     GPIOD->MODER &= ~(3 << 10);
     GPIOD->MODER |= (1 << 10);
 
     while (1) {
-        GPIOD->ODR ^= (1 << 5); // Toggle PD5
-        for(volatile int i=0; i<1000000; i++); // Delay
+        GPIOD->ODR ^= (1 << 5);
+        for(volatile int i=0; i<2000000; i++); // Fast blink
     }
+}
+
+__attribute__((naked)) void HardFault_Handler(void)
+{
+    __asm volatile (
+        " tst lr, #4 \n"
+        " ite eq \n"
+        " mrseq r0, msp \n"
+        " mrsne r0, psp \n"
+        " b HardFault_Handler_C \n"
+    );
 }
 
 void MemManage_Handler(void)

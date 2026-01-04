@@ -48,11 +48,11 @@ void StartDisplayTask(void * argument) {
             }
         }
 
-        // Monitor Heap
+        // Monitor Heap & Alive
         static TickType_t lastHeapPrint = 0;
         if (xTaskGetTickCount() - lastHeapPrint > pdMS_TO_TICKS(5000)) {
             lastHeapPrint = xTaskGetTickCount();
-            printf("Free Heap: %d\n", xPortGetFreeHeapSize());
+            printf("Display Alive: %lu. Free Heap: %d\n", lastHeapPrint, xPortGetFreeHeapSize());
         }
 
         // LVGL Task Handler
