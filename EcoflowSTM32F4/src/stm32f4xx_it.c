@@ -35,20 +35,41 @@ void HardFault_Handler(void)
 
 void MemManage_Handler(void)
 {
-    printf("MemManage_Handler\n");
-    while (1) { }
+    // Green LED Blink (PG6)
+    RCC->AHB1ENR |= (1 << 6); // Enable GPIOG
+    GPIOG->MODER &= ~(3 << 12); // Clear mode
+    GPIOG->MODER |= (1 << 12);  // Output
+
+    while (1) {
+        GPIOG->ODR ^= (1 << 6);
+        for(volatile int i=0; i<1000000; i++);
+    }
 }
 
 void BusFault_Handler(void)
 {
-    printf("BusFault_Handler\n");
-    while (1) { }
+    // Orange LED Blink (PD4)
+    RCC->AHB1ENR |= (1 << 3); // Enable GPIOD
+    GPIOD->MODER &= ~(3 << 8); // Clear mode
+    GPIOD->MODER |= (1 << 8);  // Output
+
+    while (1) {
+        GPIOD->ODR ^= (1 << 4);
+        for(volatile int i=0; i<1000000; i++);
+    }
 }
 
 void UsageFault_Handler(void)
 {
-    printf("UsageFault_Handler\n");
-    while (1) { }
+    // Blue LED Blink (PK3)
+    RCC->AHB1ENR |= (1 << 10); // Enable GPIOK
+    GPIOK->MODER &= ~(3 << 6); // Clear mode
+    GPIOK->MODER |= (1 << 6);  // Output
+
+    while (1) {
+        GPIOK->ODR ^= (1 << 3);
+        for(volatile int i=0; i<1000000; i++);
+    }
 }
 
 void DebugMon_Handler(void)
