@@ -84,15 +84,11 @@ static void event_temp_change(lv_event_t * e) {
 static void update_mode_ui(int mode) {
     current_mode = mode;
 
-    // Reset styles
+    // Reset styles (only remove the selected style)
+    // style_btn_default is permanently added in init and serves as the background
     lv_obj_remove_style(btn_mode_cool, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_cool, &style_btn_default, 0);
-
     lv_obj_remove_style(btn_mode_heat, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_heat, &style_btn_default, 0);
-
     lv_obj_remove_style(btn_mode_fan, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_fan, &style_btn_default, 0);
 
     // Apply selected style
     if (mode == 0) { // Cool
