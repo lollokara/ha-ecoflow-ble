@@ -315,9 +315,9 @@ int main(void) {
     }
 
     // Create FreeRTOS Tasks
-    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
-    xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
+    xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();

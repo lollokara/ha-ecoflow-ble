@@ -3,6 +3,19 @@
 #include "uart_task.h"
 #include "ui_lvgl.h" // For UI_LVGL_ShowDashboard
 #include <stdio.h>
+#include <string.h>
+
+static inline float get_float_aligned(const float *ptr) {
+    float val;
+    memcpy(&val, ptr, sizeof(float));
+    return val;
+}
+
+static inline int32_t get_int32_aligned(const int32_t *ptr) {
+    int32_t val;
+    memcpy(&val, ptr, sizeof(int32_t));
+    return val;
+}
 
 static lv_obj_t * scr_wave2;
 static lv_style_t style_scr;
@@ -324,33 +337,38 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
+    if (!scr_wave2) return; // Prevent updates if screen not created
 
     // Suppress updates for 2 seconds after user interaction to prevent UI jumping
     if ((HAL_GetTick() - last_cmd_time) < 2000) {
         return;
     }
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
+    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)get_float_aligned(&data->envTemp));
 
+    int32_t setTemp = get_int32_aligned(&data->setTemp);
     if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+        lv_arc_set_value(arc_set_temp, setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", (int)setTemp);
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {
-        lv_dropdown_set_selected(dd_sub_mode, data->subMode);
+    int32_t subMode = get_int32_aligned(&data->subMode);
+    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+        lv_dropdown_set_selected(dd_sub_mode, subMode);
     }
 
+    int32_t fanValue = get_int32_aligned(&data->fanValue);
     if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, data->fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)data->fanValue);
+        lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
+        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
     }
 
     // Update Power Button State
+    int32_t powerMode = get_int32_aligned(&data->powerMode);
     if (btn_pwr) {
-        if (data->powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(data->mode, data->subMode, data->powerMode != 0);
+    update_visibility(get_int32_aligned(&data->mode), subMode, powerMode != 0);
 }
