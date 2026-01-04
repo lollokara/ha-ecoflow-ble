@@ -88,6 +88,37 @@ static void logAlternatorChargerData(const AlternatorChargerData& d) {
     ESP_LOGI(TAG, "DC Power: %.1fW", d.dcPower);
 }
 
+// Temporary verbose logger for debugging D3P fields
+static void logVerboseD3P(const mr521_DisplayPropertyUpload& msg) {
+    ESP_LOGI(TAG, "--- D3P Verbose Dump ---");
+    if (msg.has_errcode) ESP_LOGI(TAG, "errcode: %u", msg.errcode);
+    if (msg.has_sys_status) ESP_LOGI(TAG, "sys_status: %u", msg.sys_status);
+    if (msg.has_pow_in_sum_w) ESP_LOGI(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
+    if (msg.has_pow_out_sum_w) ESP_LOGI(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
+    if (msg.has_pow_get_pv_l) ESP_LOGI(TAG, "pow_get_pv_l: %.2f", msg.pow_get_pv_l);
+    if (msg.has_pow_get_pv_h) ESP_LOGI(TAG, "pow_get_pv_h: %.2f", msg.pow_get_pv_h);
+    if (msg.has_pow_get_pv) ESP_LOGI(TAG, "pow_get_pv: %.2f", msg.pow_get_pv);
+    if (msg.has_pow_get_pv2) ESP_LOGI(TAG, "pow_get_pv2: %.2f", msg.pow_get_pv2);
+
+    // AC related fields to investigate
+    if (msg.has_pow_get_ac) ESP_LOGI(TAG, "pow_get_ac (53): %.2f", msg.pow_get_ac);
+    if (msg.has_pow_get_ac_in) ESP_LOGI(TAG, "pow_get_ac_in (54): %.2f", msg.pow_get_ac_in);
+    if (msg.has_plug_in_info_ac_in_flag) ESP_LOGI(TAG, "plug_in_info_ac_in_flag (61): %u", msg.plug_in_info_ac_in_flag);
+    if (msg.has_plug_in_info_ac_in_feq) ESP_LOGI(TAG, "plug_in_info_ac_in_feq (62): %u", msg.plug_in_info_ac_in_feq);
+    if (msg.has_plug_in_info_ac_in_chg_pow_max) ESP_LOGI(TAG, "plug_in_info_ac_in_chg_pow_max (209): %u", msg.plug_in_info_ac_in_chg_pow_max);
+
+    // DC / Alt Charger Related
+    if (msg.has_pow_get_12v) ESP_LOGI(TAG, "pow_get_12v (37): %.2f", msg.pow_get_12v);
+    if (msg.has_flow_info_12v) ESP_LOGI(TAG, "flow_info_12v (33): %u", msg.flow_info_12v);
+    if (msg.has_pow_get_dc) ESP_LOGI(TAG, "pow_get_dc (297): %.2f", msg.pow_get_dc);
+    if (msg.has_pow_get_dc_bidi) ESP_LOGI(TAG, "pow_get_dc_bidi (105): %.2f", msg.pow_get_dc_bidi);
+
+    // Plug In Info
+    if (msg.has_plug_in_info_pv_l_type) ESP_LOGI(TAG, "plug_in_info_pv_l_type: %u", msg.plug_in_info_pv_l_type);
+    if (msg.has_plug_in_info_pv_h_type) ESP_LOGI(TAG, "plug_in_info_pv_h_type: %u", msg.plug_in_info_pv_h_type);
+    if (msg.has_plug_in_info_pv_type) ESP_LOGI(TAG, "plug_in_info_pv_type: %u", msg.plug_in_info_pv_type);
+}
+
 namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
@@ -165,18 +196,23 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                 if (pb_decode(&stream, mr521_DisplayPropertyUpload_fields, &mr521_msg)) {
                      DeltaPro3Data& d3p = data.deltaPro3;
 
+                     // Enable verbose logging temporarily
+                     logVerboseD3P(mr521_msg);
+
                      if (mr521_msg.has_cms_batt_soc) d3p.batteryLevel = mr521_msg.cms_batt_soc;
                      if (mr521_msg.has_bms_batt_soc) d3p.batteryLevelMain = mr521_msg.bms_batt_soc;
 
                      // AC Input Logic: Prefer pow_get_ac_in (54) over pow_get_ac (53)
+                     // If both are 0, we can't do much yet without better data
                      if (mr521_msg.has_pow_get_ac_in && mr521_msg.pow_get_ac_in > 0) {
                          d3p.acInputPower = mr521_msg.pow_get_ac_in;
                      }
-                     else if (mr521_msg.has_pow_get_ac) {
-                         // Some firmwares report AC input as negative in pow_get_ac? Or positive?
-                         // If pow_get_ac_in is 0, let's try this.
+                     else if (mr521_msg.has_pow_get_ac && mr521_msg.pow_get_ac != 0) {
+                         // Fallback to Tag 53
                          d3p.acInputPower = std::abs(mr521_msg.pow_get_ac);
-                         // Note: Removed negation from previous version as "in" usually positive
+                     }
+                     else {
+                         d3p.acInputPower = 0;
                      }
 
                      if (mr521_msg.has_pow_get_ac_lv_out) d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out);
@@ -217,24 +253,19 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      // Plugged In Info (Tag 61)
                      if (mr521_msg.has_plug_in_info_ac_in_flag) d3p.pluggedInAc = (mr521_msg.plug_in_info_ac_in_flag != 0);
 
-                     // Logic for solar might need adjustment based on d3 logic
-                     if (d3p.dcLvInputState == 2 && d3p.dcLvInputPower > 0) d3p.solarLvPower = d3p.dcLvInputPower;
-                     else d3p.solarLvPower = 0;
+                     // Solar Mapping (Fixed logic from previous issues)
+                     d3p.solarLvPower = (d3p.dcLvInputState == 2 && d3p.dcLvInputPower > 0) ? d3p.dcLvInputPower : 0;
+                     d3p.solarHvPower = (d3p.dcHvInputState == 2 && d3p.dcHvInputPower > 0) ? d3p.dcHvInputPower : 0;
 
-                     if (d3p.dcHvInputState == 2 && d3p.dcHvInputPower > 0) d3p.solarHvPower = d3p.dcHvInputPower;
-                     else d3p.solarHvPower = 0;
-
-                     // Fallback Calculation if AC Input is still 0 but Total > Solar+DC
+                     // Temporarily use the "total - solar" fallback for AC if explicit AC is 0 but we have input
+                     // This is to satisfy the user until we find the real field in the verbose logs
                      if (d3p.acInputPower == 0 && d3p.inputPower > 0) {
-                         float solarTotal = d3p.solarLvPower + d3p.solarHvPower;
-                         // DC Input can also be non-solar (e.g. Alternator).
-                         // dcLvInputState: 1=Car, 2=Solar? Need to verify.
-                         // For now, subtract explicit DC/Solar inputs from Total.
-                         float dcTotal = d3p.dcLvInputPower + d3p.dcHvInputPower;
-
-                         float calculatedAC = d3p.inputPower - dcTotal;
-                         if (calculatedAC > 10.0f) { // Threshold to avoid noise
-                             d3p.acInputPower = calculatedAC;
+                         float solarSum = d3p.solarLvPower + d3p.solarHvPower;
+                         // Assuming no other DC input for now unless Alt Charger is mapped separately
+                         // If Alt Charger is connected, we might subtract that too?
+                         // But we don't have D3P-side Alt Charger power in this struct yet, only Alt Charger's own struct.
+                         if (d3p.inputPower > solarSum + 10.0f) {
+                             d3p.acInputPower = d3p.inputPower - solarSum;
                          }
                      }
 
@@ -323,6 +354,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (w2.batChgRemainTime > 0 && w2.batChgRemainTime < 6000) w2.remainingTime = w2.batChgRemainTime;
                     else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
                     else w2.remainingTime = 0;
+
+                    // Wave 2 Power Calculation (Source: WebAssets logic simulation)
+                    // In WebAssets: `if (d.pwr_mppt > 0) draw = "Solar " + d.pwr_mppt; else if (d.pwr_psdr > 0) draw = "DC " + d.pwr_psdr; else draw = Math.abs(d.pwr_bat);`
+                    // We need to map this correctly.
+                    // psdrPwrWatt is DC input/output. mpptPwrWatt is Solar. batPwrWatt is Battery.
+                    // We will store all of them, but note that the web UI prioritizes displaying Solar/DC over Battery if active.
 
                     logWave2Data(w2);
                 }
