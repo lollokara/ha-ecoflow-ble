@@ -105,9 +105,16 @@ static lv_obj_t * label_usb_val;
 static lv_obj_t * label_12v_val;
 static lv_obj_t * label_ac_val;
 
+// Wave 2 Button
+static lv_obj_t * btn_wave2;
+static lv_obj_t * lbl_wave_txt;
+
 // Popup
 static lv_obj_t * cont_popup;
 static lv_obj_t * cont_popup_alt;
+
+// Animation
+static float anim_phase = 0.0f;
 
 // --- Helpers ---
 
@@ -337,7 +344,7 @@ static void event_slider_alt_pow(lv_event_t * e) {
     }
 }
 
-// --- Arc Draw Callback for Limits ---
+// --- Arc Draw Callback for Limits & Animation ---
 static void event_arc_draw(lv_event_t * e) {
     lv_event_code_t code = lv_event_get_code(e);
     if(code == LV_EVENT_DRAW_PART_END) {
@@ -388,6 +395,36 @@ static void event_arc_draw(lv_event_t * e) {
                 line_dsc.round_start = 1;
                 line_dsc.round_end = 1;
                 lv_draw_line(draw_ctx, &line_dsc, &p1, &p2);
+            }
+
+            // Charging Animation (Waves)
+            // Draw an arc segment that moves based on anim_phase
+            // Phase goes 0.0 to 1.0. Map to Current SOC Angle -> 360 deg.
+            int val = lv_arc_get_value(obj);
+            if (val < 100) {
+                float start_angle = 270.0f + (val * 3.6f);
+                float end_angle = 270.0f + 360.0f; // Wraps around
+                float total_span = end_angle - start_angle;
+
+                // Anim phase maps to position in the empty space
+                float current_anim_angle = start_angle + (total_span * anim_phase);
+
+                // Draw a small fading arc segment at current_anim_angle
+                lv_draw_arc_dsc_t arc_dsc;
+                lv_draw_arc_dsc_init(&arc_dsc);
+                arc_dsc.color = lv_palette_main(LV_PALETTE_TEAL);
+                arc_dsc.width = 4;
+                arc_dsc.opa = LV_OPA_50; // Semi-transparent
+
+                // Draw 3 segments for "wave" effect
+                for(int i=0; i<3; i++) {
+                    float offset = i * 15.0f; // degrees spacing
+                    float a = current_anim_angle - offset;
+                    if (a > start_angle) {
+                         // Simplify: Just draw a small arc
+                         lv_draw_arc(draw_ctx, &arc_dsc, &center, r_out - 7, (uint16_t)a, (uint16_t)(a+10));
+                    }
+                }
             }
         }
     }
@@ -803,10 +840,7 @@ static void UI_ShowAltChargerPopup(void) {
     }
 
     // Refresh State
-    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER); // 1-based index 4? No, get by index.
-    // Wait, UI_GetDeviceCache takes index 0-3. DeviceType is 1-4.
-    // Index = Type - 1.
-    dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
 
     if (dev) {
         lv_obj_t * panel = lv_obj_get_child(cont_popup_alt, 0);
@@ -953,20 +987,24 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_set);
 
     // Wave 2 (Left of Settings)
-    lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
+    btn_wave2 = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 210, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
-    lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
-    lv_label_set_text(lbl_wave, "Wave 2");
-    lv_obj_center(lbl_wave);
+    lbl_wave_txt = lv_label_create(btn_wave2);
+    lv_label_set_text(lbl_wave_txt, "Wave 2");
+    lv_obj_set_style_text_align(lbl_wave_txt, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(lbl_wave_txt);
 
     // Toggles (Center Bottom)
     btn_ac_toggle = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_ac_toggle, btn_w, btn_h);
     lv_obj_align(btn_ac_toggle, LV_ALIGN_BOTTOM_MID, -70, btn_y);
     lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+    lv_obj_add_style(btn_ac_toggle, &style_btn_green, LV_STATE_CHECKED);
     lv_obj_add_flag(btn_ac_toggle, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_ac_toggle, event_toggle_ac, LV_EVENT_CLICKED, NULL);
     lbl_ac_t = lv_label_create(btn_ac_toggle);
@@ -978,6 +1016,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(btn_dc_toggle, btn_w, btn_h);
     lv_obj_align(btn_dc_toggle, LV_ALIGN_BOTTOM_MID, 70, btn_y);
     lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+    lv_obj_add_style(btn_dc_toggle, &style_btn_green, LV_STATE_CHECKED);
     lv_obj_add_flag(btn_dc_toggle, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_dc_toggle, event_toggle_dc, LV_EVENT_CLICKED, NULL);
     lbl_dc_t = lv_label_create(btn_dc_toggle);
@@ -1073,6 +1112,11 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     uint32_t now = xTaskGetTickCount();
     uint8_t target_brightness = 100;
 
+    // Update Animation Phase (0.0 to 1.0) for wave effect
+    anim_phase += 0.05f;
+    if (anim_phase > 1.0f) anim_phase = 0.0f;
+    if (arc_batt) lv_obj_invalidate(arc_batt); // Trigger redraw for animation
+
     if (dev) {
          if (dev->brightness > 0) target_brightness = dev->brightness;
     }
@@ -1096,13 +1140,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     FanStatus fanStatus;
     Fan_GetStatus(&fanStatus);
     if (fanStatus.connected) {
-        // Toggle Blink for Activity (Blue/DarkBlue or similar, or just static blue)
-        // User asked for "dot in home screen does not blink".
-        // Let's blink Blue/LightBlue if data is fresh.
-        // Actually, we can reuse the global toggle if we want synchronous blink.
-        // But let's check last packet time logic in fan_task.c which sets connected=false after 3s.
-        // If we want blink on packet reception, we need an event flag.
-        // For now, simpler: connected = solid blue.
         lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
         lv_label_set_text_fmt(label_amb_temp, "Amb: %d C", (int)fanStatus.amb_temp);
     } else {
@@ -1110,8 +1147,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         lv_label_set_text(label_amb_temp, "Amb: -- C");
     }
 
-    // Blink RP2040 Dot if connected (using static toggle from bottom of function)
-    // We need to move the toggle logic up or duplicate it.
+    // Blink RP2040 Dot if connected
     static bool blink_toggle = false;
     blink_toggle = !blink_toggle;
 
@@ -1127,9 +1163,34 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
     }
 
+    // Process Wave 2 specific updates
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
-        return; // Don't update dashboard with Wave 2 data
+
+        // Update Dashboard Button for Wave 2
+        if (btn_wave2) {
+            int32_t mode = get_int32_aligned(&dev->data.w2.powerMode);
+            int32_t watts = get_int32_aligned(&dev->data.w2.batPwrWatt); // Using Battery Power as proxy for now?
+            // Actually usually input power is what matters. Wave 2 has psdrPwrWatt?
+            // User requested: "power draw reported from the wave 2"
+
+            if (mode != 0) {
+                 lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
+                 lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
+            } else {
+                 lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                 lv_label_set_text(lbl_wave_txt, "Wave 2");
+            }
+        }
+
+        return; // Don't update dashboard main stats with Wave 2 data
+    }
+
+    // Check if Alternator Charger is present and updating
+    if (dev->id == DEV_TYPE_ALT_CHARGER) {
+         // We might want to trigger a dashboard update if Alt Charger data changed significantly?
+         // But main loop below handles D3P updates.
+         // We need to ensure we mix data if needed.
     }
 
     // Map data
@@ -1142,9 +1203,26 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
-        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.inputPower));
+        // Use AC Input specifically for Grid
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acInputPower));
+        // Sum Solar Inputs
         in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
-        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+
+        // Alternator Charger Logic:
+        // Use Alternator Charger's own data if available/connected, otherwise D3P's input
+        DeviceStatus* ac_dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+        int alt_power = 0;
+        if (ac_dev && ac_dev->connected && ac_dev->data.ac.dcPower > 0) {
+             alt_power = safe_float_to_int(ac_dev->data.ac.dcPower);
+        }
+
+        if (alt_power > 0) {
+            in_alt = alt_power;
+        } else {
+            // Fallback to D3P DC Input
+            in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+        }
+
         out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
         out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3p.dc12vOutputPower));
         out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3p.usbaOutputPower) + get_float_aligned(&dev->data.d3p.usbcOutputPower));
@@ -1244,13 +1322,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
         if (first_run || ac_on != last_ac_on) {
             if (ac_on) {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
                 lv_label_set_text(lbl_ac_t, "AC\nON");
                 lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
             } else {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
                 lv_label_set_text(lbl_ac_t, "AC\nOFF");
                 lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
             }
@@ -1259,13 +1333,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
         if (first_run || dc_on != last_dc_on) {
             if (dc_on) {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
                 lv_label_set_text(lbl_dc_t, "12V\nON");
                 lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
             } else {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
                 lv_label_set_text(lbl_dc_t, "12V\nOFF");
                 lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
             }
@@ -1424,13 +1494,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
         if (first_run || ac_on != last_ac_on) {
             if (ac_on) {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
                 lv_label_set_text(lbl_ac_t, "AC\nON");
                 lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
             } else {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
                 lv_label_set_text(lbl_ac_t, "AC\nOFF");
                 lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
             }
@@ -1439,13 +1505,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
         if (first_run || dc_on != last_dc_on) {
             if (dc_on) {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
                 lv_label_set_text(lbl_dc_t, "12V\nON");
                 lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
             } else {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
                 lv_label_set_text(lbl_dc_t, "12V\nOFF");
                 lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
             }
