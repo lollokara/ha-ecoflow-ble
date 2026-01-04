@@ -1146,26 +1146,53 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     float temp = 25.0f;
     bool is_main_device = false;
 
+    // Prioritization Logic
+    static uint8_t primary_dev_id = 0;
+
+    if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+        primary_dev_id = DEV_TYPE_DELTA_PRO_3; // Lock onto DP3 if seen
+    }
+
+    // Determine if we should process this device as main
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
-        in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
-        out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
-        temp = (float)dev->data.d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
-        is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3.acInputPower);
-        in_solar = safe_float_to_int(dev->data.d3.solarInputPower);
-        in_alt = safe_float_to_int(dev->data.d3.dcPortInputPower);
-        out_ac = safe_float_to_int(dev->data.d3.acOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
-        temp = (float)dev->data.d3.cellTemperature;
+        // Only treat as main if we haven't locked onto DP3, or if DP3 is disconnected (TODO: handle disconnect timeout)
+        if (primary_dev_id == 0 || primary_dev_id == DEV_TYPE_DELTA_3) {
+            is_main_device = true;
+            primary_dev_id = DEV_TYPE_DELTA_3;
+        } else {
+             // DP3 is primary, ignore D3 for main dashboard stats
+             is_main_device = false;
+        }
+    }
+
+    if (is_main_device) {
+        if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+            DeltaPro3DataStruct d3p;
+            memcpy(&d3p, &dev->data.d3p, sizeof(DeltaPro3DataStruct));
+
+            soc = safe_float_to_int(d3p.batteryLevel);
+            in_ac = safe_float_to_int(d3p.inputPower);
+            in_solar = safe_float_to_int(d3p.solarLvPower + d3p.solarHvPower);
+            in_alt = safe_float_to_int(d3p.dcLvInputPower);
+            out_ac = safe_float_to_int(d3p.acLvOutputPower + d3p.acHvOutputPower);
+            out_12v = safe_float_to_int(d3p.dc12vOutputPower);
+            out_usb = safe_float_to_int(d3p.usbaOutputPower + d3p.usbcOutputPower);
+            temp = (float)d3p.cellTemperature;
+        } else if (dev->id == DEV_TYPE_DELTA_3) {
+            Delta3DataStruct d3;
+            memcpy(&d3, &dev->data.d3, sizeof(Delta3DataStruct));
+
+            soc = safe_float_to_int(d3.batteryLevel);
+            in_ac = safe_float_to_int(d3.acInputPower);
+            in_solar = safe_float_to_int(d3.solarInputPower);
+            in_alt = safe_float_to_int(d3.dcPortInputPower);
+            out_ac = safe_float_to_int(d3.acOutputPower);
+            out_12v = safe_float_to_int(d3.dc12vOutputPower);
+            out_usb = safe_float_to_int(d3.usbaOutputPower + d3.usbcOutputPower);
+            temp = (float)d3.cellTemperature;
+        }
     }
 
     // Static variables to track state and minimize redraws
