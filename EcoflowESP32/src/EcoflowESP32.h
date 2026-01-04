@@ -11,7 +11,7 @@
 #define ECOFLOW_ESP32_H
 
 #include <NimBLEDevice.h>
-#include "EcoflowData.h"
+#include "types.h"
 #include "EcoflowCrypto.h"
 #include <vector>
 #include <string>

@@ -196,7 +196,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                 switch(type) {
                     case W2_PARAM_TEMP: w2->setTemperature(value); break;
                     case W2_PARAM_MODE: w2->setMainMode(value); break;
-                    case W2_PARAM_SUB_MODE: w2->setSubMode(value); break;
+                    case W2_PARAM_SUBMODE: w2->setSubMode(value); break;
                     case W2_PARAM_FAN: w2->setFanSpeed(value); break;
                     case W2_PARAM_POWER: w2->setPowerState(value); break;
                 }

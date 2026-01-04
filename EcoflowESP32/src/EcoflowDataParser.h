@@ -1,7 +1,7 @@
 #ifndef ECOFLOW_DATA_PARSER_H
 #define ECOFLOW_DATA_PARSER_H
 
-#include "EcoflowData.h"
+#include "types.h"
 #include "EcoflowProtocol.h"
 #include "types.h"
 

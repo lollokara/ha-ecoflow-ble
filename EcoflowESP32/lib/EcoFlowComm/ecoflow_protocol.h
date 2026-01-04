@@ -1,5 +1,5 @@
-#ifndef ECOFLOW_PROTOCOL_H
-#define ECOFLOW_PROTOCOL_H
+#ifndef ECOFLOW_PROTOCOL_C_H
+#define ECOFLOW_PROTOCOL_C_H
 
 /**
  * @file ecoflow_protocol.h
@@ -21,109 +21,120 @@ extern "C" {
 #endif
 
 // Protocol constants
-#define START_BYTE 0xAA      ///< Packet Start Byte
+#define START_BYTE 0xBB      ///< Packet Start Byte (Updated)
 #define MAX_PAYLOAD_LEN 255  ///< Maximum payload size
 #define MAX_DEVICES 4        ///< Maximum supported devices
 
 // Message Format: [START][CMD][LEN][PAYLOAD][CRC8]
 
-// --- ESP32 -> F4 Command IDs ---
-#define CMD_BATTERY_STATUS 0x01      ///< Legacy: Simple Battery Status
-#define CMD_TEMPERATURE 0x02         ///< Legacy: Temperature
-#define CMD_CONNECTION_STATE 0x03    ///< Legacy: Connection State
-
-#define CMD_HANDSHAKE_ACK 0x21       ///< Handshake Acknowledgment
-#define CMD_DEVICE_LIST 0x22         ///< Push Device List to STM32
-#define CMD_DEVICE_STATUS 0x24       ///< Send Device Telemetry Data
+// --- ESP32 -> F4 Command IDs (Corrected to match Stm32Serial.h) ---
+#define CMD_HANDSHAKE_ACK 0x02       ///< Handshake Acknowledgment
+#define CMD_DEVICE_LIST 0x03         ///< Push Device List to STM32
+#define CMD_DEVICE_STATUS 0x04       ///< Send Device Telemetry Data
+#define CMD_DEVICE_LIST_ACK 0x23     ///< Acknowledge Device List reception
 #define CMD_DEBUG_INFO 0x61          ///< Send Debug Info (IP, uptime)
+
+#define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
+#define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge
+
+// --- F4 -> ESP32 Command IDs ---
+#define CMD_HANDSHAKE 0x01           ///< Initiate Handshake
+#define CMD_GET_DEVICE_STATUS 0x24   ///< Request Status for specific device
+#define CMD_SET_WAVE2 0x20           ///< Control Wave 2 (Temp, Mode)
+#define CMD_SET_AC 0x21              ///< Toggle AC Ports
+#define CMD_SET_DC 0x22              ///< Toggle DC Ports
+#define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
+#define CMD_POWER_OFF 0x99           ///< Trigger System Power Off
+#define CMD_GET_DEBUG_INFO 0x50      ///< Request Debug Info
+#define CMD_CONNECT_DEVICE 0x60      ///< Request to connect to a device type
+#define CMD_FORGET_DEVICE 0x61       ///< Request to forget a device
 
 #define CMD_OTA_START 0xA0           ///< Start OTA Update
 #define CMD_OTA_CHUNK 0xA1           ///< OTA Data Chunk
 #define CMD_OTA_END   0xA2           ///< End OTA Update
 #define CMD_OTA_APPLY 0xA3           ///< Apply OTA Update
 
-// --- F4 -> ESP32 Command IDs ---
-#define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
-
-#define CMD_HANDSHAKE 0x20           ///< Initiate Handshake
-#define CMD_DEVICE_LIST_ACK 0x23     ///< Acknowledge Device List reception
-#define CMD_GET_DEVICE_STATUS 0x25   ///< Request Status for specific device
-#define CMD_GET_DEBUG_INFO 0x60      ///< Request Debug Info
-#define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
-#define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
-
-#define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
-#define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge
-
-// --- Control Commands (F4 -> ESP32) ---
-#define CMD_SET_WAVE2 0x30           ///< Control Wave 2 (Temp, Mode)
-#define CMD_SET_AC 0x31              ///< Toggle AC Ports
-#define CMD_SET_DC 0x32              ///< Toggle DC Ports
-#define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
-#define CMD_POWER_OFF 0x50           ///< Trigger System Power Off
-
-// Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
-#define W2_PARAM_TEMP 1
-#define W2_PARAM_MODE 2
-#define W2_PARAM_SUB_MODE 3
-#define W2_PARAM_FAN 4
-#define W2_PARAM_POWER 5
+// Wave 2 Set Types
+#define W2_PARAM_POWER 20
+#define W2_PARAM_MODE 21
+#define W2_PARAM_TEMP 22
+#define W2_PARAM_FAN 23
+#define W2_PARAM_SUBMODE 24
 
 // Set Value Types
-#define SET_VAL_AC_LIMIT 1
-#define SET_VAL_MAX_SOC 2
-#define SET_VAL_MIN_SOC 3
-// Alternator Charger Set Values
-#define SET_VAL_ALT_START_VOLTAGE 4
-#define SET_VAL_ALT_MODE 5
-#define SET_VAL_ALT_PROD_LIMIT 6
-#define SET_VAL_ALT_REV_LIMIT 7
-#define SET_VAL_ALT_CHG_LIMIT 8
-#define SET_VAL_ALT_ENABLE 9
+#define SET_VAL_AC_ENABLED 1
+#define SET_VAL_DC_ENABLED 2
+#define SET_VAL_USB_ENABLED 3
+#define SET_VAL_AC_CHG_SPEED 4
+// Alias for compatibility
+#define SET_VAL_AC_LIMIT 4
+#define SET_VAL_AC_ALWAYS_ON 5
+#define SET_VAL_UP_LIMIT 6
+// Alias for compatibility
+#define SET_VAL_MAX_SOC 6
+#define SET_VAL_DOWN_LIMIT 7
+// Alias for compatibility
+#define SET_VAL_MIN_SOC 7
+#define SET_VAL_BACKUP_RESERVE 8
 
-// Device Types (matching types.h)
+// Alternator Charger Set Values
+#define SET_VAL_ALT_ENABLE 9
+#define SET_VAL_ALT_MODE 10
+#define SET_VAL_ALT_START_VOLTAGE 11
+#define SET_VAL_ALT_REV_CHG_CURRENT 12
+// Alias
+#define SET_VAL_ALT_REV_LIMIT 12
+#define SET_VAL_ALT_CHG_CURRENT 13
+// Alias
+#define SET_VAL_ALT_CHG_LIMIT 13
+#define SET_VAL_ALT_POWER_LIMIT 14
+// Alias
+#define SET_VAL_ALT_PROD_LIMIT 14
+
+// Device Types
+#define DEV_TYPE_UNKNOWN 0
 #define DEV_TYPE_DELTA_3 1
 #define DEV_TYPE_DELTA_PRO_3 2
 #define DEV_TYPE_WAVE_2 3
-#define DEV_TYPE_ALT_CHARGER 4
+#define DEV_TYPE_ALT_CHARGER 4 // Matches types.h (was ALTERNATOR_CHARGER)
 
 
 #pragma pack(push, 1)
 
-// --- Shared Data Structures (POD versions of EcoflowData.h) ---
+// --- Shared Data Structures ---
 
 /**
  * @brief Telemetry data for Delta 3.
  */
 typedef struct {
     float batteryLevel;
-    float acInputPower;
-    float acOutputPower;
     float inputPower;
     float outputPower;
-    float dc12vOutputPower;
+    float acInputPower;
+    float acOutputPower;
     float dcPortInputPower;
-    int32_t dcPortState;
+    float solarInputPower;
+    float batteryInputPower;
+    float batteryOutputPower;
+    float dc12vOutputPower;
     float usbcOutputPower;
     float usbc2OutputPower;
     float usbaOutputPower;
     float usba2OutputPower;
-    bool pluggedInAc;
-    bool energyBackup;
-    int32_t energyBackupBatteryLevel;
-    float batteryInputPower;
-    float batteryOutputPower;
     int32_t batteryChargeLimitMin;
     int32_t batteryChargeLimitMax;
-    int32_t cellTemperature;
-    bool dc12vPort;
-    bool acPorts;
-    float solarInputPower;
     int32_t acChargingSpeed;
     int32_t maxAcChargingPower;
-    bool acOn;
-    bool dcOn;
-    bool usbOn;
+    int32_t dcPortState;
+    int32_t energyBackup;
+    int32_t energyBackupBatteryLevel;
+    int32_t cellTemperature;
+    uint8_t acOn;
+    uint8_t dcOn;
+    uint8_t usbOn;
+    uint8_t pluggedInAc;
+    uint8_t dc12vPort;
+    uint8_t acPorts;
 } Delta3DataStruct;
 
 /**
@@ -135,6 +146,15 @@ typedef struct {
     int32_t setTemp;
     int32_t fanValue;
     float envTemp;
+    float outLetTemp;
+    int32_t batSoc;
+    int32_t batChgStatus;
+    uint32_t batChgRemainTime;
+    uint32_t batDsgRemainTime;
+    uint32_t remainingTime;
+    int32_t batPwrWatt;
+    int32_t mpptPwrWatt;
+    int32_t psdrPwrWatt;
     int32_t tempSys;
     int32_t displayIdleTime;
     int32_t displayIdleMode;
@@ -149,14 +169,6 @@ typedef struct {
     int32_t tempDisplay;
     int32_t powerMode;
     int32_t powerSrc;
-    int32_t psdrPwrWatt;
-    int32_t batPwrWatt;
-    int32_t mpptPwrWatt;
-    uint32_t batDsgRemainTime;
-    uint32_t batChgRemainTime;
-    int32_t batSoc;
-    int32_t batChgStatus;
-    float outLetTemp;
     int32_t mpptWork;
     int32_t bmsErr;
     int32_t rgbState;
@@ -164,7 +176,6 @@ typedef struct {
     int32_t bmsBoundFlag;
     int32_t bmsUndervoltage;
     int32_t ver;
-    int32_t remainingTime;
 } Wave2DataStruct;
 
 /**
@@ -172,7 +183,7 @@ typedef struct {
  */
 typedef struct {
     float batteryLevel;
-    float batteryLevelMain; // Added field
+    float batteryLevelMain;
     float acInputPower;
     float acLvOutputPower;
     float acHvOutputPower;
@@ -183,24 +194,34 @@ typedef struct {
     float dcHvInputPower;
     int32_t dcLvInputState;
     int32_t dcHvInputState;
-    float usbcOutputPower;
-    float usbc2OutputPower;
+    float solarLvPower;
+    float solarHvPower;
     float usbaOutputPower;
     float usba2OutputPower;
+    float usbcOutputPower;
+    float usbc2OutputPower;
     int32_t acChargingSpeed;
     int32_t maxAcChargingPower;
-    bool pluggedInAc;
-    bool energyBackup;
+    int32_t energyBackup;
     int32_t energyBackupBatteryLevel;
     int32_t batteryChargeLimitMin;
     int32_t batteryChargeLimitMax;
     int32_t cellTemperature;
-    bool dc12vPort;
-    bool acLvPort;
-    bool acHvPort;
-    float solarLvPower;
-    float solarHvPower;
-    bool gfiMode;
+    uint8_t dc12vPort;
+    uint8_t acLvPort;
+    uint8_t acHvPort;
+    uint8_t gfiMode;
+
+    // New fields
+    float expansion1_power;
+    float expansion2_power;
+    int32_t ac_in_status;
+    float bms_batt_soh;
+    uint32_t bms_dsg_rem_time;
+    uint32_t bms_chg_rem_time;
+    // Missing boolean pluggedInAc present in old version but not in my recent overwrite?
+    // Added back:
+    uint8_t pluggedInAc;
 } DeltaPro3DataStruct;
 
 /**
@@ -208,14 +229,14 @@ typedef struct {
  */
 typedef struct {
     float batteryLevel;
-    float batteryTemperature;
+    int32_t batteryTemperature;
     float dcPower;
     float carBatteryVoltage;
     float startVoltage;
     int32_t startVoltageMin;
     int32_t startVoltageMax;
     int32_t chargerMode;
-    bool chargerOpen;
+    uint8_t chargerOpen;
     int32_t powerLimit;
     int32_t powerMax;
     float reverseChargingCurrentLimit;
@@ -223,29 +244,6 @@ typedef struct {
     float reverseChargingCurrentMax;
     float chargingCurrentMax;
 } AlternatorChargerDataStruct;
-
-
-/**
- * @brief Legacy Battery Status (Fallback).
- */
-typedef struct {
-    uint8_t soc;
-    int16_t power_w;
-    uint16_t voltage_v;
-    uint8_t connected;
-    char device_name[16];
-} BatteryStatus;
-
-/**
- * @brief Union to hold data based on device type.
- */
-typedef union {
-    Delta3DataStruct d3;
-    Wave2DataStruct w2;
-    DeltaPro3DataStruct d3p;
-    AlternatorChargerDataStruct ac;
-    BatteryStatus legacy; // Fallback
-} DeviceSpecificData;
 
 /**
  * @brief Payload for CMD_DEVICE_STATUS.
@@ -255,7 +253,12 @@ typedef struct {
     uint8_t connected;
     char name[16];
     uint8_t brightness;  // 10-100%
-    DeviceSpecificData data;
+    union {
+        Delta3DataStruct d3;
+        Wave2DataStruct w2;
+        DeltaPro3DataStruct d3p;
+        AlternatorChargerDataStruct ac;
+    } data;
 } DeviceStatus;
 
 /**
@@ -272,19 +275,11 @@ typedef struct {
 } DeviceList;
 
 /**
- * @brief Payload for CMD_SET_WAVE2.
- */
-typedef struct {
-    uint8_t type;  // W2_PARAM_TEMP, etc.
-    uint8_t value;
-} Wave2SetMsg;
-
-/**
  * @brief Payload for CMD_DEBUG_INFO.
  */
 typedef struct {
     char ip[16];
-    uint8_t wifi_connected;
+    uint8_t wifi_connected; // Legacy, kept for compatibility if needed
     uint8_t devices_connected;
     uint8_t devices_paired;
 } DebugInfo;
@@ -298,6 +293,14 @@ typedef struct {
     uint32_t offset;
     // Data follows
 } OtaChunkHeader;
+
+/**
+ * @brief Payload for CMD_SET_WAVE2.
+ */
+typedef struct {
+    uint8_t type;  // W2_PARAM_TEMP, etc.
+    uint8_t value;
+} Wave2SetMsg;
 
 #pragma pack(pop)
 
@@ -351,4 +354,4 @@ int pack_ota_apply_message(uint8_t *buffer);
 }
 #endif
 
-#endif // ECOFLOW_PROTOCOL_H
+#endif // ECOFLOW_PROTOCOL_C_H

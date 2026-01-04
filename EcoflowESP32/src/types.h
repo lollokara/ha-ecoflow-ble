@@ -14,6 +14,42 @@ enum class DeviceType {
     ALTERNATOR_CHARGER = 4
 };
 
+// --- Display Enums ---
+enum class DisplayAction {
+    NONE,
+    CONNECT_D3,
+    CONNECT_W2,
+    CONNECT_D3P,
+    CONNECT_ALT,
+    SET_AC_LIMIT,
+    SET_MAX_CHG,
+    SET_MIN_DSG,
+    SET_W2_TEMP,
+    SET_W2_FAN,
+    FORGET_DEV,
+    TOGGLE_AC,
+    TOGGLE_DC,
+    TOGGLE_USB,
+    W2_SET_PWR,
+    W2_SET_MODE,
+    W2_SET_FAN,
+    W2_SET_SUB_MODE,
+    SYSTEM_OFF,
+    SET_SOC_LIMITS,
+    CONNECT_DEVICE,
+    DISCONNECT_DEVICE
+};
+
+enum class ButtonInput {
+    NONE,
+    BTN_UP,
+    BTN_DOWN,
+    BTN_ENTER,
+    BTN_BACK,
+    BTN_ENTER_SHORT,
+    BTN_ENTER_HOLD
+};
+
 // --- Data Structures ---
 
 struct Delta3Data {
@@ -34,6 +70,7 @@ struct Delta3Data {
     int batteryChargeLimitMin;
     int batteryChargeLimitMax;
     int acChargingSpeed;
+    int maxAcChargingPower; // Added
     int dcPortState; // 0=None, 1=Car, 2=Solar
     int energyBackup;
     int energyBackupBatteryLevel;
@@ -76,6 +113,7 @@ struct DeltaPro3Data {
     bool acLvPort;
     bool acHvPort;
     bool gfiMode;
+    bool pluggedInAc; // Added to match EcoflowData.h
 
     // New fields
     float expansion1_power;
@@ -130,6 +168,8 @@ struct AlternatorChargerData {
     float dcPower;
     float carBatteryVoltage;
     float startVoltage;
+    int startVoltageMin; // Added
+    int startVoltageMax; // Added
     int chargerMode; // 0=Charge, 1=Reverse
     bool chargerOpen;
     int powerLimit;
@@ -141,6 +181,7 @@ struct AlternatorChargerData {
 };
 
 struct EcoflowData {
+    bool isConnected; // Added
     Delta3Data delta3;
     DeltaPro3Data deltaPro3;
     Wave2Data wave2;

@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_DotStar.h>
-#include "EcoflowData.h"
+#include "types.h"
 #include "DeviceManager.h"
 #include "types.h"
 
