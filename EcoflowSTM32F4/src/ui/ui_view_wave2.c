@@ -27,7 +27,9 @@ static lv_obj_t * btn_mode_heat;
 static lv_obj_t * btn_mode_fan;
 
 // State Tracking
-static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static int current_mode = -1; // 0=Cool, 1=Heat, 2=Fan
+static int last_sub_mode = -1;
+static int last_power_mode = -1;
 static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
 static void create_styles(void) {
@@ -82,8 +84,6 @@ static void event_temp_change(lv_event_t * e) {
 }
 
 static void update_mode_ui(int mode) {
-    current_mode = mode;
-
     // Reset styles
     lv_obj_remove_style(btn_mode_cool, &style_btn_selected, 0);
     lv_obj_add_style(btn_mode_cool, &style_btn_default, 0);
@@ -356,5 +356,11 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(get_int32_aligned(&data->mode), subMode, pwrMode != 0);
+    int mode = get_int32_aligned(&data->mode);
+    if (mode != current_mode || subMode != last_sub_mode || pwrMode != last_power_mode) {
+        current_mode = mode;
+        last_sub_mode = subMode;
+        last_power_mode = pwrMode;
+        update_visibility(mode, subMode, pwrMode != 0);
+    }
 }
