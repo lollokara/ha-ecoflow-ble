@@ -315,7 +315,8 @@ int main(void) {
     }
 
     // Create FreeRTOS Tasks
-    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
+    // Increased Stack Size to 16384 words (64KB) to prevent overflow
+    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
 
