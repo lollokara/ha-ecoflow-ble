@@ -287,16 +287,21 @@ int main(void) {
         // Increment Boot Counter (App must clear it on success)
         RTC->BKP1R = boot_fails + 1;
 
-        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
-        uint8_t buf[1];
+        // Wait 500ms for OTA START - Blink Blue
+        uint8_t buf[3];
         LED_B_On();
 
-        // Use non-blocking read for start byte check
+        // Check for specific CMD_OTA_START command sequence
+        // AA A0 ...
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
-                 Bootloader_OTA_Loop();
+                 if (HAL_UART_Receive(&huart6, &buf[1], 2, 50) == HAL_OK) {
+                     if (buf[1] == CMD_OTA_START) {
+                         Serial_Log("OTA START received on boot.");
+                         RTC->BKP1R = 0; // Reset counter if we enter OTA manually
+                         Bootloader_OTA_Loop();
+                     }
+                 }
             }
         }
         LED_B_Off();
@@ -317,13 +322,6 @@ int main(void) {
     } else {
         // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
-
-        // SAFETY: If we are in Bank 2 (BFB2 set) and App is invalid,
-        // we might be stuck in a loop.
-        // We should try to revert to Bank 1?
-        // But maybe Bank 1 is also invalid.
-        // Best to stay in OTA mode.
-
         RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     }
@@ -416,6 +414,7 @@ void Bootloader_OTA_Loop(void) {
     bool checksum_verified = false;
     uint32_t bytes_written = 0;
     uint32_t chunks_received = 0;
+    uint32_t last_packet_time = HAL_GetTick();
 
     while(1) {
         // Watchdog Refresh (Important for long waits)
@@ -426,6 +425,17 @@ void Bootloader_OTA_Loop(void) {
         if (HAL_GetTick() - last_tick > (ota_started ? 200 : 1000)) {
             LED_B_Toggle();
             last_tick = HAL_GetTick();
+        }
+
+        // Timeout Check (30 seconds of inactivity)
+        // Only if OTA has not started (or maybe even if it has? Best to allow resume if stuck)
+        // If OTA has started, we might want to stay longer, but 30s silence is bad.
+        // But the ESP32 might be downloading.
+        // Let's set timeout to 30s. If OTA started, maybe 60s?
+        uint32_t timeout_val = ota_started ? 60000 : 30000;
+        if (HAL_GetTick() - last_packet_time > timeout_val) {
+             Serial_Log("OTA Timeout (%d ms). Resetting...", timeout_val);
+             HAL_NVIC_SystemReset();
         }
 
         uint8_t b;
@@ -446,6 +456,7 @@ void Bootloader_OTA_Loop(void) {
             LED_O_Off(); continue;
         }
 
+        last_packet_time = HAL_GetTick(); // Update timestamp
         LED_O_Off(); // RX Done
 
         uint8_t recv_crc = payload[len];
