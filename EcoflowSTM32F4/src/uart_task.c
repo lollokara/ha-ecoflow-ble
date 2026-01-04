@@ -303,6 +303,12 @@ void StartUARTTask(void * argument) {
         }
 
         // 3. State Machine
+        static TickType_t lastAlivePrint = 0;
+        if ((xTaskGetTickCount() - lastAlivePrint) > pdMS_TO_TICKS(5000)) {
+            lastAlivePrint = xTaskGetTickCount();
+            printf("UART Alive: %lu\n", lastAlivePrint);
+        }
+
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
             switch (protocolState) {
