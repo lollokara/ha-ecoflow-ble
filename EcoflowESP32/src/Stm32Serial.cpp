@@ -440,6 +440,9 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.solarLvPower = src.solarLvPower;
         dst.solarHvPower = src.solarHvPower;
         dst.gfiMode = src.gfiMode;
+        dst.expansion1Power = src.expansion1Power;
+        dst.expansion2Power = src.expansion2Power;
+        dst.acInputStatus = src.acInputStatus;
 
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
         strncpy(status.name, "Alt Charger", 15);

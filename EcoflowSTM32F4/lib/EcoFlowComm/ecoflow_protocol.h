@@ -201,6 +201,9 @@ typedef struct {
     float solarLvPower;
     float solarHvPower;
     bool gfiMode;
+    float expansion1Power;
+    float expansion2Power;
+    int32_t acInputStatus;
 } DeltaPro3DataStruct;
 
 /**

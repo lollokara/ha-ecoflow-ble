@@ -116,6 +116,9 @@ struct DeltaPro3Data {
     float solarLvPower = 0;
     float solarHvPower = 0;
     bool gfiMode = false;
+    float expansion1Power = 0;
+    float expansion2Power = 0;
+    int acInputStatus = 0;
 };
 
 struct AlternatorChargerData {
