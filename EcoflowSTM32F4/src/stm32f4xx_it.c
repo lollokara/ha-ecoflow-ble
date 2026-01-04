@@ -7,6 +7,7 @@
 /* External variables */
 extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart6;
+extern UART_HandleTypeDef huart4;
 
 /******************************************************************************/
 /*           Cortex-M4 Processor Interruption and Exception Handlers          */
@@ -96,6 +97,11 @@ void USART3_IRQHandler(void)
 void USART6_IRQHandler(void)
 {
   HAL_UART_IRQHandler(&huart6);
+}
+
+void UART4_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&huart4);
 }
 
 /******************************************************************************/

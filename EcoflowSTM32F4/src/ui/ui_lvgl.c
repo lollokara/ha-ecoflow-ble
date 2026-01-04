@@ -21,6 +21,12 @@
 #include <math.h>
 #include "stm32f4xx_hal.h"
 
+static float get_float_aligned(const float *ptr) {
+    float val;
+    memcpy(&val, ptr, sizeof(float));
+    return val;
+}
+
 // External Backlight Control
 extern void SetBacklight(uint8_t percent);
 
@@ -1148,23 +1154,23 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
-        in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
-        in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
-        out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3p.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
+        soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.inputPower)); // Corrected to use inputPower instead of acInputPower
+        in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+        out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
+        out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3p.dc12vOutputPower));
+        out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3p.usbaOutputPower) + get_float_aligned(&dev->data.d3p.usbcOutputPower));
         temp = (float)dev->data.d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
         is_main_device = true;
-        soc = safe_float_to_int(dev->data.d3.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3.acInputPower);
-        in_solar = safe_float_to_int(dev->data.d3.solarInputPower);
-        in_alt = safe_float_to_int(dev->data.d3.dcPortInputPower);
-        out_ac = safe_float_to_int(dev->data.d3.acOutputPower);
-        out_12v = safe_float_to_int(dev->data.d3.dc12vOutputPower);
-        out_usb = safe_float_to_int(dev->data.d3.usbaOutputPower + dev->data.d3.usbcOutputPower);
+        soc = safe_float_to_int(get_float_aligned(&dev->data.d3.batteryLevel));
+        in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3.acInputPower));
+        in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3.solarInputPower));
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3.dcPortInputPower));
+        out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3.acOutputPower));
+        out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3.dc12vOutputPower));
+        out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3.usbaOutputPower) + get_float_aligned(&dev->data.d3.usbcOutputPower));
         temp = (float)dev->data.d3.cellTemperature;
     }
 
