@@ -244,7 +244,7 @@ int main(void) {
 
     UART_Init();
     USART3_Init();
-    // MX_IWDG_Init(); // Init Watchdog (Disabled for Debugging)
+    MX_IWDG_Init(); // Init Watchdog (Required for Flash Erase loops)
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
@@ -385,12 +385,10 @@ void Bootloader_OTA_Loop(void) {
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
-    // Determine Active Bank and Target Bank
-    FLASH_OBProgramInitTypeDef OBInit;
-    HAL_FLASHEx_OBGetConfig(&OBInit);
-    bool bfb2_active = ((OBInit.USERConfig & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2);
+    // Determine Active Bank and Target Bank (Use Direct Register Read)
+    bool bfb2_active = (FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2;
 
-    Serial_Log("USERConfig: 0x%08X. BFB2: %d. WRPSector: 0x%08X", OBInit.USERConfig, bfb2_active, OBInit.WRPSector);
+    Serial_Log("OPTCR: 0x%08X. BFB2: %d", FLASH->OPTCR, bfb2_active);
 
     // Target Inactive Bank
     // Bank 2 (Inactive when BFB2=0) mapped at 0x08100000
@@ -422,7 +420,7 @@ void Bootloader_OTA_Loop(void) {
 
     while(1) {
         // Watchdog Refresh (Important for long waits)
-        // HAL_IWDG_Refresh(&hiwdg);
+        HAL_IWDG_Refresh(&hiwdg);
 
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;
