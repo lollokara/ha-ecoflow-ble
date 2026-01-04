@@ -11,6 +11,7 @@ static lv_style_t style_text_large;
 static lv_style_t style_text_small;
 static lv_style_t style_btn_default;
 static lv_style_t style_btn_selected;
+static lv_style_t style_btn_red;
 
 static lv_obj_t * label_cur_temp;
 static lv_obj_t * arc_set_temp;
@@ -56,6 +57,11 @@ static void create_styles(void) {
     lv_style_set_bg_color(&style_btn_selected, lv_palette_main(LV_PALETTE_TEAL));
     lv_style_set_text_color(&style_btn_selected, lv_color_white());
     lv_style_set_radius(&style_btn_selected, 12);
+
+    lv_style_init(&style_btn_red);
+    lv_style_set_bg_color(&style_btn_red, lv_palette_main(LV_PALETTE_RED));
+    lv_style_set_text_color(&style_btn_red, lv_color_white());
+    lv_style_set_radius(&style_btn_red, 12);
 }
 
 static void event_back(lv_event_t * e) {
@@ -142,6 +148,19 @@ static void event_fan_change(lv_event_t * e) {
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         send_cmd(W2_PARAM_FAN, (uint8_t)val);
     }
+}
+
+static void event_power_toggle(lv_event_t * e) {
+     // Check current state from data? We don't have access to 'data' struct here easily unless cached.
+     // But we can just send a specific value if the device supports toggle command.
+     // If not, we might need to know state.
+     // Ecoflow usually uses 1=ON, 0=OFF.
+     // Let's blindly send 1 (or 0?).
+     // Ideally we should have a toggle switch.
+     // Let's use a Checkable Button (Toggle Switch).
+     lv_obj_t * btn = lv_event_get_target(e);
+     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+     send_cmd(W2_PARAM_POWER, state ? 1 : 0);
 }
 
 void ui_view_wave2_init(lv_obj_t * parent) {
@@ -273,6 +292,19 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_label_set_text(label_fan_val, "Fan: 1");
     lv_obj_align_to(label_fan_val, slider_fan, LV_ALIGN_OUT_TOP_MID, 0, -10);
 
+    // Power Toggle Button
+    lv_obj_t * btn_power = lv_btn_create(panel);
+    lv_obj_set_size(btn_power, 80, 80);
+    lv_obj_align(btn_power, LV_ALIGN_TOP_RIGHT, -30, 40);
+    lv_obj_add_style(btn_power, &style_btn_red, 0); // Use Red for Power
+    lv_obj_add_flag(btn_power, LV_OBJ_FLAG_CHECKABLE); // Make it a toggle button
+    lv_obj_t * lbl_pwr = lv_label_create(btn_power);
+    ui_set_icon(lbl_pwr, MDI_ICON_POWER);
+    lv_obj_center(lbl_pwr);
+
+    // Add explicit event handler function
+    lv_obj_add_event_cb(btn_power, event_power_toggle, LV_EVENT_CLICKED, NULL);
+
     update_visibility(0, 0); // Default Cool, Max
 }
 
@@ -287,7 +319,7 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
         lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", (int)data->setTemp);
     }
 
     if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {

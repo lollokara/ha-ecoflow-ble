@@ -3,11 +3,16 @@
 
 #include <stdint.h>
 
+// Enum values MUST match ecoflow_protocol.h defines:
+// DEV_TYPE_DELTA_3 = 1
+// DEV_TYPE_DELTA_PRO_3 = 2
+// DEV_TYPE_WAVE_2 = 3
+// DEV_TYPE_ALT_CHARGER = 4
 enum class DeviceType {
-    DELTA_3,
-    WAVE_2,
-    DELTA_PRO_3,
-    ALTERNATOR_CHARGER
+    DELTA_3 = 1,
+    DELTA_PRO_3 = 2,
+    WAVE_2 = 3,
+    ALTERNATOR_CHARGER = 4
 };
 
 enum class ButtonInput {

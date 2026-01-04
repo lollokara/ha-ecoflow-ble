@@ -1265,10 +1265,14 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         last_temp = temp_int;
     }
 
-    if (first_run || soc != last_soc) {
-        lv_arc_set_value(arc_batt, soc);
-        lv_label_set_text_fmt(label_soc, "%d%%", soc);
-        last_soc = soc;
+    // Only update Battery Level if the current device is a Battery Device
+    // This prevents Alternator Charger or other devices from resetting the SOC to 0
+    if (dev->id == DEV_TYPE_DELTA_3 || dev->id == DEV_TYPE_DELTA_PRO_3) {
+        if (first_run || soc != last_soc) {
+            lv_arc_set_value(arc_batt, soc);
+            lv_label_set_text_fmt(label_soc, "%d%%", soc);
+            last_soc = soc;
+        }
     }
 
     if (first_run || in_solar != last_solar) {
