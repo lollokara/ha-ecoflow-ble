@@ -23,6 +23,7 @@
 
 // External Backlight Control
 extern void SetBacklight(uint8_t percent);
+extern IWDG_HandleTypeDef hiwdg;
 
 static uint32_t last_touch_time = 0;
 static bool is_sleeping = false;
@@ -1035,16 +1036,24 @@ static void create_dashboard(void) {
  * @brief Initializes LVGL and creates the UI.
  */
 void UI_LVGL_Init(void) {
+    HAL_IWDG_Refresh(&hiwdg);
     lv_init();
 
     extern void lv_port_disp_init(void);
     extern void lv_port_indev_init(void);
+
+    HAL_IWDG_Refresh(&hiwdg);
     lv_port_disp_init();
+    HAL_IWDG_Refresh(&hiwdg);
     lv_port_indev_init();
+    HAL_IWDG_Refresh(&hiwdg);
 
     create_styles();
+    HAL_IWDG_Refresh(&hiwdg);
     create_settings();
+    HAL_IWDG_Refresh(&hiwdg);
     create_dashboard();
+    HAL_IWDG_Refresh(&hiwdg);
     ui_view_wave2_init(NULL); // Pre-init Wave 2 to ensure styles
 
     lv_scr_load(scr_dash);

@@ -22,6 +22,8 @@ void StartDisplayTask(void * argument) {
 
     printf("Display Task Started\n");
 
+    HAL_IWDG_Refresh(&hiwdg);
+
     // Init UI (Handles LCD and Backlight Init)
     UI_LVGL_Init();
 
