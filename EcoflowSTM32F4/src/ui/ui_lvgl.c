@@ -24,6 +24,8 @@
 
 // External Backlight Control
 extern void SetBacklight(uint8_t percent);
+// New Debug Periodic Refresh
+extern void UI_Debug_PeriodicRefresh(void);
 
 static uint32_t last_touch_time = 0;
 static bool is_sleeping = false;
@@ -104,6 +106,10 @@ static lv_obj_t * label_car_val;
 static lv_obj_t * label_usb_val;
 static lv_obj_t * label_12v_val;
 static lv_obj_t * label_ac_val;
+
+// Dashboard Wave 2 Button
+static lv_obj_t * btn_wave2;
+static lv_obj_t * lbl_wave_txt; // To update text
 
 // Popup
 static lv_obj_t * cont_popup;
@@ -803,10 +809,7 @@ static void UI_ShowAltChargerPopup(void) {
     }
 
     // Refresh State
-    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER); // 1-based index 4? No, get by index.
-    // Wait, UI_GetDeviceCache takes index 0-3. DeviceType is 1-4.
-    // Index = Type - 1.
-    dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+    DeviceStatus* dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
 
     if (dev) {
         lv_obj_t * panel = lv_obj_get_child(cont_popup_alt, 0);
@@ -953,14 +956,18 @@ static void create_dashboard(void) {
     lv_obj_center(lbl_set);
 
     // Wave 2 (Left of Settings)
-    lv_obj_t * btn_wave2 = lv_btn_create(scr_dash);
+    btn_wave2 = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 210, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    // Green Style for ON
+    lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE); // Allow checked state
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
-    lv_obj_t * lbl_wave = lv_label_create(btn_wave2);
-    lv_label_set_text(lbl_wave, "Wave 2");
-    lv_obj_center(lbl_wave);
+    lbl_wave_txt = lv_label_create(btn_wave2);
+    lv_label_set_text(lbl_wave_txt, "Wave 2");
+    lv_obj_set_style_text_align(lbl_wave_txt, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(lbl_wave_txt);
 
     // Toggles (Center Bottom)
     btn_ac_toggle = lv_btn_create(scr_dash);
@@ -991,7 +998,7 @@ static void create_dashboard(void) {
     lv_obj_set_size(cont_popup, 800, 480);
     lv_obj_center(cont_popup);
     lv_obj_set_style_bg_color(cont_popup, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(cont_popup, LV_OPA_70, 0);
+    lv_obj_set_style_bg_opa(cont_popup, LV_OPA_TRANSP, 0);
     lv_obj_add_flag(cont_popup, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t * popup_panel = lv_obj_create(cont_popup);
@@ -1044,9 +1051,6 @@ void UI_LVGL_Init(void) {
     lv_scr_load(scr_dash);
 
     // Add global input listener
-    // Note: LV_EVENT_ALL is broad. We specifically want press/scroll.
-    // Adding to layer_sys or layer_top captures all?
-    // Often better to use an indev feedback callback in `lv_port_indev.c` but here we do it in UI layer.
     lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(lv_layer_top(), input_event_cb, LV_EVENT_SCROLL, NULL);
 
@@ -1073,6 +1077,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     uint32_t now = xTaskGetTickCount();
     uint8_t target_brightness = 100;
 
+    // Periodic Debug Refresh every 5s
+    static uint32_t last_debug_refresh = 0;
+    if (now - last_debug_refresh > 5000) {
+        UI_Debug_PeriodicRefresh();
+        last_debug_refresh = now;
+    }
+
     if (dev) {
          if (dev->brightness > 0) target_brightness = dev->brightness;
     }
@@ -1096,13 +1107,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     FanStatus fanStatus;
     Fan_GetStatus(&fanStatus);
     if (fanStatus.connected) {
-        // Toggle Blink for Activity (Blue/DarkBlue or similar, or just static blue)
-        // User asked for "dot in home screen does not blink".
-        // Let's blink Blue/LightBlue if data is fresh.
-        // Actually, we can reuse the global toggle if we want synchronous blink.
-        // But let's check last packet time logic in fan_task.c which sets connected=false after 3s.
-        // If we want blink on packet reception, we need an event flag.
-        // For now, simpler: connected = solid blue.
         lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_BLUE), 0);
         lv_label_set_text_fmt(label_amb_temp, "Amb: %d C", (int)fanStatus.amb_temp);
     } else {
@@ -1111,7 +1115,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Blink RP2040 Dot if connected (using static toggle from bottom of function)
-    // We need to move the toggle logic up or duplicate it.
     static bool blink_toggle = false;
     blink_toggle = !blink_toggle;
 
@@ -1129,6 +1132,22 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
+
+        // Update Dashboard Button Style
+        int pwr = get_int32_aligned(&dev->data.w2.powerMode);
+        int watts = get_int32_aligned(&dev->data.w2.batPwrWatt); // Battery Power
+
+        // If bat power is 0 (e.g. AC plugged), maybe use PSDR power?
+        if (watts == 0) watts = get_int32_aligned(&dev->data.w2.psdrPwrWatt);
+
+        lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", watts);
+
+        if (pwr) {
+             lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
+        } else {
+             lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+        }
+
         return; // Don't update dashboard with Wave 2 data
     }
 
@@ -1142,9 +1161,15 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
+
+        // Use 'inputPower' (Total) for Grid Tile because AC Input field is unreliable (0W)
         in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.inputPower));
+
         in_solar = safe_float_to_int(get_float_aligned(&dev->data.d3p.solarLvPower) + get_float_aligned(&dev->data.d3p.solarHvPower));
-        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower));
+
+        // Sum Low Voltage and High Voltage DC Inputs for default 'Car' tile mapping
+        in_alt = safe_float_to_int(get_float_aligned(&dev->data.d3p.dcLvInputPower) + get_float_aligned(&dev->data.d3p.dcHvInputPower));
+
         out_ac = safe_float_to_int(get_float_aligned(&dev->data.d3p.acLvOutputPower) + get_float_aligned(&dev->data.d3p.acHvOutputPower));
         out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3p.dc12vOutputPower));
         out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3p.usbaOutputPower) + get_float_aligned(&dev->data.d3p.usbcOutputPower));
@@ -1159,7 +1184,18 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_12v = safe_float_to_int(get_float_aligned(&dev->data.d3.dc12vOutputPower));
         out_usb = safe_float_to_int(get_float_aligned(&dev->data.d3.usbaOutputPower) + get_float_aligned(&dev->data.d3.usbcOutputPower));
         temp = (float)get_int32_aligned(&dev->data.d3.cellTemperature);
+    } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        // Only update Alt Charger specific popup
+        // But if an Alt Charger is present, we might want to override the "Car" tile on Dashboard
+        // Check cache for this later
     }
+
+    // Override "Car" tile if Alternator Charger is connected
+    DeviceStatus* alt_dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+    if (alt_dev && alt_dev->connected) {
+         in_alt = safe_float_to_int(get_float_aligned(&alt_dev->data.ac.dcPower));
+    }
+
 
     // Static variables to track state and minimize redraws
     static int last_soc = -1;
@@ -1356,103 +1392,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-    }
-
-    if (is_main_device) {
-        // Simple filter: Ignore 0 if we already had a valid value
-        if (temp_int == 0 && last_temp != -999 && last_temp != 0) {
-             // Ignore glitch
-        } else {
-            if (first_run || temp_int != last_temp) {
-                lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);
-                last_temp = temp_int;
-            }
-        }
-
-        if (soc == 0 && last_soc > 0) {
-             // Ignore glitch (jumping to 0%)
-        } else {
-            if (first_run || soc != last_soc) {
-                lv_arc_set_value(arc_batt, soc);
-                lv_label_set_text_fmt(label_soc, "%d%%", soc);
-                last_soc = soc;
-            }
-        }
-
-        if (first_run || in_solar != last_solar) {
-            lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
-            update_card_style(&card_solar, in_solar);
-            last_solar = in_solar;
-        }
-        if (first_run || in_ac != last_grid) {
-            lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
-            update_card_style(&card_grid, in_ac);
-            last_grid = in_ac;
-        }
-        if (first_run || in_alt != last_car) {
-            lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
-            update_card_style(&card_car, in_alt);
-            last_car = in_alt;
-        }
-        if (first_run || out_usb != last_usb) {
-            lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
-            update_card_style(&card_usb, out_usb);
-            last_usb = out_usb;
-        }
-        if (first_run || out_12v != last_12v) {
-            lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
-            update_card_style(&card_12v, out_12v);
-            last_12v = out_12v;
-        }
-        if (first_run || out_ac != last_ac) {
-            lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
-            update_card_style(&card_ac, out_ac);
-            last_ac = out_ac;
-        }
-
-        // Toggle Styles based on PORT state, not power
-        bool ac_on = false;
-        bool dc_on = false;
-
-        if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-            ac_on = dev->data.d3p.acHvPort; // Or acLvPort, D3P typically uses HV for output
-            dc_on = dev->data.d3p.dc12vPort;
-        } else if (dev->id == DEV_TYPE_DELTA_3) {
-            ac_on = dev->data.d3.acOn;
-            dc_on = dev->data.d3.dcOn;
-        }
-
-        if (first_run || ac_on != last_ac_on) {
-            if (ac_on) {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
-                lv_label_set_text(lbl_ac_t, "AC\nON");
-                lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
-            } else {
-                lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
-                lv_label_set_text(lbl_ac_t, "AC\nOFF");
-                lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
-            }
-            last_ac_on = ac_on;
-        }
-
-        if (first_run || dc_on != last_dc_on) {
-            if (dc_on) {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
-                lv_label_set_text(lbl_dc_t, "12V\nON");
-                lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
-            } else {
-                lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
-                lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
-                lv_label_set_text(lbl_dc_t, "12V\nOFF");
-                lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
-            }
-            last_dc_on = dc_on;
-        }
-
-        first_run = false;
     }
 
     // Update Disconnected State

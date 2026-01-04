@@ -21,6 +21,9 @@
 #define CMD_OTA_ACK   0x06
 #define CMD_OTA_NACK  0x15
 
+// Timeout for Bootloader Loop (30 seconds)
+#define BOOTLOADER_TIMEOUT_MS 30000
+
 // Ring Buffer Definition
 #define RING_BUFFER_SIZE 2048
 typedef struct {
@@ -53,6 +56,7 @@ void GPIO_Init(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
 void ClearFlashFlags(void);
+void Perform_Jump(void);
 
 // Software Delay (Independent of SysTick)
 void Software_Delay(uint32_t count) {
@@ -222,6 +226,24 @@ void Serial_Log(const char* fmt, ...) {
     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 10);
 }
 
+void Perform_Jump(void) {
+    // Jump - Green ON
+    LED_G_On();
+    Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
+
+    uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
+
+    // Reset RCC (Clocks) to default state (HSI) before jump
+    HAL_RCC_DeInit();
+
+    DeInit();
+
+    JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+    JumpToApplication = (pFunction) JumpAddress;
+    __set_MSP(sp);
+    JumpToApplication();
+}
+
 int main(void) {
     // CRITICAL: Ensure Interrupt Vector Table is set correctly.
     // When booting from Bank 2 (aliased to 0x00), this ensures VTOR points to
@@ -234,9 +256,6 @@ int main(void) {
     GPIO_Init();
 
     // 1. Startup Sequence with Software Delay
-    // This verifies CPU execution INDEPENDENT of SysTick.
-    // If these blink but subsequent HAL_Delay fails, we know it's SysTick.
-    // Delay increased to ~10M iterations for visibility (~200ms at 180MHz)
     LED_B_On(); Software_Delay(10000000); LED_B_Off();
     LED_O_On(); Software_Delay(10000000); LED_O_Off();
     LED_R_On(); Software_Delay(10000000); LED_R_Off();
@@ -256,14 +275,9 @@ int main(void) {
     uint32_t boot_fails = RTC->BKP1R;
 
     // Determine Active Bank based on OPTCR
-    // Note: On F469, BFB2 is Bit 4.
-    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1.
-    // However, the hardware Aliases Bank 2 to 0x08000000.
-    // Let's log the full OPTCR for diagnostics.
     Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
 
-    // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
-    // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
+    // Check App Validity
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
 
@@ -287,43 +301,30 @@ int main(void) {
         // Increment Boot Counter (App must clear it on success)
         RTC->BKP1R = boot_fails + 1;
 
-        // Wait 500ms for OTA START - Blink Blue (Scenario 1)
-        uint8_t buf[1];
+        // Wait 500ms for OTA START - Blink Blue
+        uint8_t buf[2]; // Increased buffer to check 2 bytes
         LED_B_On();
 
         // Use non-blocking read for start byte check
+        // We now check for START_BYTE + CMD_OTA_START to strictly enter OTA
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
-            if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
-                 Bootloader_OTA_Loop();
-            }
+             if (buf[0] == START_BYTE) {
+                 // Try to read next byte immediately
+                 if (HAL_UART_Receive(&huart6, &buf[1], 1, 10) == HAL_OK) {
+                     if (buf[1] == CMD_OTA_START) {
+                         Serial_Log("OTA Start Seq received.");
+                         RTC->BKP1R = 0; // Reset counter if we enter OTA manually
+                         Bootloader_OTA_Loop();
+                     }
+                 }
+             }
         }
         LED_B_Off();
 
-        // Jump - Green ON
-        LED_G_On();
-        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
-
-        // Reset RCC (Clocks) to default state (HSI) before jump
-        HAL_RCC_DeInit();
-
-        DeInit();
-
-        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
-        JumpToApplication = (pFunction) JumpAddress;
-        __set_MSP(sp);
-        JumpToApplication();
+        Perform_Jump();
     } else {
         // No valid app, force OTA
         Serial_Log("No valid app found. Entering OTA Loop.");
-
-        // SAFETY: If we are in Bank 2 (BFB2 set) and App is invalid,
-        // we might be stuck in a loop.
-        // We should try to revert to Bank 1?
-        // But maybe Bank 1 is also invalid.
-        // Best to stay in OTA mode.
-
         RTC->BKP1R = 0;
         Bootloader_OTA_Loop();
     }
@@ -391,12 +392,6 @@ void Bootloader_OTA_Loop(void) {
     Serial_Log("OPTCR: 0x%08X. BFB2: %d", FLASH->OPTCR, bfb2_active);
 
     // Target Inactive Bank
-    // On STM32F469 with Dual Bank enabled:
-    // Active Bank is ALWAYS mapped to 0x08000000. Inactive to 0x08100000.
-    // BUT we must target correct PHYSICAL SECTORS for Erase.
-    // If BFB2=1 (Bank 2 Active), Inactive is Bank 1 (Phys Sectors 0-11).
-    // If BFB2=0 (Bank 1 Active), Inactive is Bank 2 (Phys Sectors 12-23).
-
     uint32_t target_bank_addr = 0x08100000;
     uint32_t start_sector, end_sector;
 
@@ -417,6 +412,9 @@ void Bootloader_OTA_Loop(void) {
     uint32_t bytes_written = 0;
     uint32_t chunks_received = 0;
 
+    // Timeout Logic
+    uint32_t last_packet_time = HAL_GetTick();
+
     while(1) {
         // Watchdog Refresh (Important for long waits)
         HAL_IWDG_Refresh(&hiwdg);
@@ -428,10 +426,26 @@ void Bootloader_OTA_Loop(void) {
             last_tick = HAL_GetTick();
         }
 
+        // Timeout Check
+        if (!ota_started && (HAL_GetTick() - last_packet_time > BOOTLOADER_TIMEOUT_MS)) {
+            Serial_Log("OTA Timeout. Jumping to App.");
+            // Check app validity before jumping?
+            uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
+            if (sp >= 0x20000000 && sp <= 0x20060000) {
+                 Perform_Jump();
+            } else {
+                 Serial_Log("Cannot Jump. App Invalid. Staying in Bootloader.");
+                 last_packet_time = HAL_GetTick(); // Reset timeout to avoid loop spam
+            }
+        }
+
         uint8_t b;
         // Non-blocking check for start byte
         if (UART_ReadByte(&b, 10) != HAL_OK) continue;
         if (b != START_BYTE) continue;
+
+        // Reset Timeout on Packet Start
+        last_packet_time = HAL_GetTick();
 
         // RX Activity: Orange On
         LED_O_On();
@@ -480,6 +494,8 @@ void Bootloader_OTA_Loop(void) {
             for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
                 // Refresh Watchdog inside Erase Loop
                 HAL_IWDG_Refresh(&hiwdg);
+                // Reset timeout during long erase
+                last_packet_time = HAL_GetTick();
 
                 EraseInitStruct.Sector = sec;
 
@@ -513,8 +529,6 @@ void Bootloader_OTA_Loop(void) {
                 uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
                 memcpy(&word, &data[i], copy_len);
 
-                // ClearFlashFlags(); // Optimization: Removed for speed. Only on error?
-
                 if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
                     ok = false; break;
                 }
@@ -546,7 +560,10 @@ void Bootloader_OTA_Loop(void) {
 
                 for(uint32_t i = 0; i < bytes_written; i++) {
                      // Refresh Watchdog during CRC Check
-                     if (i % 10000 == 0) HAL_IWDG_Refresh(&hiwdg);
+                     if (i % 10000 == 0) {
+                         HAL_IWDG_Refresh(&hiwdg);
+                         last_packet_time = HAL_GetTick();
+                     }
                      calculated_crc32 = calculate_crc32(calculated_crc32, &flash_ptr[i], 1);
                 }
 

@@ -46,6 +46,7 @@ static void add_list_item(lv_obj_t * parent, const char * name, const char * val
     lv_obj_set_style_bg_opa(item, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(item, 0, 0);
     lv_obj_set_style_pad_all(item, 0, 0);
+    lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE); // Fix: Prevent unwanted scrolling on items
 
     lv_obj_t * l_name = lv_label_create(item);
     lv_label_set_text(l_name, name);
@@ -77,7 +78,67 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
 }
 
 static void populate_device_list(void) {
+    if (!cont_list) return;
+
+    // Save Scroll Position before clean
+    lv_coord_t scroll_y = lv_obj_get_scroll_y(cont_list);
+
+    lv_obj_clean(cont_list); // Clear previous items to avoid duplication
+
     char buf[32];
+
+    // System Info Section
+    add_section_header(cont_list, "System Info");
+
+    lv_obj_t * item_ip = lv_obj_create(cont_list);
+    lv_obj_set_size(item_ip, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_ip, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_ip, 0, 0);
+    lv_obj_clear_flag(item_ip, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_ip_name = lv_label_create(item_ip);
+    lv_label_set_text(l_ip_name, "ESP32 IP");
+    lv_obj_align(l_ip_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_ip_name, lv_color_white(), 0);
+
+    label_ip = lv_label_create(item_ip);
+    lv_label_set_text(label_ip, "Loading...");
+    lv_obj_align(label_ip, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_ip, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+
+    lv_obj_t * item_conn = lv_obj_create(cont_list);
+    lv_obj_set_size(item_conn, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_conn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_conn, 0, 0);
+    lv_obj_clear_flag(item_conn, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_conn_name = lv_label_create(item_conn);
+    lv_label_set_text(l_conn_name, "Connected Devices");
+    lv_obj_align(l_conn_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_conn_name, lv_color_white(), 0);
+
+    label_conn_dev = lv_label_create(item_conn);
+    lv_label_set_text(label_conn_dev, "--");
+    lv_obj_align(label_conn_dev, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_conn_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+    lv_obj_t * item_pair = lv_obj_create(cont_list);
+    lv_obj_set_size(item_pair, lv_pct(100), 40);
+    lv_obj_set_style_bg_opa(item_pair, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_pair, 0, 0);
+    lv_obj_clear_flag(item_pair, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t * l_pair_name = lv_label_create(item_pair);
+    lv_label_set_text(l_pair_name, "Paired Devices");
+    lv_obj_align(l_pair_name, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_text_color(l_pair_name, lv_color_white(), 0);
+
+    label_paired_dev = lv_label_create(item_pair);
+    lv_label_set_text(label_paired_dev, "--");
+    lv_obj_align(label_paired_dev, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(label_paired_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
+
 
     // Add Fan Info
     FanStatus fanStatus;
@@ -190,11 +251,19 @@ static void populate_device_list(void) {
             }
         }
     }
+
+    // Restore Scroll Position
+    // We must force layout update first
+    lv_obj_update_layout(cont_list);
+    lv_obj_scroll_to_y(cont_list, scroll_y, LV_ANIM_OFF);
 }
 
 void UI_CreateDebugView(void) {
     if (scr_debug) {
         lv_scr_load(scr_debug);
+        // Refresh when reopening
+        populate_device_list();
+        UART_SendGetDebugInfo();
         return;
     }
 
@@ -256,55 +325,6 @@ void UI_CreateDebugView(void) {
     lv_obj_set_style_bg_opa(cont_list, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_flow(cont_list, LV_FLEX_FLOW_COLUMN);
 
-    // System Info Section
-    add_section_header(cont_list, "System Info");
-
-    lv_obj_t * item_ip = lv_obj_create(cont_list);
-    lv_obj_set_size(item_ip, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_ip, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_ip, 0, 0);
-
-    lv_obj_t * l_ip_name = lv_label_create(item_ip);
-    lv_label_set_text(l_ip_name, "ESP32 IP");
-    lv_obj_align(l_ip_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_ip_name, lv_color_white(), 0);
-
-    label_ip = lv_label_create(item_ip);
-    lv_label_set_text(label_ip, "Loading...");
-    lv_obj_align(label_ip, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_ip, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-
-    lv_obj_t * item_conn = lv_obj_create(cont_list);
-    lv_obj_set_size(item_conn, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_conn, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_conn, 0, 0);
-
-    lv_obj_t * l_conn_name = lv_label_create(item_conn);
-    lv_label_set_text(l_conn_name, "Connected Devices");
-    lv_obj_align(l_conn_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_conn_name, lv_color_white(), 0);
-
-    label_conn_dev = lv_label_create(item_conn);
-    lv_label_set_text(label_conn_dev, "--");
-    lv_obj_align(label_conn_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_conn_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-    lv_obj_t * item_pair = lv_obj_create(cont_list);
-    lv_obj_set_size(item_pair, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_pair, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_pair, 0, 0);
-
-    lv_obj_t * l_pair_name = lv_label_create(item_pair);
-    lv_label_set_text(l_pair_name, "Paired Devices");
-    lv_obj_align(l_pair_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_pair_name, lv_color_white(), 0);
-
-    label_paired_dev = lv_label_create(item_pair);
-    lv_label_set_text(label_paired_dev, "--");
-    lv_obj_align(label_paired_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_paired_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
-
     // Initial population of device list
     populate_device_list();
 
@@ -317,9 +337,20 @@ void UI_CreateDebugView(void) {
 }
 
 void UI_UpdateDebugInfo(DebugInfo* info) {
-    if (!scr_debug || !info) return;
+    // If not visible, do nothing
+    if (!scr_debug) return;
 
-    if (label_ip) lv_label_set_text(label_ip, info->ip);
-    if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
-    if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
+    if (info) {
+        if (label_ip) lv_label_set_text(label_ip, info->ip);
+        if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
+        if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
+    }
+}
+
+// Function to call periodically (every 5s) to refresh debug info
+void UI_Debug_PeriodicRefresh(void) {
+    if (scr_debug) {
+         populate_device_list(); // Re-populate to update dynamic values
+         UART_SendGetDebugInfo();
+    }
 }
