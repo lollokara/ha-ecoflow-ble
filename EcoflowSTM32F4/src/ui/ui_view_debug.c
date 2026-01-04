@@ -46,6 +46,7 @@ static void add_list_item(lv_obj_t * parent, const char * name, const char * val
     lv_obj_set_style_bg_opa(item, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(item, 0, 0);
     lv_obj_set_style_pad_all(item, 0, 0);
+    lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t * l_name = lv_label_create(item);
     lv_label_set_text(l_name, name);
@@ -78,6 +79,9 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
 
 static void populate_device_list(void) {
     char buf[32];
+
+    // Clear existing list
+    lv_obj_clean(cont_list);
 
     // Add Fan Info
     FanStatus fanStatus;
@@ -317,9 +321,25 @@ void UI_CreateDebugView(void) {
 }
 
 void UI_UpdateDebugInfo(DebugInfo* info) {
-    if (!scr_debug || !info) return;
+    if (!scr_debug) return;
 
-    if (label_ip) lv_label_set_text(label_ip, info->ip);
-    if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
-    if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
+    if (info) {
+        if (label_ip) lv_label_set_text(label_ip, info->ip);
+        if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
+        if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
+    }
+
+    // Refresh list every 5 seconds
+    static uint32_t last_refresh = 0;
+    if (HAL_GetTick() - last_refresh > 5000) {
+        // Save scroll position
+        lv_coord_t scroll_y = lv_obj_get_scroll_y(cont_list);
+
+        populate_device_list();
+
+        // Restore scroll position
+        lv_obj_scroll_to_y(cont_list, scroll_y, LV_ANIM_OFF);
+
+        last_refresh = HAL_GetTick();
+    }
 }

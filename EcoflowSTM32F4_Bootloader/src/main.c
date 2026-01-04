@@ -294,9 +294,17 @@ int main(void) {
         // Use non-blocking read for start byte check
         if (HAL_UART_Receive(&huart6, buf, 1, 500) == HAL_OK) {
             if (buf[0] == START_BYTE) {
-                 Serial_Log("OTA Byte received on boot.");
-                 RTC->BKP1R = 0; // Reset counter if we enter OTA manually
-                 Bootloader_OTA_Loop();
+                 // Double Check: Peek next byte to see if it is OTA Start
+                 uint8_t next_byte;
+                 if (HAL_UART_Receive(&huart6, &next_byte, 1, 50) == HAL_OK) {
+                     if (next_byte == CMD_OTA_START) {
+                        Serial_Log("OTA Start Cmd received on boot.");
+                        RTC->BKP1R = 0; // Reset counter if we enter OTA manually
+                        Bootloader_OTA_Loop();
+                     } else {
+                        Serial_Log("Ignored non-OTA packet (Cmd 0x%02X)", next_byte);
+                     }
+                 }
             }
         }
         LED_B_Off();
@@ -416,10 +424,17 @@ void Bootloader_OTA_Loop(void) {
     bool checksum_verified = false;
     uint32_t bytes_written = 0;
     uint32_t chunks_received = 0;
+    uint32_t last_valid_packet_time = HAL_GetTick();
 
     while(1) {
         // Watchdog Refresh (Important for long waits)
         HAL_IWDG_Refresh(&hiwdg);
+
+        // Timeout Check (30 seconds of inactivity)
+        if (HAL_GetTick() - last_valid_packet_time > 30000) {
+             Serial_Log("OTA Timeout. Resetting...");
+             HAL_NVIC_SystemReset();
+        }
 
         // Heartbeat: Blue Toggle
         static uint32_t last_tick = 0;
@@ -459,6 +474,8 @@ void Bootloader_OTA_Loop(void) {
             Serial_Log("CRC Err: Cmd=%02X Len=%d Calc=%02X Recv=%02X", cmd, len, calculated_crc8_val, recv_crc);
             send_nack(); continue;
         }
+
+        last_valid_packet_time = HAL_GetTick(); // Reset timeout
 
         if (cmd == CMD_OTA_START) {
             Serial_Log("OTA Start");
