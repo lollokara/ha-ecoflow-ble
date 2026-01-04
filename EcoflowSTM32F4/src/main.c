@@ -284,7 +284,7 @@ int main(void) {
     // Relocate Vector Table to Application Address (0x08008000)
     // Note: When booting from Bank 2 (BFB2 set), 0x08000000 is the alias for Bank 2.
     // So 0x08008000 is the correct offset relative to the START of the current bank.
-    // Reverted to 0x08008000 as 0x00008000 caused immediate crash.
+    // Reverted to 0x08008000 (standard). 0x00008000 was risky.
     SCB->VTOR = 0x08008000;
     __DSB();
 
@@ -306,7 +306,7 @@ int main(void) {
 
     MX_TIM2_Init();
 
-    // MX_IWDG_Init(); // Watchdog Disabled to prevent Boot Loop during Init
+    MX_IWDG_Init(); // Watchdog Enabled
 
     // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
