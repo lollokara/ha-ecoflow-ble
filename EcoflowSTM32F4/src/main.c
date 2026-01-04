@@ -381,7 +381,18 @@ void SysTick_Handler(void)
  */
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
     printf("Stack Overflow in task: %s\n", pcTaskName);
-    while(1);
+
+    // Blink Magenta (Red PD5 + Blue PK3)
+    RCC->AHB1ENR |= (1 << 3) | (1 << 10); // GPIOD, GPIOK
+
+    GPIOD->MODER &= ~(3 << 10); GPIOD->MODER |= (1 << 10); // PD5 Output
+    GPIOK->MODER &= ~(3 << 6); GPIOK->MODER |= (1 << 6);   // PK3 Output
+
+    while(1) {
+        GPIOD->ODR ^= (1 << 5);
+        GPIOK->ODR ^= (1 << 3);
+        for(volatile int i=0; i<1000000; i++);
+    }
 }
 
 /**
@@ -389,7 +400,18 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
  */
 void vApplicationMallocFailedHook(void) {
     printf("Malloc Failed!\n");
-    while(1);
+
+    // Blink Yellow (Red PD5 + Green PG6)
+    RCC->AHB1ENR |= (1 << 3) | (1 << 6); // GPIOD, GPIOG
+
+    GPIOD->MODER &= ~(3 << 10); GPIOD->MODER |= (1 << 10); // PD5 Output
+    GPIOG->MODER &= ~(3 << 12); GPIOG->MODER |= (1 << 12); // PG6 Output
+
+    while(1) {
+        GPIOD->ODR ^= (1 << 5);
+        GPIOG->ODR ^= (1 << 6);
+        for(volatile int i=0; i<1000000; i++);
+    }
 }
 
 void WWDG_IRQHandler(void) {
