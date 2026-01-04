@@ -35,6 +35,26 @@ extern String ota_msg;
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
 
+static uint8_t enumToProtocolId(DeviceType type) {
+    switch (type) {
+        case DeviceType::DELTA_3: return DEV_TYPE_DELTA_3;
+        case DeviceType::DELTA_PRO_3: return DEV_TYPE_DELTA_PRO_3;
+        case DeviceType::WAVE_2: return DEV_TYPE_WAVE_2;
+        case DeviceType::ALTERNATOR_CHARGER: return DEV_TYPE_ALT_CHARGER;
+        default: return 0;
+    }
+}
+
+static DeviceType protocolIdToEnum(uint8_t id) {
+    switch (id) {
+        case DEV_TYPE_DELTA_3: return DeviceType::DELTA_3;
+        case DEV_TYPE_DELTA_PRO_3: return DeviceType::DELTA_PRO_3;
+        case DEV_TYPE_WAVE_2: return DeviceType::WAVE_2;
+        case DEV_TYPE_ALT_CHARGER: return DeviceType::ALTERNATOR_CHARGER;
+        default: return DeviceType::DELTA_3;
+    }
+}
+
 // CRC32 Table-driven implementation (Standard Ethernet Polynomial 0x04C11DB7)
 static const uint32_t crc32_table[] = {
     0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
@@ -182,7 +202,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     } else if (cmd == CMD_OTA_NACK) {
         otaNackReceived = true;
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
-        // STM32 is requesting status for a specific device
+        // STM32 is requesting status for a specific device (Protocol ID)
         uint8_t dev_id;
         if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
             sendDeviceStatus(dev_id);
@@ -291,15 +311,15 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         sendData(buffer, len);
     } else if (cmd == CMD_CONNECT_DEVICE) {
         // Initiate BLE scan/connection for a device type
-        uint8_t type;
-        if (unpack_connect_device_message(rx_buf, &type) == 0) {
-            DeviceManager::getInstance().scanAndConnect((DeviceType)type);
+        uint8_t type_id;
+        if (unpack_connect_device_message(rx_buf, &type_id) == 0) {
+            DeviceManager::getInstance().scanAndConnect(protocolIdToEnum(type_id));
         }
     } else if (cmd == CMD_FORGET_DEVICE) {
         // Forget a bonded device
-        uint8_t type;
-        if (unpack_forget_device_message(rx_buf, &type) == 0) {
-            DeviceManager::getInstance().forget((DeviceType)type);
+        uint8_t type_id;
+        if (unpack_forget_device_message(rx_buf, &type_id) == 0) {
+            DeviceManager::getInstance().forget(protocolIdToEnum(type_id));
         }
     }
 }
@@ -322,7 +342,7 @@ void Stm32Serial::sendDeviceList() {
     uint8_t count = 0;
     for (int i = 0; i < 4; i++) {
         if (slots[i]) {
-            list.devices[count].id = (uint8_t)slots[i]->type;
+            list.devices[count].id = enumToProtocolId(slots[i]->type);
             strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
             list.devices[count].connected = slots[i]->isConnected ? 1 : 0;
             list.devices[count].paired = !slots[i]->macAddress.empty() ? 1 : 0;
@@ -345,13 +365,14 @@ void Stm32Serial::sendDeviceList() {
  * @param device_id The ID of the device to report.
  */
 void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
-    DeviceType type = (DeviceType)device_id;
+    // device_id is the Protocol ID (1..4)
+    DeviceType type = protocolIdToEnum(device_id);
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
 
     if (!dev || !dev->isAuthenticated()) return;
 
     DeviceStatus status = {0};
-    status.id = device_id;
+    status.id = device_id; // Reply with the requested Protocol ID
     status.connected = 1;
 
     // Set Brightness based on ambient light sensor
