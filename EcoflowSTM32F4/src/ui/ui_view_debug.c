@@ -53,7 +53,21 @@ static void event_to_fan(lv_event_t * e) {
     UI_CreateFanView();
 }
 
-static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
+// Find existing item by name or create new one
+static lv_obj_t* get_or_create_item(lv_obj_t * parent, const char * name, int index) {
+    if (lv_obj_get_child_cnt(parent) > index) {
+        lv_obj_t* item = lv_obj_get_child(parent, index);
+        // Verify name matches (child 0 is name label)
+        lv_obj_t* l_name = lv_obj_get_child(item, 0);
+        if (strcmp(lv_label_get_text(l_name), name) == 0) {
+            return item;
+        }
+        // If mismatch, we might need to clean but let's assume structure is static for now
+        // Or we just update text regardless of name if index matches (risky if list changes)
+        // Ideally we search children
+    }
+
+    // Fallback: Create new
     lv_obj_t * item = lv_obj_create(parent);
     lv_obj_set_size(item, lv_pct(100), 40);
     lv_obj_set_style_bg_opa(item, LV_OPA_TRANSP, 0);
@@ -68,24 +82,42 @@ static void add_list_item(lv_obj_t * parent, const char * name, const char * val
     lv_obj_set_style_text_color(l_name, lv_color_white(), 0);
 
     lv_obj_t * l_val = lv_label_create(item);
-    lv_label_set_text(l_val, val);
+    lv_label_set_text(l_val, "--");
     lv_obj_align(l_val, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_set_style_text_font(l_val, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(l_val, lv_palette_main(LV_PALETTE_TEAL), 0);
+
+    return item;
 }
 
-static void add_section_header(lv_obj_t * parent, const char * title) {
-    lv_obj_t * l = lv_label_create(parent);
+static void update_list_item(lv_obj_t * parent, const char * name, const char * val, int* index) {
+    lv_obj_t* item = get_or_create_item(parent, name, *index);
+    lv_obj_t* l_val = lv_obj_get_child(item, 1); // 2nd child is value
+    lv_label_set_text(l_val, val);
+    (*index)++;
+}
+
+static void add_section_header(lv_obj_t * parent, const char * title, int* index) {
+    lv_obj_t * l;
+    if (lv_obj_get_child_cnt(parent) > *index) {
+        l = lv_obj_get_child(parent, *index);
+        // Assuming types match if count matches logic
+        if (!lv_obj_check_type(l, &lv_label_class)) {
+             // Mismatch, recreate? For now assume sync.
+        }
+    } else {
+        l = lv_label_create(parent);
+        lv_obj_set_style_text_font(l, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(l, lv_palette_main(LV_PALETTE_ORANGE), 0);
+        lv_obj_set_style_pad_top(l, 20, 0);
+        lv_obj_set_style_pad_bottom(l, 5, 0);
+    }
     lv_label_set_text(l, title);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_color(l, lv_palette_main(LV_PALETTE_ORANGE), 0);
-    lv_obj_set_style_pad_top(l, 20, 0);
-    lv_obj_set_style_pad_bottom(l, 5, 0);
+    (*index)++;
 }
 
 extern DeviceStatus* UI_GetDeviceCache(int index);
 
-// Helper to format float to string safely
 static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
     snprintf(buf, len, "%d%s", (int)f, suffix);
 }
@@ -93,81 +125,37 @@ static void fmt_float(char* buf, size_t len, float f, const char* suffix) {
 static void populate_debug_view(void) {
     if (!cont_list) return;
 
-    // Clear the list
-    lv_obj_clean(cont_list);
+    int child_idx = 0;
 
     // --- System Info Section ---
-    add_section_header(cont_list, "System Info");
+    // Manually handled items at top of list
+    // Actually we can reuse update_list_item if we treat them as part of the flow
+    add_section_header(cont_list, "System Info", &child_idx);
 
-    lv_obj_t * item_ip = lv_obj_create(cont_list);
-    lv_obj_set_size(item_ip, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_ip, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_ip, 0, 0);
-    lv_obj_clear_flag(item_ip, LV_OBJ_FLAG_SCROLLABLE);
+    char buf[64];
+    if (last_debug_info.ip[0] != 0) snprintf(buf, sizeof(buf), "%s", last_debug_info.ip);
+    else snprintf(buf, sizeof(buf), "Loading...");
+    update_list_item(cont_list, "ESP32 IP", buf, &child_idx);
 
-    lv_obj_t * l_ip_name = lv_label_create(item_ip);
-    lv_label_set_text(l_ip_name, "ESP32 IP");
-    lv_obj_align(l_ip_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_ip_name, lv_color_white(), 0);
+    snprintf(buf, sizeof(buf), "%d", last_debug_info.devices_connected);
+    update_list_item(cont_list, "Connected Devices", buf, &child_idx);
 
-    label_ip = lv_label_create(item_ip);
-    if (last_debug_info.ip[0] != 0) {
-        lv_label_set_text(label_ip, last_debug_info.ip);
-    } else {
-        lv_label_set_text(label_ip, "Loading...");
-    }
-    lv_obj_align(label_ip, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_ip, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-
-    lv_obj_t * item_conn = lv_obj_create(cont_list);
-    lv_obj_set_size(item_conn, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_conn, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_conn, 0, 0);
-    lv_obj_clear_flag(item_conn, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t * l_conn_name = lv_label_create(item_conn);
-    lv_label_set_text(l_conn_name, "Connected Devices");
-    lv_obj_align(l_conn_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_conn_name, lv_color_white(), 0);
-
-    label_conn_dev = lv_label_create(item_conn);
-    lv_label_set_text_fmt(label_conn_dev, "%d", last_debug_info.devices_connected);
-    lv_obj_align(label_conn_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_conn_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
-
-    lv_obj_t * item_pair = lv_obj_create(cont_list);
-    lv_obj_set_size(item_pair, lv_pct(100), 40);
-    lv_obj_set_style_bg_opa(item_pair, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(item_pair, 0, 0);
-    lv_obj_clear_flag(item_pair, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t * l_pair_name = lv_label_create(item_pair);
-    lv_label_set_text(l_pair_name, "Paired Devices");
-    lv_obj_align(l_pair_name, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_text_color(l_pair_name, lv_color_white(), 0);
-
-    label_paired_dev = lv_label_create(item_pair);
-    lv_label_set_text_fmt(label_paired_dev, "%d", last_debug_info.devices_paired);
-    lv_obj_align(label_paired_dev, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_text_color(label_paired_dev, lv_palette_main(LV_PALETTE_TEAL), 0);
-
+    snprintf(buf, sizeof(buf), "%d", last_debug_info.devices_paired);
+    update_list_item(cont_list, "Paired Devices", buf, &child_idx);
 
     // --- Devices Section ---
-    char buf[32];
-
     // Add Fan Info
     FanStatus fanStatus;
     Fan_GetStatus(&fanStatus);
     if (fanStatus.connected) {
-        add_section_header(cont_list, "Fan Control (RP2040)");
+        add_section_header(cont_list, "Fan Control (RP2040)", &child_idx);
         fmt_float(buf, sizeof(buf), fanStatus.amb_temp, " C");
-        add_list_item(cont_list, "Amb Temp", buf);
+        update_list_item(cont_list, "Amb Temp", buf, &child_idx);
         for(int i=0; i<4; i++) {
              char label[16];
              snprintf(label, sizeof(label), "Fan %d RPM", i+1);
              snprintf(buf, sizeof(buf), "%d", fanStatus.fan_rpm[i]);
-             add_list_item(cont_list, label, buf);
+             update_list_item(cont_list, label, buf, &child_idx);
         }
     }
 
@@ -175,104 +163,109 @@ static void populate_debug_view(void) {
         DeviceStatus* dev = UI_GetDeviceCache(i);
         if (dev && dev->connected) {
             snprintf(buf, sizeof(buf), "Device %d (%s)", dev->id, dev->name);
-            add_section_header(cont_list, buf);
+            add_section_header(cont_list, buf, &child_idx);
 
             if (dev->id == DEV_TYPE_DELTA_PRO_3) {
                  fmt_float(buf, sizeof(buf), dev->data.d3p.batteryLevel, "%");
-                 add_list_item(cont_list, "Battery Level", buf);
+                 update_list_item(cont_list, "Battery Level", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.batteryLevelMain, "%");
-                 add_list_item(cont_list, "Main Batt Level", buf);
+                 update_list_item(cont_list, "Main Batt Level", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acInputPower, " W");
-                 add_list_item(cont_list, "AC Input", buf);
+                 update_list_item(cont_list, "AC Input", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acLvOutputPower, " W");
-                 add_list_item(cont_list, "AC LV Out", buf);
+                 update_list_item(cont_list, "AC LV Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.acHvOutputPower, " W");
-                 add_list_item(cont_list, "AC HV Out", buf);
+                 update_list_item(cont_list, "AC HV Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.inputPower, " W");
-                 add_list_item(cont_list, "Total Input", buf);
+                 update_list_item(cont_list, "Total Input", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.outputPower, " W");
-                 add_list_item(cont_list, "Total Output", buf);
+                 update_list_item(cont_list, "Total Output", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dc12vOutputPower, " W");
-                 add_list_item(cont_list, "DC 12V Out", buf);
+                 update_list_item(cont_list, "DC 12V Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dcLvInputPower, " W");
-                 add_list_item(cont_list, "DC LV In", buf);
+                 update_list_item(cont_list, "DC LV In", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcLvInputState);
-                 add_list_item(cont_list, "DC LV State", buf);
+                 update_list_item(cont_list, "DC LV State", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.dcHvInputPower, " W");
-                 add_list_item(cont_list, "DC HV In", buf);
+                 update_list_item(cont_list, "DC HV In", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.d3p.dcHvInputState);
-                 add_list_item(cont_list, "DC HV State", buf);
+                 update_list_item(cont_list, "DC HV State", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarLvPower, " W");
-                 add_list_item(cont_list, "Solar LV", buf);
+                 update_list_item(cont_list, "Solar LV", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.solarHvPower, " W");
-                 add_list_item(cont_list, "Solar HV", buf);
+                 update_list_item(cont_list, "Solar HV", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usbaOutputPower, " W");
-                 add_list_item(cont_list, "USB-A Out", buf);
+                 update_list_item(cont_list, "USB-A Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usba2OutputPower, " W");
-                 add_list_item(cont_list, "USB-A(2) Out", buf);
+                 update_list_item(cont_list, "USB-A(2) Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usbcOutputPower, " W");
-                 add_list_item(cont_list, "USB-C Out", buf);
+                 update_list_item(cont_list, "USB-C Out", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3p.usbc2OutputPower, " W");
-                 add_list_item(cont_list, "USB-C(2) Out", buf);
+                 update_list_item(cont_list, "USB-C(2) Out", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%s", dev->data.d3p.pluggedInAc ? "Yes" : "No");
-                 add_list_item(cont_list, "AC Plugged", buf);
+                 update_list_item(cont_list, "AC Plugged", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3p.cellTemperature);
-                 add_list_item(cont_list, "Cell Temp", buf);
+                 update_list_item(cont_list, "Cell Temp", buf, &child_idx);
             }
             else if (dev->id == DEV_TYPE_DELTA_3) {
                  fmt_float(buf, sizeof(buf), dev->data.d3.batteryLevel, "%");
-                 add_list_item(cont_list, "Battery Level", buf);
+                 update_list_item(cont_list, "Battery Level", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3.acInputPower, " W");
-                 add_list_item(cont_list, "AC Input", buf);
+                 update_list_item(cont_list, "AC Input", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3.acOutputPower, " W");
-                 add_list_item(cont_list, "AC Output", buf);
+                 update_list_item(cont_list, "AC Output", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3.solarInputPower, " W");
-                 add_list_item(cont_list, "Solar Input", buf);
+                 update_list_item(cont_list, "Solar Input", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.d3.dc12vOutputPower, " W");
-                 add_list_item(cont_list, "DC 12V Out", buf);
+                 update_list_item(cont_list, "DC 12V Out", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d C", (int)dev->data.d3.cellTemperature);
-                 add_list_item(cont_list, "Cell Temp", buf);
+                 update_list_item(cont_list, "Cell Temp", buf, &child_idx);
             }
             else if (dev->id == DEV_TYPE_WAVE_2) {
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.w2.mode);
-                 add_list_item(cont_list, "Mode", buf);
+                 update_list_item(cont_list, "Mode", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.w2.setTemp);
-                 add_list_item(cont_list, "Set Temp", buf);
+                 update_list_item(cont_list, "Set Temp", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.w2.envTemp, " C");
-                 add_list_item(cont_list, "Env Temp", buf);
+                 update_list_item(cont_list, "Env Temp", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d %%", (int)dev->data.w2.batSoc);
-                 add_list_item(cont_list, "Bat SOC", buf);
+                 update_list_item(cont_list, "Bat SOC", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d W", (int)dev->data.w2.batPwrWatt);
-                 add_list_item(cont_list, "Bat Power", buf);
+                 update_list_item(cont_list, "Bat Power", buf, &child_idx);
             }
             else if (dev->id == DEV_TYPE_ALT_CHARGER) {
                  fmt_float(buf, sizeof(buf), dev->data.ac.batteryLevel, "%");
-                 add_list_item(cont_list, "Battery Level", buf);
+                 update_list_item(cont_list, "Battery Level", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.ac.dcPower, " W");
-                 add_list_item(cont_list, "DC Power", buf);
+                 update_list_item(cont_list, "DC Power", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.ac.carBatteryVoltage, " V");
-                 add_list_item(cont_list, "Car Batt Volt", buf);
+                 update_list_item(cont_list, "Car Batt Volt", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.ac.startVoltage, " V");
-                 add_list_item(cont_list, "Start Volt", buf);
+                 update_list_item(cont_list, "Start Volt", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d", (int)dev->data.ac.chargerMode);
-                 add_list_item(cont_list, "Mode", buf);
+                 update_list_item(cont_list, "Mode", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%s", dev->data.ac.chargerOpen ? "ON" : "OFF");
-                 add_list_item(cont_list, "Charger Open", buf);
+                 update_list_item(cont_list, "Charger Open", buf, &child_idx);
                  snprintf(buf, sizeof(buf), "%d W", (int)dev->data.ac.powerLimit);
-                 add_list_item(cont_list, "Power Limit", buf);
+                 update_list_item(cont_list, "Power Limit", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.ac.chargingCurrentLimit, " A");
-                 add_list_item(cont_list, "Chg Limit", buf);
+                 update_list_item(cont_list, "Chg Limit", buf, &child_idx);
                  fmt_float(buf, sizeof(buf), dev->data.ac.reverseChargingCurrentLimit, " A");
-                 add_list_item(cont_list, "Rev Chg Limit", buf);
+                 update_list_item(cont_list, "Rev Chg Limit", buf, &child_idx);
             }
         }
+    }
+
+    // Clean up excess items if device list shrank
+    while(lv_obj_get_child_cnt(cont_list) > child_idx) {
+        // Delete last child
+        lv_obj_del(lv_obj_get_child(cont_list, child_idx));
     }
 }
 
 void UI_CreateDebugView(void) {
     if (scr_debug) {
         lv_scr_load(scr_debug);
-        // Ensure timer is running if reopened (though we cleanup on delete)
         if (!debug_timer) {
             debug_timer = lv_timer_create(refresh_debug_info, 5000, NULL);
         }
@@ -358,9 +351,7 @@ void UI_UpdateDebugInfo(DebugInfo* info) {
     memcpy(&last_debug_info, info, sizeof(DebugInfo));
 
     // Update UI if valid
-    if (scr_debug) {
-        if (label_ip) lv_label_set_text(label_ip, info->ip);
-        if (label_conn_dev) lv_label_set_text_fmt(label_conn_dev, "%d", info->devices_connected);
-        if (label_paired_dev) lv_label_set_text_fmt(label_paired_dev, "%d", info->devices_paired);
+    if (scr_debug && cont_list) {
+        populate_debug_view();
     }
 }

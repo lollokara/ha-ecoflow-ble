@@ -74,7 +74,7 @@ static void logWave2Data(const Wave2Data& w) {
 static void logDeltaPro3Data(const DeltaPro3Data& d) {
     ESP_LOGI(TAG, "=== Delta Pro 3 Data ===");
     ESP_LOGI(TAG, "Batt: %.1f%% (Main: %.1f%%), Backup: %d (Lvl: %d%%)", d.batteryLevel, d.batteryLevelMain, d.energyBackup, d.energyBackupBatteryLevel);
-    ESP_LOGI(TAG, "AC: In=%.1fW, Out LV=%.1fW, Out HV=%.1fW", d.inputPower, d.acLvOutputPower, d.acHvOutputPower);
+    ESP_LOGI(TAG, "AC: In=%.1fW, Out LV=%.1fW, Out HV=%.1fW, Plugged: %d", d.acInputPower, d.acLvOutputPower, d.acHvOutputPower, d.pluggedInAc);
     ESP_LOGI(TAG, "DC: 12V=%.1fW, Solar LV=%.1fW, Solar HV=%.1fW", d.dc12vOutputPower, d.solarLvPower, d.solarHvPower);
     ESP_LOGI(TAG, "USB: A=%.1fW/%.1fW, C=%.1fW/%.1fW", d.usbaOutputPower, d.usba2OutputPower, d.usbcOutputPower, d.usbc2OutputPower);
     ESP_LOGI(TAG, "Limits: AC Chg=%dW, SOC %d-%d%%", d.acChargingSpeed, d.batteryChargeLimitMin, d.batteryChargeLimitMax);
@@ -167,7 +167,18 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
                      if (mr521_msg.has_cms_batt_soc) d3p.batteryLevel = mr521_msg.cms_batt_soc;
                      if (mr521_msg.has_bms_batt_soc) d3p.batteryLevelMain = mr521_msg.bms_batt_soc;
-                     if (mr521_msg.has_pow_get_ac) d3p.acInputPower = -mr521_msg.pow_get_ac;
+
+                     // AC Input Logic: Prefer pow_get_ac_in (54) over pow_get_ac (53)
+                     if (mr521_msg.has_pow_get_ac_in && mr521_msg.pow_get_ac_in > 0) {
+                         d3p.acInputPower = mr521_msg.pow_get_ac_in;
+                     }
+                     else if (mr521_msg.has_pow_get_ac) {
+                         // Some firmwares report AC input as negative in pow_get_ac? Or positive?
+                         // If pow_get_ac_in is 0, let's try this.
+                         d3p.acInputPower = std::abs(mr521_msg.pow_get_ac);
+                         // Note: Removed negation from previous version as "in" usually positive
+                     }
+
                      if (mr521_msg.has_pow_get_ac_lv_out) d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out);
                      if (mr521_msg.has_pow_get_ac_hv_out) d3p.acHvOutputPower = -std::abs(mr521_msg.pow_get_ac_hv_out);
 
@@ -203,12 +214,29 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
                      if (mr521_msg.has_llc_GFCI_flag) d3p.gfiMode = mr521_msg.llc_GFCI_flag;
 
+                     // Plugged In Info (Tag 61)
+                     if (mr521_msg.has_plug_in_info_ac_in_flag) d3p.pluggedInAc = (mr521_msg.plug_in_info_ac_in_flag != 0);
+
                      // Logic for solar might need adjustment based on d3 logic
                      if (d3p.dcLvInputState == 2 && d3p.dcLvInputPower > 0) d3p.solarLvPower = d3p.dcLvInputPower;
                      else d3p.solarLvPower = 0;
 
                      if (d3p.dcHvInputState == 2 && d3p.dcHvInputPower > 0) d3p.solarHvPower = d3p.dcHvInputPower;
                      else d3p.solarHvPower = 0;
+
+                     // Fallback Calculation if AC Input is still 0 but Total > Solar+DC
+                     if (d3p.acInputPower == 0 && d3p.inputPower > 0) {
+                         float solarTotal = d3p.solarLvPower + d3p.solarHvPower;
+                         // DC Input can also be non-solar (e.g. Alternator).
+                         // dcLvInputState: 1=Car, 2=Solar? Need to verify.
+                         // For now, subtract explicit DC/Solar inputs from Total.
+                         float dcTotal = d3p.dcLvInputPower + d3p.dcHvInputPower;
+
+                         float calculatedAC = d3p.inputPower - dcTotal;
+                         if (calculatedAC > 10.0f) { // Threshold to avoid noise
+                             d3p.acInputPower = calculatedAC;
+                         }
+                     }
 
                      logDeltaPro3Data(d3p);
                 }

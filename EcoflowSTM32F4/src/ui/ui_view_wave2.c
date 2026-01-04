@@ -4,6 +4,7 @@
 #include "ui_lvgl.h" // For UI_LVGL_ShowDashboard
 #include "ui_utils.h" // For safe aligned access
 #include <stdio.h>
+#include <math.h> // For abs
 
 static lv_obj_t * scr_wave2;
 static lv_style_t style_scr;
@@ -333,8 +334,8 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
 
-    // Suppress updates for 2 seconds after user interaction to prevent UI jumping
-    if ((HAL_GetTick() - last_cmd_time) < 2000) {
+    // Suppress updates for 3 seconds after user interaction to prevent UI jumping
+    if ((HAL_GetTick() - last_cmd_time) < 3000) {
         return;
     }
 

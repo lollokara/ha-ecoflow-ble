@@ -178,6 +178,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
         } else if (self->_state >= ConnectionState::CONNECTED && !self->_pClient->isConnected()){
              ESP_LOGW(TAG, "Client disconnected unexpectedly");
              self->onDisconnect(self->_pClient);
+             self->_state = ConnectionState::DISCONNECTED; // Force transition to avoid loop
         }
 
         // --- State Machine for Connected Client ---
@@ -274,11 +275,11 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
-    _state = ConnectionState::DISCONNECTED;
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
-        _pAdvertisedDevice = nullptr;
+    // If not intentionally disconnected (state is NOT_CONNECTED), try to reconnect logic (DISCONNECTED)
+    if (_state != ConnectionState::NOT_CONNECTED) {
+        _state = ConnectionState::DISCONNECTED;
     }
+    // Note: Do NOT delete _pAdvertisedDevice here if we want to reconnect.
 }
 
 /**
