@@ -113,7 +113,7 @@ static void process_byte(uint8_t b) {
                 uint8_t cmd = parseBuffer[1];
                 uint8_t *payload = &parseBuffer[3];
 
-                printf("FAN: Valid Packet CMD=%02X LEN=%d\n", cmd, len);
+                // printf("FAN: Valid Packet CMD=%02X LEN=%d\n", cmd, len);
 
                 xSemaphoreTake(dataMutex, portMAX_DELAY);
                 lastPacketTime = xTaskGetTickCount();
@@ -122,14 +122,14 @@ static void process_byte(uint8_t b) {
                 if (cmd == FAN_CMD_STATUS && len == 12) {
                     memcpy(&currentStatus.amb_temp, payload, 4);
                     memcpy(currentStatus.fan_rpm, payload + 4, 8);
-                    printf("FAN: Status Updated. Temp=%.2f\n", currentStatus.amb_temp);
+                    // printf("FAN: Status Updated. Temp=%.2f\n", currentStatus.amb_temp);
                 } else if (cmd == FAN_CMD_CONFIG_RESP && len == sizeof(FanConfig)) {
                     memcpy(&currentConfig, payload, sizeof(FanConfig));
-                    printf("FAN: Config Received\n");
+                    // printf("FAN: Config Received\n");
                 }
                 xSemaphoreGive(dataMutex);
             } else {
-                printf("FAN: CRC Error. Calc=%02X Recv=%02X\n", calc_crc8(parseBuffer, 3 + len), parseBuffer[3 + len]);
+                // printf("FAN: CRC Error. Calc=%02X Recv=%02X\n", calc_crc8(parseBuffer, 3 + len), parseBuffer[3 + len]);
             }
             // Reset
             parseIndex = 0;
@@ -137,7 +137,7 @@ static void process_byte(uint8_t b) {
     }
 
     if (parseIndex >= RX_PARSE_BUF_SIZE) {
-        printf("FAN: Buffer Overflow, Resetting\n");
+        // printf("FAN: Buffer Overflow, Resetting\n");
         parseIndex = 0; // Overflow safety
     }
 }
