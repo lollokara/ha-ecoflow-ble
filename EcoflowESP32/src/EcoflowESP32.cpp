@@ -513,11 +513,10 @@ int EcoflowESP32::getBatteryLevel() {
 int EcoflowESP32::getInputPower() {
     if (_deviceType == DeviceType::DELTA_PRO_3) return (int)_data.deltaPro3.inputPower;
     if (_protocolVersion == 2) {
-        // Return the largest non-zero power value among Battery, MPPT, and PSDR
-        int p_bat = (_data.wave2.batPwrWatt > 0) ? _data.wave2.batPwrWatt : 0;
-        int p_mppt = (_data.wave2.mpptPwrWatt > 0) ? _data.wave2.mpptPwrWatt : 0;
-        int p_psdr = (_data.wave2.psdrPwrWatt > 0) ? _data.wave2.psdrPwrWatt : 0;
-        return std::max({p_bat, p_mppt, p_psdr});
+        // Prioritize: Solar (MPPT) > DC (PSDR) > Battery (Abs)
+        if (_data.wave2.mpptPwrWatt > 0) return _data.wave2.mpptPwrWatt;
+        if (_data.wave2.psdrPwrWatt > 0) return _data.wave2.psdrPwrWatt;
+        return abs(_data.wave2.batPwrWatt);
     }
     return (int)_data.delta3.inputPower;
 }

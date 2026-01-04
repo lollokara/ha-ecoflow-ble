@@ -173,7 +173,10 @@ static void event_sub_mode_change(lv_event_t * e) {
 static void event_fan_change(lv_event_t * e) {
     lv_obj_t * slider = lv_event_get_target(e);
     int val = (int)lv_slider_get_value(slider);
-    lv_label_set_text_fmt(label_fan_val, "Fan: %d", val);
+    const char* label = "Fan: Low";
+    if (val == 1) label = "Fan: Med";
+    else if (val == 2) label = "Fan: High";
+    lv_label_set_text(label_fan_val, label);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         send_cmd(W2_PARAM_FAN, (uint8_t)val);
     }
@@ -313,8 +316,8 @@ void ui_view_wave2_init(lv_obj_t * parent) {
 
     // Fan Slider
     slider_fan = lv_slider_create(panel);
-    lv_slider_set_range(slider_fan, 1, 3);
-    lv_slider_set_value(slider_fan, 1, LV_ANIM_OFF);
+    lv_slider_set_range(slider_fan, 0, 2); // 0=Low, 1=Med, 2=High
+    lv_slider_set_value(slider_fan, 0, LV_ANIM_OFF);
     lv_obj_set_width(slider_fan, 280);
     // Center alignment relative to the 3 mode buttons
     // The buttons start at start_x (300) and span 3*btn_size + 2*spacing = 3*80 + 2*20 = 280px
@@ -324,7 +327,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_obj_add_event_cb(slider_fan, event_fan_change, LV_EVENT_RELEASED, NULL);
 
     label_fan_val = lv_label_create(panel);
-    lv_label_set_text(label_fan_val, "Fan: 1");
+    lv_label_set_text(label_fan_val, "Fan: Low");
     lv_obj_align_to(label_fan_val, slider_fan, LV_ALIGN_OUT_TOP_MID, 0, -10);
 
     update_visibility(0, 0, false); // Default Cool, Max, Off
@@ -363,12 +366,16 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
 
     if (lv_slider_is_dragged(slider_fan) == false) {
         lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
+        const char* label = "Fan: Low";
+        if (fanValue == 1) label = "Fan: Med";
+        else if (fanValue == 2) label = "Fan: High";
+        lv_label_set_text(label_fan_val, label);
     }
 
     // Update Power Button State
     if (btn_pwr) {
-        if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        // Backend maps: 1=ON, 2=OFF. JS checks `powerMode == 1` for ON.
+        if (powerMode == 1) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
