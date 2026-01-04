@@ -394,15 +394,29 @@ void Bootloader_OTA_Loop(void) {
 
     // Target Inactive Bank
     // On STM32F469 with Dual Bank enabled:
-    // Active Bank is ALWAYS mapped to 0x08000000 (Sectors 0-11).
-    // Inactive Bank is ALWAYS mapped to 0x08100000 (Sectors 12-23).
-    // So we ALWAYS erase Sectors 12-23 and Write to 0x08100000.
+    // Active Bank is ALWAYS mapped to 0x08000000.
+    // Inactive Bank is ALWAYS mapped to 0x08100000.
+    // We ALWAYS Write to 0x08100000 (Inactive Address).
+    // BUT we must erase the PHYSICAL sectors corresponding to the Inactive Bank.
+
+    // If BFB2=0: Active=Bank1 (Sec 0-11). Inactive=Bank2 (Sec 12-23).
+    // If BFB2=1: Active=Bank2 (Sec 12-23). Inactive=Bank1 (Sec 0-11).
 
     uint32_t target_bank_addr = 0x08100000;
     uint32_t start_sector = FLASH_SECTOR_12;
     uint32_t end_sector = FLASH_SECTOR_23;
 
-    Serial_Log("Target: Inactive Bank (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+    if (bfb2_active) {
+        // Active is Bank 2. Inactive is Bank 1.
+        start_sector = FLASH_SECTOR_0;
+        end_sector = FLASH_SECTOR_11;
+        Serial_Log("Target: Inactive Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
+    } else {
+        // Active is Bank 1. Inactive is Bank 2.
+        start_sector = FLASH_SECTOR_12;
+        end_sector = FLASH_SECTOR_23;
+        Serial_Log("Target: Inactive Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
+    }
 
     bool ota_started = false;
     bool checksum_verified = false;
