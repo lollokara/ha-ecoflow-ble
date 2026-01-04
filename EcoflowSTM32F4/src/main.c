@@ -107,6 +107,11 @@ void SystemClock_Config(void) {
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
        // Error_Handler();
     }
+
+    // PERFORMANCE: Enable Cache and Prefetch (App side)
+    __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
+    __HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
+    __HAL_FLASH_DATA_CACHE_ENABLE();
 }
 
 /**
@@ -300,7 +305,7 @@ int main(void) {
 
     MX_TIM2_Init();
 
-    MX_IWDG_Init(); // Watchdog Enabled
+    // MX_IWDG_Init(); // Watchdog Disabled to prevent Boot Loop during Init
 
     // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
