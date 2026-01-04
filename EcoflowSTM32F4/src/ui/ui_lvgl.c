@@ -703,7 +703,8 @@ static void event_popup_alt_hide(lv_event_t * e) {
 static void event_alt_toggle(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
-    UART_SendDCSet(state ? 1 : 0); // Reused CMD_SET_DC for Alt Charger Master Switch
+    // Send updated SET_VAL_ALT_ENABLE command (Value 9)
+    UART_SendSetValue(SET_VAL_ALT_ENABLE, state ? 1 : 0);
 }
 
 static void event_alt_mode_click(lv_event_t * e) {
@@ -1143,8 +1144,10 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     int in_solar=0, in_ac=0, in_alt=0;
     int out_usb=0, out_12v=0, out_ac=0;
     float temp = 25.0f;
+    bool is_main_device = false;
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+        is_main_device = true;
         soc = safe_float_to_int(dev->data.d3p.batteryLevel);
         in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
         in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
@@ -1154,6 +1157,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         out_usb = safe_float_to_int(dev->data.d3p.usbaOutputPower + dev->data.d3p.usbcOutputPower);
         temp = (float)dev->data.d3p.cellTemperature;
     } else if (dev->id == DEV_TYPE_DELTA_3) {
+        is_main_device = true;
         soc = safe_float_to_int(dev->data.d3.batteryLevel);
         in_ac = safe_float_to_int(dev->data.d3.acInputPower);
         in_solar = safe_float_to_int(dev->data.d3.solarInputPower);
@@ -1180,72 +1184,173 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     int temp_int = safe_float_to_int(temp);
 
-    // Settings Sync: Update state variables only if settings screen is not active
-    if (lv_scr_act() != scr_settings) {
-        if (dev->id == DEV_TYPE_DELTA_PRO_3 || dev->id == DEV_TYPE_DELTA_3) {
-            int new_ac_lim = 0;
-            int new_max_chg = 0;
-            int new_min_dsg = 0;
+    // Only update Dashboard logic if it is a main device
+    if (is_main_device) {
+        if (first_run || temp_int != last_temp) {
+            lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);
+            last_temp = temp_int;
+        }
 
-            if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-                new_ac_lim = dev->data.d3p.acChargingSpeed;
-                new_max_chg = dev->data.d3p.batteryChargeLimitMax;
-                new_min_dsg = dev->data.d3p.batteryChargeLimitMin;
+        if (first_run || soc != last_soc) {
+            lv_arc_set_value(arc_batt, soc);
+            lv_label_set_text_fmt(label_soc, "%d%%", soc);
+            last_soc = soc;
+        }
+
+        if (first_run || in_solar != last_solar) {
+            lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
+            update_card_style(&card_solar, in_solar);
+            last_solar = in_solar;
+        }
+        if (first_run || in_ac != last_grid) {
+            lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
+            update_card_style(&card_grid, in_ac);
+            last_grid = in_ac;
+        }
+        if (first_run || in_alt != last_car) {
+            lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
+            update_card_style(&card_car, in_alt);
+            last_car = in_alt;
+        }
+        if (first_run || out_usb != last_usb) {
+            lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
+            update_card_style(&card_usb, out_usb);
+            last_usb = out_usb;
+        }
+        if (first_run || out_12v != last_12v) {
+            lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
+            update_card_style(&card_12v, out_12v);
+            last_12v = out_12v;
+        }
+        if (first_run || out_ac != last_ac) {
+            lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
+            update_card_style(&card_ac, out_ac);
+            last_ac = out_ac;
+        }
+
+        // Toggle Styles based on PORT state, not power
+        bool ac_on = false;
+        bool dc_on = false;
+
+        if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+            ac_on = dev->data.d3p.acHvPort; // Or acLvPort, D3P typically uses HV for output
+            dc_on = dev->data.d3p.dc12vPort;
+        } else if (dev->id == DEV_TYPE_DELTA_3) {
+            ac_on = dev->data.d3.acOn;
+            dc_on = dev->data.d3.dcOn;
+        }
+
+        if (first_run || ac_on != last_ac_on) {
+            if (ac_on) {
+                lv_obj_add_style(btn_ac_toggle, &style_btn_green, 0);
+                lv_obj_remove_style(btn_ac_toggle, &style_btn_default, 0);
+                lv_label_set_text(lbl_ac_t, "AC\nON");
+                lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
             } else {
-                new_ac_lim = dev->data.d3.acChargingSpeed;
-                new_max_chg = dev->data.d3.batteryChargeLimitMax;
-                new_min_dsg = dev->data.d3.batteryChargeLimitMin;
+                lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
+                lv_obj_remove_style(btn_ac_toggle, &style_btn_green, 0);
+                lv_label_set_text(lbl_ac_t, "AC\nOFF");
+                lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
             }
+            last_ac_on = ac_on;
+        }
 
-            if (new_ac_lim > 0 && new_ac_lim != lim_input_w) {
-                lim_input_w = new_ac_lim;
-                if (label_lim_in_val) lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
-                if (slider_lim_in) lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
+        if (first_run || dc_on != last_dc_on) {
+            if (dc_on) {
+                lv_obj_add_style(btn_dc_toggle, &style_btn_green, 0);
+                lv_obj_remove_style(btn_dc_toggle, &style_btn_default, 0);
+                lv_label_set_text(lbl_dc_t, "12V\nON");
+                lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
+            } else {
+                lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
+                lv_obj_remove_style(btn_dc_toggle, &style_btn_green, 0);
+                lv_label_set_text(lbl_dc_t, "12V\nOFF");
+                lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
             }
-            if (new_max_chg > 0 && new_max_chg != lim_charge_p) {
-                lim_charge_p = new_max_chg;
-                if (label_lim_chg_val) lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
-                if (slider_lim_chg) lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
+            last_dc_on = dc_on;
+        }
+
+        first_run = false;
+    }
+
+    // Settings Sync: Update state variables and UI if not being dragged
+    if (dev->id == DEV_TYPE_DELTA_PRO_3 || dev->id == DEV_TYPE_DELTA_3) {
+        int new_ac_lim = 0;
+        int new_max_chg = 0;
+        int new_min_dsg = 0;
+
+        if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+            new_ac_lim = dev->data.d3p.acChargingSpeed;
+            new_max_chg = dev->data.d3p.batteryChargeLimitMax;
+            new_min_dsg = dev->data.d3p.batteryChargeLimitMin;
+        } else {
+            new_ac_lim = dev->data.d3.acChargingSpeed;
+            new_max_chg = dev->data.d3.batteryChargeLimitMax;
+            new_min_dsg = dev->data.d3.batteryChargeLimitMin;
+        }
+
+        if (new_ac_lim > 0 && new_ac_lim != lim_input_w) {
+            lim_input_w = new_ac_lim;
+            if (label_lim_in_val) lv_label_set_text_fmt(label_lim_in_val, "%d W", lim_input_w);
+            if (slider_lim_in && !lv_slider_is_dragged(slider_lim_in)) {
+                lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
+            }
+        }
+        if (new_max_chg > 0 && new_max_chg != lim_charge_p) {
+            lim_charge_p = new_max_chg;
+            if (label_lim_chg_val) lv_label_set_text_fmt(label_lim_chg_val, "%d %%", lim_charge_p);
+            if (slider_lim_chg && !lv_slider_is_dragged(slider_lim_chg)) {
+                lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
             }
-            if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
-                lim_discharge_p = new_min_dsg;
-                if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
-                if (slider_lim_out) lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
+        }
+        if (new_min_dsg >= 0 && new_min_dsg != lim_discharge_p) {
+            lim_discharge_p = new_min_dsg;
+            if (label_lim_out_val) lv_label_set_text_fmt(label_lim_out_val, "%d %%", lim_discharge_p);
+            if (slider_lim_out && !lv_slider_is_dragged(slider_lim_out)) {
+                lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
             }
-        } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
-            // Update Alt Charger Settings
-            if (dev->data.ac.startVoltage > 0) {
-                int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
-                if (val != alt_start_v) {
-                    alt_start_v = val;
-                    if (label_alt_start_v) lv_label_set_text_fmt(label_alt_start_v, "%d.%d V", alt_start_v/10, alt_start_v%10);
-                    if (slider_alt_start_v) lv_slider_set_value(slider_alt_start_v, alt_start_v, LV_ANIM_OFF);
+        }
+    } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        // Update Alt Charger Settings
+        if (dev->data.ac.startVoltage > 0) {
+            int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
+            if (val != alt_start_v) {
+                alt_start_v = val;
+                if (label_alt_start_v) lv_label_set_text_fmt(label_alt_start_v, "%d.%d V", alt_start_v/10, alt_start_v%10);
+                if (slider_alt_start_v && !lv_slider_is_dragged(slider_alt_start_v)) {
+                    lv_slider_set_value(slider_alt_start_v, alt_start_v, LV_ANIM_OFF);
                 }
             }
-            if (dev->data.ac.reverseChargingCurrentLimit > 0) {
-                int val = (int)dev->data.ac.reverseChargingCurrentLimit;
-                if (val != alt_rev_curr) {
-                    alt_rev_curr = val;
-                    if (label_alt_rev_curr) lv_label_set_text_fmt(label_alt_rev_curr, "%d A", alt_rev_curr);
-                    if (slider_alt_rev_curr) lv_slider_set_value(slider_alt_rev_curr, alt_rev_curr, LV_ANIM_OFF);
+        }
+        if (dev->data.ac.reverseChargingCurrentLimit > 0) {
+            int val = (int)dev->data.ac.reverseChargingCurrentLimit;
+            if (val != alt_rev_curr) {
+                alt_rev_curr = val;
+                if (label_alt_rev_curr) lv_label_set_text_fmt(label_alt_rev_curr, "%d A", alt_rev_curr);
+                if (slider_alt_rev_curr && !lv_slider_is_dragged(slider_alt_rev_curr)) {
+                    lv_slider_set_value(slider_alt_rev_curr, alt_rev_curr, LV_ANIM_OFF);
                 }
             }
-            if (dev->data.ac.chargingCurrentLimit > 0) {
-                int val = (int)dev->data.ac.chargingCurrentLimit;
-                if (val != alt_chg_curr) {
-                    alt_chg_curr = val;
-                    if (label_alt_chg_curr) lv_label_set_text_fmt(label_alt_chg_curr, "%d A", alt_chg_curr);
-                    if (slider_alt_chg_curr) lv_slider_set_value(slider_alt_chg_curr, alt_chg_curr, LV_ANIM_OFF);
+        }
+        if (dev->data.ac.chargingCurrentLimit > 0) {
+            int val = (int)dev->data.ac.chargingCurrentLimit;
+            if (val != alt_chg_curr) {
+                alt_chg_curr = val;
+                if (label_alt_chg_curr) lv_label_set_text_fmt(label_alt_chg_curr, "%d A", alt_chg_curr);
+                if (slider_alt_chg_curr && !lv_slider_is_dragged(slider_alt_chg_curr)) {
+                    lv_slider_set_value(slider_alt_chg_curr, alt_chg_curr, LV_ANIM_OFF);
                 }
             }
-            if (dev->data.ac.powerLimit > 0) {
-                int val = dev->data.ac.powerLimit;
-                if (val != alt_pow_limit) {
-                    alt_pow_limit = val;
-                    if (label_alt_pow) lv_label_set_text_fmt(label_alt_pow, "%d W", alt_pow_limit);
-                    if (slider_alt_pow) lv_slider_set_value(slider_alt_pow, alt_pow_limit, LV_ANIM_OFF);
+        }
+        if (dev->data.ac.powerLimit > 0) {
+            int val = dev->data.ac.powerLimit;
+            if (val != alt_pow_limit) {
+                alt_pow_limit = val;
+                if (label_alt_pow) lv_label_set_text_fmt(label_alt_pow, "%d W", alt_pow_limit);
+                if (slider_alt_pow && !lv_slider_is_dragged(slider_alt_pow)) {
+                    lv_slider_set_value(slider_alt_pow, alt_pow_limit, LV_ANIM_OFF);
                 }
             }
         }

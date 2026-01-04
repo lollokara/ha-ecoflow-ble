@@ -79,6 +79,7 @@ extern "C" {
 #define SET_VAL_ALT_PROD_LIMIT 6
 #define SET_VAL_ALT_REV_LIMIT 7
 #define SET_VAL_ALT_CHG_LIMIT 8
+#define SET_VAL_ALT_ENABLE 9
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1

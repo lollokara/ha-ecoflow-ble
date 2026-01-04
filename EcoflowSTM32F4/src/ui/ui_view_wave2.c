@@ -19,6 +19,7 @@ static lv_obj_t * cont_sub_mode;
 static lv_obj_t * dd_sub_mode;
 static lv_obj_t * slider_fan;
 static lv_obj_t * label_fan_val;
+static lv_obj_t * btn_pwr; // Power Button
 
 // Mode Buttons
 static lv_obj_t * btn_mode_cool;
@@ -144,6 +145,12 @@ static void event_fan_change(lv_event_t * e) {
     }
 }
 
+static void event_power_toggle(lv_event_t * e) {
+    lv_obj_t * btn = lv_event_get_target(e);
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    send_cmd(W2_PARAM_POWER, state ? 1 : 0);
+}
+
 void ui_view_wave2_init(lv_obj_t * parent) {
     create_styles();
     scr_wave2 = lv_obj_create(NULL);
@@ -201,11 +208,24 @@ void ui_view_wave2_init(lv_obj_t * parent) {
 
     // Right Side: Controls
 
+    // Power Button (Top Right of Panel)
+    btn_pwr = lv_btn_create(panel);
+    lv_obj_set_size(btn_pwr, 80, 50);
+    lv_obj_align(btn_pwr, LV_ALIGN_TOP_RIGHT, -20, 20);
+    lv_obj_add_style(btn_pwr, &style_btn_default, 0);
+    lv_obj_add_style(btn_pwr, &style_btn_selected, LV_STATE_CHECKED);
+    lv_obj_add_flag(btn_pwr, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_add_event_cb(btn_pwr, event_power_toggle, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t * lbl_pwr = lv_label_create(btn_pwr);
+    ui_set_icon(lbl_pwr, MDI_ICON_POWER);
+    lv_obj_center(lbl_pwr);
+
     // Mode Buttons (Icon Selector)
     int btn_size = 80;
     int spacing = 20;
     int start_x = 300;
-    int start_y = 40;
+    int start_y = 60; // Moved down slightly
 
     // Cool Button
     btn_mode_cool = lv_btn_create(panel);
@@ -297,6 +317,12 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
     if (lv_slider_is_dragged(slider_fan) == false) {
         lv_slider_set_value(slider_fan, data->fanValue, LV_ANIM_ON);
         lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)data->fanValue);
+    }
+
+    // Update Power Button State
+    if (btn_pwr) {
+        if (data->powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
     update_visibility(data->mode, data->subMode);
