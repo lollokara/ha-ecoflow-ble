@@ -221,9 +221,6 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
 
             EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
-
-            EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-            if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
         }
     } else if (cmd == CMD_SET_VALUE) {
         // Handle generic value setting (Charge limits, SOC limits)
@@ -254,6 +251,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                     case SET_VAL_ALT_PROD_LIMIT: alt->setPowerLimit(value); break;
                     case SET_VAL_ALT_REV_LIMIT: alt->setCarBatteryChargeLimit((float)value); break;
                     case SET_VAL_ALT_CHG_LIMIT: alt->setDeviceBatteryChargeLimit((float)value); break;
+                    case SET_VAL_ALT_ENABLE: alt->setChargerOpen(value ? true : false); break;
                  }
              }
         }
