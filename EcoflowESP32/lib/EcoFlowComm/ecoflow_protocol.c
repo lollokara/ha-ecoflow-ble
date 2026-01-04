@@ -176,23 +176,32 @@ int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable) {
     return 0;
 }
 
-int pack_set_dc_message(uint8_t *buffer, uint8_t enable) {
-    uint8_t len = 1;
+int pack_set_dc_message(uint8_t *buffer, uint8_t enable, uint8_t device_type) {
+    uint8_t len = 2; // Enable + Type
     buffer[0] = START_BYTE;
     buffer[1] = CMD_SET_DC;
     buffer[2] = len;
     buffer[3] = enable;
+    buffer[4] = device_type;
     buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
     return 4 + len;
 }
 
-int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable) {
+int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable, uint8_t *device_type) {
     uint8_t len = buffer[2];
-    if (len != 1) return -2;
+    // Backward compatibility: If len is 1, treat type as 0 (All)
+    if (len != 1 && len != 2) return -2;
+
     uint8_t received_crc = buffer[3 + len];
     uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
     if (received_crc != calculated_crc) return -1;
     *enable = buffer[3];
+
+    if (len == 2) {
+        *device_type = buffer[4];
+    } else {
+        *device_type = 0;
+    }
     return 0;
 }
 

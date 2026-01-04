@@ -38,6 +38,10 @@ typedef struct {
         Wave2SetMsg w2;
         uint8_t enable;
         struct {
+            uint8_t enable;
+            uint8_t device_type;
+        } set_dc;
+        struct {
             uint8_t type;
             int value;
         } set_val;
@@ -213,8 +217,8 @@ void UART_SendPowerOff(void) {
 void UART_SendACSet(uint8_t enable) {
     if (uartTxQueue) { TxMessage tx; tx.type = MSG_AC_SET; tx.data.enable = enable; xQueueSend(uartTxQueue, &tx, 0); }
 }
-void UART_SendDCSet(uint8_t enable) {
-    if (uartTxQueue) { TxMessage tx; tx.type = MSG_DC_SET; tx.data.enable = enable; xQueueSend(uartTxQueue, &tx, 0); }
+void UART_SendDCSet(uint8_t enable, uint8_t device_type) {
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_DC_SET; tx.data.set_dc.enable = enable; tx.data.set_dc.device_type = device_type; xQueueSend(uartTxQueue, &tx, 0); }
 }
 void UART_SendSetValue(uint8_t type, int value) {
     if (uartTxQueue) { TxMessage tx; tx.type = MSG_SET_VALUE; tx.data.set_val.type = type; tx.data.set_val.value = value; xQueueSend(uartTxQueue, &tx, 0); }
@@ -292,7 +296,7 @@ void StartUARTTask(void * argument) {
             int len = 0;
             if (tx.type == MSG_WAVE2_SET) len = pack_set_wave2_message(buf, tx.data.w2.type, tx.data.w2.value);
             else if (tx.type == MSG_AC_SET) len = pack_set_ac_message(buf, tx.data.enable);
-            else if (tx.type == MSG_DC_SET) len = pack_set_dc_message(buf, tx.data.enable);
+            else if (tx.type == MSG_DC_SET) len = pack_set_dc_message(buf, tx.data.set_dc.enable, tx.data.set_dc.device_type);
             else if (tx.type == MSG_SET_VALUE) len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
             else if (tx.type == MSG_POWER_OFF) len = pack_power_off_message(buf);
             else if (tx.type == MSG_GET_DEBUG_INFO) len = pack_get_debug_info_message(buf);

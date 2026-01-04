@@ -323,8 +323,9 @@ int unpack_set_wave2_message(const uint8_t *buffer, uint8_t *type, uint8_t *valu
 int pack_set_ac_message(uint8_t *buffer, uint8_t enable);
 int unpack_set_ac_message(const uint8_t *buffer, uint8_t *enable);
 
-int pack_set_dc_message(uint8_t *buffer, uint8_t enable);
-int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable);
+// Updated to include optional target device type (0 = All/Default)
+int pack_set_dc_message(uint8_t *buffer, uint8_t enable, uint8_t device_type);
+int unpack_set_dc_message(const uint8_t *buffer, uint8_t *enable, uint8_t *device_type);
 
 int pack_set_value_message(uint8_t *buffer, uint8_t type, int value);
 int unpack_set_value_message(const uint8_t *buffer, uint8_t *type, int *value);

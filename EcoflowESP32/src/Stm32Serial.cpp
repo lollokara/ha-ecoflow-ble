@@ -215,15 +215,26 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     } else if (cmd == CMD_SET_DC) {
         // Toggle DC Power
         uint8_t enable;
-        if (unpack_set_dc_message(rx_buf, &enable) == 0) {
-            EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
-            if (d3 && d3->isAuthenticated()) d3->setDC(enable);
+        uint8_t target_type = 0;
+        if (unpack_set_dc_message(rx_buf, &enable, &target_type) == 0) {
 
-            EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
-            if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+            // If target_type is 0, apply to all "Main" batteries/ports.
+            // If target_type is specified, apply ONLY to that device.
 
-            EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
-            if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
+            if (target_type == 0 || target_type == (uint8_t)DeviceType::DELTA_3) {
+                 EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
+                 if (d3 && d3->isAuthenticated()) d3->setDC(enable);
+            }
+
+            if (target_type == 0 || target_type == (uint8_t)DeviceType::DELTA_PRO_3) {
+                 EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+                 if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
+            }
+
+            if (target_type == 0 || target_type == (uint8_t)DeviceType::ALTERNATOR_CHARGER) {
+                 EcoflowESP32* alt = DeviceManager::getInstance().getDevice(DeviceType::ALTERNATOR_CHARGER);
+                 if (alt && alt->isAuthenticated()) alt->setChargerOpen(enable);
+            }
         }
     } else if (cmd == CMD_SET_VALUE) {
         // Handle generic value setting (Charge limits, SOC limits)
@@ -312,16 +323,22 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
  */
 void Stm32Serial::sendDeviceList() {
     DeviceList list = {0};
+    // The order in the array matches the implicit assumption in STM32 panels: 0=D3, 1=D3P, 2=W2, 3=ALT
+    // However, STM32 uses the ID to find the slot, so order is less critical as long as ID is correct.
+    // We iterate explicitly to ensure we check all types.
+
     DeviceSlot* slots[] = {
         DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
+        DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3), // Swapped to match priority if needed, but keeping list order safe
         DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
-        DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
         DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
     };
 
     uint8_t count = 0;
     for (int i = 0; i < 4; i++) {
         if (slots[i]) {
+            // Note: DeviceType enum is now explicit (1, 2, 3, 4).
+            // Casting to uint8_t preserves these values.
             list.devices[count].id = (uint8_t)slots[i]->type;
             strncpy(list.devices[count].name, slots[i]->name.c_str(), sizeof(list.devices[count].name) - 1);
             list.devices[count].connected = slots[i]->isConnected ? 1 : 0;
