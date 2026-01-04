@@ -1186,15 +1186,24 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     // Only update Dashboard logic if it is a main device
     if (is_main_device) {
-        if (first_run || temp_int != last_temp) {
-            lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);
-            last_temp = temp_int;
+        // Simple filter: Ignore 0 if we already had a valid value
+        if (temp_int == 0 && last_temp != -999 && last_temp != 0) {
+             // Ignore glitch
+        } else {
+            if (first_run || temp_int != last_temp) {
+                lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);
+                last_temp = temp_int;
+            }
         }
 
-        if (first_run || soc != last_soc) {
-            lv_arc_set_value(arc_batt, soc);
-            lv_label_set_text_fmt(label_soc, "%d%%", soc);
-            last_soc = soc;
+        if (soc == 0 && last_soc > 0) {
+             // Ignore glitch (jumping to 0%)
+        } else {
+            if (first_run || soc != last_soc) {
+                lv_arc_set_value(arc_batt, soc);
+                lv_label_set_text_fmt(label_soc, "%d%%", soc);
+                last_soc = soc;
+            }
         }
 
         if (first_run || in_solar != last_solar) {
@@ -1274,7 +1283,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Settings Sync: Update state variables and UI if not being dragged
-    if (dev->id == DEV_TYPE_DELTA_PRO_3 || dev->id == DEV_TYPE_DELTA_3) {
+    if (is_main_device) {
         int new_ac_lim = 0;
         int new_max_chg = 0;
         int new_min_dsg = 0;
