@@ -167,9 +167,13 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
                      if (mr521_msg.has_cms_batt_soc) d3p.batteryLevel = mr521_msg.cms_batt_soc;
                      if (mr521_msg.has_bms_batt_soc) d3p.batteryLevelMain = mr521_msg.bms_batt_soc;
-                     if (mr521_msg.has_pow_get_ac) d3p.acInputPower = -mr521_msg.pow_get_ac;
+                     if (mr521_msg.has_pow_get_ac_in) d3p.acInputPower = mr521_msg.pow_get_ac_in;
+                     else if (mr521_msg.has_pow_get_ac) d3p.acInputPower = -mr521_msg.pow_get_ac;
+
                      if (mr521_msg.has_pow_get_ac_lv_out) d3p.acLvOutputPower = -std::abs(mr521_msg.pow_get_ac_lv_out);
                      if (mr521_msg.has_pow_get_ac_hv_out) d3p.acHvOutputPower = -std::abs(mr521_msg.pow_get_ac_hv_out);
+
+                     if (mr521_msg.has_plug_in_info_ac_in_flag) d3p.pluggedInAc = (bool)mr521_msg.plug_in_info_ac_in_flag;
 
                      if (mr521_msg.has_pow_in_sum_w) d3p.inputPower = mr521_msg.pow_in_sum_w;
                      if (mr521_msg.has_pow_out_sum_w) d3p.outputPower = mr521_msg.pow_out_sum_w;
