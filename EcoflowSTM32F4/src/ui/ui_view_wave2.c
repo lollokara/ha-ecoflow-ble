@@ -28,10 +28,14 @@ static lv_obj_t * btn_mode_heat;
 static lv_obj_t * btn_mode_fan;
 
 // State Tracking
-static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static int current_mode = -1; // 0=Cool, 1=Heat, 2=Fan. Init to -1 to ensure first update applies styles.
 static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
 static void create_styles(void) {
+    static bool styles_created = false;
+    if (styles_created) return;
+    styles_created = true;
+
     lv_style_init(&style_scr);
     lv_style_set_bg_color(&style_scr, lv_color_hex(0xFF121212));
     lv_style_set_text_color(&style_scr, lv_color_white());
@@ -83,17 +87,13 @@ static void event_temp_change(lv_event_t * e) {
 }
 
 static void update_mode_ui(int mode) {
+    if (current_mode == mode) return; // Optimization: Skip if already set
     current_mode = mode;
 
-    // Reset styles
+    // Reset styles (only remove selected style, default style remains)
     lv_obj_remove_style(btn_mode_cool, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_cool, &style_btn_default, 0);
-
     lv_obj_remove_style(btn_mode_heat, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_heat, &style_btn_default, 0);
-
     lv_obj_remove_style(btn_mode_fan, &style_btn_selected, 0);
-    lv_obj_add_style(btn_mode_fan, &style_btn_default, 0);
 
     // Apply selected style
     if (mode == 0) { // Cool
@@ -106,6 +106,15 @@ static void update_mode_ui(int mode) {
 }
 
 static void update_visibility(int mode, int sub, bool power_on) {
+    // Cache state to prevent redundant LVGL updates (which can fragment heap)
+    static int last_mode = -1;
+    static int last_sub = -1;
+    static int last_pwr = -1;
+
+    if (mode == last_mode && sub == last_sub && (power_on ? 1:0) == last_pwr) {
+        return;
+    }
+
     if (!power_on) {
         // Gray out controls
         lv_obj_add_state(arc_set_temp, LV_STATE_DISABLED);
@@ -139,6 +148,10 @@ static void update_visibility(int mode, int sub, bool power_on) {
         }
     }
     update_mode_ui(mode);
+
+    last_mode = mode;
+    last_sub = sub;
+    last_pwr = power_on ? 1:0;
 }
 
 static void event_mode_click(lv_event_t * e) {
@@ -156,7 +169,9 @@ static void event_sub_mode_change(lv_event_t * e) {
     uint16_t opt = lv_dropdown_get_selected(dd_sub_mode);
     send_cmd(W2_PARAM_SUB_MODE, (uint8_t)opt);
 
-    update_visibility(current_mode, opt, true);
+    // Use current_mode for optimistic update as we don't change mode here
+    int mode = (current_mode == -1) ? 0 : current_mode;
+    update_visibility(mode, opt, true);
 }
 
 static void event_fan_change(lv_event_t * e) {
@@ -339,26 +354,46 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
     int32_t powerMode = get_int32_aligned(&data->powerMode);
     int32_t mode = get_int32_aligned(&data->mode);
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", safe_float_to_int(envTemp));
+    // Cache values to prevent unnecessary LVGL updates
+    static int32_t last_setTemp = -99;
+    static int32_t last_fanValue = -99;
+    static int32_t last_envTempInt = -99;
 
-    if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
+    int32_t envTempInt = safe_float_to_int(envTemp);
+    if (envTempInt != last_envTempInt) {
+        lv_label_set_text_fmt(label_cur_temp, "%d C", envTempInt);
+        last_envTempInt = envTempInt;
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+    if (setTemp != last_setTemp) {
+        if (lv_slider_is_dragged(arc_set_temp) == false) {
+            lv_arc_set_value(arc_set_temp, setTemp);
+            lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
+            last_setTemp = setTemp;
+        }
+    }
+
+    // Dropdown handles its own cache internally, but checking value avoids function call overhead
+    if ((int32_t)lv_dropdown_get_selected(dd_sub_mode) != subMode) {
         lv_dropdown_set_selected(dd_sub_mode, subMode);
     }
 
-    if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
+    if (fanValue != last_fanValue) {
+        if (lv_slider_is_dragged(slider_fan) == false) {
+            lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
+            lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
+            last_fanValue = fanValue;
+        }
     }
 
     // Update Power Button State
     if (btn_pwr) {
-        if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
-        else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
+        bool is_checked = lv_obj_has_state(btn_pwr, LV_STATE_CHECKED);
+        bool should_be_checked = (powerMode != 0);
+        if (is_checked != should_be_checked) {
+            if (should_be_checked) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+            else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
+        }
     }
 
     update_visibility(mode, subMode, powerMode != 0);
