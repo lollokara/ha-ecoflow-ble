@@ -4,6 +4,12 @@
 #include "ui_lvgl.h" // For UI_LVGL_ShowDashboard
 #include <stdio.h>
 
+static float get_float_aligned(const float *ptr) {
+    float val;
+    memcpy(&val, ptr, sizeof(float));
+    return val;
+}
+
 static lv_obj_t * scr_wave2;
 static lv_style_t style_scr;
 static lv_style_t style_panel;
@@ -330,7 +336,7 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
         return;
     }
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
+    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)get_float_aligned(&data->envTemp));
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
         lv_arc_set_value(arc_set_temp, data->setTemp);

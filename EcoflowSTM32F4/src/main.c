@@ -285,7 +285,7 @@ int main(void) {
     // Note: When booting from Bank 2 (BFB2 set), 0x08000000 is the alias for Bank 2.
     // So 0x08008000 is the correct offset relative to the START of the current bank.
     // Reverted to 0x08008000 (standard). 0x00008000 was risky.
-    SCB->VTOR = 0x08008000;
+    SCB->VTOR = 0x00008000;
     __DSB();
 
     // Enable Interrupts (Bootloader disables them)
@@ -315,9 +315,9 @@ int main(void) {
     }
 
     // Create FreeRTOS Tasks
-    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
-    xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
+    xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
