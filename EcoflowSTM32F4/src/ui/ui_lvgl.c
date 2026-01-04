@@ -232,7 +232,8 @@ static void event_toggle_ac(lv_event_t * e) {
 static void event_toggle_dc(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
-    UART_SendDCSet(state ? 1 : 0);
+    // Send DC set with device_type=0 (All) for Main Dashboard toggle
+    UART_SendDCSet(state ? 1 : 0, 0);
 }
 
 // --- Calibration Debug ---
@@ -703,7 +704,7 @@ static void event_popup_alt_hide(lv_event_t * e) {
 static void event_alt_toggle(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
-    UART_SendDCSet(state ? 1 : 0); // Reused CMD_SET_DC for Alt Charger Master Switch
+    UART_SendDCSet(state ? 1 : 0, DEV_TYPE_ALT_CHARGER); // Reused CMD_SET_DC for Alt Charger Master Switch
 }
 
 static void event_alt_mode_click(lv_event_t * e) {
@@ -1138,6 +1139,30 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         return; // Don't update dashboard with Wave 2 data
     }
 
+    // Logic to select "Main Battery" for display
+    // If D3P is connected, it takes precedence.
+    // If D3 is connected, it shows if D3P is not.
+    // If only one device is connected, show it.
+
+    // We check the cache to see if D3P is connected.
+    // device_cache is 0-indexed. ID is 1-based.
+    // DEV_TYPE_DELTA_PRO_3 = 2 -> Index 1
+    // DEV_TYPE_DELTA_3 = 1 -> Index 0
+
+    bool d3p_connected = device_cache[DEV_TYPE_DELTA_PRO_3 - 1].connected;
+    // bool d3_connected = device_cache[DEV_TYPE_DELTA_3 - 1].connected;
+
+    // Filter updates: Only update dashboard if this packet is from the "Primary" device
+    // Primary Priority: D3P > D3
+
+    bool update_dashboard = false;
+    if (d3p_connected) {
+        if (dev->id == DEV_TYPE_DELTA_PRO_3) update_dashboard = true;
+    } else {
+        // If D3P not connected, accept D3
+        if (dev->id == DEV_TYPE_DELTA_3) update_dashboard = true;
+    }
+
     // Map data
     int soc = 0;
     int in_solar=0, in_ac=0, in_alt=0;
@@ -1146,7 +1171,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     if (dev->id == DEV_TYPE_DELTA_PRO_3) {
         soc = safe_float_to_int(dev->data.d3p.batteryLevel);
-        in_ac = safe_float_to_int(dev->data.d3p.inputPower); // Corrected to use inputPower instead of acInputPower
+        in_ac = safe_float_to_int(dev->data.d3p.inputPower);
         in_solar = safe_float_to_int(dev->data.d3p.solarLvPower + dev->data.d3p.solarHvPower);
         in_alt = safe_float_to_int(dev->data.d3p.dcLvInputPower);
         out_ac = safe_float_to_int(dev->data.d3p.acLvOutputPower + dev->data.d3p.acHvOutputPower);
@@ -1214,7 +1239,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 if (slider_lim_out) lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
             }
-        } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        }
+
+        if (dev->id == DEV_TYPE_ALT_CHARGER) {
             // Update Alt Charger Settings
             if (dev->data.ac.startVoltage > 0) {
                 int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
@@ -1259,6 +1286,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
     }
+
+    // Only update dashboard widgets if this is the primary device
+    if (!update_dashboard) return;
 
     if (first_run || temp_int != last_temp) {
         lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);

@@ -4,10 +4,10 @@
 #include <stdint.h>
 
 enum class DeviceType {
-    DELTA_3,
-    WAVE_2,
-    DELTA_PRO_3,
-    ALTERNATOR_CHARGER
+    DELTA_3 = 1,
+    DELTA_PRO_3 = 2,
+    WAVE_2 = 3,
+    ALTERNATOR_CHARGER = 4
 };
 
 enum class ButtonInput {

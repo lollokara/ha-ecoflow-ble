@@ -24,9 +24,11 @@ static lv_obj_t * label_fan_val;
 static lv_obj_t * btn_mode_cool;
 static lv_obj_t * btn_mode_heat;
 static lv_obj_t * btn_mode_fan;
+static lv_obj_t * btn_power; // Added Power Button
 
 // State Tracking
 static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static int power_state = 0;
 
 static void create_styles(void) {
     lv_style_init(&style_scr);
@@ -76,6 +78,19 @@ static void event_temp_change(lv_event_t * e) {
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         send_cmd(W2_PARAM_TEMP, (uint8_t)val);
     }
+}
+
+static void event_power_toggle(lv_event_t * e) {
+    power_state = !power_state;
+    // Optimistic UI
+    if(power_state) {
+        lv_obj_add_state(btn_power, LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(btn_power, lv_palette_main(LV_PALETTE_GREEN), 0);
+    } else {
+        lv_obj_clear_state(btn_power, LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(btn_power, lv_palette_main(LV_PALETTE_GREY), 0);
+    }
+    send_cmd(W2_PARAM_POWER, power_state ? 1 : 0);
 }
 
 static void update_mode_ui(int mode) {
@@ -201,11 +216,21 @@ void ui_view_wave2_init(lv_obj_t * parent) {
 
     // Right Side: Controls
 
+    // Power Button (Top Left of Controls)
+    btn_power = lv_btn_create(panel);
+    lv_obj_set_size(btn_power, 80, 50);
+    lv_obj_align(btn_power, LV_ALIGN_TOP_LEFT, 300, 20); // Above modes
+    lv_obj_add_style(btn_power, &style_btn_default, 0);
+    lv_obj_add_event_cb(btn_power, event_power_toggle, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_pwr = lv_label_create(btn_power);
+    ui_set_icon(lbl_pwr, MDI_ICON_POWER);
+    lv_obj_center(lbl_pwr);
+
     // Mode Buttons (Icon Selector)
     int btn_size = 80;
     int spacing = 20;
     int start_x = 300;
-    int start_y = 40;
+    int start_y = 90; // Shifted down to make room for Power
 
     // Cool Button
     btn_mode_cool = lv_btn_create(panel);
@@ -282,6 +307,16 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
+
+    // Update Power Button
+    power_state = (data->powerMode != 0); // Assuming non-zero is ON
+    if(power_state) {
+        lv_obj_add_state(btn_power, LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(btn_power, lv_palette_main(LV_PALETTE_GREEN), 0);
+    } else {
+        lv_obj_clear_state(btn_power, LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(btn_power, lv_palette_main(LV_PALETTE_GREY), 0);
+    }
 
     lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
 
