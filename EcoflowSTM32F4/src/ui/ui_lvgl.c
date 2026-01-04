@@ -26,7 +26,9 @@
 extern void SetBacklight(uint8_t percent);
 
 static uint32_t last_touch_time = 0;
+static uint32_t last_alt_cmd_time = 0; // Timestamp for Alt Charger interaction
 static bool is_sleeping = false;
+bool is_charging_active = false;
 
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
@@ -301,7 +303,8 @@ static void event_slider_alt_start_v(lv_event_t * e) {
         lv_label_set_text_fmt(label_alt_start_v, "%d.%d V", alt_start_v / 10, alt_start_v % 10);
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        UART_SendSetValue(SET_VAL_ALT_START_VOLTAGE, alt_start_v);
+        for(int i=0; i<3; i++) { UART_SendSetValue(SET_VAL_ALT_START_VOLTAGE, alt_start_v); HAL_Delay(10); }
+        last_alt_cmd_time = HAL_GetTick();
     }
 }
 static void event_slider_alt_rev_curr(lv_event_t * e) {
@@ -314,7 +317,8 @@ static void event_slider_alt_rev_curr(lv_event_t * e) {
         lv_label_set_text_fmt(label_alt_rev_curr, "%d A", alt_rev_curr);
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        UART_SendSetValue(SET_VAL_ALT_REV_LIMIT, alt_rev_curr);
+        for(int i=0; i<3; i++) { UART_SendSetValue(SET_VAL_ALT_REV_LIMIT, alt_rev_curr); HAL_Delay(10); }
+        last_alt_cmd_time = HAL_GetTick();
     }
 }
 static void event_slider_alt_chg_curr(lv_event_t * e) {
@@ -327,7 +331,8 @@ static void event_slider_alt_chg_curr(lv_event_t * e) {
         lv_label_set_text_fmt(label_alt_chg_curr, "%d A", alt_chg_curr);
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        UART_SendSetValue(SET_VAL_ALT_CHG_LIMIT, alt_chg_curr);
+        for(int i=0; i<3; i++) { UART_SendSetValue(SET_VAL_ALT_CHG_LIMIT, alt_chg_curr); HAL_Delay(10); }
+        last_alt_cmd_time = HAL_GetTick();
     }
 }
 static void event_slider_alt_pow(lv_event_t * e) {
@@ -340,7 +345,8 @@ static void event_slider_alt_pow(lv_event_t * e) {
         lv_label_set_text_fmt(label_alt_pow, "%d W", alt_pow_limit);
     }
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        UART_SendSetValue(SET_VAL_ALT_PROD_LIMIT, alt_pow_limit);
+        for(int i=0; i<3; i++) { UART_SendSetValue(SET_VAL_ALT_PROD_LIMIT, alt_pow_limit); HAL_Delay(10); }
+        last_alt_cmd_time = HAL_GetTick();
     }
 }
 
@@ -401,7 +407,9 @@ static void event_arc_draw(lv_event_t * e) {
             // Draw an arc segment that moves based on anim_phase
             // Phase goes 0.0 to 1.0. Map to Current SOC Angle -> 360 deg.
             int val = lv_arc_get_value(obj);
-            if (val < 100) {
+            // Only draw if charging
+            extern bool is_charging_active;
+            if (val < 100 && is_charging_active) {
                 float start_angle = 270.0f + (val * 3.6f);
                 float end_angle = 270.0f + 360.0f; // Wraps around
                 float total_span = end_angle - start_angle;
@@ -1345,6 +1353,11 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         first_run = false;
     }
 
+    // Update global charging flag
+    if (is_main_device) {
+        is_charging_active = (in_ac > 0 || in_solar > 0 || in_alt > 0);
+    }
+
     // Settings Sync: Update state variables and UI if not being dragged
     if (is_main_device) {
         int new_ac_lim = 0;
@@ -1385,8 +1398,11 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             }
         }
     } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+        // Suppress updates for 4 seconds after user interaction
+        bool ignore_updates = (HAL_GetTick() - last_alt_cmd_time) < 4000;
+
         // Update Alt Charger Settings
-        if (dev->data.ac.startVoltage > 0) {
+        if (!ignore_updates && dev->data.ac.startVoltage > 0) {
             int val = (int)(dev->data.ac.startVoltage * 10); // Float to Decivolt
             if (val != alt_start_v) {
                 alt_start_v = val;
@@ -1396,7 +1412,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.reverseChargingCurrentLimit > 0) {
+        if (!ignore_updates && dev->data.ac.reverseChargingCurrentLimit > 0) {
             int val = (int)dev->data.ac.reverseChargingCurrentLimit;
             if (val != alt_rev_curr) {
                 alt_rev_curr = val;
@@ -1406,7 +1422,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.chargingCurrentLimit > 0) {
+        if (!ignore_updates && dev->data.ac.chargingCurrentLimit > 0) {
             int val = (int)dev->data.ac.chargingCurrentLimit;
             if (val != alt_chg_curr) {
                 alt_chg_curr = val;
@@ -1416,7 +1432,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-        if (dev->data.ac.powerLimit > 0) {
+        if (!ignore_updates && dev->data.ac.powerLimit > 0) {
             int val = dev->data.ac.powerLimit;
             if (val != alt_pow_limit) {
                 alt_pow_limit = val;

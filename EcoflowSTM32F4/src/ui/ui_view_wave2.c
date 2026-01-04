@@ -75,7 +75,11 @@ static void send_cmd(uint8_t type, uint8_t val) {
     Wave2SetMsg msg;
     msg.type = type;
     msg.value = val;
-    UART_SendWave2Set(&msg);
+    // Send 3 times for robustness
+    for(int i=0; i<3; i++) {
+        UART_SendWave2Set(&msg);
+        HAL_Delay(10); // Small delay between sends
+    }
     last_cmd_time = HAL_GetTick(); // Update timestamp
 }
 
@@ -333,8 +337,8 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
 
-    // Suppress updates for 2 seconds after user interaction to prevent UI jumping
-    if ((HAL_GetTick() - last_cmd_time) < 2000) {
+    // Suppress updates for 4 seconds after user interaction to prevent UI jumping
+    if ((HAL_GetTick() - last_cmd_time) < 4000) {
         return;
     }
 

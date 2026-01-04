@@ -17,6 +17,7 @@
 #include "mr521.pb.h"
 #include "dc009_apl_comm.pb.h"
 #include <pb_encode.h>
+#include <algorithm>
 static const char* TAG = "EcoflowESP32";
 
 // Static vector to hold instances for the static notify callback
@@ -132,6 +133,7 @@ void EcoflowESP32::disconnectAndForget() {
     }
     _ble_address = "";
     _deviceSn = "";
+    _txSeq = 0; // Reset transaction sequence
     _state = ConnectionState::NOT_CONNECTED;
     if (_pAdvertisedDevice) {
         delete _pAdvertisedDevice;
@@ -175,7 +177,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                     self->_state = ConnectionState::DISCONNECTED;
                 }
             }
-        } else if (self->_state >= ConnectionState::CONNECTED && !self->_pClient->isConnected()){
+        } else if (self->_state >= ConnectionState::CONNECTED && self->_state < ConnectionState::DISCONNECTING && !self->_pClient->isConnected()){
              ESP_LOGW(TAG, "Client disconnected unexpectedly");
              self->onDisconnect(self->_pClient);
         }
@@ -510,7 +512,13 @@ int EcoflowESP32::getBatteryLevel() {
 }
 int EcoflowESP32::getInputPower() {
     if (_deviceType == DeviceType::DELTA_PRO_3) return (int)_data.deltaPro3.inputPower;
-    if (_protocolVersion == 2) return (_data.wave2.batPwrWatt > 0) ? _data.wave2.batPwrWatt : 0;
+    if (_protocolVersion == 2) {
+        // Return the largest non-zero power value among Battery, MPPT, and PSDR
+        int p_bat = (_data.wave2.batPwrWatt > 0) ? _data.wave2.batPwrWatt : 0;
+        int p_mppt = (_data.wave2.mpptPwrWatt > 0) ? _data.wave2.mpptPwrWatt : 0;
+        int p_psdr = (_data.wave2.psdrPwrWatt > 0) ? _data.wave2.psdrPwrWatt : 0;
+        return std::max({p_bat, p_mppt, p_psdr});
+    }
     return (int)_data.delta3.inputPower;
 }
 int EcoflowESP32::getOutputPower() {
