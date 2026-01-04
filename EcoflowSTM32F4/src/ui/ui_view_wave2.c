@@ -4,12 +4,6 @@
 #include "ui_lvgl.h" // For UI_LVGL_ShowDashboard
 #include <stdio.h>
 
-static float get_float_aligned(const float *ptr) {
-    float val;
-    memcpy(&val, ptr, sizeof(float));
-    return val;
-}
-
 static lv_obj_t * scr_wave2;
 static lv_style_t style_scr;
 static lv_style_t style_panel;
@@ -338,25 +332,29 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
 
     lv_label_set_text_fmt(label_cur_temp, "%d C", (int)get_float_aligned(&data->envTemp));
 
+    int setTemp = get_int32_aligned(&data->setTemp);
     if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+        lv_arc_set_value(arc_set_temp, setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {
-        lv_dropdown_set_selected(dd_sub_mode, data->subMode);
+    int subMode = get_int32_aligned(&data->subMode);
+    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+        lv_dropdown_set_selected(dd_sub_mode, subMode);
     }
 
+    int fanVal = get_int32_aligned(&data->fanValue);
     if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, data->fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)data->fanValue);
+        lv_slider_set_value(slider_fan, fanVal, LV_ANIM_ON);
+        lv_label_set_text_fmt(label_fan_val, "Fan: %d", fanVal);
     }
 
     // Update Power Button State
+    int pwrMode = get_int32_aligned(&data->powerMode);
     if (btn_pwr) {
-        if (data->powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        if (pwrMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(data->mode, data->subMode, data->powerMode != 0);
+    update_visibility(get_int32_aligned(&data->mode), subMode, pwrMode != 0);
 }
