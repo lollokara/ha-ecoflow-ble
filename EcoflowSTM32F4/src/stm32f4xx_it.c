@@ -18,8 +18,23 @@ void NMI_Handler(void)
     while (1) { }
 }
 
-void HardFault_Handler(void)
+void prvGetRegistersFromStack(uint32_t *pStack)
 {
+    printf("\n\n=== HARD FAULT ===\n");
+    printf("R0   = 0x%08lX\n", pStack[0]);
+    printf("R1   = 0x%08lX\n", pStack[1]);
+    printf("R2   = 0x%08lX\n", pStack[2]);
+    printf("R3   = 0x%08lX\n", pStack[3]);
+    printf("R12  = 0x%08lX\n", pStack[4]);
+    printf("LR   = 0x%08lX\n", pStack[5]);
+    printf("PC   = 0x%08lX\n", pStack[6]);
+    printf("xPSR = 0x%08lX\n", pStack[7]);
+
+    printf("CFSR = 0x%08lX\n", SCB->CFSR);
+    printf("HFSR = 0x%08lX\n", SCB->HFSR);
+    printf("MMAR = 0x%08lX\n", SCB->MMFAR);
+    printf("BFAR = 0x%08lX\n", SCB->BFAR);
+
     // Direct Register Red LED Blink (PD5)
     // 1. Enable GPIOD Clock (RCC_AHB1ENR bit 3)
     RCC->AHB1ENR |= (1 << 3);
@@ -31,6 +46,18 @@ void HardFault_Handler(void)
         GPIOD->ODR ^= (1 << 5); // Toggle PD5
         for(volatile int i=0; i<1000000; i++); // Delay
     }
+}
+
+__attribute__((naked)) void HardFault_Handler(void)
+{
+  __asm volatile
+  (
+    " tst lr, #4                                                \n"
+    " ite eq                                                    \n"
+    " mrseq r0, msp                                             \n"
+    " mrsne r0, psp                                             \n"
+    " b prvGetRegistersFromStack                                \n"
+  );
 }
 
 void MemManage_Handler(void)
