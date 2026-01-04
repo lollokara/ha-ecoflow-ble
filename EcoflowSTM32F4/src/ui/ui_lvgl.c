@@ -20,6 +20,7 @@
 #include "ui_utils.h"  // For safe aligned access
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h> // For abs()
 #include "stm32f4xx_hal.h"
 
 // External Backlight Control
