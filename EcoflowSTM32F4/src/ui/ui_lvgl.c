@@ -880,6 +880,19 @@ static void event_alt_toggle(lv_event_t * e) {
 static void event_alt_mode_click(lv_event_t * e) {
     int mode = (intptr_t)lv_event_get_user_data(e);
     UART_SendSetValue(SET_VAL_ALT_MODE, mode);
+
+    // Optimistic UI Update: Set this button to checked, others unchecked
+    lv_obj_t * btn = lv_event_get_target(e);
+    lv_obj_t * parent = lv_obj_get_parent(btn);
+    uint32_t cnt = lv_obj_get_child_cnt(parent);
+    for(uint32_t i=0; i<cnt; i++) {
+        lv_obj_t * child = lv_obj_get_child(parent, i);
+        if (child == btn) {
+            lv_obj_add_state(child, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(child, LV_STATE_CHECKED);
+        }
+    }
 }
 
 static void event_consume(lv_event_t * e) {
@@ -1186,7 +1199,6 @@ static void create_dashboard(void) {
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 140, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lbl_wave_txt = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave_txt, "Wave 2");
@@ -1776,5 +1788,30 @@ void UI_LVGL_Update(DeviceStatus* dev) {
        if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
        else lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
        toggle = !toggle;
+    }
+}
+
+void UI_UpdateDashboardConnectionState(DeviceList *list) {
+    if (!list) return;
+
+    bool d3_connected = false;
+
+    for (int i=0; i < list->count; i++) {
+        // Update Cache
+        int id = list->devices[i].id;
+        if (id > 0 && id <= MAX_DEVICES) {
+             device_cache[id - 1].connected = list->devices[i].connected;
+        }
+
+        // Check Main Device
+        if (id == DEV_TYPE_DELTA_3 || id == DEV_TYPE_DELTA_PRO_3) {
+             if (list->devices[i].connected) d3_connected = true;
+        }
+    }
+
+    if (d3_connected) {
+         lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+    } else {
+         lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
     }
 }
