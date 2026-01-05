@@ -1186,7 +1186,7 @@ static void create_dashboard(void) {
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 140, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
+    // lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lbl_wave_txt = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave_txt, "Wave 2");
@@ -1372,7 +1372,16 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (btn_wave2) {
         bool connected = (w2_cache && w2_cache->connected);
         int32_t mode = connected ? get_int32_aligned(&w2_cache->data.w2.powerMode) : 0;
-        int32_t watts = connected ? get_int32_aligned(&w2_cache->data.w2.batPwrWatt) : 0;
+
+        int32_t watts = 0;
+        if (connected) {
+             int32_t bat = get_int32_aligned(&w2_cache->data.w2.batPwrWatt);
+             int32_t mppt = get_int32_aligned(&w2_cache->data.w2.mpptPwrWatt);
+             int32_t psdr = get_int32_aligned(&w2_cache->data.w2.psdrPwrWatt);
+             if (mppt > 0) watts = mppt;
+             else if (psdr > 0) watts = psdr;
+             else watts = abs(bat);
+        }
 
         if (connected != last_w2_connected || mode != last_w2_mode || (connected && mode != 0 && watts != last_w2_watts)) {
             if (connected) {
@@ -1421,6 +1430,36 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     // Check if Alternator Charger is present and updating
     if (dev->id == DEV_TYPE_ALT_CHARGER) {
          // Logic moved to top of function for consistent blinking
+    }
+
+    // Update Alt Charger Popup if visible
+    if (cont_popup_alt && !lv_obj_has_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN)) {
+        DeviceStatus* ac_dev = UI_GetDeviceCache(DEV_TYPE_ALT_CHARGER - 1);
+        if (ac_dev) {
+            lv_obj_t * panel = lv_obj_get_child(cont_popup_alt, 0);
+            // Update Switch (child 0 of panel)
+            lv_obj_t * sw = lv_obj_get_child(panel, 0);
+            if(lv_obj_check_type(sw, &lv_switch_class)) {
+                if (ac_dev->data.ac.chargerOpen) lv_obj_add_state(sw, LV_STATE_CHECKED);
+                else lv_obj_clear_state(sw, LV_STATE_CHECKED);
+            }
+            // Update Buttons (child 2 of panel)
+            lv_obj_t * cont_btns = lv_obj_get_child(panel, 2);
+            int mode = ac_dev->data.ac.chargerMode;
+            // Buttons are children 0, 1, 2 of cont_btns
+            // 0: Mode 1 (Charging)
+            // 1: Mode 3 (Reverse)
+            // 2: Mode 2 (Maintenance)
+            for(int i=0; i<3; i++) {
+                lv_obj_t * btn = lv_obj_get_child(cont_btns, i);
+                int btn_mode = 0;
+                if(i==0) btn_mode = 1;
+                if(i==1) btn_mode = 3;
+                if(i==2) btn_mode = 2;
+                if(mode == btn_mode) lv_obj_add_state(btn, LV_STATE_CHECKED);
+                else lv_obj_clear_state(btn, LV_STATE_CHECKED);
+            }
+        }
     }
 
     // Map data
@@ -1776,5 +1815,15 @@ void UI_LVGL_Update(DeviceStatus* dev) {
        if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
        else lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
        toggle = !toggle;
+    }
+
+    // Update D3P Disconnected Label based on Cache (Global Check)
+    DeviceStatus* d3p_c = UI_GetDeviceCache(DEV_TYPE_DELTA_PRO_3 - 1);
+    DeviceStatus* d3_c = UI_GetDeviceCache(DEV_TYPE_DELTA_3 - 1);
+    bool main_conn = (d3p_c && d3p_c->connected) || (d3_c && d3_c->connected);
+    if (main_conn) {
+         lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+    } else {
+         lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
     }
 }
