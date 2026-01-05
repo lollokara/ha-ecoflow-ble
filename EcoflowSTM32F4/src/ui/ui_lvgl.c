@@ -1827,3 +1827,15 @@ void UI_LVGL_Update(DeviceStatus* dev) {
          lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
     }
 }
+
+void UI_UpdateConnectionStatus(uint8_t devId, bool connected) {
+    if (devId > 0 && devId <= MAX_DEVICES) {
+        device_cache[devId - 1].connected = connected ? 1 : 0;
+        // Trigger UI refresh logic implicitly next cycle or immediate if needed?
+        // Since UI_LVGL_Update is periodic or event driven, updating cache is enough for next frame.
+        // But we should manually force an update of the disconnected label if D3/D3P changed.
+        if (devId == DEV_TYPE_DELTA_3 || devId == DEV_TYPE_DELTA_PRO_3) {
+             UI_LVGL_Update(NULL);
+        }
+    }
+}

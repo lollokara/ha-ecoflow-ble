@@ -60,7 +60,7 @@ static void update_panel_state(DevPanel* p, bool connected, bool paired) {
     lv_obj_remove_event_cb(p->btn, event_forget_device);
     lv_obj_remove_event_cb(p->btn, event_connect_device);
 
-    if (connected) {
+    if (connected && paired) {
         lv_label_set_text(p->lbl_status, "Status: Connected");
         lv_obj_set_style_text_color(p->lbl_status, lv_palette_main(LV_PALETTE_GREEN), 0);
 
@@ -98,7 +98,8 @@ static void create_device_panel(lv_obj_t * parent, const char * name, uint8_t ty
 
     // Status
     lv_obj_t * l_status = lv_label_create(panel);
-    lv_label_set_text(l_status, "Status: --");
+    lv_label_set_text(l_status, "Status: Disconnected");
+    lv_obj_set_style_text_color(l_status, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_align(l_status, LV_ALIGN_LEFT_MID, 0, -10);
 
     // Button

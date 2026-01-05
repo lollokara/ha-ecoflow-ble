@@ -19,6 +19,9 @@ void UI_ResetIdleTimer(void);
 // Access to cache for debug view
 DeviceStatus* UI_GetDeviceCache(int index);
 
+// Force update connection status in cache
+void UI_UpdateConnectionStatus(uint8_t devId, bool connected);
+
 #ifdef __cplusplus
 }
 #endif
