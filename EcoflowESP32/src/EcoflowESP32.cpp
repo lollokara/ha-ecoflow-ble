@@ -217,6 +217,11 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                         self->_lastKeepAliveTime = millis();
                         self->requestData();
                     }
+                    // Data Timeout Check (20 seconds)
+                    if (millis() - self->_lastRxTime > 20000) {
+                        ESP_LOGW(TAG, "Data timeout (20s) - Disconnecting");
+                        self->_pClient->disconnect();
+                    }
                     break;
                 default:
                     // Handle authentication timeout
@@ -273,6 +278,7 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _connectionRetries = 0;
     _state = ConnectionState::SERVICE_DISCOVERY;
     _lastAuthActivity = millis();
+    _lastRxTime = millis();
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
@@ -377,6 +383,8 @@ void EcoflowESP32::_startAuthentication() {
  */
 void EcoflowESP32::_handlePacket(Packet* pkt) {
     ESP_LOGD(TAG, "_handlePacket: cmdId=0x%02x", pkt->getCmdId());
+    // Valid packet received, update Rx timer
+    _lastRxTime = millis();
     if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data, _deviceType);
 
