@@ -2,6 +2,7 @@
 #include "ecoflow_protocol.h"
 #include "display_task.h"
 #include "stm32f4xx_hal.h"
+#include "ui/ui_lvgl.h" // For UI_UpdateConnectionStatus
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
@@ -167,6 +168,11 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     else if (cmd == CMD_DEVICE_LIST) {
         if (protocolState == STATE_WAIT_DEVICE_LIST || protocolState == STATE_POLLING) {
             unpack_device_list_message(packet, &knownDevices);
+
+            // Sync with UI cache immediately
+            for(int i=0; i<knownDevices.count; i++) {
+                UI_UpdateConnectionStatus(knownDevices.devices[i].id, knownDevices.devices[i].connected);
+            }
 
             DisplayEvent event;
             event.type = DISPLAY_EVENT_UPDATE_DEVICE_LIST;
