@@ -4,6 +4,7 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include "Stm32Serial.h"
+#include "Credentials.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -21,8 +22,8 @@ void WebServer::begin() {
     prefs.end();
 
     if (ssid.length() == 0) {
-        ssid = "Casa!";
-        pass = "CasaKaravania";
+        ssid = WIFI_SSID;
+        pass = WIFI_PASSWORD;
     }
 
     if (ssid.length() > 0) {
@@ -93,7 +94,7 @@ static File stm32File;
 void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
         Serial.printf("[WebServer] STM32 Update Start: %s\n", filename.c_str());
-        LittleFS.begin();
+        LittleFS.begin(true);
         stm32File = LittleFS.open("/stm32_update.bin", "w");
         if (!stm32File) {
             Serial.println("[WebServer] Failed to open file for writing");
