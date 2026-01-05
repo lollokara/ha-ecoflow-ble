@@ -302,6 +302,49 @@ static void event_to_wave2(lv_event_t * e) {
 void UI_LVGL_ShowDashboard(void) {
     lv_scr_load_anim(scr_dash, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, false);
 }
+
+void UI_UpdateDashboardConnectionState(DeviceList *list) {
+    if (!list) return;
+
+    // Update connection cache for all devices
+    for(int i=0; i<list->count; i++) {
+        uint8_t id = list->devices[i].id;
+        if (id > 0 && id <= MAX_DEVICES) {
+            device_cache[id - 1].connected = list->devices[i].connected;
+        }
+    }
+
+    // Determine Main Device Connection Status (D3 or D3P)
+    bool main_connected = false;
+    bool d3p_found = false;
+    bool d3_found = false;
+
+    for(int i=0; i<list->count; i++) {
+        if (list->devices[i].id == DEV_TYPE_DELTA_PRO_3) {
+            d3p_found = true;
+            if (list->devices[i].connected) main_connected = true;
+        } else if (list->devices[i].id == DEV_TYPE_DELTA_3) {
+            d3_found = true;
+            if (list->devices[i].connected) main_connected = true;
+        }
+    }
+
+    // Logic: If we have a main device paired but not connected, show label.
+    // If no main device is even paired (not in list?), maybe hide?
+    // User request: "If the Delta 3 pro is not connected a text saying not connected should be placed"
+    // We assume if it's in the list, it's relevant.
+
+    // Simplification: If either D3 or D3P is known and connected, we are good.
+    // If we know about D3/D3P and NEITHER is connected, show text.
+
+    if (d3p_found || d3_found) {
+        if (main_connected) {
+             if (label_d3_disc) lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+        } else {
+             if (label_d3_disc) lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
 void UI_LVGL_ShowWave2(void) {
     event_to_wave2(NULL);
 }
@@ -878,8 +921,23 @@ static void event_alt_toggle(lv_event_t * e) {
 }
 
 static void event_alt_mode_click(lv_event_t * e) {
+    lv_obj_t * btn = lv_event_get_target(e);
     int mode = (intptr_t)lv_event_get_user_data(e);
     UART_SendSetValue(SET_VAL_ALT_MODE, mode);
+
+    // Optimistic UI Update: Set clicked button to Checked, others to Unchecked
+    lv_obj_t * cont = lv_obj_get_parent(btn);
+    if (cont) {
+        uint32_t count = lv_obj_get_child_cnt(cont);
+        for(uint32_t i=0; i<count; i++) {
+            lv_obj_t * child = lv_obj_get_child(cont, i);
+            if (child == btn) {
+                lv_obj_add_state(child, LV_STATE_CHECKED);
+            } else {
+                lv_obj_clear_state(child, LV_STATE_CHECKED);
+            }
+        }
+    }
 }
 
 static void event_consume(lv_event_t * e) {
@@ -1186,7 +1244,7 @@ static void create_dashboard(void) {
     lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 140, btn_y);
     lv_obj_add_style(btn_wave2, &style_btn_default, 0);
     lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
+    // Removed LV_OBJ_FLAG_CHECKABLE so it acts as a simple navigation button (visual state managed by Update)
     lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
     lbl_wave_txt = lv_label_create(btn_wave2);
     lv_label_set_text(lbl_wave_txt, "Wave 2");
