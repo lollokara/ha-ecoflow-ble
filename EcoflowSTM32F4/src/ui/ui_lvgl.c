@@ -1153,23 +1153,12 @@ static void create_dashboard(void) {
     ui_set_icon(lbl_set, MDI_ICON_SETTINGS);
     lv_obj_center(lbl_set);
 
-    // Wave 2 (Left of Settings)
-    btn_wave2 = lv_btn_create(scr_dash);
-    lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
-    lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 210, btn_y);
-    lv_obj_add_style(btn_wave2, &style_btn_default, 0);
-    lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
-    lbl_wave_txt = lv_label_create(btn_wave2);
-    lv_label_set_text(lbl_wave_txt, "Wave 2");
-    lv_obj_set_style_text_align(lbl_wave_txt, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_center(lbl_wave_txt);
-
     // Toggles (Center Bottom)
+    // Order: AC (-140), 12V (0), Wave 2 (+140)
+
     btn_ac_toggle = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_ac_toggle, btn_w, btn_h);
-    lv_obj_align(btn_ac_toggle, LV_ALIGN_BOTTOM_MID, -70, btn_y);
+    lv_obj_align(btn_ac_toggle, LV_ALIGN_BOTTOM_MID, -140, btn_y);
     lv_obj_add_style(btn_ac_toggle, &style_btn_default, 0);
     lv_obj_add_style(btn_ac_toggle, &style_btn_green, LV_STATE_CHECKED);
     lv_obj_add_flag(btn_ac_toggle, LV_OBJ_FLAG_CHECKABLE);
@@ -1181,7 +1170,7 @@ static void create_dashboard(void) {
 
     btn_dc_toggle = lv_btn_create(scr_dash);
     lv_obj_set_size(btn_dc_toggle, btn_w, btn_h);
-    lv_obj_align(btn_dc_toggle, LV_ALIGN_BOTTOM_MID, 70, btn_y);
+    lv_obj_align(btn_dc_toggle, LV_ALIGN_BOTTOM_MID, 0, btn_y);
     lv_obj_add_style(btn_dc_toggle, &style_btn_default, 0);
     lv_obj_add_style(btn_dc_toggle, &style_btn_green, LV_STATE_CHECKED);
     lv_obj_add_flag(btn_dc_toggle, LV_OBJ_FLAG_CHECKABLE);
@@ -1190,6 +1179,19 @@ static void create_dashboard(void) {
     lv_label_set_text(lbl_dc_t, "12V\nOFF");
     lv_obj_set_style_text_align(lbl_dc_t, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(lbl_dc_t);
+
+    // Wave 2 (Right)
+    btn_wave2 = lv_btn_create(scr_dash);
+    lv_obj_set_size(btn_wave2, 120, 70); // Same Size as 12V/AC
+    lv_obj_align(btn_wave2, LV_ALIGN_BOTTOM_MID, 140, btn_y);
+    lv_obj_add_style(btn_wave2, &style_btn_default, 0);
+    lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+    lv_obj_add_flag(btn_wave2, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_add_event_cb(btn_wave2, event_to_wave2, LV_EVENT_CLICKED, NULL); // Link to Wave 2
+    lbl_wave_txt = lv_label_create(btn_wave2);
+    lv_label_set_text(lbl_wave_txt, "Wave 2");
+    lv_obj_set_style_text_align(lbl_wave_txt, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(lbl_wave_txt);
 
 
     // --- Popup Overlay ---
@@ -1363,28 +1365,43 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     // Update Wave 2 Button State (Global Check, not just on update)
     // We check cache for connection status
     DeviceStatus* w2_cache = UI_GetDeviceCache(DEV_TYPE_WAVE_2 - 1);
-    if (btn_wave2) {
-        if (w2_cache && w2_cache->connected) {
-             // Connected
-             int32_t mode = get_int32_aligned(&w2_cache->data.w2.powerMode);
-             int32_t watts = get_int32_aligned(&w2_cache->data.w2.batPwrWatt);
+    static bool last_w2_connected = false;
+    static int32_t last_w2_mode = -1;
+    static int32_t last_w2_watts = -1;
 
-             if (mode != 0) {
-                  lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
-                  lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-                  lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
-                  lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
-             } else {
-                  lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
-                  lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
-                  lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
-                  lv_label_set_text(lbl_wave_txt, "Wave 2");
-             }
-        } else {
-             // Disconnected -> Red
-             lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
-             lv_obj_add_style(btn_wave2, &style_btn_red, 0);
-             lv_label_set_text(lbl_wave_txt, "Wave 2\nDisc.");
+    if (btn_wave2) {
+        bool connected = (w2_cache && w2_cache->connected);
+        int32_t mode = connected ? get_int32_aligned(&w2_cache->data.w2.powerMode) : 0;
+        int32_t watts = connected ? get_int32_aligned(&w2_cache->data.w2.batPwrWatt) : 0;
+
+        if (connected != last_w2_connected || mode != last_w2_mode || (connected && mode != 0 && watts != last_w2_watts)) {
+            if (connected) {
+                 // Connected
+                 if (mode != 0) {
+                      if (!last_w2_connected) { // Clear red if coming from disconnected
+                          lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
+                      }
+                      lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+                      lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
+                      lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
+                 } else {
+                      if (!last_w2_connected) {
+                          lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
+                      }
+                      lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+                      lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                      lv_label_set_text(lbl_wave_txt, "Wave 2");
+                 }
+            } else {
+                 // Disconnected -> Red
+                 lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                 lv_obj_add_style(btn_wave2, &style_btn_red, 0);
+                 lv_label_set_text(lbl_wave_txt, "Wave 2\nDisc.");
+            }
+
+            last_w2_connected = connected;
+            last_w2_mode = mode;
+            last_w2_watts = watts;
         }
     }
 
