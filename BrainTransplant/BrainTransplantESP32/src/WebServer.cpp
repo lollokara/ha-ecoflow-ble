@@ -4,7 +4,6 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include "Stm32Serial.h"
-#include "Credentials.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -22,8 +21,8 @@ void WebServer::begin() {
     prefs.end();
 
     if (ssid.length() == 0) {
-        ssid = WIFI_SSID;
-        pass = WIFI_PASSWORD;
+        ssid = "Casa!";
+        pass = "CasaKaravania";
     }
 
     if (ssid.length() > 0) {

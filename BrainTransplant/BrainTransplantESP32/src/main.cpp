@@ -6,7 +6,6 @@
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
-#include "Credentials.h"
 #include "WebServer.h"
 #include "Stm32Serial.h"
 
