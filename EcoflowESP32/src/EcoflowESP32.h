@@ -199,6 +199,7 @@ public:
     uint32_t _lastConnectionAttempt = 0;
     uint32_t _lastScanTime = 0;
     uint32_t _lastAuthActivity = 0;
+    uint32_t _lastRxTime = 0;
 
     EcoflowCrypto _crypto;
     EcoflowData _data;

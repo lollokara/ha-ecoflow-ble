@@ -306,6 +306,7 @@ int main(void) {
     ESP32_Reset_Init();
 
     MX_TIM2_Init();
+    SetBacklight(75); // Ensure screen is visible at boot
 
     MX_IWDG_Init(); // Watchdog Enabled
 
