@@ -1202,6 +1202,36 @@ void UI_LVGL_Update(DeviceStatus* dev) {
          else lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
     }
 
+    // --- Van Dot Blink Logic ---
+    static uint32_t last_van_blink_time = 0;
+    static bool van_dot_on = false;
+
+    // Trigger Blink if new packet
+    if (dev && dev->id == DEV_TYPE_ALT_CHARGER) {
+         van_dot_on = true;
+         last_van_blink_time = now;
+
+         // Update Label here while we have dev
+         if (label_van_vol) {
+             float van_vol = dev->data.ac.carBatteryVoltage;
+             int d = (int)van_vol;
+             int f = (int)abs((van_vol - d) * 10); // Use abs for fraction
+             lv_label_set_text_fmt(label_van_vol, "Van: %d.%d V", d, f);
+         }
+    }
+
+    // Handle State Transition (Red/Green)
+    if (led_van_dot) {
+        if (van_dot_on) {
+            lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+            if (now - last_van_blink_time > 200) {
+                van_dot_on = false;
+            }
+        } else {
+            lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_RED), 0);
+        }
+    }
+
     if (!dev) return;
 
     // Cache the device status
@@ -1233,30 +1263,8 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Check if Alternator Charger is present and updating
-    static uint32_t last_van_blink_time = 0;
-    static bool van_dot_on = false;
-
     if (dev->id == DEV_TYPE_ALT_CHARGER) {
-         // Update Van Voltage Label
-         float van_vol = dev->data.ac.carBatteryVoltage;
-         // Round to 1 decimal: handled by %.1f
-         int d = (int)van_vol;
-         int f = (int)((van_vol - d) * 10);
-         lv_label_set_text_fmt(label_van_vol, "Van: %d.%d V", d, abs(f));
-
-         // Trigger Blink Green
-         van_dot_on = true;
-         last_van_blink_time = now;
-    }
-
-    // Handle Van Dot Blink Logic (Turn off after 200ms)
-    if (van_dot_on) {
-        lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
-        if (now - last_van_blink_time > 200) {
-            van_dot_on = false;
-        }
-    } else {
-        lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_RED), 0);
+         // Logic moved to top of function for consistent blinking
     }
 
     // Map data
