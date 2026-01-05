@@ -52,6 +52,19 @@ DeviceStatus* UI_GetDeviceCache(int index) {
     return NULL;
 }
 
+void UI_UpdateConnectionCache(DeviceList* list) {
+    for (int i = 0; i < list->count; i++) {
+        uint8_t id = list->devices[i].id;
+        if (id > 0 && id <= MAX_DEVICES) {
+            device_cache[id - 1].id = id; // Ensure ID is set
+            device_cache[id - 1].connected = list->devices[i].connected;
+            // Name also?
+        }
+    }
+    // Force UI Update for Disconnected Logic
+    UI_LVGL_Update(NULL);
+}
+
 // --- Styles ---
 static lv_style_t style_scr;
 static lv_style_t style_panel;
@@ -1355,10 +1368,8 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         }
     }
 
-    if (!dev) return;
-
-    // Cache the device status
-    if (dev->id > 0 && dev->id <= MAX_DEVICES) {
+    // Cache the device status if provided
+    if (dev && dev->id > 0 && dev->id <= MAX_DEVICES) {
         memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
     }
 
@@ -1413,13 +1424,13 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Process Wave 2 specific updates
-    if (dev->id == DEV_TYPE_WAVE_2) {
+    if (dev && dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
         return; // Don't update dashboard main stats with Wave 2 data
     }
 
     // Check if Alternator Charger is present and updating
-    if (dev->id == DEV_TYPE_ALT_CHARGER) {
+    if (dev && dev->id == DEV_TYPE_ALT_CHARGER) {
          // Logic moved to top of function for consistent blinking
     }
 
@@ -1431,7 +1442,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     bool is_main_device = false;
     bool ac_plugged_in = false;
 
-    if (dev->id == DEV_TYPE_DELTA_PRO_3) {
+    if (dev && dev->id == DEV_TYPE_DELTA_PRO_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3p.batteryLevel));
         // Use AC Input specifically for Grid
@@ -1450,7 +1461,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         if (get_int32_aligned(&dev->data.d3p.acInputStatus) == 2) {
              ac_plugged_in = true;
         }
-    } else if (dev->id == DEV_TYPE_DELTA_3) {
+    } else if (dev && dev->id == DEV_TYPE_DELTA_3) {
         is_main_device = true;
         soc = safe_float_to_int(get_float_aligned(&dev->data.d3.batteryLevel));
         in_ac = safe_float_to_int(get_float_aligned(&dev->data.d3.acInputPower));
@@ -1619,7 +1630,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 lv_obj_invalidate(arc_batt);
             }
         }
-    } else if (dev->id == DEV_TYPE_ALT_CHARGER) {
+    } else if (dev && dev->id == DEV_TYPE_ALT_CHARGER) {
         // Suppress updates for 4 seconds after user interaction
         bool ignore_updates = (HAL_GetTick() - last_alt_cmd_time) < 4000;
 
@@ -1755,26 +1766,36 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         first_run = false;
     }
 
-    // Update Disconnected State
-    if (dev->connected) {
-        lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0); // Green dot for data
-    } else {
-        lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    // Update Disconnected State (If dev is provided, it's the source of truth for blinking)
+    if (dev) {
+        if (dev->connected) {
+            lv_obj_add_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0); // Green dot for data
+        } else {
+            lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+        }
 
-        // If main device disconnected, show the text
-        if (is_main_device) {
+        // Blink indicator only if connected
+        static bool toggle = false;
+        if (dev->connected) {
+           if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+           else lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+           toggle = !toggle;
+        }
+    } else {
+        // Global Refresh triggered by Device List update
+        // Check main device connection in cache
+        DeviceStatus* d3 = UI_GetDeviceCache(DEV_TYPE_DELTA_3 - 1);
+        DeviceStatus* d3p = UI_GetDeviceCache(DEV_TYPE_DELTA_PRO_3 - 1);
+        bool main_connected = false;
+        if (d3 && d3->connected) main_connected = true;
+        if (d3p && d3p->connected) main_connected = true;
+
+        if (main_connected) {
+             lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+        } else {
              lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
         }
-    }
-
-
-    // Blink indicator
-    static bool toggle = false;
-    if (dev->connected) {
-       if (toggle) lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
-       else lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
-       toggle = !toggle;
     }
 }
