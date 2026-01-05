@@ -7,79 +7,38 @@
  * @brief Header for the Stm32Serial class.
  *
  * Defines the singleton class responsible for managing the UART connection
- * to the STM32F4 user interface controller.
+ * to the STM32F4 bootloader.
  */
 
 #include <Arduino.h>
-#include "ecoflow_protocol.h"
 #include <freertos/semphr.h>
 
-/**
- * @class Stm32Serial
- * @brief Singleton class for ESP32-STM32 UART communication.
- *
- * This class handles:
- * - Initialization of the hardware serial port.
- * - Processing incoming packets (parsing, CRC validation).
- * - Sending outgoing packets (Handshakes, Status Updates).
- */
+// Protocol Constants
+#define START_BYTE 0xAA
+#define CMD_HANDSHAKE 0x01
+#define CMD_OTA_START 0xA0
+#define CMD_OTA_CHUNK 0xA1
+#define CMD_OTA_END 0xA2
+#define CMD_OTA_APPLY 0xA3
+#define CMD_OTA_ACK 0x06
+#define CMD_OTA_NACK 0x15
+
 class Stm32Serial {
 public:
-    /**
-     * @brief Gets the singleton instance.
-     * @return Reference to the Stm32Serial instance.
-     */
     static Stm32Serial& getInstance() {
         static Stm32Serial instance;
         return instance;
     }
 
-    /**
-     * @brief Initializes the serial interface.
-     */
     void begin();
-
-    /**
-     * @brief Updates the serial handler.
-     * Must be called frequently in the main loop to process incoming data.
-     */
     void update();
-
-    /**
-     * @brief Sends the current list of devices to the STM32.
-     */
-    void sendDeviceList();
-
-    /**
-     * @brief Sends the status of a specific device to the STM32.
-     * @param device_id The ID of the device to report.
-     */
-    void sendDeviceStatus(uint8_t device_id);
-
-    /**
-     * @brief Starts the background OTA task.
-     * @param filename Path to the firmware file in LittleFS.
-     */
     void startOta(const String& filename);
-
     bool isOtaInProgress() const { return _otaRunning; }
-
-    // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
 
 private:
-    /**
-     * @brief Private constructor for Singleton pattern.
-     */
     Stm32Serial() {}
-
-    /**
-     * @brief Processes a fully received and validated packet.
-     * @param buf Pointer to the packet buffer.
-     * @param len Length of the packet.
-     */
     void processPacket(uint8_t* buf, uint8_t len);
-
     static void otaTask(void* parameter);
 
     bool _otaRunning = false;

@@ -1,3 +1,9 @@
+/**
+ * @file Stm32Serial.cpp
+ * @author Lollokara
+ * @brief Implementation of the UART communication layer between ESP32 and STM32F4.
+ */
+
 #include "Stm32Serial.h"
 #include <WiFi.h>
 #include <LittleFS.h>
@@ -5,7 +11,6 @@
 
 #define RX_PIN 18
 #define TX_PIN 17
-
 static const char* TAG = "Stm32Serial";
 
 extern int ota_state;
@@ -15,6 +20,7 @@ extern String ota_msg;
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
 
+// CRC32 Table (Polynomial 0x04C11DB7)
 static const uint32_t crc32_table[] = {
     0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
     0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
@@ -58,6 +64,19 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
     return ~crc;
 }
 
+// CRC8 (Polynomial 0x31)
+static uint8_t calculate_crc8(const uint8_t *data, size_t len) {
+    uint8_t crc = 0;
+    while (len--) {
+        crc ^= *data++;
+        for (uint8_t i = 0; i < 8; i++) {
+            if (crc & 0x80) crc = (crc << 1) ^ 0x31;
+            else crc <<= 1;
+        }
+    }
+    return crc;
+}
+
 void Stm32Serial::begin() {
     Serial1.begin(921600, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
@@ -70,8 +89,6 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             Serial1.write(data, len);
             xSemaphoreGive(_txMutex);
-        } else {
-            ESP_LOGE(TAG, "Failed to take TX mutex");
         }
     } else {
         Serial1.write(data, len);
@@ -94,8 +111,7 @@ void Stm32Serial::update() {
             }
         } else {
             rx_buf[rx_idx++] = b;
-
-            if (rx_idx == 3) { // We have START, CMD, LEN
+            if (rx_idx == 3) { // START, CMD, LEN
                 expected_len = rx_buf[2];
                 if (expected_len > 250) {
                     collecting = false;
@@ -108,8 +124,6 @@ void Stm32Serial::update() {
 
                     if (received_crc == calculated_crc) {
                         processPacket(rx_buf, rx_idx);
-                    } else {
-                        ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
                     }
                     collecting = false;
                     rx_idx = 0;
@@ -125,22 +139,12 @@ void Stm32Serial::update() {
 
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
-
-    if (cmd == CMD_HANDSHAKE) {
-        uint8_t ack[4];
-        int l = pack_handshake_ack_message(ack);
-        sendData(ack, l);
-    } else if (cmd == CMD_OTA_ACK) {
+    if (cmd == CMD_OTA_ACK) {
         otaAckReceived = true;
     } else if (cmd == CMD_OTA_NACK) {
         otaNackReceived = true;
     }
-    // Other commands ignored for simplified updater
 }
-
-// Stub for device list/status since we stripped DeviceManager
-void Stm32Serial::sendDeviceList() {}
-void Stm32Serial::sendDeviceStatus(uint8_t device_id) {}
 
 static String otaFilename;
 
@@ -153,10 +157,8 @@ void Stm32Serial::startOta(const String& filename) {
 
 void Stm32Serial::otaTask(void* parameter) {
     Stm32Serial* self = (Stm32Serial*)parameter;
-
     File f = LittleFS.open(otaFilename, "r");
     if (!f) {
-        ESP_LOGE(TAG, "Failed to open firmware file");
         ota_state = 4; ota_msg = "FS Error";
         self->_otaRunning = false;
         vTaskDelete(NULL);
@@ -164,9 +166,6 @@ void Stm32Serial::otaTask(void* parameter) {
     }
 
     uint32_t totalSize = f.size();
-    ESP_LOGI(TAG, "Starting OTA. Size: %d", totalSize);
-
-    ESP_LOGI(TAG, "Calculating Checksum...");
     uint32_t crc = 0;
     uint8_t buf[256];
     size_t readLen;
@@ -175,37 +174,32 @@ void Stm32Serial::otaTask(void* parameter) {
         crc = calculate_crc32(crc, buf, readLen);
     }
     f.close();
-    ESP_LOGI(TAG, "CRC32: 0x%08X", crc);
 
     f = LittleFS.open(otaFilename, "r");
 
-    // Send OTA Start
+    // Helper buffer for packets
+    uint8_t pkt[260];
+
+    // OTA START
+    // Packet: [START][CMD][LEN][PAYLOAD][CRC8]
+    // Payload: Size(4 bytes)
+    pkt[0] = START_BYTE;
+    pkt[1] = CMD_OTA_START;
+    pkt[2] = 4;
+    memcpy(&pkt[3], &totalSize, 4);
+    pkt[7] = calculate_crc8(&pkt[1], 6);
+
     bool startSuccess = false;
-    int len = pack_ota_start_message(buf, totalSize);
-
     for(int attempt=0; attempt<3; attempt++) {
-        ESP_LOGI(TAG, "Sending OTA Start (Attempt %d)", attempt+1);
-        self->sendData(buf, len);
-
-        otaAckReceived = false;
-        otaNackReceived = false;
+        self->sendData(pkt, 8);
+        otaAckReceived = false; otaNackReceived = false;
         uint32_t startWait = millis();
-        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) {
-            vTaskDelay(100);
-        }
-
-        if (otaAckReceived) {
-            startSuccess = true;
-            break;
-        }
-        if (otaNackReceived) {
-            ESP_LOGE(TAG, "OTA Start NACK received");
-            vTaskDelay(1000);
-        }
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) vTaskDelay(100);
+        if (otaAckReceived) { startSuccess = true; break; }
+        if (otaNackReceived) vTaskDelay(1000);
     }
 
     if (!startSuccess) {
-        ESP_LOGE(TAG, "OTA Start Failed (Timeout/NACK)");
         ota_state = 4; ota_msg = "Start Timeout";
         f.close();
         self->_otaRunning = false;
@@ -213,64 +207,67 @@ void Stm32Serial::otaTask(void* parameter) {
         return;
     }
 
+    // OTA CHUNKS
     uint32_t offset = 0;
     uint8_t chunk[200];
-    int last_log_progress = -1;
     bool transferFailed = false;
 
     while (f.available()) {
         int bytesRead = f.read(chunk, sizeof(chunk));
-        len = pack_ota_chunk_message(buf, offset, chunk, bytesRead);
+
+        // Payload: Offset(4) + Data(N)
+        pkt[0] = START_BYTE;
+        pkt[1] = CMD_OTA_CHUNK;
+        pkt[2] = 4 + bytesRead;
+        memcpy(&pkt[3], &offset, 4);
+        memcpy(&pkt[7], chunk, bytesRead);
+        pkt[3 + 4 + bytesRead] = calculate_crc8(&pkt[1], 2 + 4 + bytesRead);
+
         bool chunkSuccess = false;
         for(int retries=0; retries<3; retries++) {
-            self->sendData(buf, len);
-            otaAckReceived = false;
-            otaNackReceived = false;
+            self->sendData(pkt, 4 + 4 + bytesRead);
+            otaAckReceived = false; otaNackReceived = false;
             uint32_t startWait = millis();
-            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) {
-                vTaskDelay(5);
-            }
-            if (otaAckReceived) {
-                chunkSuccess = true;
-                break;
-            }
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) vTaskDelay(5);
+            if (otaAckReceived) { chunkSuccess = true; break; }
         }
         if (!chunkSuccess) {
-            ESP_LOGE(TAG, "OTA Chunk Failed at %d", offset);
             ota_state = 4; ota_msg = "Chunk Fail";
             transferFailed = true;
             break;
         }
         offset += bytesRead;
         ota_progress = (offset * 100) / totalSize;
-        if (ota_progress != last_log_progress && ota_progress % 10 == 0) {
-            ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d)", ota_progress, offset, totalSize);
-            last_log_progress = ota_progress;
-        }
     }
 
     f.close();
 
     if (!transferFailed && offset == totalSize) {
-        ESP_LOGI(TAG, "OTA Upload Complete. Sending End...");
-        len = pack_ota_end_message(buf, crc);
+        // OTA END
+        // Payload: CRC32(4)
+        pkt[0] = START_BYTE;
+        pkt[1] = CMD_OTA_END;
+        pkt[2] = 4;
+        memcpy(&pkt[3], &crc, 4);
+        pkt[7] = calculate_crc8(&pkt[1], 6);
+
         bool endSuccess = false;
         for(int retries=0; retries<3; retries++) {
-            self->sendData(buf, len);
-            otaAckReceived = false;
-            otaNackReceived = false;
-             uint32_t startWait = millis();
-            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) {
-                vTaskDelay(50);
-            }
+            self->sendData(pkt, 8);
+            otaAckReceived = false; otaNackReceived = false;
+            uint32_t startWait = millis();
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) vTaskDelay(50);
             if (otaAckReceived) { endSuccess = true; break; }
         }
 
         if (endSuccess) {
             vTaskDelay(500);
-            ESP_LOGI(TAG, "Sending Apply...");
-            len = pack_ota_apply_message(buf);
-            self->sendData(buf, len);
+            // OTA APPLY
+            pkt[0] = START_BYTE;
+            pkt[1] = CMD_OTA_APPLY;
+            pkt[2] = 0;
+            pkt[3] = calculate_crc8(&pkt[1], 2);
+            self->sendData(pkt, 4);
             ota_state = 3; ota_msg = "STM32 Rebooting...";
         } else {
              ota_state = 4; ota_msg = "Checksum Fail";

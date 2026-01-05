@@ -21,7 +21,7 @@ static void MX_USART3_UART_Init(void);
 
 int main(void) {
     // Relocate Vector Table to Application Address (assuming loaded at 0x08008000)
-    SCB->VTOR = 0x00008000;
+    SCB->VTOR = 0x08008000;
     __DSB();
 
     HAL_Init();

@@ -21,8 +21,9 @@ def merge_firmware(source, target, env):
     print(f"App Path: {app_path}")
 
     if not os.path.exists(bootloader_path):
-        print(f"Warning: Bootloader not found at {bootloader_path}. Skipping merge.")
-        return
+        print(f"Error: Bootloader not found at {bootloader_path}!")
+        print(f"Please build 'BrainTransplantCore' first.")
+        env.Exit(1)
 
     if not os.path.exists(app_path):
         print(f"Error: Application binary not found at {app_path}")

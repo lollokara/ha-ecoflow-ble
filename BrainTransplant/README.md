@@ -38,8 +38,9 @@ A minimal "Hello World" application for the STM32F469I-Discovery.
 5. Bootloader writes to Inactive Bank.
 6. Upon completion (CRC match), Bootloader swaps banks (BFB2 toggle) and resets.
 
-## Compilation
+## Compilation Order
+1. **BrainTransplantCore:** Compile and upload to STM32 first (via ST-Link).
+2. **BrainTransplantF4:** Compile. The post-build script will merge it with the Bootloader binary.
+3. **BrainTransplantESP32:** Compile and upload to ESP32.
+
 Use PlatformIO to compile each project.
-- `BrainTransplantCore`: Upload to STM32 first (via ST-Link).
-- `BrainTransplantESP32`: Upload to ESP32.
-- `BrainTransplantF4`: Compile to `firmware.bin` and upload via Web UI (or ST-Link at 0x08008000).
