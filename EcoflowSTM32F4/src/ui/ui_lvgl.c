@@ -66,6 +66,7 @@ static lv_style_t style_btn_green;
 static lv_obj_t * scr_dash;
 static lv_obj_t * label_temp; // Now Battery Temp
 static lv_obj_t * label_amb_temp; // New Ambient Temp
+static lv_obj_t * label_van_vol; // Van Voltage
 static lv_obj_t * arc_batt;
 static lv_obj_t * label_soc;
 
@@ -98,6 +99,7 @@ static lv_obj_t * label_calib_debug; // For touch calibration
 // Indicator
 static lv_obj_t * led_status_dot;
 static lv_obj_t * led_rp2040_dot; // New RP2040 Dot
+static lv_obj_t * led_van_dot;    // Van Data Dot
 static lv_obj_t * label_disconnected;
 
 // Flow Data Labels - Now managed via card structs
@@ -910,31 +912,50 @@ static void create_dashboard(void) {
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 10);
 
-    // Battery Temp
+    // Order: Amb (RP2040) -> Batt (Device) -> Van (Alt) [Left to Right from perspective of user looking at top right corner?]
+    // User requested order: Amb, Batt, Van.
+    // Coordinates are absolute or relative. Let's stack them from Right to Left.
+    // Rightmost: Van. Middle: Batt. Leftmost: Amb. (Or user meant Left-to-Right order?)
+    // "order should be Amb Batt Van" -> usually implies Amb is first (leftmost of the group) then Batt then Van (rightmost).
+
+    // Van Voltage (Rightmost)
+    label_van_vol = lv_label_create(scr_dash);
+    lv_label_set_text(label_van_vol, "Van: -- V");
+    lv_obj_set_style_text_font(label_van_vol, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_van_vol, LV_ALIGN_TOP_RIGHT, -20, 10);
+
+    led_van_dot = lv_obj_create(scr_dash);
+    lv_obj_set_size(led_van_dot, 15, 15);
+    lv_obj_set_style_radius(led_van_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_border_width(led_van_dot, 0, 0);
+    lv_obj_align(led_van_dot, LV_ALIGN_TOP_RIGHT, -145, 15);
+
+    // Battery Temp (Middle)
     label_temp = lv_label_create(scr_dash);
     lv_label_set_text(label_temp, "Batt: -- C");
     lv_obj_set_style_text_font(label_temp, &lv_font_montserrat_20, 0);
-    lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -20, 10);
+    lv_obj_align(label_temp, LV_ALIGN_TOP_RIGHT, -180, 10);
 
     led_status_dot = lv_obj_create(scr_dash);
     lv_obj_set_size(led_status_dot, 15, 15);
     lv_obj_set_style_radius(led_status_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
     lv_obj_set_style_border_width(led_status_dot, 0, 0);
-    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -140, 15);
+    lv_obj_align(led_status_dot, LV_ALIGN_TOP_RIGHT, -300, 15);
 
-    // Ambient Temp (RP2040)
+    // Ambient Temp (Leftmost of group)
     label_amb_temp = lv_label_create(scr_dash);
     lv_label_set_text(label_amb_temp, "Amb: -- C");
     lv_obj_set_style_text_font(label_amb_temp, &lv_font_montserrat_20, 0);
-    lv_obj_align(label_amb_temp, LV_ALIGN_TOP_RIGHT, -170, 10);
+    lv_obj_align(label_amb_temp, LV_ALIGN_TOP_RIGHT, -330, 10);
 
     led_rp2040_dot = lv_obj_create(scr_dash);
     lv_obj_set_size(led_rp2040_dot, 15, 15);
     lv_obj_set_style_radius(led_rp2040_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(led_rp2040_dot, lv_palette_main(LV_PALETTE_YELLOW), 0); // Default Yellow (Disconnected)
     lv_obj_set_style_border_width(led_rp2040_dot, 0, 0);
-    lv_obj_align(led_rp2040_dot, LV_ALIGN_TOP_RIGHT, -290, 15);
+    lv_obj_align(led_rp2040_dot, LV_ALIGN_TOP_RIGHT, -450, 15);
 
     label_disconnected = lv_label_create(scr_dash);
     lv_label_set_text(label_disconnected, "DISCONNECTED");
@@ -1212,10 +1233,30 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     }
 
     // Check if Alternator Charger is present and updating
+    static uint32_t last_van_blink_time = 0;
+    static bool van_dot_on = false;
+
     if (dev->id == DEV_TYPE_ALT_CHARGER) {
-         // We might want to trigger a dashboard update if Alt Charger data changed significantly?
-         // But main loop below handles D3P updates.
-         // We need to ensure we mix data if needed.
+         // Update Van Voltage Label
+         float van_vol = dev->data.ac.carBatteryVoltage;
+         // Round to 1 decimal: handled by %.1f
+         int d = (int)van_vol;
+         int f = (int)((van_vol - d) * 10);
+         lv_label_set_text_fmt(label_van_vol, "Van: %d.%d V", d, abs(f));
+
+         // Trigger Blink Green
+         van_dot_on = true;
+         last_van_blink_time = now;
+    }
+
+    // Handle Van Dot Blink Logic (Turn off after 200ms)
+    if (van_dot_on) {
+        lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+        if (now - last_van_blink_time > 200) {
+            van_dot_on = false;
+        }
+    } else {
+        lv_obj_set_style_bg_color(led_van_dot, lv_palette_main(LV_PALETTE_RED), 0);
     }
 
     // Map data
