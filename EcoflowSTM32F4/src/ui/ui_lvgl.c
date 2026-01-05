@@ -448,6 +448,7 @@ typedef struct {
     lv_obj_t * icon;
     lv_obj_t * title;
     lv_obj_t * value;
+    lv_obj_t * chevron; // Added for click affordance
 } InfoCardObj;
 
 // Global Card Objects
@@ -460,6 +461,10 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
     lv_obj_set_pos(obj->card, x, y);
     lv_obj_add_style(obj->card, &style_panel, 0);
     lv_obj_clear_flag(obj->card, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Initial Border Style for refined active state
+    lv_obj_set_style_border_width(obj->card, 2, 0);
+    lv_obj_set_style_border_color(obj->card, lv_color_hex(0xFF282828), 0); // Invisible initially
 
     obj->icon = lv_label_create(obj->card);
     ui_set_icon(obj->icon, icon_code);
@@ -477,18 +482,22 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
     lv_obj_add_style(obj->value, &style_text_large, 0);
     lv_obj_set_style_text_font(obj->value, &lv_font_montserrat_20, 0);
     lv_obj_align(obj->value, LV_ALIGN_BOTTOM_RIGHT, 0, 5);
+
+    obj->chevron = NULL; // Default none
 }
 
 static void update_card_style(InfoCardObj * obj, int val) {
     if (val > 0) {
-        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
-        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
-        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
-        // Dark grey or black icon on white looks good.
-        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+        // Refined Active State: Border Highlight instead of full white BG
+        lv_obj_set_style_border_color(obj->card, lv_palette_main(LV_PALETTE_TEAL), 0);
+        // Keep text white/grey for Dark Mode integrity
+        lv_obj_set_style_text_color(obj->title, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        // Ensure Icon stays Teal (fixes regression where it might default to parent text color)
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
     } else {
         // Revert to Dark Theme
-        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_border_color(obj->card, lv_color_hex(0xFF282828), 0); // Match BG
         lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
         lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
         lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
@@ -497,14 +506,14 @@ static void update_card_style(InfoCardObj * obj, int val) {
 
 static void update_card_style_active(InfoCardObj * obj, bool active) {
     if (active) {
-        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
-        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
-        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
-        // Dark grey or black icon on white looks good.
-        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+        // Refined Active State: Border Highlight
+        lv_obj_set_style_border_color(obj->card, lv_palette_main(LV_PALETTE_TEAL), 0);
+        lv_obj_set_style_text_color(obj->title, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
     } else {
         // Revert to Dark Theme
-        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_border_color(obj->card, lv_color_hex(0xFF282828), 0);
         lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
         lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
         lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
@@ -974,6 +983,13 @@ static void create_dashboard(void) {
     lv_obj_add_flag(card_car.card, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(card_car.card, event_car_tile_click, LV_EVENT_CLICKED, NULL);
 
+    // Feature: Add Chevron for Click Affordance
+    card_car.chevron = lv_label_create(card_car.card);
+    lv_label_set_text(card_car.chevron, ">"); // Simple Chevron
+    lv_obj_set_style_text_font(card_car.chevron, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(card_car.chevron, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_align(card_car.chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+
     // --- Right Column (Outputs) ---
     create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &card_usb);
     label_usb_val = card_usb.value;
@@ -1340,6 +1356,16 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             if (first_run || soc != last_soc) {
                 lv_arc_set_value(arc_batt, soc);
                 lv_label_set_text_fmt(label_soc, "%d%%", soc);
+
+                // Feature: Low Battery Warning
+                if (soc < 20) {
+                    lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_RED), LV_PART_INDICATOR);
+                    lv_obj_set_style_text_color(label_soc, lv_palette_main(LV_PALETTE_RED), 0);
+                } else {
+                    lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_TEAL), LV_PART_INDICATOR);
+                    lv_obj_set_style_text_color(label_soc, lv_color_white(), 0);
+                }
+
                 last_soc = soc;
             }
         }
