@@ -403,7 +403,11 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.batSoc = src.batSoc;
         dst.remainingTime = src.remainingTime;
         dst.powerMode = src.powerMode;
-        dst.batPwrWatt = src.batPwrWatt;
+        // Calculate Active Power (Solar > DC > Battery)
+        float power = src.mpptPwrWatt;
+        if (power == 0) power = src.psdrPwrWatt;
+        if (power == 0) power = abs(src.batPwrWatt);
+        dst.batPwrWatt = (int)power;
 
     } else if (type == DeviceType::DELTA_PRO_3) {
         strncpy(status.name, "Delta Pro 3", 15);

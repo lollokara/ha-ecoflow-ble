@@ -101,6 +101,7 @@ static lv_obj_t * led_status_dot;
 static lv_obj_t * led_rp2040_dot; // New RP2040 Dot
 static lv_obj_t * led_van_dot;    // Van Data Dot
 static lv_obj_t * label_disconnected;
+static lv_obj_t * label_d3_disc; // Delta 3/Pro 3 Not Connected Label
 
 // Flow Data Labels - Now managed via card structs
 static lv_obj_t * label_solar_val;
@@ -117,6 +118,8 @@ static lv_obj_t * lbl_wave_txt;
 // Popup
 static lv_obj_t * cont_popup;
 static lv_obj_t * cont_popup_alt;
+static lv_obj_t * cont_popup_w2;
+static uint32_t last_w2_popup_time = 0;
 
 // Animation
 static float anim_phase = 0.0f;
@@ -188,7 +191,107 @@ static void event_to_debug(lv_event_t * e) {
     UI_CreateDebugView();
 }
 
+// Forward declarations for Popup Handlers
+static void event_popup_w2_hide(lv_event_t * e);
+static void event_w2_enable_ac(lv_event_t * e);
+
 static void event_to_wave2(lv_event_t * e) {
+    DeviceStatus* w2 = UI_GetDeviceCache(DEV_TYPE_WAVE_2 - 1);
+
+    // Check connection first
+    if (!w2 || !w2->connected) {
+        // Show Popup
+        if (!cont_popup_w2) {
+             cont_popup_w2 = lv_obj_create(scr_dash);
+             lv_obj_set_size(cont_popup_w2, 800, 480);
+             lv_obj_center(cont_popup_w2);
+             lv_obj_set_style_bg_color(cont_popup_w2, lv_color_black(), 0);
+             lv_obj_set_style_bg_opa(cont_popup_w2, LV_OPA_70, 0);
+
+             lv_obj_t * panel = lv_obj_create(cont_popup_w2);
+             lv_obj_set_size(panel, 500, 300);
+             lv_obj_center(panel);
+             lv_obj_add_style(panel, &style_panel, 0);
+
+             lv_obj_t * lbl = lv_label_create(panel);
+             lv_label_set_text(lbl, "Wave 2 is not connected");
+             lv_obj_set_width(lbl, 450);
+             lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+             lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
+             lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+             lv_obj_align(lbl, LV_ALIGN_TOP_MID, 0, 40);
+
+             // Buttons
+             // We need to re-create or show/hide based on AC state.
+             // Simplest: Create all and hide/show.
+
+             // OK Button (For simple Disconnect)
+             lv_obj_t * btn_ok = lv_btn_create(panel);
+             lv_obj_set_size(btn_ok, 120, 50);
+             lv_obj_align(btn_ok, LV_ALIGN_BOTTOM_MID, 0, -20);
+             lv_obj_add_style(btn_ok, &style_btn_default, 0);
+             lv_obj_add_event_cb(btn_ok, event_popup_w2_hide, LV_EVENT_CLICKED, NULL);
+             lv_obj_t * l_ok = lv_label_create(btn_ok);
+             lv_label_set_text(l_ok, "OK");
+             lv_obj_center(l_ok);
+
+             // Enable AC Group (Container)
+             lv_obj_t * grp_ac = lv_obj_create(panel);
+             lv_obj_set_size(grp_ac, 460, 80);
+             lv_obj_align(grp_ac, LV_ALIGN_BOTTOM_MID, 0, -10);
+             lv_obj_set_style_bg_opa(grp_ac, LV_OPA_TRANSP, 0);
+             lv_obj_set_style_border_width(grp_ac, 0, 0);
+             lv_obj_add_flag(grp_ac, LV_OBJ_FLAG_HIDDEN);
+
+             lv_obj_t * btn_yes = lv_btn_create(grp_ac);
+             lv_obj_set_size(btn_yes, 120, 50);
+             lv_obj_align(btn_yes, LV_ALIGN_LEFT_MID, 40, 0);
+             lv_obj_add_style(btn_yes, &style_btn_green, 0);
+             lv_obj_add_event_cb(btn_yes, event_w2_enable_ac, LV_EVENT_CLICKED, NULL);
+             lv_obj_t * l_yes = lv_label_create(btn_yes);
+             lv_label_set_text(l_yes, "YES");
+             lv_obj_center(l_yes);
+
+             lv_obj_t * btn_no = lv_btn_create(grp_ac);
+             lv_obj_set_size(btn_no, 120, 50);
+             lv_obj_align(btn_no, LV_ALIGN_RIGHT_MID, -40, 0);
+             lv_obj_add_style(btn_no, &style_btn_red, 0);
+             lv_obj_add_event_cb(btn_no, event_popup_w2_hide, LV_EVENT_CLICKED, NULL);
+             lv_obj_t * l_no = lv_label_create(btn_no);
+             lv_label_set_text(l_no, "NO");
+             lv_obj_center(l_no);
+        }
+
+        // Determine Logic
+        // Check Main Device AC Status
+        bool ac_on = false;
+        DeviceStatus* d3 = UI_GetDeviceCache(DEV_TYPE_DELTA_3 - 1);
+        DeviceStatus* d3p = UI_GetDeviceCache(DEV_TYPE_DELTA_PRO_3 - 1);
+
+        // Priority to D3P if present? Or whichever is main.
+        if (d3p && d3p->connected) ac_on = d3p->data.d3p.acHvPort; // D3P AC Output
+        else if (d3 && d3->connected) ac_on = d3->data.d3.acOn;
+
+        lv_obj_t * panel = lv_obj_get_child(cont_popup_w2, 0);
+        lv_obj_t * lbl = lv_obj_get_child(panel, 0);
+        lv_obj_t * btn_ok = lv_obj_get_child(panel, 1);
+        lv_obj_t * grp_ac = lv_obj_get_child(panel, 2);
+
+        if (!ac_on) {
+            lv_label_set_text(lbl, "Wave 2 is not connected.\n220V disabled, enable it?");
+            lv_obj_add_flag(btn_ok, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(grp_ac, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_label_set_text(lbl, "Wave 2 is not connected");
+            lv_obj_clear_flag(btn_ok, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(grp_ac, LV_OBJ_FLAG_HIDDEN);
+        }
+
+        lv_obj_clear_flag(cont_popup_w2, LV_OBJ_FLAG_HIDDEN);
+        last_w2_popup_time = xTaskGetTickCount();
+        return;
+    }
+
     if (!ui_view_wave2_get_screen()) {
         ui_view_wave2_init(NULL);
     }
@@ -757,6 +860,16 @@ static void event_popup_alt_hide(lv_event_t * e) {
     lv_obj_add_flag(cont_popup_alt, LV_OBJ_FLAG_HIDDEN);
 }
 
+static void event_popup_w2_hide(lv_event_t * e) {
+    lv_obj_add_flag(cont_popup_w2, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void event_w2_enable_ac(lv_event_t * e) {
+    // Enable 220V (AC)
+    UART_SendACSet(1);
+    lv_obj_add_flag(cont_popup_w2, LV_OBJ_FLAG_HIDDEN);
+}
+
 static void event_alt_toggle(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
     bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
@@ -1007,6 +1120,14 @@ static void create_dashboard(void) {
     lv_obj_set_style_text_font(label_soc, &lv_font_montserrat_32, 0);
     lv_obj_align(label_soc, LV_ALIGN_CENTER, 0, -30);
 
+    // Not Connected Label (Delta 3/Pro 3)
+    label_d3_disc = lv_label_create(scr_dash);
+    lv_label_set_text(label_d3_disc, "Not Connected");
+    lv_obj_set_style_text_color(label_d3_disc, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_style_text_font(label_d3_disc, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_d3_disc, LV_ALIGN_CENTER, 0, 10); // Below SOC
+    lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+
     // --- Footer Controls ---
     int btn_h = 70;
     int btn_w = 120;
@@ -1239,26 +1360,44 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         memcpy(&device_cache[dev->id - 1], dev, sizeof(DeviceStatus));
     }
 
+    // Update Wave 2 Button State (Global Check, not just on update)
+    // We check cache for connection status
+    DeviceStatus* w2_cache = UI_GetDeviceCache(DEV_TYPE_WAVE_2 - 1);
+    if (btn_wave2) {
+        if (w2_cache && w2_cache->connected) {
+             // Connected
+             int32_t mode = get_int32_aligned(&w2_cache->data.w2.powerMode);
+             int32_t watts = get_int32_aligned(&w2_cache->data.w2.batPwrWatt);
+
+             if (mode != 0) {
+                  lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
+                  lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+                  lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
+                  lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
+             } else {
+                  lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
+                  lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
+                  lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                  lv_label_set_text(lbl_wave_txt, "Wave 2");
+             }
+        } else {
+             // Disconnected -> Red
+             lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+             lv_obj_add_style(btn_wave2, &style_btn_red, 0);
+             lv_label_set_text(lbl_wave_txt, "Wave 2\nDisc.");
+        }
+    }
+
+    // Popup Timeout Logic
+    if (cont_popup_w2 && !lv_obj_has_flag(cont_popup_w2, LV_OBJ_FLAG_HIDDEN)) {
+        if (xTaskGetTickCount() - last_w2_popup_time > pdMS_TO_TICKS(5000)) {
+            lv_obj_add_flag(cont_popup_w2, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     // Process Wave 2 specific updates
     if (dev->id == DEV_TYPE_WAVE_2) {
         ui_view_wave2_update(&dev->data.w2);
-
-        // Update Dashboard Button for Wave 2
-        if (btn_wave2) {
-            int32_t mode = get_int32_aligned(&dev->data.w2.powerMode);
-            int32_t watts = get_int32_aligned(&dev->data.w2.batPwrWatt); // Using Battery Power as proxy for now?
-            // Actually usually input power is what matters. Wave 2 has psdrPwrWatt?
-            // User requested: "power draw reported from the wave 2"
-
-            if (mode != 0) {
-                 lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
-                 lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
-            } else {
-                 lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
-                 lv_label_set_text(lbl_wave_txt, "Wave 2");
-            }
-        }
-
         return; // Don't update dashboard main stats with Wave 2 data
     }
 
@@ -1382,6 +1521,9 @@ void UI_LVGL_Update(DeviceStatus* dev) {
         // Toggle Styles based on PORT state, not power
         bool ac_on = false;
         bool dc_on = false;
+
+        // Hide "Not Connected" Label since we have a main device update
+        lv_obj_add_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
 
         if (dev->id == DEV_TYPE_DELTA_PRO_3) {
             ac_on = dev->data.d3p.acHvPort; // Or acLvPort, D3P typically uses HV for output
@@ -1603,6 +1745,11 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     } else {
         lv_obj_clear_flag(label_disconnected, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(led_status_dot, lv_palette_main(LV_PALETTE_RED), 0);
+
+        // If main device disconnected, show the text
+        if (is_main_device) {
+             lv_obj_clear_flag(label_d3_disc, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
 
