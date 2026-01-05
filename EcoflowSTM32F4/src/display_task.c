@@ -45,7 +45,6 @@ void StartDisplayTask(void * argument) {
                 UI_UpdateDebugInfo(&event.data.debugInfo);
             } else if (event.type == DISPLAY_EVENT_UPDATE_DEVICE_LIST) {
                 UI_UpdateConnectionsView(&event.data.deviceList);
-                UI_UpdateConnectionCache(&event.data.deviceList);
             }
         }
 
