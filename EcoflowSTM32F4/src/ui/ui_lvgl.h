@@ -14,6 +14,8 @@ void UI_LVGL_ShowDashboard(void);
 void UI_LVGL_ShowWave2(void);
 void UI_LVGL_ShowSettings(bool auto_del_current);
 
+void UI_UpdateDashboardConnectionState(DeviceList *list);
+
 void UI_ResetIdleTimer(void);
 
 // Access to cache for debug view

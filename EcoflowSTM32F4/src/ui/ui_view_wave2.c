@@ -184,8 +184,11 @@ static void event_fan_change(lv_event_t * e) {
 
 static void event_power_toggle(lv_event_t * e) {
     lv_obj_t * btn = lv_event_get_target(e);
-    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
-    send_cmd(W2_PARAM_POWER, state ? 1 : 0);
+    // Determine command based on current visual state (Inverse)
+    // If CHECKED (Green/ON), we want to turn OFF (0)
+    // If UNCHECKED (Grey/OFF), we want to turn ON (1)
+    bool is_on = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    send_cmd(W2_PARAM_POWER, is_on ? 0 : 1);
 }
 
 void ui_view_wave2_init(lv_obj_t * parent) {
@@ -251,7 +254,6 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_obj_align(btn_pwr, LV_ALIGN_TOP_RIGHT, -20, 20);
     lv_obj_add_style(btn_pwr, &style_btn_default, 0);
     lv_obj_add_style(btn_pwr, &style_btn_green, LV_STATE_CHECKED); // Use Green
-    lv_obj_add_flag(btn_pwr, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_add_event_cb(btn_pwr, event_power_toggle, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t * lbl_pwr = lv_label_create(btn_pwr);
@@ -340,10 +342,6 @@ lv_obj_t * ui_view_wave2_get_screen(void) {
 void ui_view_wave2_update(Wave2DataStruct * data) {
     if (!data) return;
 
-    // Suppress updates for 4 seconds after user interaction to prevent UI jumping
-    if ((HAL_GetTick() - last_cmd_time) < 4000) {
-        return;
-    }
 
     // Use safe aligned access helpers for packed struct members
     float envTemp = get_float_aligned(&data->envTemp);
