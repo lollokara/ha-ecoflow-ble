@@ -9,6 +9,11 @@
 #include <algorithm>
 
 static const char* TAG = "EcoflowDataParser";
+static uint32_t dumpTimestamp = 0;
+
+void EcoflowDataParser::triggerDebugDump() {
+    dumpTimestamp = millis();
+}
 
 // --- Helper Functions ---
 
@@ -462,7 +467,8 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     d3.dcOn = d3.dc12vPort;
                     if (d3_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(d3_msg.flow_info_qcusb1);
 
-                    logDelta3Data(d3);
+                    // logDelta3Data(d3); // Reduce spam
+                    if (millis() - dumpTimestamp < 10000) logDelta3Data(d3);
                 }
             }
             break;
@@ -529,7 +535,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
                      if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
 
-                     // logFullDeltaPro3Data(mr521_msg);
+                     if (millis() - dumpTimestamp < 10000) logFullDeltaPro3Data(mr521_msg);
                 }
             }
             break;
@@ -561,8 +567,8 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (msg.has_sp_charger_car_batt_chg_amp_max) ac.reverseChargingCurrentMax = msg.sp_charger_car_batt_chg_amp_max;
                     if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
 
-                    logAlternatorChargerData(ac);
-                    logFullAlternatorChargerData(msg);
+                    // logAlternatorChargerData(ac);
+                    if (millis() - dumpTimestamp < 10000) logFullAlternatorChargerData(msg);
                 }
             }
             break;
@@ -616,7 +622,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
                     else w2.remainingTime = 0;
 
-                    logWave2Data(w2);
+                    if (millis() - dumpTimestamp < 10000) logWave2Data(w2);
                 }
             }
             break;

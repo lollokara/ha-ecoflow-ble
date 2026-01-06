@@ -2,23 +2,19 @@
  * @file Stm32Serial.cpp
  * @author Lollokara
  * @brief Implementation of the UART communication layer between ESP32 and STM32F4.
- *
- * This file handles the serialization and deserialization of the custom protocol
- * packets, CRC verification, and dispatching of received commands to the appropriate
- * handlers (DeviceManager, LightSensor, etc.).
  */
 
 #include "Stm32Serial.h"
 #include "DeviceManager.h"
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
+#include "EcoflowDataParser.h"
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
+#include <vector>
 
-// Hardware Serial pin definition (moved from main.cpp)
-// RX Pin = 18 (connected to F4 TX)
-// TX Pin = 17 (connected to F4 RX)
+// Hardware Serial pin definition
 #define RX_PIN 18
 #define TX_PIN 17
 
@@ -35,7 +31,16 @@ extern String ota_msg;
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
 
-// CRC32 Table-driven implementation (Standard Ethernet Polynomial 0x04C11DB7)
+// Log Globals
+static std::vector<String> _cachedLogList;
+static bool _logListReady = false;
+static SemaphoreHandle_t _logListMutex = NULL;
+
+static std::vector<uint8_t> _downloadBuffer;
+static bool _downloadComplete = false;
+static SemaphoreHandle_t _downloadMutex = NULL;
+
+// CRC32 Table
 static const uint32_t crc32_table[] = {
     0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
     0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
@@ -79,11 +84,6 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
     return ~crc;
 }
 
-/**
- * @brief Initializes the UART interface.
- *
- * Configures Serial1 with 921600 baud, 8N1, on defined pins.
- */
 void Stm32Serial::begin() {
     Serial1.begin(921600, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
@@ -104,17 +104,18 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
     }
 }
 
-/**
- * @brief Main update loop for processing incoming UART data.
- *
- * Reads bytes from the serial buffer, assembles packets based on the protocol
- * (START_BYTE, Header, Length, Payload, CRC), and calls processPacket() when
- * a valid packet is received.
- */
-void Stm32Serial::update() {
-    // If OTA is running, we might still receive packets (ACK/NACK)
-    // The OTA task needs to check flags set here.
+void Stm32Serial::sendEspLog(uint8_t level, const char* tag, const char* msg) {
+    if (_txMutex != NULL) {
+        if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            uint8_t buf[256];
+            int len = pack_esp_log_message(buf, level, tag, msg);
+            Serial1.write(buf, len);
+            xSemaphoreGive(_txMutex);
+        }
+    }
+}
 
+void Stm32Serial::update() {
     static uint8_t rx_buf[1024];
     static uint16_t rx_idx = 0;
     static uint8_t expected_len = 0;
@@ -131,16 +132,14 @@ void Stm32Serial::update() {
         } else {
             rx_buf[rx_idx++] = b;
 
-            if (rx_idx == 3) { // We have START, CMD, LEN
+            if (rx_idx == 3) {
                 expected_len = rx_buf[2];
-                // Sanity check length
                 if (expected_len > 250) {
                     collecting = false;
                     rx_idx = 0;
                 }
             } else if (rx_idx > 3) {
                  if (rx_idx == (4 + expected_len)) {
-                    // Packet complete
                     uint8_t received_crc = rx_buf[rx_idx - 1];
                     uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
 
@@ -149,30 +148,23 @@ void Stm32Serial::update() {
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
                     }
-                    collecting = false; // Reset for next packet
+                    collecting = false;
                     rx_idx = 0;
                 }
             }
 
             if (rx_idx >= sizeof(rx_buf)) {
-                collecting = false; // Overflow protection
+                collecting = false;
                 rx_idx = 0;
             }
         }
     }
 }
 
-/**
- * @brief Dispatches valid packets to their specific handlers.
- *
- * @param rx_buf The buffer containing the full packet.
- * @param len The total length of the packet.
- */
 void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     uint8_t cmd = rx_buf[1];
 
     if (cmd == CMD_HANDSHAKE) {
-        // Reply with ACK and then send the device list
         uint8_t ack[4];
         int l = pack_handshake_ack_message(ack);
         sendData(ack, l);
@@ -182,13 +174,11 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     } else if (cmd == CMD_OTA_NACK) {
         otaNackReceived = true;
     } else if (cmd == CMD_GET_DEVICE_STATUS) {
-        // STM32 is requesting status for a specific device
         uint8_t dev_id;
         if (unpack_get_device_status_message(rx_buf, &dev_id) == 0) {
             sendDeviceStatus(dev_id);
         }
     } else if (cmd == CMD_SET_WAVE2) {
-        // Handle Wave 2 control commands (Temp, Mode, Fan, Power)
         uint8_t type, value;
         if (unpack_set_wave2_message(rx_buf, &type, &value) == 0) {
             EcoflowESP32* w2 = DeviceManager::getInstance().getDevice(DeviceType::WAVE_2);
@@ -203,7 +193,6 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             }
         }
     } else if (cmd == CMD_SET_AC) {
-        // Toggle AC Power
         uint8_t enable;
         if (unpack_set_ac_message(rx_buf, &enable) == 0) {
             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
@@ -213,7 +202,6 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3p && d3p->isAuthenticated()) d3p->setAC(enable);
         }
     } else if (cmd == CMD_SET_DC) {
-        // Toggle DC Power
         uint8_t enable;
         if (unpack_set_dc_message(rx_buf, &enable) == 0) {
             EcoflowESP32* d3 = DeviceManager::getInstance().getDevice(DeviceType::DELTA_3);
@@ -223,7 +211,6 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             if (d3p && d3p->isAuthenticated()) d3p->setDC(enable);
         }
     } else if (cmd == CMD_SET_VALUE) {
-        // Handle generic value setting (Charge limits, SOC limits)
         uint8_t type;
         int value;
         if (unpack_set_value_message(rx_buf, &type, &value) == 0) {
@@ -256,25 +243,19 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
              }
         }
     } else if (cmd == CMD_POWER_OFF) {
-        // Execute power-off sequence
         ESP_LOGI(TAG, "Received Power OFF Command. Shutting down...");
         Serial1.end();
         pinMode(POWER_LATCH_PIN, OUTPUT);
-        digitalWrite(POWER_LATCH_PIN, HIGH); // Assumes HIGH triggers shutdown
+        digitalWrite(POWER_LATCH_PIN, HIGH);
         delay(3000);
         ESP.restart();
     } else if (cmd == CMD_GET_DEBUG_INFO) {
-        // Reply with system debug info
         DebugInfo info = {0};
-
-        // WiFi IP
         if(WiFi.status() == WL_CONNECTED) {
             strncpy(info.ip, WiFi.localIP().toString().c_str(), 15);
         } else {
              strncpy(info.ip, "Disconnected", 15);
         }
-
-        // Device Counts
         DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
         for(int i=0; i<4; i++) {
              DeviceSlot* s = DeviceManager::getInstance().getSlot(types[i]);
@@ -283,31 +264,64 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                  if(!s->macAddress.empty()) info.devices_paired++;
              }
         }
-
         uint8_t buffer[sizeof(DebugInfo) + 4];
         int len = pack_debug_info_message(buffer, &info);
         sendData(buffer, len);
     } else if (cmd == CMD_CONNECT_DEVICE) {
-        // Initiate BLE scan/connection for a device type
         uint8_t type;
         if (unpack_connect_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().scanAndConnect((DeviceType)type);
         }
     } else if (cmd == CMD_FORGET_DEVICE) {
-        // Forget a bonded device
         uint8_t type;
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
+    } else if (cmd == CMD_GET_FULL_CONFIG) {
+        sendEspLog(ESP_LOG_INFO, "CFG", "--- ESP32 Config ---");
+        char buf[64];
+        snprintf(buf, sizeof(buf), "MAC: %s", WiFi.macAddress().c_str());
+        sendEspLog(ESP_LOG_INFO, "CFG", buf);
+        snprintf(buf, sizeof(buf), "IP: %s", WiFi.localIP().toString().c_str());
+        sendEspLog(ESP_LOG_INFO, "CFG", buf);
+    } else if (cmd == CMD_GET_DEBUG_DUMP) {
+        EcoflowDataParser::triggerDebugDump();
+    } else if (cmd == CMD_LOG_LIST_RESP) {
+        uint8_t total, idx;
+        uint32_t size;
+        char name[32];
+        if (unpack_log_list_resp_message(rx_buf, &total, &idx, &size, name) == 0) {
+            if (!_logListMutex) _logListMutex = xSemaphoreCreateMutex();
+            xSemaphoreTake(_logListMutex, portMAX_DELAY);
+            if (idx == 0) _cachedLogList.clear();
+            if (total > 0 && name[0]) {
+                _cachedLogList.push_back(String(name));
+            }
+            if (idx == total - 1 || total == 0) {
+                _logListReady = true;
+            }
+            xSemaphoreGive(_logListMutex);
+        }
+    } else if (cmd == CMD_LOG_DATA_CHUNK) {
+        if (len >= 9) {
+            uint16_t dataLen;
+            memcpy(&dataLen, &rx_buf[7], 2);
+            if (!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
+            xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+            if (dataLen > 0) {
+                if (len >= 9 + dataLen) {
+                    size_t current = _downloadBuffer.size();
+                    _downloadBuffer.resize(current + dataLen);
+                    memcpy(&_downloadBuffer[current], &rx_buf[9], dataLen);
+                }
+            } else {
+                _downloadComplete = true;
+            }
+            xSemaphoreGive(_downloadMutex);
+        }
     }
 }
 
-/**
- * @brief Constructs and sends the Device List packet.
- *
- * Iterates through all device slots in DeviceManager and populates the
- * DeviceList structure with ID, Name, Connection Status, and Pairing Status.
- */
 void Stm32Serial::sendDeviceList() {
     DeviceList list = {0};
     DeviceSlot* slots[] = {
@@ -334,14 +348,6 @@ void Stm32Serial::sendDeviceList() {
     sendData(buffer, len);
 }
 
-/**
- * @brief Sends the detailed status for a specific device.
- *
- * Maps the internal device data structures (Delta3Data, Wave2Data, etc.)
- * to the protocol-defined DeviceStatus structure and transmits it via UART.
- *
- * @param device_id The ID of the device to report.
- */
 void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     DeviceType type = (DeviceType)device_id;
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
@@ -351,15 +357,12 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     DeviceStatus status = {0};
     status.id = device_id;
     status.connected = 1;
-
-    // Set Brightness based on ambient light sensor
     status.brightness = LightSensor::getInstance().getBrightnessPercent();
 
     if (type == DeviceType::DELTA_3) {
         strncpy(status.name, "Delta 3", 15);
         const Delta3Data& src = dev->getData().delta3;
         Delta3DataStruct& dst = status.data.d3;
-
         dst.batteryLevel = src.batteryLevel;
         dst.acInputPower = src.acInputPower;
         dst.acOutputPower = src.acOutputPower;
@@ -388,12 +391,10 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.acOn = src.acOn;
         dst.dcOn = src.dcOn;
         dst.usbOn = src.usbOn;
-
     } else if (type == DeviceType::WAVE_2) {
         strncpy(status.name, "Wave 2", 15);
         const Wave2Data& src = dev->getData().wave2;
         Wave2DataStruct& dst = status.data.w2;
-
         dst.mode = src.mode;
         dst.subMode = src.subMode;
         dst.setTemp = src.setTemp;
@@ -403,17 +404,14 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.batSoc = src.batSoc;
         dst.remainingTime = src.remainingTime;
         dst.powerMode = src.powerMode;
-        // Calculate Active Power (Solar > DC > Battery)
         float power = src.mpptPwrWatt;
         if (power == 0) power = src.psdrPwrWatt;
         if (power == 0) power = abs(src.batPwrWatt);
         dst.batPwrWatt = (int)power;
-
     } else if (type == DeviceType::DELTA_PRO_3) {
         strncpy(status.name, "Delta Pro 3", 15);
         const DeltaPro3Data& src = dev->getData().deltaPro3;
         DeltaPro3DataStruct& dst = status.data.d3p;
-
         dst.batteryLevel = src.batteryLevel;
         dst.batteryLevelMain = src.batteryLevelMain;
         dst.acInputPower = src.acInputPower;
@@ -450,12 +448,10 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.soh = src.soh;
         dst.dischargeRemainingTime = src.dischargeRemainingTime;
         dst.chargeRemainingTime = src.chargeRemainingTime;
-
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
         strncpy(status.name, "Alt Charger", 15);
         const AlternatorChargerData& src = dev->getData().alternatorCharger;
         AlternatorChargerDataStruct& dst = status.data.ac;
-
         dst.batteryLevel = src.batteryLevel;
         dst.dcPower = src.dcPower;
         dst.chargerMode = src.chargerMode;
@@ -477,19 +473,75 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
     sendData(buffer, len);
 }
 
+void Stm32Serial::requestLogList() {
+    if(!_logListMutex) _logListMutex = xSemaphoreCreateMutex();
+    _logListReady = false;
+    uint8_t buf[8];
+    int l = pack_log_list_req_message(buf);
+    sendData(buf, l);
+}
+
+std::vector<String> Stm32Serial::getLogList() {
+    uint32_t start = millis();
+    while(!_logListReady && millis() - start < 5000) {
+        vTaskDelay(10);
+    }
+    xSemaphoreTake(_logListMutex, portMAX_DELAY);
+    std::vector<String> copy = _cachedLogList;
+    xSemaphoreGive(_logListMutex);
+    return copy;
+}
+
+void Stm32Serial::startLogDownload(const String& name) {
+    if(!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
+    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    _downloadBuffer.clear();
+    _downloadBuffer.reserve(4096);
+    _downloadComplete = false;
+    xSemaphoreGive(_downloadMutex);
+
+    uint8_t buf[64];
+    int len = pack_log_download_req_message(buf, name.c_str());
+    sendData(buf, len);
+}
+
+size_t Stm32Serial::readLogChunk(uint8_t* buffer, size_t maxLen) {
+    size_t read = 0;
+    if(!_downloadMutex) return 0;
+    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    if (!_downloadBuffer.empty()) {
+        read = std::min(maxLen, _downloadBuffer.size());
+        memcpy(buffer, _downloadBuffer.data(), read);
+        _downloadBuffer.erase(_downloadBuffer.begin(), _downloadBuffer.begin() + read);
+    }
+    xSemaphoreGive(_downloadMutex);
+    return read;
+}
+
+bool Stm32Serial::isLogDownloadComplete() {
+    if(!_downloadMutex) return true;
+    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    bool c = _downloadComplete && _downloadBuffer.empty();
+    xSemaphoreGive(_downloadMutex);
+    return c;
+}
+
+void Stm32Serial::abortLogDownload() {
+    // Placeholder
+}
+
 static String otaFilename;
 
 void Stm32Serial::startOta(const String& filename) {
     if (_otaRunning) return;
     otaFilename = filename;
     _otaRunning = true;
-    xTaskCreate(otaTask, "OtaTask", 8192, this, 1, NULL); // Increased stack for CRC
+    xTaskCreate(otaTask, "OtaTask", 8192, this, 1, NULL);
 }
 
 void Stm32Serial::otaTask(void* parameter) {
     Stm32Serial* self = (Stm32Serial*)parameter;
 
-    // 1. Open File
     File f = LittleFS.open(otaFilename, "r");
     if (!f) {
         ESP_LOGE(TAG, "Failed to open firmware file");
@@ -502,7 +554,6 @@ void Stm32Serial::otaTask(void* parameter) {
     uint32_t totalSize = f.size();
     ESP_LOGI(TAG, "Starting OTA. Size: %d", totalSize);
 
-    // 1a. Calculate CRC32
     ESP_LOGI(TAG, "Calculating Checksum...");
     uint32_t crc = 0;
     uint8_t buf[256];
@@ -514,11 +565,8 @@ void Stm32Serial::otaTask(void* parameter) {
     f.close();
     ESP_LOGI(TAG, "CRC32: 0x%08X", crc);
 
-    // Re-open for reading
     f = LittleFS.open(otaFilename, "r");
 
-    // 2. Send Start Command
-    // Try sending Start Command up to 3 times
     bool startSuccess = false;
     int len = pack_ota_start_message(buf, totalSize);
 
@@ -526,12 +574,9 @@ void Stm32Serial::otaTask(void* parameter) {
         ESP_LOGI(TAG, "Sending OTA Start (Attempt %d)", attempt+1);
         self->sendData(buf, len);
 
-        // Wait for ACK (longer timeout for erase: 30s)
         otaAckReceived = false;
         otaNackReceived = false;
         uint32_t startWait = millis();
-        // Mass erase or large sector erase can take time.
-        // Recovery OTA erases 10 sectors (Bank 1).
         while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) {
             vTaskDelay(100);
         }
@@ -543,7 +588,6 @@ void Stm32Serial::otaTask(void* parameter) {
 
         if (otaNackReceived) {
             ESP_LOGE(TAG, "OTA Start NACK received");
-            // If NACK, maybe it's busy or invalid state. Wait before retry.
             vTaskDelay(1000);
         }
     }
@@ -557,9 +601,8 @@ void Stm32Serial::otaTask(void* parameter) {
         return;
     }
 
-    // 3. Send Chunks
     uint32_t offset = 0;
-    uint8_t chunk[200]; // Keep under 255 payload limit
+    uint8_t chunk[200];
     int last_log_progress = -1;
     bool transferFailed = false;
 
@@ -572,11 +615,10 @@ void Stm32Serial::otaTask(void* parameter) {
         for(int retries=0; retries<3; retries++) {
             self->sendData(buf, len);
 
-            // Wait for ACK
             otaAckReceived = false;
             otaNackReceived = false;
             uint32_t startWait = millis();
-            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) { // 2s timeout
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 2000)) {
                 vTaskDelay(5);
             }
 
@@ -620,11 +662,11 @@ void Stm32Serial::otaTask(void* parameter) {
             otaAckReceived = false;
             otaNackReceived = false;
              uint32_t startWait = millis();
-            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) { // 5s timeout
+            while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) {
                 vTaskDelay(50);
             }
             if (otaAckReceived) { endSuccess = true; break; }
-            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; } // Fatal
+            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; }
         }
 
         if (endSuccess) {

@@ -42,6 +42,22 @@ extern "C" {
 #define CMD_OTA_END   0xA2           ///< End OTA Update
 #define CMD_OTA_APPLY 0xA3           ///< Apply OTA Update
 
+// --- Log Management Commands ---
+// ESP32 -> F4
+#define CMD_LOG_LIST_REQ      0x70   ///< Request List of Log Files
+#define CMD_LOG_DOWNLOAD_REQ  0x71   ///< Request to start downloading a specific log
+#define CMD_LOG_DELETE_REQ    0x72   ///< Request to delete a specific log
+#define CMD_ESP_LOG_DATA      0x73   ///< Send ESP32 Log (Error/Warning) to F4
+#define CMD_LOG_MANAGER_OP    0x74   ///< Perform Log Manager Op (Format, Delete All)
+
+// F4 -> ESP32
+#define CMD_LOG_LIST_RESP     0x75   ///< Response with Log File List
+#define CMD_LOG_DATA_CHUNK    0x76   ///< Stream Log Data Chunk
+#define CMD_LOG_DELETE_RESP   0x77   ///< Response for Delete Request
+#define CMD_GET_FULL_CONFIG   0x78   ///< Request Full Config Dump (Section 2)
+#define CMD_GET_DEBUG_DUMP    0x79   ///< Request Debug Values Dump (Section 3)
+#define CMD_LOG_MANAGER_RESP  0x7A   ///< Response for Log Manager Op
+
 // --- F4 -> ESP32 Command IDs ---
 #define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
 
@@ -87,6 +103,9 @@ extern "C" {
 #define DEV_TYPE_WAVE_2 3
 #define DEV_TYPE_ALT_CHARGER 4
 
+// Log Manager Operations
+#define LOG_OP_DELETE_ALL 1
+#define LOG_OP_FORMAT_SD  2
 
 #pragma pack(push, 1)
 
@@ -305,6 +324,48 @@ typedef struct {
     // Data follows
 } OtaChunkHeader;
 
+// --- Log Payloads ---
+
+typedef struct {
+    uint8_t count;
+} LogListRespEntry;
+
+typedef struct {
+    uint8_t total_files;
+    uint8_t index;
+    uint32_t size;
+    char name[32];
+} LogListEntryMsg;
+
+typedef struct {
+    char name[32];
+} LogDownloadReqMsg;
+
+typedef struct {
+    uint32_t offset; // File offset
+    uint16_t len;
+    // Data follows
+} LogDataChunkHeader;
+
+typedef struct {
+    char name[32];
+} LogDeleteReqMsg;
+
+typedef struct {
+    uint8_t status; // 0=OK, 1=Fail
+} LogOpRespMsg;
+
+typedef struct {
+    uint8_t level; // 0=Error, 1=Warn
+    // char tag[16];
+    // char msg[];
+    // We will pack this manually
+} EspLogHeader;
+
+typedef struct {
+    uint8_t op_code;
+} LogManagerOpMsg;
+
 #pragma pack(pop)
 
 // --- API Functions (Serialization/Deserialization) ---
@@ -352,6 +413,27 @@ int pack_ota_start_message(uint8_t *buffer, uint32_t total_size);
 int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len);
 int pack_ota_end_message(uint8_t *buffer, uint32_t crc32);
 int pack_ota_apply_message(uint8_t *buffer);
+
+// Log API
+int pack_log_list_req_message(uint8_t *buffer);
+int pack_log_list_resp_message(uint8_t *buffer, uint8_t total, uint8_t index, uint32_t size, const char* name);
+int unpack_log_list_resp_message(const uint8_t *buffer, uint8_t *total, uint8_t *index, uint32_t *size, char* name);
+
+int pack_log_download_req_message(uint8_t *buffer, const char* name);
+int unpack_log_download_req_message(const uint8_t *buffer, char* name);
+
+int pack_log_data_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t* data, uint16_t len);
+// unpack manual due to variable data
+
+int pack_log_delete_req_message(uint8_t *buffer, const char* name);
+int unpack_log_delete_req_message(const uint8_t *buffer, char* name);
+
+int pack_esp_log_message(uint8_t *buffer, uint8_t level, const char* tag, const char* msg);
+// unpack manual
+
+int pack_simple_cmd_message(uint8_t *buffer, uint8_t cmd); // For GET_FULL_CONFIG, GET_DEBUG_DUMP, LOG_OP_RESP
+int pack_log_manager_op_message(uint8_t *buffer, uint8_t op);
+int unpack_log_manager_op_message(const uint8_t *buffer, uint8_t *op);
 
 #ifdef __cplusplus
 }

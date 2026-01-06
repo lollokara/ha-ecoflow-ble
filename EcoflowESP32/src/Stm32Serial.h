@@ -13,6 +13,7 @@
 #include <Arduino.h>
 #include "ecoflow_protocol.h"
 #include <freertos/semphr.h>
+#include <vector>
 
 /**
  * @class Stm32Serial
@@ -66,6 +67,19 @@ public:
 
     // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
+
+    // Send Log to STM32
+    void sendEspLog(uint8_t level, const char* tag, const char* msg);
+
+    // Log Download Support
+    void requestLogList(void);
+    std::vector<String> getLogList(void); // Blocking wait
+
+    // Stream Support
+    void startLogDownload(const String& name);
+    size_t readLogChunk(uint8_t* buffer, size_t maxLen);
+    bool isLogDownloadComplete(void);
+    void abortLogDownload(void);
 
 private:
     /**

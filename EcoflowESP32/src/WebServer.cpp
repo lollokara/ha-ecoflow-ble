@@ -1,12 +1,40 @@
 #include "WebServer.h"
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include "AsyncJson.h"
 #include <esp_log.h>
 #include <LittleFS.h>
 #include "Stm32Serial.h"
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
+
+// Custom Response Class for SD Log Streaming
+class LogResponse : public AsyncAbstractResponse {
+    String _name;
+public:
+    LogResponse(String name) : _name(name) {
+        _code = 200;
+        _contentType = "application/octet-stream";
+        Stm32Serial::getInstance().startLogDownload(name);
+    }
+    ~LogResponse() {
+        Stm32Serial::getInstance().abortLogDownload();
+    }
+    bool _sourceValid() const { return true; }
+    virtual size_t _fillBuffer(uint8_t *data, size_t len){
+        if (Stm32Serial::getInstance().isLogDownloadComplete()) {
+            return 0;
+        }
+        size_t read = Stm32Serial::getInstance().readLogChunk(data, len);
+        if (read == 0) {
+            // Wait a bit for data to arrive from UART
+            vTaskDelay(10);
+            read = Stm32Serial::getInstance().readLogChunk(data, len);
+        }
+        return read;
+    }
+};
 
 // Global OTA State
 int ota_progress = 0;
@@ -85,6 +113,28 @@ void WebServer::setupRoutes() {
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
+
+    // SD Logs
+    server.on("/api/sd_logs", HTTP_GET, [](AsyncWebServerRequest *request){
+        Stm32Serial::getInstance().requestLogList();
+        std::vector<String> logs = Stm32Serial::getInstance().getLogList();
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonArray root = response->getRoot();
+        for(const String& log : logs) root.add(log);
+        response->setLength();
+        request->send(response);
+    });
+
+    server.on("/api/sd_logs/download", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!request->hasParam("name")) {
+            request->send(400, "text/plain", "Missing name");
+            return;
+        }
+        String name = request->getParam("name")->value();
+        AsyncWebServerResponse *response = new LogResponse(name);
+        response->addHeader("Content-Disposition", "attachment; filename=" + name);
+        request->send(response);
+    });
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);

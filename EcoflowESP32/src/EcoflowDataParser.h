@@ -16,6 +16,11 @@ namespace EcoflowDataParser {
  */
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type);
 
+/**
+ * @brief Triggers a debug dump of the next received packets.
+ */
+void triggerDebugDump();
+
 } // namespace EcoflowDataParser
 
 #endif // ECOFLOW_DATA_PARSER_H

@@ -24,6 +24,8 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "ff.h"
+#include "sd_diskio.h"
 #include <stdio.h>
 
 // External Handles
@@ -33,6 +35,10 @@ extern UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3;
 TIM_HandleTypeDef htim2;
 IWDG_HandleTypeDef hiwdg;
+SD_HandleTypeDef hsd;
+FATFS SDFatFs;
+char SDPath[4];
+
 QueueHandle_t displayQueue; // Global queue for UI events
 
 // Forward Declarations
@@ -41,6 +47,7 @@ static void ESP32_Reset_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_IWDG_Init(void);
+static void MX_SDIO_SD_Init(void);
 
 /**
  * @brief  System Clock Configuration
@@ -213,6 +220,25 @@ static void MX_IWDG_Init(void) {
 }
 
 /**
+ * @brief SDIO Initialization.
+ */
+static void MX_SDIO_SD_Init(void) {
+    hsd.Instance = SDIO;
+    hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
+    hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
+    hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
+    hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
+    hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
+    hsd.Init.ClockDiv = 0;
+    if (HAL_SD_Init(&hsd) != HAL_OK) {
+        printf("SD Init Failed\n");
+    }
+    if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B) != HAL_OK) {
+         printf("SD Wide Bus Failed\n");
+    }
+}
+
+/**
  * @brief UART MSP Initialization.
  * Configures PB10 (TX) and PB11 (RX) for USART3.
  * Configures PA1 (RX) for UART4 and PA2 (TX) for USART2 (Split Mode).
@@ -269,6 +295,34 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle) {
 }
 
 /**
+ * @brief SDIO MSP Initialization.
+ */
+void HAL_SD_MspInit(SD_HandleTypeDef *hsd) {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    if(hsd->Instance==SDIO) {
+        __HAL_RCC_SDIO_CLK_ENABLE();
+        __HAL_RCC_GPIOC_CLK_ENABLE();
+        __HAL_RCC_GPIOD_CLK_ENABLE();
+
+        // PC8..PC12: D0..D3, CK
+        GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_PULLUP;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+        HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+        // PD2: CMD
+        GPIO_InitStruct.Pin = GPIO_PIN_2;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_PULLUP;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+        HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    }
+}
+
+/**
  * @brief Sets the display backlight brightness.
  * @param percent Brightness 0-100.
  */
@@ -307,6 +361,18 @@ int main(void) {
 
     MX_TIM2_Init();
     SetBacklight(75); // Ensure screen is visible at boot
+
+    // Initialize SD and Filesystem
+    MX_SDIO_SD_Init();
+    if (FATFS_LinkDriver(&SD_Driver, SDPath) == 0) {
+        if (f_mount(&SDFatFs, SDPath, 1) != FR_OK) {
+            printf("FatFs Mount Failed\n");
+        } else {
+            printf("FatFs Mounted on %s\n", SDPath);
+        }
+    } else {
+        printf("FatFs Link Driver Failed\n");
+    }
 
     MX_IWDG_Init(); // Watchdog Enabled
 

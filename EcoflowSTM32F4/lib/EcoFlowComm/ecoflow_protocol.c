@@ -30,6 +30,181 @@ int pack_handshake_message(uint8_t *buffer) {
     return 4;
 }
 
+// Log API
+
+int pack_log_list_req_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_LIST_REQ;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_log_list_resp_message(uint8_t *buffer, uint8_t total, uint8_t index, uint32_t size, const char* name) {
+    // Structure: [Total:1][Index:1][Size:4][Name:32] = 38 bytes
+    LogListEntryMsg msg;
+    msg.total_files = total;
+    msg.index = index;
+    msg.size = size;
+    strncpy(msg.name, name, 31);
+    msg.name[31] = 0;
+
+    uint8_t len = sizeof(LogListEntryMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_LIST_RESP;
+    buffer[2] = len;
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_list_resp_message(const uint8_t *buffer, uint8_t *total, uint8_t *index, uint32_t *size, char* name) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogListEntryMsg)) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    LogListEntryMsg msg;
+    memcpy(&msg, &buffer[3], len);
+
+    *total = msg.total_files;
+    *index = msg.index;
+    *size = msg.size;
+    strncpy(name, msg.name, 32);
+    return 0;
+}
+
+int pack_log_download_req_message(uint8_t *buffer, const char* name) {
+    LogDownloadReqMsg msg;
+    strncpy(msg.name, name, 31);
+    msg.name[31] = 0;
+
+    uint8_t len = sizeof(LogDownloadReqMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DOWNLOAD_REQ;
+    buffer[2] = len;
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_download_req_message(const uint8_t *buffer, char* name) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogDownloadReqMsg)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    LogDownloadReqMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    strncpy(name, msg.name, 32);
+    return 0;
+}
+
+int pack_log_data_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t* data, uint16_t len) {
+    // [Offset:4][Len:2][Data:...]
+    // Header size = 6.
+    // Payload max 255. So Data max 249.
+    if (len > 249) return -3; // Too large
+
+    uint8_t payload_len = 6 + len;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DATA_CHUNK;
+    buffer[2] = payload_len;
+
+    memcpy(&buffer[3], &offset, 4);
+    memcpy(&buffer[7], &len, 2);
+    if (len > 0 && data) {
+        memcpy(&buffer[9], data, len);
+    }
+
+    buffer[3 + payload_len] = calculate_crc8(&buffer[1], 2 + payload_len);
+    return 4 + payload_len;
+}
+
+int pack_log_delete_req_message(uint8_t *buffer, const char* name) {
+    LogDeleteReqMsg msg;
+    strncpy(msg.name, name, 31);
+    msg.name[31] = 0;
+
+    uint8_t len = sizeof(LogDeleteReqMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DELETE_REQ;
+    buffer[2] = len;
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_delete_req_message(const uint8_t *buffer, char* name) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogDeleteReqMsg)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    LogDeleteReqMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    strncpy(name, msg.name, 32);
+    return 0;
+}
+
+int pack_esp_log_message(uint8_t *buffer, uint8_t level, const char* tag, const char* msg) {
+    // [Level:1][TagLen:1][Tag:...][Msg...]
+    // Max payload 255.
+    uint8_t tagLen = strlen(tag);
+    uint8_t msgLen = strlen(msg);
+    if (1 + 1 + tagLen + msgLen > 255) {
+        // Truncate message
+        int avail = 255 - (1 + 1 + tagLen);
+        if (avail < 0) return -3;
+        msgLen = avail;
+    }
+
+    uint8_t payload_len = 1 + 1 + tagLen + msgLen;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_ESP_LOG_DATA;
+    buffer[2] = payload_len;
+
+    buffer[3] = level;
+    buffer[4] = tagLen;
+    memcpy(&buffer[5], tag, tagLen);
+    memcpy(&buffer[5+tagLen], msg, msgLen);
+
+    buffer[3 + payload_len] = calculate_crc8(&buffer[1], 2 + payload_len);
+    return 4 + payload_len;
+}
+
+int pack_simple_cmd_message(uint8_t *buffer, uint8_t cmd) {
+    buffer[0] = START_BYTE;
+    buffer[1] = cmd;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_log_manager_op_message(uint8_t *buffer, uint8_t op) {
+    uint8_t len = 1;
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_MANAGER_OP;
+    buffer[2] = len;
+    buffer[3] = op;
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_manager_op_message(const uint8_t *buffer, uint8_t *op) {
+    uint8_t len = buffer[2];
+    if (len != 1) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    *op = buffer[3];
+    return 0;
+}
+
 int pack_handshake_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_HANDSHAKE_ACK;

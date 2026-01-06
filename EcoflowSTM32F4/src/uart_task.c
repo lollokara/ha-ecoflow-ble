@@ -3,13 +3,16 @@
 #include "display_task.h"
 #include "stm32f4xx_hal.h"
 #include "ui/ui_lvgl.h" // For UI_UpdateConnectionStatus
+#include "log_manager.h"
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "semphr.h"
 
 extern IWDG_HandleTypeDef hiwdg; // Refresh Watchdog during long ops
 
 UART_HandleTypeDef huart6;
+SemaphoreHandle_t uartTxMutex;
 
 // Ring Buffer Implementation
 #define RING_BUFFER_SIZE 2048 // Increased to support OTA Chunks (1KB payload + overhead)
@@ -159,6 +162,52 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         HAL_NVIC_SystemReset();
     }
+    // ... Log Commands ...
+    else if (cmd == CMD_LOG_LIST_REQ) {
+        LogManager_HandleListReq();
+    }
+    else if (cmd == CMD_LOG_DOWNLOAD_REQ) {
+        char name[32];
+        if (unpack_log_download_req_message(packet, name) == 0) {
+            LogManager_HandleDownloadReq(name);
+        }
+    }
+    else if (cmd == CMD_LOG_DELETE_REQ) {
+        char name[32];
+        if (unpack_log_delete_req_message(packet, name) == 0) {
+            LogManager_HandleDeleteReq(name);
+        }
+    }
+    else if (cmd == CMD_LOG_MANAGER_OP) {
+        uint8_t op;
+        if (unpack_log_manager_op_message(packet, &op) == 0) {
+            LogManager_HandleManagerOp(op);
+        }
+    }
+    else if (cmd == CMD_ESP_LOG_DATA) {
+        // [Level:1][TagLen:1][Tag][Msg]
+        // Manual unpack since implementation was custom
+        uint8_t payload_len = packet[2];
+        if (payload_len >= 2) {
+            uint8_t level = packet[3];
+            uint8_t tagLen = packet[4];
+            if (payload_len >= 2 + tagLen) {
+                char tag[32];
+                if (tagLen > 31) tagLen = 31;
+                memcpy(tag, &packet[5], tagLen);
+                tag[tagLen] = 0;
+
+                int msgLen = payload_len - (2 + tagLen);
+                if (msgLen > 0) {
+                    char msg[256];
+                    if (msgLen > 255) msgLen = 255;
+                    memcpy(msg, &packet[5+packet[4]], msgLen); // packet[4] is actual tagLen in packet
+                    msg[msgLen] = 0;
+                    LogManager_HandleEspLog(level, tag, msg);
+                }
+            }
+        }
+    }
     // ... Normal Commands ...
     else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
@@ -181,7 +230,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
             uint8_t ack[4];
             int len = pack_device_list_ack_message(ack);
-            HAL_UART_Transmit(&huart6, ack, len, 100);
+            UART_SendRaw(ack, len);
 
             protocolState = STATE_POLLING;
         }
@@ -237,8 +286,20 @@ void UART_SendForgetDevice(uint8_t type) {
 void UART_GetKnownDevices(DeviceList *list) { memcpy(list, &knownDevices, sizeof(DeviceList)); }
 
 
+void UART_SendRaw(uint8_t* data, uint16_t len) {
+    if (uartTxMutex) {
+        if (xSemaphoreTake(uartTxMutex, 100) == pdTRUE) {
+            HAL_UART_Transmit(&huart6, data, len, 100);
+            xSemaphoreGive(uartTxMutex);
+        }
+    }
+}
+
 void StartUARTTask(void * argument) {
     UART_Init();
+    LogManager_Init(); // Init Log Manager (Filesystem)
+
+    uartTxMutex = xSemaphoreCreateMutex();
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
     uint8_t tx_buf[32];
     int len;
@@ -247,6 +308,8 @@ void StartUARTTask(void * argument) {
     TickType_t lastHandshakeTime = 0;
 
     for(;;) {
+        // Process Log Streaming
+        LogManager_Process();
         // 1. Process RX
         while (rb_pop(&rx_ring_buffer, &b)) {
             switch (parseState) {
@@ -305,7 +368,7 @@ void StartUARTTask(void * argument) {
             else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(buf, tx.data.device_type);
             else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(buf, tx.data.device_type);
 
-            if (len > 0) HAL_UART_Transmit(&huart6, buf, len, 100);
+            if (len > 0) UART_SendRaw(buf, len);
         }
 
         // 3. State Machine
@@ -316,7 +379,7 @@ void StartUARTTask(void * argument) {
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        UART_SendRaw(tx_buf, len);
                         protocolState = STATE_WAIT_HANDSHAKE_ACK;
                     }
                     break;
@@ -324,7 +387,7 @@ void StartUARTTask(void * argument) {
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        UART_SendRaw(tx_buf, len);
                     }
                     break;
                 case STATE_POLLING:
@@ -333,7 +396,7 @@ void StartUARTTask(void * argument) {
                         if (knownDevices.devices[currentDeviceIndex].connected) {
                             uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
                             len = pack_get_device_status_message(tx_buf, dev_id);
-                            HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                            UART_SendRaw(tx_buf, len);
                         }
                         currentDeviceIndex++;
                     }

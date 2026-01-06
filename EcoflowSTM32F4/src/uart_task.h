@@ -22,4 +22,7 @@ void UART_GetKnownDevices(DeviceList *list);
 // Helper for IRQ dispatch
 void UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
+// Direct Send (Thread Safe)
+void UART_SendRaw(uint8_t* data, uint16_t len);
+
 #endif // UART_TASK_H
