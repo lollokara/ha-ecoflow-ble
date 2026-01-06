@@ -8,9 +8,10 @@
 
 static lv_obj_t * scr_log_manager = NULL;
 static lv_obj_t * label_space = NULL;
+static lv_obj_t * label_stats = NULL;
 
 static void refresh_space(void) {
-    if (!label_space) return;
+    if (!label_space || !label_stats) return;
 
     uint32_t total_kb = LogManager_GetTotalSpace();
     uint32_t free_kb = LogManager_GetFreeSpace();
@@ -20,6 +21,19 @@ static void refresh_space(void) {
     uint32_t free_mb = free_kb / 1024;
 
     lv_label_set_text_fmt(label_space, "Space Available: %lu MB / %lu MB", free_mb, total_mb);
+
+    uint32_t log_size_b, log_lines, other_files;
+    LogManager_GetStats(&log_size_b, &log_lines, &other_files);
+
+    // Format size
+    char size_str[16];
+    if (log_size_b < 1024) snprintf(size_str, sizeof(size_str), "%lu B", log_size_b);
+    else if (log_size_b < 1024*1024) snprintf(size_str, sizeof(size_str), "%lu KB", log_size_b/1024);
+    else snprintf(size_str, sizeof(size_str), "%lu MB", log_size_b/(1024*1024));
+
+    lv_label_set_text_fmt(label_stats,
+        "Current Log: %s\nLines (Session): %lu\nArchived Logs: %lu",
+        size_str, log_lines, other_files);
 }
 
 static void event_back(lv_event_t * e) {
@@ -61,7 +75,14 @@ void UI_CreateLogManagerView(void) {
     // Space Label
     label_space = lv_label_create(scr_log_manager);
     lv_obj_set_style_text_font(label_space, &lv_font_montserrat_20, 0);
-    lv_obj_align(label_space, LV_ALIGN_TOP_MID, 0, 80);
+    lv_obj_align(label_space, LV_ALIGN_TOP_MID, 0, 60);
+
+    // Stats Label
+    label_stats = lv_label_create(scr_log_manager);
+    lv_obj_set_style_text_font(label_stats, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_stats, LV_ALIGN_TOP_MID, 0, 100);
+    lv_obj_set_style_text_align(label_stats, LV_TEXT_ALIGN_CENTER, 0);
+
     refresh_space();
 
     // Delete All Button

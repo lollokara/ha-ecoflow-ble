@@ -231,10 +231,10 @@ static void MX_SDIO_SD_Init(void) {
     hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
     hsd.Init.ClockDiv = 0;
     if (HAL_SD_Init(&hsd) != HAL_OK) {
-        printf("SD Init Failed\n");
+        printf("SD Init Failed: %lu\n", hsd.ErrorCode);
     }
     if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B) != HAL_OK) {
-         printf("SD Wide Bus Failed\n");
+         printf("SD Wide Bus Failed: %lu\n", hsd.ErrorCode);
     }
 }
 
@@ -365,8 +365,9 @@ int main(void) {
     // Initialize SD and Filesystem
     MX_SDIO_SD_Init();
     if (FATFS_LinkDriver(&SD_Driver, SDPath) == 0) {
-        if (f_mount(&SDFatFs, SDPath, 1) != FR_OK) {
-            printf("FatFs Mount Failed\n");
+        FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+        if (res != FR_OK) {
+            printf("FatFs Mount Failed: %d\n", res);
         } else {
             printf("FatFs Mounted on %s\n", SDPath);
         }
