@@ -492,6 +492,12 @@ std::vector<String> Stm32Serial::getLogList() {
     return copy;
 }
 
+void Stm32Serial::deleteLog(const String& name) {
+    uint8_t buf[64];
+    int len = pack_log_delete_req_message(buf, name.c_str());
+    sendData(buf, len);
+}
+
 void Stm32Serial::startLogDownload(const String& name) {
     if(!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
     xSemaphoreTake(_downloadMutex, portMAX_DELAY);

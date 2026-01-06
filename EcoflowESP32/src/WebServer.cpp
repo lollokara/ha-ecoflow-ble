@@ -136,6 +136,16 @@ void WebServer::setupRoutes() {
         request->send(response);
     });
 
+    server.on("/api/sd_logs/delete", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!request->hasParam("name", true)) { // POST param
+            request->send(400, "text/plain", "Missing name");
+            return;
+        }
+        String name = request->getParam("name", true)->value();
+        Stm32Serial::getInstance().deleteLog(name);
+        request->send(200, "text/plain", "OK");
+    });
+
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
 

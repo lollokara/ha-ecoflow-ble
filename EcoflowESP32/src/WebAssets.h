@@ -1049,13 +1049,27 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
                 div.style.padding = '8px 0';
                 div.innerHTML = `
-                    <span style="font-family:monospace; font-size:0.9em;">${display}</span>
-                    <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
+                    <span style="font-family:monospace; font-size:0.9em; flex:1;">${display}</span>
+                    <div style="display:flex; gap:10px;">
+                        <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
+                        <button class="btn" style="padding:4px 10px; font-size:0.8em; background:rgba(255,50,50,0.2); color:#ff5252; border:1px solid #ff5252;" onclick="deleteLog('${name}')">Delete</button>
+                    </div>
                 `;
                 list.appendChild(div);
             });
         }).catch(e => {
             el('sd-log-list').innerHTML = '<div style="text-align:center; color:var(--neon-pink);">Error loading list</div>';
+        });
+    }
+
+    function deleteLog(name) {
+        if(!confirm('Delete ' + name + '?')) return;
+        const fd = new FormData();
+        fd.append('name', name);
+        fetch(API + '/sd_logs/delete', { method: 'POST', body: fd })
+        .then(r => {
+            if(r.ok) setTimeout(fetchSdLogs, 500);
+            else alert('Error deleting log');
         });
     }
 
