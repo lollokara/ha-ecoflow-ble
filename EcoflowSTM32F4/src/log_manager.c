@@ -15,7 +15,6 @@ extern FATFS SDFatFs;
 
 static FIL LogFile;
 static bool LogOpen = false;
-static uint32_t CurrentLogLines = 0;
 
 // Download State
 static bool Downloading = false;
@@ -30,9 +29,6 @@ void LogManager_Init(void) {
     if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         f_lseek(&LogFile, f_size(&LogFile)); // Append
         LogOpen = true;
-        // Note: We don't count existing lines on append to save time.
-        // CurrentLogLines will track new lines added.
-        CurrentLogLines = 0;
 
         // Check size
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
@@ -46,8 +42,6 @@ void LogManager_ForceRotate(void) {
         f_close(&LogFile);
         LogOpen = false;
     }
-
-    CurrentLogLines = 0;
 
     // Rename current.log to log_N.txt
     // Find next available N
@@ -100,7 +94,6 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
 
     UINT bw;
     f_write(&LogFile, line, strlen(line), &bw);
-    CurrentLogLines++;
     f_sync(&LogFile); // Sync frequently or rely on periodic sync? Sync is safer but slower.
 }
 
@@ -222,9 +215,8 @@ uint32_t LogManager_GetTotalSpace(void) {
     return 0;
 }
 
-void LogManager_GetStats(uint32_t* size, uint32_t* lines, uint32_t* file_count) {
+void LogManager_GetStats(uint32_t* size, uint32_t* file_count) {
     if (size) *size = LogOpen ? f_size(&LogFile) : 0;
-    if (lines) *lines = CurrentLogLines;
 
     if (file_count) {
         *file_count = 0;

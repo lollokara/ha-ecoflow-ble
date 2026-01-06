@@ -28,6 +28,6 @@ void LogManager_SendChunkAck(void); // If needed
 // Status
 uint32_t LogManager_GetTotalSpace(void);
 uint32_t LogManager_GetFreeSpace(void);
-void LogManager_GetStats(uint32_t* size, uint32_t* lines, uint32_t* file_count);
+void LogManager_GetStats(uint32_t* size, uint32_t* file_count);
 
 #endif // LOG_MANAGER_H

@@ -22,8 +22,8 @@ static void refresh_space(void) {
 
     lv_label_set_text_fmt(label_space, "Space Available: %lu MB / %lu MB", free_mb, total_mb);
 
-    uint32_t log_size_b, log_lines, other_files;
-    LogManager_GetStats(&log_size_b, &log_lines, &other_files);
+    uint32_t log_size_b, other_files;
+    LogManager_GetStats(&log_size_b, &other_files);
 
     // Format size
     char size_str[16];
@@ -32,8 +32,8 @@ static void refresh_space(void) {
     else snprintf(size_str, sizeof(size_str), "%lu MB", log_size_b/(1024*1024));
 
     lv_label_set_text_fmt(label_stats,
-        "Current Log: %s\nLines (Session): %lu\nArchived Logs: %lu",
-        size_str, log_lines, other_files);
+        "Current Log: %s\nArchived Logs: %lu",
+        size_str, other_files);
 }
 
 static void event_back(lv_event_t * e) {
