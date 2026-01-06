@@ -15,6 +15,11 @@
 #include <freertos/semphr.h>
 #include <vector>
 
+typedef struct {
+    String name;
+    uint32_t size;
+} LogFileEntry;
+
 /**
  * @class Stm32Serial
  * @brief Singleton class for ESP32-STM32 UART communication.
@@ -68,17 +73,21 @@ public:
     // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
 
-    // Send Log to STM32
-    void sendEspLog(uint8_t level, const char* tag, const char* msg);
+    // Send Log to STM32 (Raw String)
+    void sendEspLog(const char* msg);
 
     // Log Download Support
     void requestLogList(void);
-    std::vector<String> getLogList(void); // Blocking wait
+    std::vector<LogFileEntry> getLogList(void); // Blocking wait (max 1s)
+
+    // Log Management
+    void deleteLogFile(const String& filename);
 
     // Stream Support
     void startLogDownload(const String& name);
+    // Returns bytes read. 0 = No data yet or EOF.
     size_t readLogChunk(uint8_t* buffer, size_t maxLen);
-    bool isLogDownloadComplete(void);
+    bool isLogDownloadComplete(void) { return _logDownloadComplete; }
     void abortLogDownload(void);
 
 private:
@@ -98,6 +107,15 @@ private:
 
     bool _otaRunning = false;
     SemaphoreHandle_t _txMutex = NULL;
+
+    // Log List State
+    std::vector<LogFileEntry> _logList;
+    SemaphoreHandle_t _logListMutex = NULL;
+    bool _logListReady = false;
+
+    // Log Stream State
+    QueueHandle_t _logChunkQueue = NULL;
+    bool _logDownloadComplete = false;
 };
 
 #endif

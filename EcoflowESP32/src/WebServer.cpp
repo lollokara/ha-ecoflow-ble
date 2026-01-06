@@ -5,6 +5,7 @@
 #include <esp_log.h>
 #include <LittleFS.h>
 #include "Stm32Serial.h"
+#include "WebAssets.h" // For WEB_APP_HTML
 
 static const char* TAG = "WebServer";
 AsyncWebServer WebServer::server(80);
@@ -16,6 +17,7 @@ public:
     LogResponse(String name) : _name(name) {
         _code = 200;
         _contentType = "application/octet-stream";
+        // Trigger start on creation
         Stm32Serial::getInstance().startLogDownload(name);
     }
     ~LogResponse() {
@@ -24,17 +26,52 @@ public:
     bool _sourceValid() const { return true; }
     virtual size_t _fillBuffer(uint8_t *data, size_t len){
         if (Stm32Serial::getInstance().isLogDownloadComplete()) {
-            return 0;
+            return 0; // EOF
         }
         size_t read = Stm32Serial::getInstance().readLogChunk(data, len);
         if (read == 0) {
-            // Wait a bit for data to arrive from UART
+            // No data yet, return 0 to indicate "wait" if supported, or check loop
+            // AsyncWebServer expects 0 = EOF unless we are chunked?
+            // Actually _fillBuffer returning 0 means EOF for standard responses.
+            // But we can't block here forever.
+            // Ideally we should use a chunked response but that requires a different base class usage.
+            // However, readLogChunk is non-blocking. If buffer is empty but not complete, we should wait?
+            // We can't wait in this callback as it blocks the async server task.
+            // Workaround: Return a single dummy byte or handle state carefully.
+            // Better: Use stream response if possible, but we don't have a Stream object.
+            // Let's rely on the fact that STM32 sends chunks fast.
+            // If we return 0 and not complete, connection closes.
+            // We MUST return something or block slightly.
             vTaskDelay(10);
             read = Stm32Serial::getInstance().readLogChunk(data, len);
         }
         return read;
     }
 };
+
+// We need a Chunked Response for reliability
+void WebServer::sendChunkedLog(AsyncWebServerRequest *request, String filename) {
+    Stm32Serial::getInstance().startLogDownload(filename);
+
+    AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [filename](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if (Stm32Serial::getInstance().isLogDownloadComplete()) {
+            return 0;
+        }
+        size_t read = 0;
+        // Wait up to 1s for data
+        for(int i=0; i<100; i++) {
+            read = Stm32Serial::getInstance().readLogChunk(buffer, maxLen);
+            if (read > 0) break;
+            vTaskDelay(10);
+            if (Stm32Serial::getInstance().isLogDownloadComplete()) return 0;
+        }
+        return read;
+    });
+
+    response->addHeader("Content-Disposition", "attachment; filename=" + filename);
+    request->send(response);
+}
+
 
 // Global OTA State
 int ota_progress = 0;
@@ -117,12 +154,26 @@ void WebServer::setupRoutes() {
     // SD Logs
     server.on("/api/sd_logs", HTTP_GET, [](AsyncWebServerRequest *request){
         Stm32Serial::getInstance().requestLogList();
-        std::vector<String> logs = Stm32Serial::getInstance().getLogList();
+        std::vector<LogFileEntry> logs = Stm32Serial::getInstance().getLogList();
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonArray root = response->getRoot();
-        for(const String& log : logs) root.add(log);
+        for(const auto& log : logs) {
+            JsonObject obj = root.createNestedObject();
+            obj["name"] = log.name;
+            obj["size"] = log.size;
+        }
         response->setLength();
         request->send(response);
+    });
+
+    server.on("/api/sd_logs", HTTP_DELETE, [](AsyncWebServerRequest *request){
+        if (request->hasParam("name")) {
+            String name = request->getParam("name")->value();
+            Stm32Serial::getInstance().deleteLogFile(name);
+            request->send(200, "text/plain", "Deleted");
+        } else {
+            request->send(400, "text/plain", "Missing name");
+        }
     });
 
     server.on("/api/sd_logs/download", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -131,9 +182,7 @@ void WebServer::setupRoutes() {
             return;
         }
         String name = request->getParam("name")->value();
-        AsyncWebServerResponse *response = new LogResponse(name);
-        response->addHeader("Content-Disposition", "attachment; filename=" + name);
-        request->send(response);
+        sendChunkedLog(request, name);
     });
 
     server.on("/api/settings", HTTP_GET, handleSettings);
@@ -151,12 +200,6 @@ void WebServer::setupRoutes() {
         request->send(200, "text/plain", "Upload OK");
     }, handleUpdateStm32);
 }
-
-// ... (Existing Handlers: Status, History, Control, Connect, Disconnect, Forget, Logs, LogConfig, RawCommand, Settings, SettingsSave) ...
-// Copying existing handlers here to keep file complete
-// (For brevity in tool response, I will assume existing handlers are unchanged,
-//  but I must output the full file content to overwrite correctly.
-//  I'll include them from previous `read_file` output.)
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(4096);
