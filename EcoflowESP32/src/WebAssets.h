@@ -334,6 +334,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 </div>
             </div>
         </div>
+
+        <!-- SD Logs Card -->
+        <div class="card">
+            <div class="header" onclick="toggleSdLogs()">
+                <h3>💾 SD Card Logs</h3>
+                <button class="btn btn-sub" id="sd-log-toggle-btn" style="font-size:0.8em;">Show</button>
+            </div>
+            <div id="sd-log-section" class="hidden">
+                <div class="ctrl-row">
+                    <button class="btn btn-primary" onclick="fetchSdLogs()">Refresh List</button>
+                    <span id="sd-status" style="font-size:0.8em; color:var(--text-sub)"></span>
+                </div>
+                <div id="sd-log-list" style="margin-top:15px; max-height:300px; overflow-y:auto;">
+                    <div style="text-align:center; color:#555; padding:20px;">Click Refresh to load...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
 <script>
@@ -1001,6 +1018,44 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 c.appendChild(line);
                 if (el('auto-scroll').checked) c.scrollTop = c.scrollHeight;
             }
+        });
+    }
+
+    // --- SD Logs ---
+    function toggleSdLogs() {
+        const elSec = el('sd-log-section');
+        elSec.classList.toggle('hidden');
+        if (!elSec.classList.contains('hidden')) fetchSdLogs();
+    }
+
+    function fetchSdLogs() {
+        el('sd-log-list').innerHTML = '<div style="text-align:center; color:#888;">Loading...</div>';
+        fetch(API + '/sd_logs').then(r => r.json()).then(data => {
+            const list = el('sd-log-list');
+            list.innerHTML = '';
+            if (!data || data.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#555;">No logs found</div>';
+                return;
+            }
+            data.forEach(file => {
+                let name = file;
+                let display = file;
+                if (file.includes(' (')) {
+                    name = file.split(' (')[0];
+                }
+
+                const div = document.createElement('div');
+                div.className = 'ctrl-row';
+                div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                div.style.padding = '8px 0';
+                div.innerHTML = `
+                    <span style="font-family:monospace; font-size:0.9em;">${display}</span>
+                    <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
+                `;
+                list.appendChild(div);
+            });
+        }).catch(e => {
+            el('sd-log-list').innerHTML = '<div style="text-align:center; color:var(--neon-pink);">Error loading list</div>';
         });
     }
 
