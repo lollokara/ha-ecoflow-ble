@@ -13,6 +13,7 @@
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
 #include <vector>
+#include <algorithm> // Required for std::min
 
 // Hardware Serial pin definition
 #define RX_PIN 18
@@ -30,15 +31,6 @@ extern String ota_msg;
 // Variables for OTA
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
-
-// Log Globals
-static std::vector<LogFileEntry> _cachedLogList;
-static bool _logListReady = false;
-static SemaphoreHandle_t _logListMutex = NULL;
-
-static std::vector<uint8_t> _downloadBuffer;
-static bool _downloadComplete = false;
-static SemaphoreHandle_t _downloadMutex = NULL;
 
 // CRC32 Table
 static const uint32_t crc32_table[] = {
@@ -107,10 +99,7 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
 void Stm32Serial::sendEspLog(const char* msg) {
     if (_txMutex != NULL) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            uint8_t buf[512]; // Increased to accommodate larger messages
-            // Assuming pack_log_msg_message is defined in ecoflow_protocol.h
-            // if not, we must construct it: [START][CMD_LOG_MSG][LEN][PAYLOAD][CRC]
-
+            uint8_t buf[512];
             size_t msgLen = strlen(msg);
             if (msgLen > 255) msgLen = 255;
 
@@ -315,8 +304,11 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         }
     } else if (cmd == CMD_LOG_DATA_CHUNK) {
         if (len >= 9) {
+            uint32_t offset; // not used currently, we stream
             uint16_t dataLen;
+            memcpy(&offset, &rx_buf[3], 4);
             memcpy(&dataLen, &rx_buf[7], 2);
+
             if (!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
             xSemaphoreTake(_downloadMutex, portMAX_DELAY);
             if (dataLen > 0) {
@@ -544,7 +536,7 @@ bool Stm32Serial::isLogDownloadComplete() {
 }
 
 void Stm32Serial::abortLogDownload() {
-    // Placeholder
+    // Placeholder - could send cancel command to STM32
 }
 
 static String otaFilename;

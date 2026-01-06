@@ -25,27 +25,23 @@ public:
     }
     bool _sourceValid() const { return true; }
     virtual size_t _fillBuffer(uint8_t *data, size_t len){
-        if (Stm32Serial::getInstance().isLogDownloadComplete()) {
-            return 0; // EOF
+        size_t totalRead = 0;
+        // Try to fill the buffer
+        while (totalRead < len) {
+            size_t read = Stm32Serial::getInstance().readLogChunk(data + totalRead, len - totalRead);
+            if (read > 0) {
+                totalRead += read;
+            } else {
+                // No data available yet
+                if (Stm32Serial::getInstance().isLogDownloadComplete()) {
+                    // Download complete and no data left
+                    break;
+                }
+                // Wait briefly for more data
+                vTaskDelay(5);
+            }
         }
-        size_t read = Stm32Serial::getInstance().readLogChunk(data, len);
-        if (read == 0) {
-            // No data yet, return 0 to indicate "wait" if supported, or check loop
-            // AsyncWebServer expects 0 = EOF unless we are chunked?
-            // Actually _fillBuffer returning 0 means EOF for standard responses.
-            // But we can't block here forever.
-            // Ideally we should use a chunked response but that requires a different base class usage.
-            // However, readLogChunk is non-blocking. If buffer is empty but not complete, we should wait?
-            // We can't wait in this callback as it blocks the async server task.
-            // Workaround: Return a single dummy byte or handle state carefully.
-            // Better: Use stream response if possible, but we don't have a Stream object.
-            // Let's rely on the fact that STM32 sends chunks fast.
-            // If we return 0 and not complete, connection closes.
-            // We MUST return something or block slightly.
-            vTaskDelay(10);
-            read = Stm32Serial::getInstance().readLogChunk(data, len);
-        }
-        return read;
+        return totalRead;
     }
 };
 
@@ -54,18 +50,21 @@ void WebServer::sendChunkedLog(AsyncWebServerRequest *request, String filename) 
     Stm32Serial::getInstance().startLogDownload(filename);
 
     AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [filename](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-        if (Stm32Serial::getInstance().isLogDownloadComplete()) {
-            return 0;
+        size_t totalRead = 0;
+        // Wait loop for data
+        for(int i=0; i<200; i++) { // Wait up to 2 seconds for initial data or next chunk
+            size_t read = Stm32Serial::getInstance().readLogChunk(buffer + totalRead, maxLen - totalRead);
+            if (read > 0) {
+                totalRead += read;
+                if (totalRead == maxLen) break; // Filled buffer
+            } else {
+                if (Stm32Serial::getInstance().isLogDownloadComplete()) {
+                    return totalRead; // Return whatever we have, next call will return 0
+                }
+                vTaskDelay(10);
+            }
         }
-        size_t read = 0;
-        // Wait up to 1s for data
-        for(int i=0; i<100; i++) {
-            read = Stm32Serial::getInstance().readLogChunk(buffer, maxLen);
-            if (read > 0) break;
-            vTaskDelay(10);
-            if (Stm32Serial::getInstance().isLogDownloadComplete()) return 0;
-        }
-        return read;
+        return totalRead;
     });
 
     response->addHeader("Content-Disposition", "attachment; filename=" + filename);

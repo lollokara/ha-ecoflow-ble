@@ -87,7 +87,7 @@ public:
     void startLogDownload(const String& name);
     // Returns bytes read. 0 = No data yet or EOF.
     size_t readLogChunk(uint8_t* buffer, size_t maxLen);
-    bool isLogDownloadComplete(void) { return _logDownloadComplete; }
+    bool isLogDownloadComplete(void);
     void abortLogDownload(void);
 
 private:
@@ -114,7 +114,9 @@ private:
     bool _logListReady = false;
 
     // Log Stream State
-    QueueHandle_t _logChunkQueue = NULL;
+    // Using std::vector as a dynamic buffer for incoming chunks
+    std::vector<uint8_t> _downloadBuffer;
+    SemaphoreHandle_t _downloadMutex = NULL;
     bool _logDownloadComplete = false;
 };
 
