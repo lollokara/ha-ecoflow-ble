@@ -10,6 +10,8 @@
 
 #include "DeviceManager.h"
 #include "Credentials.h"
+#include "LogBuffer.h"
+#include "Stm32Serial.h"
 #include <NimBLEDevice.h>
 
 /**
@@ -202,6 +204,32 @@ void DeviceManager::printStatus(Print& out) {
     printSlot(slotW2);
     printSlot(slotD3P);
     printSlot(slotAC);
+}
+
+void DeviceManager::dumpConfig() {
+    String output = "";
+    output += "Firmware Version: ESP32 v1.0.0\n";
+    output += "Devices:\n";
+
+    DeviceSlot* slots[] = {&slotD3, &slotW2, &slotD3P, &slotAC};
+    for(int i=0; i<4; i++) {
+        output += String(slots[i]->name.c_str());
+        output += ": ";
+        if (!slots[i]->macAddress.empty()) {
+            output += "MAC=" + String(slots[i]->macAddress.c_str()) + ", ";
+            output += "SN=" + String(slots[i]->serialNumber.c_str());
+            if (slots[i]->isConnected) output += " [Connected]";
+        } else {
+            output += "Not Paired";
+        }
+        output += "\n";
+    }
+
+    if (output.length() > 250) output = output.substring(0, 250);
+
+    uint8_t buf[260];
+    int len = pack_log_status_resp_message(buf, output.c_str());
+    Stm32Serial::getInstance().sendData(buf, len);
 }
 
 void DeviceManager::forget(DeviceType type) {

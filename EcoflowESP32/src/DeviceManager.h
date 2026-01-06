@@ -88,6 +88,7 @@ public:
 
     // --- Management Commands ---
     void printStatus(Print& out);
+    void dumpConfig();
     void forget(DeviceType type);
     String getDeviceStatusJson();
 

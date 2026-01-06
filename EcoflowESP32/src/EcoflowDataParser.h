@@ -16,6 +16,11 @@ namespace EcoflowDataParser {
  */
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type);
 
+/**
+ * @brief Sets a flag to dump full debug info for the next packet of the given type.
+ */
+void setDumpNextPacket(DeviceType type);
+
 } // namespace EcoflowDataParser
 
 #endif // ECOFLOW_DATA_PARSER_H

@@ -288,6 +288,16 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
         <div id="device-list"></div>
 
         <div class="card">
+            <div class="header">
+                <h3>📂 Log Files (STM32)</h3>
+                <button class="btn btn-sub" onclick="refreshLogList()" style="font-size:0.8em;">Refresh</button>
+            </div>
+            <div id="file-list" class="grid grid-3" style="max-height: 300px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 10px;">
+                <div style="color:#777; padding:10px; width:100%; text-align:center;">Click Refresh to load list</div>
+            </div>
+        </div>
+
+        <div class="card">
             <div class="header" onclick="toggleLogs()">
                 <h3>📋 System Logs</h3>
                 <button class="btn btn-sub" id="log-toggle-btn" style="font-size:0.8em;">Show</button>
@@ -1001,6 +1011,45 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 c.appendChild(line);
                 if (el('auto-scroll').checked) c.scrollTop = c.scrollHeight;
             }
+        });
+    }
+
+    // --- STM32 Logs ---
+    function refreshLogList() {
+        el('file-list').innerHTML = '<div style="color:#777; padding:10px; width:100%; text-align:center;">Loading...</div>';
+        fetch(API + '/logs').then(r => {
+            if(!r.ok) throw new Error('Failed');
+            return r.json();
+        }).then(files => {
+            const list = el('file-list');
+            list.innerHTML = '';
+            if (files.length === 0) list.innerHTML = '<div style="color:#777; padding:10px; width:100%; text-align:center;">No logs found</div>';
+
+            files.forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'stat';
+                div.style.flex = '1 1 150px'; // Responsive grid item
+                div.innerHTML = `<div class="stat-label" style="text-transform:none; font-size:0.9em; word-break:break-all;">${f.name}</div>
+                                 <div class="stat-val" style="font-size:0.9em; margin:5px 0;">${(f.size/1024).toFixed(1)} KB</div>
+                                 <div style="display:flex; gap:5px; justify-content:center;">
+                                     <button class="btn" style="font-size:0.75em; padding:4px 8px;" onclick="downloadLog('${f.name}')">Get</button>
+                                     <button class="btn" style="font-size:0.75em; padding:4px 8px; background:rgba(255,50,50,0.2); color:#ff5252;" onclick="deleteLog('${f.name}')">Del</button>
+                                 </div>`;
+                list.appendChild(div);
+            });
+        }).catch(e => {
+            el('file-list').innerHTML = '<div style="color:#f55; padding:10px; width:100%; text-align:center;">Error loading list. Check connections.</div>';
+        });
+    }
+
+    function downloadLog(filename) {
+        window.location.href = API + '/logs/download?file=' + filename;
+    }
+
+    function deleteLog(filename) {
+        if(!confirm('Delete ' + filename + '?')) return;
+        fetch(API + '/logs/delete?file=' + filename, {method:'POST'}).then(r => {
+            setTimeout(refreshLogList, 1000); // Wait for delete
         });
     }
 

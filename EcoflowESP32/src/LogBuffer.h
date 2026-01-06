@@ -32,6 +32,9 @@ public:
     // Internal use for the vprintf hook
     void addLog(esp_log_level_t level, const char* tag, const char* format, va_list args);
 
+    void setForwarding(bool enabled);
+    bool isForwarding() const;
+
 private:
     LogBuffer();
     LogBuffer(const LogBuffer&) = delete;

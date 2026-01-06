@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
+#include "log_manager.h"
 
 extern IWDG_HandleTypeDef hiwdg; // Refresh Watchdog during long ops
 
@@ -30,7 +31,8 @@ typedef enum {
     MSG_POWER_OFF,
     MSG_GET_DEBUG_INFO,
     MSG_CONNECT_DEVICE,
-    MSG_FORGET_DEVICE
+    MSG_FORGET_DEVICE,
+    MSG_LOG_STATUS_REQ
 } TxMsgType;
 
 typedef struct {
@@ -106,6 +108,9 @@ static uint8_t parseBuffer[1024]; // Increased for safety
 static uint16_t parseIndex = 0;
 static uint8_t expectedPayloadLen = 0;
 
+// Log Streaming State
+static bool is_streaming_log = false;
+
 static void UART_Init(void) {
     __HAL_RCC_USART6_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -141,7 +146,6 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     // Check OTA Commands first
     if (cmd == CMD_OTA_START) {
         // Send NACK to force ESP32 to retry (waiting for Bootloader)
-        // This solves the "Double OTA" issue where ESP32 times out waiting for ACK from App
         uint8_t nack[4];
         nack[0] = 0xAA;
         nack[1] = 0x15; // CMD_OTA_NACK
@@ -159,6 +163,58 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         HAL_NVIC_SystemReset();
     }
+    // ... Log Commands ...
+    else if (cmd == CMD_LOG_LIST_REQ) {
+        LogFileEntry entries[4];
+        LogListRespMsg msg;
+        msg.count = LogManager_GetLogList(entries, 4);
+        // Convert to Proto struct
+        for(int i=0; i<msg.count; i++) {
+            strncpy(msg.files[i].name, entries[i].name, 32);
+            msg.files[i].size = entries[i].size;
+        }
+        uint8_t buf[256];
+        int len = pack_log_list_resp_message(buf, &msg);
+        HAL_UART_Transmit(&huart6, buf, len, 100);
+    }
+    else if (cmd == CMD_LOG_DOWNLOAD_REQ) {
+        char filename[32];
+        uint32_t offset;
+        unpack_log_download_req_message(packet, filename, &offset);
+        // Note: offset handling for resume not fully implemented in LogManager_StartRead (assumes start)
+        // But for simplicity we start fresh.
+        if (LogManager_StartRead(filename)) {
+            is_streaming_log = true;
+        }
+    }
+    else if (cmd == CMD_LOG_DELETE_REQ) {
+        char filename[32];
+        unpack_log_delete_req_message(packet, filename);
+        // If filename is empty or special, delete all. My protocol implies per file but UI "Delete All".
+        // Protocol supports filename. If filename == "", delete all?
+        // Let's assume Delete All for now or if filename="ALL".
+        LogManager_DeleteAllLogs();
+
+        uint8_t ack[4];
+        ack[0] = START_BYTE; ack[1] = CMD_LOG_DELETE_RESP; ack[2] = 1; ack[3] = 1; // Success
+        ack[4] = calculate_crc8(&ack[1], 3);
+        HAL_UART_Transmit(&huart6, ack, 5, 100);
+    }
+    else if (cmd == CMD_ESP_LOG_DATA) {
+        char msg[256];
+        unpack_esp_log_data_message(packet, msg, sizeof(msg));
+        // LogManager handles newlines
+        LogManager_Write("ESP32", "Log", msg);
+    }
+    else if (cmd == CMD_LOG_STATUS_RESP) {
+        char dump[256];
+        // Manually unpack since unpack function is not defined
+        uint8_t len = packet[2];
+        memcpy(dump, &packet[3], len);
+        dump[len] = 0;
+        LogManager_WriteSection2(dump);
+    }
+
     // ... Normal Commands ...
     else if (cmd == CMD_HANDSHAKE_ACK) {
         if (protocolState == STATE_WAIT_HANDSHAKE_ACK) {
@@ -234,13 +290,16 @@ void UART_SendConnectDevice(uint8_t type) {
 void UART_SendForgetDevice(uint8_t type) {
     if (uartTxQueue) { TxMessage tx; tx.type = MSG_FORGET_DEVICE; tx.data.device_type = type; xQueueSend(uartTxQueue, &tx, 0); }
 }
+void UART_SendLogStatusReq(void) {
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_LOG_STATUS_REQ; xQueueSend(uartTxQueue, &tx, 0); }
+}
 void UART_GetKnownDevices(DeviceList *list) { memcpy(list, &knownDevices, sizeof(DeviceList)); }
 
 
 void StartUARTTask(void * argument) {
     UART_Init();
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
-    uint8_t tx_buf[32];
+    uint8_t tx_buf[256]; // Increased buffer size for log packets
     int len;
     uint8_t b;
     TickType_t lastActivityTime = xTaskGetTickCount();
@@ -291,24 +350,47 @@ void StartUARTTask(void * argument) {
             }
         }
 
-        // 2. Process TX
-        TxMessage tx;
-        if (xQueueReceive(uartTxQueue, &tx, 0) == pdTRUE) {
-            uint8_t buf[32];
-            int len = 0;
-            if (tx.type == MSG_WAVE2_SET) len = pack_set_wave2_message(buf, tx.data.w2.type, tx.data.w2.value);
-            else if (tx.type == MSG_AC_SET) len = pack_set_ac_message(buf, tx.data.enable);
-            else if (tx.type == MSG_DC_SET) len = pack_set_dc_message(buf, tx.data.enable);
-            else if (tx.type == MSG_SET_VALUE) len = pack_set_value_message(buf, tx.data.set_val.type, tx.data.set_val.value);
-            else if (tx.type == MSG_POWER_OFF) len = pack_power_off_message(buf);
-            else if (tx.type == MSG_GET_DEBUG_INFO) len = pack_get_debug_info_message(buf);
-            else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(buf, tx.data.device_type);
-            else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(buf, tx.data.device_type);
-
-            if (len > 0) HAL_UART_Transmit(&huart6, buf, len, 100);
+        // 2. Log Streaming
+        if (is_streaming_log) {
+            uint8_t chunk[200];
+            int read = LogManager_ReadChunk(chunk, sizeof(chunk));
+            if (read > 0) {
+                len = pack_log_data_chunk_message(tx_buf, chunk, read);
+                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                // Flow control needed?
+                // We trust HAL_UART_Transmit blocks until Sent (or timeout).
+                // Just yield a bit to allow RX processing.
+            } else {
+                is_streaming_log = false;
+                LogManager_CloseRead();
+                // Send End (Empty Chunk)
+                len = pack_log_data_chunk_message(tx_buf, NULL, 0);
+                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+            }
         }
 
-        // 3. State Machine
+        // 3. Process TX
+        TxMessage tx;
+        if (xQueueReceive(uartTxQueue, &tx, 0) == pdTRUE) {
+            // Priority: Send queued message.
+            // Note: If streaming, we might interleave packets. ESP must handle it.
+            // Protocol supports packet interleaving as long as atomic packets are sent.
+
+            len = 0;
+            if (tx.type == MSG_WAVE2_SET) len = pack_set_wave2_message(tx_buf, tx.data.w2.type, tx.data.w2.value);
+            else if (tx.type == MSG_AC_SET) len = pack_set_ac_message(tx_buf, tx.data.enable);
+            else if (tx.type == MSG_DC_SET) len = pack_set_dc_message(tx_buf, tx.data.enable);
+            else if (tx.type == MSG_SET_VALUE) len = pack_set_value_message(tx_buf, tx.data.set_val.type, tx.data.set_val.value);
+            else if (tx.type == MSG_POWER_OFF) len = pack_power_off_message(tx_buf);
+            else if (tx.type == MSG_GET_DEBUG_INFO) len = pack_get_debug_info_message(tx_buf);
+            else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(tx_buf, tx.data.device_type);
+            else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(tx_buf, tx.data.device_type);
+            else if (tx.type == MSG_LOG_STATUS_REQ) len = pack_log_status_req_message(tx_buf);
+
+            if (len > 0) HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+        }
+
+        // 4. State Machine (Heartbeat)
         if ((xTaskGetTickCount() - lastActivityTime) > pdMS_TO_TICKS(200)) {
             lastActivityTime = xTaskGetTickCount();
             switch (protocolState) {
@@ -328,14 +410,17 @@ void StartUARTTask(void * argument) {
                     }
                     break;
                 case STATE_POLLING:
-                    if (knownDevices.count > 0) {
-                        if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
-                        if (knownDevices.devices[currentDeviceIndex].connected) {
-                            uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
-                            len = pack_get_device_status_message(tx_buf, dev_id);
-                            HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                    // Don't poll while streaming logs to save bandwidth?
+                    if (!is_streaming_log) {
+                        if (knownDevices.count > 0) {
+                            if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
+                            if (knownDevices.devices[currentDeviceIndex].connected) {
+                                uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
+                                len = pack_get_device_status_message(tx_buf, dev_id);
+                                HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                            }
+                            currentDeviceIndex++;
                         }
-                        currentDeviceIndex++;
                     }
                     break;
                 default: break;

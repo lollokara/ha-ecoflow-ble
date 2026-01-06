@@ -12,6 +12,7 @@
 #include "DeviceManager.h"
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
+#include "EcoflowDataParser.h"
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
@@ -102,6 +103,18 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
     } else {
         Serial1.write(data, len);
     }
+}
+
+void Stm32Serial::sendEspLog(const char* msg) {
+    static bool inside = false;
+    if (inside) return;
+    inside = true;
+
+    uint8_t buf[260];
+    int len = pack_esp_log_data_message(buf, msg);
+    sendData(buf, len);
+
+    inside = false;
 }
 
 /**
@@ -299,7 +312,43 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
+    } else if (cmd == CMD_LOG_LIST_RESP) {
+        LogListRespMsg msg;
+        if (unpack_log_list_resp_message(rx_buf, &msg) == 0) {
+            _logList.clear();
+            for(int i=0; i<msg.count; i++) {
+                _logList.push_back(msg.files[i]);
+            }
+        }
+    } else if (cmd == CMD_LOG_DATA_CHUNK) {
+        if (_logChunkCb) {
+            _logChunkCb(&rx_buf[3], rx_buf[2]);
+        }
+    } else if (cmd == CMD_LOG_STATUS_REQ) {
+        DeviceManager::getInstance().dumpConfig();
+        EcoflowDataParser::setDumpNextPacket(DeviceType::DELTA_3);
+        EcoflowDataParser::setDumpNextPacket(DeviceType::DELTA_PRO_3);
+        EcoflowDataParser::setDumpNextPacket(DeviceType::WAVE_2);
+        EcoflowDataParser::setDumpNextPacket(DeviceType::ALTERNATOR_CHARGER);
     }
+}
+
+void Stm32Serial::requestLogList() {
+    uint8_t buf[8];
+    int len = pack_log_list_req_message(buf);
+    sendData(buf, len);
+}
+
+void Stm32Serial::requestLogDownload(const char* filename) {
+    uint8_t buf[64];
+    int len = pack_log_download_req_message(buf, filename, 0);
+    sendData(buf, len);
+}
+
+void Stm32Serial::requestDeleteLog(const char* filename) {
+    uint8_t buf[64];
+    int len = pack_log_delete_req_message(buf, filename);
+    sendData(buf, len);
 }
 
 /**

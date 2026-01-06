@@ -25,6 +25,8 @@
 #include "uart_task.h"
 #include "fan_task.h"
 #include <stdio.h>
+#include "sd_card/sd_driver.h"
+#include "log_manager.h"
 
 // External Handles
 extern UART_HandleTypeDef huart6;
@@ -308,6 +310,7 @@ int main(void) {
     MX_TIM2_Init();
     SetBacklight(75); // Ensure screen is visible at boot
 
+    MX_SDIO_SD_Init();
     MX_IWDG_Init(); // Watchdog Enabled
 
     // Create Display Event Queue
@@ -394,4 +397,19 @@ void vApplicationMallocFailedHook(void) {
 void WWDG_IRQHandler(void) {
     printf("WWDG_IRQHandler (IRQ 0) Triggered!\n");
     while(1);
+}
+
+void StartDefaultTask(void const * argument)
+{
+  LogManager_Init();
+  for(;;)
+  {
+    osDelay(1000);
+  }
+}
+
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1) {}
 }

@@ -1,7 +1,9 @@
 #include "LogBuffer.h"
+#include "Stm32Serial.h"
 
 // We need a separate static function for the hook
 static vprintf_like_t old_vprintf = nullptr;
+static bool _globalForwarding = false;
 
 static int silent_vprintf(const char *fmt, va_list args) {
     return 0; // Do nothing
@@ -13,6 +15,11 @@ static int buffer_vprintf(const char *fmt, va_list args) {
     int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
 
     if (len > 0) {
+        bool isErrWarn = (strstr(buffer, "W (") || strstr(buffer, "E ("));
+        if (_globalForwarding || isErrWarn) {
+             Stm32Serial::getInstance().sendEspLog(buffer);
+        }
+
         String logLine = String(buffer);
 
         // Basic parsing logic
@@ -178,4 +185,12 @@ void LogBuffer::clearLogs() {
     xSemaphoreTake(_mutex, portMAX_DELAY);
     _logs.clear();
     xSemaphoreGive(_mutex);
+}
+
+void LogBuffer::setForwarding(bool enabled) {
+    _globalForwarding = enabled;
+}
+
+bool LogBuffer::isForwarding() const {
+    return _globalForwarding;
 }

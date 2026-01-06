@@ -52,6 +52,17 @@ extern "C" {
 #define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
 #define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
 
+// --- Log Management Commands ---
+#define CMD_LOG_LIST_REQ        0x70 // ESP -> STM (Get list)
+#define CMD_LOG_LIST_RESP       0x71 // STM -> ESP (List data)
+#define CMD_LOG_DOWNLOAD_REQ    0x72 // ESP -> STM (Start download)
+#define CMD_LOG_DATA_CHUNK      0x73 // STM -> ESP (File content)
+#define CMD_LOG_DELETE_REQ      0x74 // ESP -> STM (Delete file)
+#define CMD_LOG_DELETE_RESP     0x75 // STM -> ESP (Result)
+#define CMD_ESP_LOG_DATA        0x76 // ESP -> STM (Store log entry)
+#define CMD_LOG_STATUS_REQ      0x77 // STM -> ESP (Request Config Dump)
+#define CMD_LOG_STATUS_RESP     0x78 // ESP -> STM (Config Dump Data)
+
 #define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
 #define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge
 
@@ -305,6 +316,22 @@ typedef struct {
     // Data follows
 } OtaChunkHeader;
 
+// Log Protocol Structures
+typedef struct {
+    char name[32];
+    uint32_t size;
+} LogEntryProto;
+
+typedef struct {
+    uint8_t count;
+    LogEntryProto files[4]; // Max 4 per packet to stay under 255 bytes (36*4 + 1 = 145)
+} LogListRespMsg;
+
+typedef struct {
+    char filename[32];
+    uint32_t offset;
+} LogDownloadReqMsg;
+
 #pragma pack(pop)
 
 // --- API Functions (Serialization/Deserialization) ---
@@ -352,6 +379,28 @@ int pack_ota_start_message(uint8_t *buffer, uint32_t total_size);
 int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len);
 int pack_ota_end_message(uint8_t *buffer, uint32_t crc32);
 int pack_ota_apply_message(uint8_t *buffer);
+
+// Log API
+int pack_log_list_req_message(uint8_t *buffer);
+int pack_log_list_resp_message(uint8_t *buffer, const LogListRespMsg *msg);
+int unpack_log_list_resp_message(const uint8_t *buffer, LogListRespMsg *msg);
+
+int pack_log_download_req_message(uint8_t *buffer, const char* filename, uint32_t offset);
+int unpack_log_download_req_message(const uint8_t *buffer, char* filename, uint32_t* offset);
+
+int pack_log_data_chunk_message(uint8_t *buffer, const uint8_t* data, uint8_t len); // Simple chunk for streaming
+
+int pack_log_delete_req_message(uint8_t *buffer, const char* filename); // Empty filename = delete all
+int unpack_log_delete_req_message(const uint8_t *buffer, char* filename);
+
+int pack_esp_log_data_message(uint8_t *buffer, const char* msg);
+int unpack_esp_log_data_message(const uint8_t *buffer, char* msg, uint8_t max_len);
+
+int pack_log_status_req_message(uint8_t *buffer);
+int pack_log_status_resp_message(uint8_t *buffer, const char* config_dump); // Might be multi-packet? For now assume single fits or specific packet type.
+// Actually config dump can be large. We might need chunking or just use log_data for ESP->STM.
+// But here STM requests info from ESP to WRITE to log.
+// So ESP sends data to STM. "CMD_LOG_STATUS_RESP". Payload is string.
 
 #ifdef __cplusplus
 }
