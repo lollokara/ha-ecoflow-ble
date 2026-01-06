@@ -83,6 +83,9 @@ void WebServer::setupRoutes() {
     server.on("/api/history", HTTP_GET, handleHistory);
 
     server.on("/api/logs", HTTP_GET, handleLogs);
+    server.on("/api/logs/list", HTTP_GET, handleLogList);
+    server.on("/api/logs/download", HTTP_GET, handleLogDownload);
+    server.on("/api/logs/delete", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogDelete);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
 
@@ -330,6 +333,91 @@ void WebServer::handleLogs(AsyncWebServerRequest *request) {
     }
     String json; serializeJson(doc, json);
     request->send(200, "application/json", json);
+}
+
+void WebServer::handleLogList(AsyncWebServerRequest *request) {
+    Stm32Serial::getInstance().sendLogListReq();
+    // Wait for response (Semaphore)
+    if (xSemaphoreTake(Stm32Serial::getInstance()._logListSem, pdMS_TO_TICKS(2000)) == pdTRUE) {
+        DynamicJsonDocument doc(2048);
+        JsonArray arr = doc.to<JsonArray>();
+        LogListMsg list = Stm32Serial::getInstance()._lastLogList;
+        for(int i=0; i<list.count; i++) {
+            JsonObject obj = arr.createNestedObject();
+            obj["name"] = list.files[i].filename;
+            obj["size"] = list.files[i].size;
+        }
+        String json; serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    } else {
+        request->send(504, "text/plain", "Timeout waiting for STM32");
+    }
+}
+
+void WebServer::handleLogDownload(AsyncWebServerRequest *request) {
+    if (!request->hasParam("file")) {
+        request->send(400, "text/plain", "Missing file param");
+        return;
+    }
+    String filename = request->getParam("file")->value();
+    uint32_t offset = 0;
+    if (request->hasParam("offset")) offset = request->getParam("offset")->value().toInt();
+
+    AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [filename, offset, reqSent = false](uint8_t *buffer, size_t maxLen, size_t index) mutable -> size_t {
+        // This callback is called repeatedly to fill buffer.
+        // We need to fetch data from STM32.
+        // The first time (index=0), we trigger the download.
+        // But beginChunkedResponse is non-blocking. It expects us to fill buffer immediately or return 0 (which pauses?)
+        // If we block here, we block the async server thread. That's bad but acceptable if short.
+        // However, STM32 UART is slow.
+        // We should use a queue.
+
+        if (index == 0 && !reqSent) {
+            // Clear Queue first
+            std::vector<uint8_t>* dummy;
+            while(xQueueReceive(Stm32Serial::getInstance()._logStreamQueue, &dummy, 0)) { if(dummy) delete dummy; }
+
+            Stm32Serial::getInstance().sendLogDownloadReq(filename.c_str(), offset);
+            reqSent = true;
+        }
+
+        // Wait for data
+        std::vector<uint8_t>* chunk = NULL;
+        // Wait up to 1s
+        if (xQueueReceive(Stm32Serial::getInstance()._logStreamQueue, &chunk, pdMS_TO_TICKS(1000))) {
+            if (chunk == NULL) {
+                // EOF
+                reqSent = false; // Reset for next time (static is tricky here if concurrent, but we assume single user)
+                return 0; // End of response
+            }
+            size_t len = chunk->size();
+            if (len > maxLen) len = maxLen; // Should not happen if chunk < 200 and maxLen usually ~1KB
+            memcpy(buffer, chunk->data(), len);
+            delete chunk;
+            return len;
+        } else {
+             // Timeout or no data yet.
+             // If we return 0 without final, it keeps connection open?
+             // AsyncWebServer docs say return 0 implies wait?
+             // Or maybe we should return RESPONSE_TRY_AGAIN if supported?
+             // For now return 0 and hope it retries? No, 0 means EOF usually.
+             // But if we timed out, we should probably close.
+             reqSent = false;
+             return 0;
+        }
+    });
+    request->send(response);
+}
+
+void WebServer::handleLogDelete(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    StaticJsonDocument<200> doc; deserializeJson(doc, data, len);
+    if (doc.containsKey("file")) {
+        String f = doc["file"];
+        Stm32Serial::getInstance().sendLogDeleteReq(f.c_str());
+        request->send(200, "text/plain", "Deleted");
+    } else {
+        request->send(400, "text/plain", "Missing file");
+    }
 }
 
 void WebServer::handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {

@@ -1,4 +1,5 @@
 #include "LogBuffer.h"
+#include "Stm32Serial.h"
 
 // We need a separate static function for the hook
 static vprintf_like_t old_vprintf = nullptr;
@@ -36,6 +37,12 @@ static int buffer_vprintf(const char *fmt, va_list args) {
         }
 
         LogBuffer::getInstance().addLog(level, tag.c_str(), logLine.c_str(), args);
+
+        // Forward Errors/Warnings to STM32
+        if (level == ESP_LOG_ERROR || level == ESP_LOG_WARN) {
+            uint8_t type = (level == ESP_LOG_ERROR) ? 2 : 1;
+            Stm32Serial::getInstance().sendLogPushData(type, msg.c_str());
+        }
     }
 
     // Forward to original handler (UART)

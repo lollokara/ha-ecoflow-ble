@@ -30,6 +30,66 @@ int pack_handshake_message(uint8_t *buffer) {
     return 4;
 }
 
+int pack_log_list_message(uint8_t *buffer, const LogListMsg *list) {
+    uint8_t len = sizeof(LogListMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_LIST;
+    buffer[2] = len;
+    memcpy(&buffer[3], list, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_list_message(const uint8_t *buffer, LogListMsg *list) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogListMsg)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    memcpy(list, &buffer[3], len);
+    return 0;
+}
+
+int pack_log_download_req(uint8_t *buffer, const LogDownloadReq *req) {
+    uint8_t len = sizeof(LogDownloadReq);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DOWNLOAD;
+    buffer[2] = len;
+    memcpy(&buffer[3], req, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_download_req(const uint8_t *buffer, LogDownloadReq *req) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogDownloadReq)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    memcpy(req, &buffer[3], len);
+    return 0;
+}
+
+int pack_log_push_data(uint8_t *buffer, const LogPushData *data) {
+    uint8_t len = sizeof(LogPushData);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_PUSH_DATA;
+    buffer[2] = len;
+    memcpy(&buffer[3], data, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_push_data(const uint8_t *buffer, LogPushData *data) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogPushData)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    memcpy(data, &buffer[3], len);
+    return 0;
+}
+
 int pack_handshake_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_HANDSHAKE_ACK;

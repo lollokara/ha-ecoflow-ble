@@ -4,6 +4,7 @@
 #include "uart_task.h"
 #include "fan_task.h"
 #include "ui_view_fan.h"
+#include "ui_view_log_manager.h"
 #include <stdio.h>
 #include "lvgl.h"
 
@@ -51,6 +52,10 @@ static void event_to_connections(lv_event_t * e) {
 
 static void event_to_fan(lv_event_t * e) {
     UI_CreateFanView();
+}
+
+static void event_to_log(lv_event_t * e) {
+    UI_CreateLogManagerView();
 }
 
 static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
@@ -356,6 +361,17 @@ void UI_CreateDebugView(void) {
     lv_obj_t * lbl_fan = lv_label_create(btn_fan);
     lv_label_set_text(lbl_fan, "Fan Control");
     lv_obj_center(lbl_fan);
+
+    // Log Manager Button
+    lv_obj_t * btn_log = lv_btn_create(header);
+    lv_obj_set_size(btn_log, 140, 40);
+    lv_obj_align(btn_log, LV_ALIGN_LEFT_MID, 440, 0);
+    lv_obj_set_style_bg_color(btn_log, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(btn_log, event_to_log, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t * lbl_log = lv_label_create(btn_log);
+    lv_label_set_text(lbl_log, "Log Mgr");
+    lv_obj_center(lbl_log);
 
     // Close Button (Top Right)
     lv_obj_t * btn_close = lv_btn_create(header);
