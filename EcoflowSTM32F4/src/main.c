@@ -223,18 +223,37 @@ static void MX_IWDG_Init(void) {
  * @brief SDIO Initialization.
  */
 static void MX_SDIO_SD_Init(void) {
+    // Initialize CD Pin (PG2)
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // Check Card Detect
+    // Assuming Active Low (Grounded when inserted)
+    if (HAL_GPIO_ReadPin(GPIOG, GPIO_PIN_2) == GPIO_PIN_RESET) {
+        printf("SD Card Detected\n");
+    } else {
+        printf("SD Card Not Detected (PG2 High)\n");
+    }
+
     hsd.Instance = SDIO;
     hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
     hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
     hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
     hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
     hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-    hsd.Init.ClockDiv = 0;
+    hsd.Init.ClockDiv = 4; // Slow down clock (48MHz / (4+2) = 8MHz)
+
     if (HAL_SD_Init(&hsd) != HAL_OK) {
         printf("SD Init Failed: %lu\n", hsd.ErrorCode);
     }
-    if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B) != HAL_OK) {
-         printf("SD Wide Bus Failed: %lu\n", hsd.ErrorCode);
+
+    // Force 1-bit mode to verify basic connectivity and avoid D2/D3 issues
+    if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_1B) != HAL_OK) {
+         printf("SD Bus Config Failed: %lu\n", hsd.ErrorCode);
     }
 }
 

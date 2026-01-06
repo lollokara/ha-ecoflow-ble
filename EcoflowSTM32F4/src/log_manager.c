@@ -30,10 +30,16 @@ void LogManager_Init(void) {
         printf("No Filesystem. Formatting...\n");
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
-        if (f_mkfs(SDPath, &opt, work, sizeof(work)) == FR_OK) {
-            f_mount(&SDFatFs, SDPath, 1);
+        FRESULT fmt_res = f_mkfs(SDPath, &opt, work, sizeof(work));
+        if (fmt_res == FR_OK) {
+            printf("Format Success. Remounting...\n");
+            FRESULT remount_res = f_mount(&SDFatFs, SDPath, 1);
+            if (remount_res != FR_OK) {
+                printf("Remount Failed: %d\n", remount_res);
+                return;
+            }
         } else {
-            printf("Format Failed\n");
+            printf("Format Failed: %d\n", fmt_res);
             return;
         }
     } else if (res != FR_OK) {
