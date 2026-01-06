@@ -1,4 +1,5 @@
 #include "ff.h"
+#include <stdio.h>
 
 #if FF_FS_REENTRANT
 #include "FreeRTOS.h"
@@ -10,6 +11,7 @@
 int ff_mutex_create (int vol)
 {
     SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+    if (!mutex) printf("FF: Mutex Create Failed (OOM?)\n");
     return (int)mutex;
 }
 
@@ -20,8 +22,15 @@ void ff_mutex_delete (int vol)
 
 int ff_mutex_take (int vol)
 {
-    if (!vol) return 0;
-    return xSemaphoreTake((SemaphoreHandle_t)vol, FF_FS_TIMEOUT) == pdTRUE;
+    if (!vol) {
+        printf("FF: Mutex Take NULL\n");
+        return 0;
+    }
+    if (xSemaphoreTake((SemaphoreHandle_t)vol, FF_FS_TIMEOUT) != pdTRUE) {
+        printf("FF: Mutex Take Timeout\n");
+        return 0;
+    }
+    return 1;
 }
 
 void ff_mutex_give (int vol)
