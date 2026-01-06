@@ -73,7 +73,8 @@ public:
 
     // Log Download Support
     void requestLogList(void);
-    std::vector<String> getLogList(void); // Blocking wait
+    struct LogEntry { String name; uint32_t size; };
+    std::vector<LogEntry> getLogList(void); // Blocking wait
     void deleteLog(const String& name);
 
     // Stream Support

@@ -1038,18 +1038,21 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 return;
             }
             data.forEach(file => {
-                let name = file;
-                let display = file;
-                if (file.includes(' (')) {
-                    name = file.split(' (')[0];
-                }
+                let name = file.name;
+                let size = file.size;
+                let sizeStr = size + ' B';
+                if (size > 1024) sizeStr = (size / 1024).toFixed(1) + ' KB';
+                if (size > 1024*1024) sizeStr = (size / (1024*1024)).toFixed(2) + ' MB';
 
                 const div = document.createElement('div');
                 div.className = 'ctrl-row';
                 div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
                 div.style.padding = '8px 0';
                 div.innerHTML = `
-                    <span style="font-family:monospace; font-size:0.9em; flex:1;">${display}</span>
+                    <div style="flex:1; display:flex; flex-direction:column;">
+                        <span style="font-family:monospace; font-size:0.9em;">${name}</span>
+                        <span style="font-size:0.75em; color:#888;">${sizeStr}</span>
+                    </div>
                     <div style="display:flex; gap:10px;">
                         <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
                         <button class="btn" style="padding:4px 10px; font-size:0.8em; background:rgba(255,50,50,0.2); color:#ff5252; border:1px solid #ff5252;" onclick="deleteLog('${name}')">Delete</button>

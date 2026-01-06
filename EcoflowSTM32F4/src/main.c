@@ -364,14 +364,7 @@ int main(void) {
 
     // Initialize SD and Filesystem
     MX_SDIO_SD_Init();
-    if (FATFS_LinkDriver(&SD_Driver, SDPath) == 0) {
-        FRESULT res = f_mount(&SDFatFs, SDPath, 1);
-        if (res != FR_OK) {
-            printf("FatFs Mount Failed: %d\n", res);
-        } else {
-            printf("FatFs Mounted on %s\n", SDPath);
-        }
-    } else {
+    if (FATFS_LinkDriver(&SD_Driver, SDPath) != 0) {
         printf("FatFs Link Driver Failed\n");
     }
 

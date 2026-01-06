@@ -24,7 +24,23 @@ static uint32_t DownloadOffset = 0;
 static uint32_t DownloadSize = 0;
 
 void LogManager_Init(void) {
-    // Mount is done in main.c
+    // Mount Filesystem
+    FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+    if (res == FR_NO_FILESYSTEM) {
+        printf("No Filesystem. Formatting...\n");
+        BYTE work[FF_MAX_SS];
+        MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
+        if (f_mkfs(SDPath, &opt, work, sizeof(work)) == FR_OK) {
+            f_mount(&SDFatFs, SDPath, 1);
+        } else {
+            printf("Format Failed\n");
+            return;
+        }
+    } else if (res != FR_OK) {
+        printf("FatFs Mount Failed: %d\n", res);
+        return;
+    }
+
     // Open current log
     if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         f_lseek(&LogFile, f_size(&LogFile)); // Append

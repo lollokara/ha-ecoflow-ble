@@ -32,7 +32,7 @@ static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
 
 // Log Globals
-static std::vector<String> _cachedLogList;
+static std::vector<Stm32Serial::LogEntry> _cachedLogList;
 static bool _logListReady = false;
 static SemaphoreHandle_t _logListMutex = NULL;
 
@@ -295,7 +295,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             xSemaphoreTake(_logListMutex, portMAX_DELAY);
             if (idx == 0) _cachedLogList.clear();
             if (total > 0 && name[0]) {
-                _cachedLogList.push_back(String(name));
+                _cachedLogList.push_back({String(name), size});
             }
             if (idx == total - 1 || total == 0) {
                 _logListReady = true;
@@ -481,13 +481,13 @@ void Stm32Serial::requestLogList() {
     sendData(buf, l);
 }
 
-std::vector<String> Stm32Serial::getLogList() {
+std::vector<Stm32Serial::LogEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
     while(!_logListReady && millis() - start < 5000) {
         vTaskDelay(10);
     }
     xSemaphoreTake(_logListMutex, portMAX_DELAY);
-    std::vector<String> copy = _cachedLogList;
+    std::vector<LogEntry> copy = _cachedLogList;
     xSemaphoreGive(_logListMutex);
     return copy;
 }
