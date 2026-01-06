@@ -364,9 +364,15 @@ int main(void) {
 
     // Initialize SD and Filesystem
     MX_SDIO_SD_Init();
+    printf("SDIO Init Called\n");
     if (FATFS_LinkDriver(&SD_Driver, SDPath) == 0) {
-        if (f_mount(&SDFatFs, SDPath, 1) != FR_OK) {
-            printf("FatFs Mount Failed\n");
+        printf("FATFS Linked Driver to %s\n", SDPath);
+        FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+        if (res != FR_OK) {
+            printf("FatFs Mount Failed: %d\n", res);
+            if (res == FR_NO_FILESYSTEM) {
+                printf("No Filesystem found. Please Format SD Card via Log Manager.\n");
+            }
         } else {
             printf("FatFs Mounted on %s\n", SDPath);
         }

@@ -8,18 +8,21 @@
 
 static lv_obj_t * scr_log_manager = NULL;
 static lv_obj_t * label_space = NULL;
+static lv_obj_t * label_files = NULL;
 
-static void refresh_space(void) {
+static void refresh_stats(void) {
     if (!label_space) return;
 
     uint32_t total_kb = LogManager_GetTotalSpace();
     uint32_t free_kb = LogManager_GetFreeSpace();
+    uint32_t file_count = LogManager_GetFileCount();
 
     // Format to MB
     uint32_t total_mb = total_kb / 1024;
     uint32_t free_mb = free_kb / 1024;
 
     lv_label_set_text_fmt(label_space, "Space Available: %lu MB / %lu MB", free_mb, total_mb);
+    if(label_files) lv_label_set_text_fmt(label_files, "Total Log Files: %lu", file_count);
 }
 
 static void event_back(lv_event_t * e) {
@@ -62,7 +65,13 @@ void UI_CreateLogManagerView(void) {
     label_space = lv_label_create(scr_log_manager);
     lv_obj_set_style_text_font(label_space, &lv_font_montserrat_20, 0);
     lv_obj_align(label_space, LV_ALIGN_TOP_MID, 0, 80);
-    refresh_space();
+
+    // Files Label
+    label_files = lv_label_create(scr_log_manager);
+    lv_obj_set_style_text_font(label_files, &lv_font_montserrat_20, 0);
+    lv_obj_align(label_files, LV_ALIGN_TOP_MID, 0, 110);
+
+    refresh_stats();
 
     // Delete All Button
     lv_obj_t * btn_del = lv_btn_create(scr_log_manager);

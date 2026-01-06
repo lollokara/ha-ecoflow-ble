@@ -4,29 +4,37 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 
-// Note: FatFs expects int return 1 on success for mutex_create
-// and int return 1 on success for mutex_take
+static SemaphoreHandle_t Mutex[FF_VOLUMES];
 
 int ff_mutex_create (int vol)
 {
-    SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
-    return (int)mutex;
+    if (vol >= FF_VOLUMES) return 0;
+
+    if (Mutex[vol] == NULL) {
+        Mutex[vol] = xSemaphoreCreateMutex();
+    }
+    return (Mutex[vol] != NULL);
 }
 
 void ff_mutex_delete (int vol)
 {
-    if (vol) vSemaphoreDelete((SemaphoreHandle_t)vol);
+    if (vol < FF_VOLUMES && Mutex[vol]) {
+        vSemaphoreDelete(Mutex[vol]);
+        Mutex[vol] = NULL;
+    }
 }
 
 int ff_mutex_take (int vol)
 {
-    if (!vol) return 0;
-    return xSemaphoreTake((SemaphoreHandle_t)vol, FF_FS_TIMEOUT) == pdTRUE;
+    if (vol >= FF_VOLUMES || !Mutex[vol]) return 0;
+    return xSemaphoreTake(Mutex[vol], FF_FS_TIMEOUT) == pdTRUE;
 }
 
 void ff_mutex_give (int vol)
 {
-    if (vol) xSemaphoreGive((SemaphoreHandle_t)vol);
+    if (vol < FF_VOLUMES && Mutex[vol]) {
+        xSemaphoreGive(Mutex[vol]);
+    }
 }
 #endif
 
