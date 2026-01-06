@@ -24,6 +24,8 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "sd_card.h"
+#include "log_manager.h"
 #include <stdio.h>
 
 // External Handles
@@ -310,6 +312,8 @@ int main(void) {
 
     MX_IWDG_Init(); // Watchdog Enabled
 
+    MX_SDIO_SD_Init();
+
     // Create Display Event Queue
     displayQueue = xQueueCreate(10, sizeof(DisplayEvent));
     if (displayQueue == NULL) {
@@ -320,6 +324,7 @@ int main(void) {
     xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
+    xTaskCreate(StartLogTask, "Log", 4096, NULL, 1, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();

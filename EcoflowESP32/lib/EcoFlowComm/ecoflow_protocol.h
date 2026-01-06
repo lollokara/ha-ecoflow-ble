@@ -62,6 +62,17 @@ extern "C" {
 #define CMD_SET_VALUE 0x40           ///< Set Numeric Value (Limits)
 #define CMD_POWER_OFF 0x50           ///< Trigger System Power Off
 
+// --- Log Manager Commands ---
+#define CMD_LOG_LIST 0x70            ///< Request Log List
+#define CMD_LOG_DOWNLOAD 0x71        ///< Request File Download
+#define CMD_LOG_DELETE 0x72          ///< Delete File
+#define CMD_LOG_DELETE_ALL 0x73      ///< Delete All Logs
+#define CMD_LOG_STREAM_DATA 0x74     ///< Stream File Data (STM->ESP)
+#define CMD_LOG_REQ_INFO 0x75        ///< Request Config Dump (STM->ESP)
+#define CMD_LOG_SEND_INFO 0x76       ///< Send Config Dump (ESP->STM)
+#define CMD_LOG_PUSH_DATA 0x77       ///< Push Log Data (ESP->STM)
+#define CMD_LOG_FORMAT 0x78          ///< Format SD Card
+
 // Wave 2 Set Types (Renamed to avoid conflict with DisplayAction enum)
 #define W2_PARAM_TEMP 1
 #define W2_PARAM_MODE 2
@@ -305,6 +316,31 @@ typedef struct {
     // Data follows
 } OtaChunkHeader;
 
+// Log Payload Structures
+typedef struct {
+    char filename[32];
+    uint32_t size;
+} LogEntry;
+
+typedef struct {
+    uint8_t count;
+    LogEntry files[5];
+} LogListMsg;
+
+typedef struct {
+    char filename[32];
+    uint32_t offset;
+} LogDownloadReq;
+
+typedef struct {
+    char filename[32];
+} LogDeleteReq;
+
+typedef struct {
+    uint8_t type; // 0=Info, 1=Warning, 2=Error
+    char msg[128];
+} LogPushData;
+
 #pragma pack(pop)
 
 // --- API Functions (Serialization/Deserialization) ---
@@ -352,6 +388,15 @@ int pack_ota_start_message(uint8_t *buffer, uint32_t total_size);
 int pack_ota_chunk_message(uint8_t *buffer, uint32_t offset, const uint8_t *data, uint8_t len);
 int pack_ota_end_message(uint8_t *buffer, uint32_t crc32);
 int pack_ota_apply_message(uint8_t *buffer);
+
+int pack_log_list_message(uint8_t *buffer, const LogListMsg *list);
+int unpack_log_list_message(const uint8_t *buffer, LogListMsg *list);
+
+int pack_log_download_req(uint8_t *buffer, const LogDownloadReq *req);
+int unpack_log_download_req(const uint8_t *buffer, LogDownloadReq *req);
+
+int pack_log_push_data(uint8_t *buffer, const LogPushData *data);
+int unpack_log_push_data(const uint8_t *buffer, LogPushData *data);
 
 #ifdef __cplusplus
 }

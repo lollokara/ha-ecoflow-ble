@@ -67,11 +67,26 @@ public:
     // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
 
+    // Log Manager Commands
+    void sendLogListReq();
+    void sendLogDownloadReq(const char* filename, uint32_t offset);
+    void sendLogDeleteReq(const char* filename);
+    void sendLogPushData(uint8_t type, const char* msg);
+
+    // Stream Queue
+    QueueHandle_t _logStreamQueue; // Holds chunks (std::vector<uint8_t>*)
+
+    // Log List Sync
+    LogListMsg _lastLogList;
+    SemaphoreHandle_t _logListSem;
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
      */
-    Stm32Serial() {}
+    Stm32Serial() {
+        _logStreamQueue = xQueueCreate(10, sizeof(void*)); // Queue of pointers to vectors
+    }
 
     /**
      * @brief Processes a fully received and validated packet.

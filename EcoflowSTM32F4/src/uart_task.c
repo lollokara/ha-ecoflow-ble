@@ -3,6 +3,7 @@
 #include "display_task.h"
 #include "stm32f4xx_hal.h"
 #include "ui/ui_lvgl.h" // For UI_UpdateConnectionStatus
+#include "log_manager.h"
 #include <string.h>
 #include <stdio.h>
 #include "queue.h"
@@ -203,6 +204,44 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             memcpy(&event.data.debugInfo, &info, sizeof(DebugInfo));
             xQueueSend(displayQueue, &event, 0);
         }
+    }
+    else if (cmd == CMD_LOG_LIST) {
+        LogManager_HandleList();
+    }
+    else if (cmd == CMD_LOG_DOWNLOAD) {
+        LogDownloadReq req;
+        if (unpack_log_download_req(packet, &req) == 0) {
+            LogManager_HandleDownload(req.filename, req.offset);
+        }
+    }
+    else if (cmd == CMD_LOG_DELETE) {
+        LogDeleteReq req;
+        // Unpack manually as simple string or struct?
+        // unpack_log_delete_req was not implemented in protocol.c?
+        // I implemented sendLogDeleteReq manually in ESP.
+        // Payload is just filename string?
+        // Wait, ESP sendLogDeleteReq sends struct { char f[32] }.
+        // I should treat it as LogDeleteReq.
+        // But I didn't add unpack_log_delete_req to protocol.c.
+        // I'll manually unpack.
+        // [AA][CMD][LEN][PAYLOAD][CRC]
+        // Payload start at packet[3].
+        memcpy(req.filename, &packet[3], sizeof(LogDeleteReq));
+        LogManager_HandleDelete(req.filename);
+    }
+    else if (cmd == CMD_LOG_PUSH_DATA) {
+        LogPushData data;
+        if (unpack_log_push_data(packet, &data) == 0) {
+            LogManager_HandlePushData(data.type, data.msg);
+        }
+    }
+    else if (cmd == CMD_LOG_SEND_INFO) {
+        // Response to REQ_INFO? Wait, ESP sends PushData or SendInfo?
+        // I used PUSH_DATA in ESP32.
+        // But REQ_INFO (0x75) -> SEND_INFO (0x76).
+        // I didn't implement SEND_INFO in ESP32, I used PUSH_DATA.
+        // So this is unused or I should handle SEND_INFO if I use it.
+        // For now ESP32 sends PUSH_DATA.
     }
 }
 

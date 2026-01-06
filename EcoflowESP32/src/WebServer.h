@@ -24,6 +24,9 @@ private:
     static void handleForget(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleHistory(AsyncWebServerRequest *request);
     static void handleLogs(AsyncWebServerRequest *request);
+    static void handleLogList(AsyncWebServerRequest *request);
+    static void handleLogDownload(AsyncWebServerRequest *request);
+    static void handleLogDelete(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleRawCommand(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     static void handleSettings(AsyncWebServerRequest *request);

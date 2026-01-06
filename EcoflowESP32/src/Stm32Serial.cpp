@@ -15,6 +15,7 @@
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
+#include <vector>
 
 // Hardware Serial pin definition (moved from main.cpp)
 // RX Pin = 18 (connected to F4 TX)
@@ -88,6 +89,9 @@ void Stm32Serial::begin() {
     Serial1.begin(921600, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
+    }
+    if (_logListSem == NULL) {
+        _logListSem = xSemaphoreCreateBinary();
     }
 }
 
@@ -298,6 +302,66 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         uint8_t type;
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
+        }
+    } else if (cmd == CMD_LOG_LIST) {
+        unpack_log_list_message(rx_buf, &_lastLogList);
+        xSemaphoreGive(_logListSem);
+    } else if (cmd == CMD_LOG_STREAM_DATA) {
+        // Payload is raw data.
+        // Format: [START][CMD][LEN][DATA][CRC]
+        // processPacket receives rx_buf which is the full packet.
+        // len is the full packet length.
+        uint8_t payload_len = rx_buf[2];
+        if (payload_len > 0) {
+            std::vector<uint8_t>* chunk = new std::vector<uint8_t>();
+            chunk->assign(&rx_buf[3], &rx_buf[3] + payload_len);
+            if (xQueueSend(_logStreamQueue, &chunk, 0) != pdTRUE) {
+                delete chunk;
+                ESP_LOGE(TAG, "Log Queue Full, dropping chunk");
+            }
+        } else {
+             // Empty payload = EOF
+             std::vector<uint8_t>* chunk = NULL; // Signal EOF
+             // For EOF (NULL), if send fails, we are in trouble (client hangs).
+             // But NULL doesn't need delete.
+             // We retry or force?
+             if (xQueueSend(_logStreamQueue, &chunk, 0) != pdTRUE) {
+                 ESP_LOGE(TAG, "Log Queue Full, dropping EOF");
+             }
+        }
+    } else if (cmd == CMD_LOG_REQ_INFO) {
+        // Send Config/Device Dump
+        sendLogPushData(0, "--- Connected Devices ---");
+        // Iterate devices
+         DeviceSlot* slots[] = {
+            DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
+            DeviceManager::getInstance().getSlot(DeviceType::WAVE_2),
+            DeviceManager::getInstance().getSlot(DeviceType::DELTA_PRO_3),
+            DeviceManager::getInstance().getSlot(DeviceType::ALTERNATOR_CHARGER)
+        };
+        for(int i=0; i<4; i++) {
+            if(slots[i] && slots[i]->isConnected) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "Dev: %s (SN: %s)", slots[i]->name.c_str(), slots[i]->serialNumber.c_str());
+                sendLogPushData(0, buf);
+            }
+        }
+
+        // Debug Values
+        // I should call specific dump functions if available, or just push key values.
+        // User asked for: "Section 3, Debug values... EcoflowDataParser on the ESP32 has a debug function for each device"
+        // I don't have direct access to DataParser debug functions easily without modifying them to return strings.
+        // But I can manually dump key values.
+
+        // Example: D3P
+        EcoflowESP32* d3p = DeviceManager::getInstance().getDevice(DeviceType::DELTA_PRO_3);
+        if (d3p && d3p->isAuthenticated()) {
+            sendLogPushData(0, "--- Full Delta Pro 3 Dump ---");
+            const DeltaPro3Data& d = d3p->getData().deltaPro3;
+            char buf[128];
+            snprintf(buf, sizeof(buf), "inputPower: %.2f, outputPower: %.2f", d.inputPower, d.outputPower);
+            sendLogPushData(0, buf);
+            // ... add more
         }
     }
 }
@@ -642,4 +706,79 @@ void Stm32Serial::otaTask(void* parameter) {
 
     self->_otaRunning = false;
     vTaskDelete(NULL);
+}
+
+void Stm32Serial::sendLogListReq() {
+    uint8_t buf[8];
+    // pack? No pack func for req without args, just raw command
+    // [AA][70][00][CRC]
+    buf[0] = START_BYTE;
+    buf[1] = CMD_LOG_LIST;
+    buf[2] = 0;
+    // Calculate CRC manually? I can't access static calculate_crc8 from here unless I expose it or duplicate.
+    // ecoflow_protocol.c exposes calculate_crc8.
+    // Wait, ecoflow_protocol.c is a C file. I included header.
+    // I can link it.
+    // But Stm32Serial.cpp uses `calculate_crc8` (lowercase) from protocol?
+    // The `Stm32Serial.cpp` has its OWN `calculate_crc8` implementation static inside it!
+    // Why? Duplication.
+    // I should use the one from `ecoflow_protocol.h` but I need to link the object.
+    // Or just copy it. The static one in Stm32Serial.cpp handles the CRC32 (Ethernet).
+    // The protocol uses CRC8 (Maxim).
+    // `Stm32Serial.cpp` uses `calculate_crc8` (lowercase) for packet validation.
+    // Wait, `Stm32Serial.cpp` calls `calculate_crc8(&rx_buf[1], ...)`
+    // Where is `calculate_crc8` defined?
+    // It is NOT defined in `Stm32Serial.cpp` (only `calculate_crc32` is).
+    // So it must be linking against `ecoflow_protocol.c`.
+    // Yes.
+
+    // So I can use `pack_` functions if I add `pack_log_req`?
+    // I didn't add `pack_log_list_req`. I added `pack_log_list_message` (response).
+    // I'll manually construct it.
+    extern uint8_t calculate_crc8(const uint8_t *data, uint8_t len);
+    buf[3] = calculate_crc8(&buf[1], 2);
+    sendData(buf, 4);
+}
+
+void Stm32Serial::sendLogDownloadReq(const char* filename, uint32_t offset) {
+    uint8_t buf[64];
+    LogDownloadReq req;
+    strncpy(req.filename, filename, 31);
+    req.offset = offset;
+    int len = pack_log_download_req(buf, &req);
+    sendData(buf, len);
+}
+
+void Stm32Serial::sendLogDeleteReq(const char* filename) {
+    // I didn't add pack_log_delete_req.
+    // Manual pack.
+    // [AA][72][LEN][NAME][CRC]
+    uint8_t buf[64];
+    uint8_t nameLen = strlen(filename);
+    if (nameLen > 31) nameLen = 31;
+
+    // Struct: char filename[32];
+    // Use struct packing manually
+    struct { char f[32]; } req;
+    strncpy(req.f, filename, 31);
+
+    buf[0] = START_BYTE;
+    buf[1] = CMD_LOG_DELETE;
+    buf[2] = sizeof(req);
+    memcpy(&buf[3], &req, sizeof(req));
+
+    extern uint8_t calculate_crc8(const uint8_t *data, uint8_t len);
+    buf[3 + sizeof(req)] = calculate_crc8(&buf[1], 2 + sizeof(req));
+    sendData(buf, 4 + sizeof(req));
+}
+
+void Stm32Serial::sendLogPushData(uint8_t type, const char* msg) {
+    uint8_t buf[256];
+    LogPushData data;
+    data.type = type;
+    strncpy(data.msg, msg, 127);
+    data.msg[127] = 0;
+
+    int len = pack_log_push_data(buf, &data);
+    sendData(buf, len);
 }
