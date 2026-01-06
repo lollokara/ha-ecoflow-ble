@@ -338,6 +338,10 @@ void HAL_SD_MspInit(SD_HandleTypeDef *hsd) {
         GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
         GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
         HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+        // Enable SDIO Interrupt (Required for some SD operations and correct HAL behavior)
+        HAL_NVIC_SetPriority(SDIO_IRQn, 5, 0);
+        HAL_NVIC_EnableIRQ(SDIO_IRQn);
     }
 }
 
@@ -473,4 +477,11 @@ void vApplicationMallocFailedHook(void) {
 void WWDG_IRQHandler(void) {
     printf("WWDG_IRQHandler (IRQ 0) Triggered!\n");
     while(1);
+}
+
+/**
+ * @brief SDIO Interrupt Handler.
+ */
+void SDIO_IRQHandler(void) {
+    HAL_SD_IRQHandler(&hsd);
 }
