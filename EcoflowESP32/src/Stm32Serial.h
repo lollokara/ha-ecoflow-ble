@@ -13,6 +13,8 @@
 #include <Arduino.h>
 #include "ecoflow_protocol.h"
 #include <freertos/semphr.h>
+#include <vector>
+#include <functional>
 
 /**
  * @class Stm32Serial
@@ -67,6 +69,18 @@ public:
     // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
 
+    void sendEspLog(const char* msg);
+
+    // Log Management
+    void requestLogList();
+    const std::vector<LogEntryProto>& getLogList() const { return _logList; }
+
+    void requestLogDownload(const char* filename);
+    void requestDeleteLog(const char* filename);
+
+    typedef std::function<void(const uint8_t*, size_t)> LogChunkCallback;
+    void setLogChunkCallback(LogChunkCallback cb) { _logChunkCb = cb; }
+
 private:
     /**
      * @brief Private constructor for Singleton pattern.
@@ -84,6 +98,9 @@ private:
 
     bool _otaRunning = false;
     SemaphoreHandle_t _txMutex = NULL;
+
+    std::vector<LogEntryProto> _logList;
+    LogChunkCallback _logChunkCb;
 };
 
 #endif

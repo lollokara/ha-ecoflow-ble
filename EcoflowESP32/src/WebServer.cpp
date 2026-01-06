@@ -1,6 +1,7 @@
 #include "WebServer.h"
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include <AsyncJson.h>
 #include <esp_log.h>
 #include <LittleFS.h>
 #include "Stm32Serial.h"
@@ -85,6 +86,60 @@ void WebServer::setupRoutes() {
     server.on("/api/logs", HTTP_GET, handleLogs);
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
+
+    server.on("/api/logs/delete", HTTP_POST, [](AsyncWebServerRequest *request){
+        if(request->hasParam("file")) {
+            Stm32Serial::getInstance().requestDeleteLog(request->getParam("file")->value().c_str());
+            request->send(200, "text/plain", "OK");
+        } else request->send(400, "text/plain", "Missing file");
+    });
+
+    server.on("/api/logs/download", HTTP_GET, [](AsyncWebServerRequest *request){
+        if(!request->hasParam("file")) { request->send(400, "text/plain", "Missing file"); return; }
+        String filename = request->getParam("file")->value();
+
+        AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [filename](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+            // Initiate download on first call
+            if(index == 0) Stm32Serial::getInstance().requestLogDownload(filename.c_str());
+
+            // Wait for data (non-blocking in AsyncWebServer context is hard without proper stream integration)
+            // Ideally we'd buffer. For now, we return 0 and hope AsyncWebServer retries or we use a queue.
+            // Using a queue with depth 20 (5KB) to handle jitter
+            static QueueHandle_t q = xQueueCreate(20, 256);
+            if (index == 0) {
+                Stm32Serial::getInstance().setLogChunkCallback([&](const uint8_t* data, size_t len){
+                    // This runs in Serial Task context.
+                    // Copy to queue.
+                    // We need to support > 0 len. 0 = End.
+                    // Packet struct: {len, data}
+                    // Since q item size is fixed, we copy.
+                    // If len > 255 (implied max), we truncate.
+                    // First byte = len.
+                    uint8_t buf[256];
+                    buf[0] = (uint8_t)len;
+                    if(len>0) memcpy(&buf[1], data, len);
+                    // Use timeout (100ms) to apply backpressure/prevent drop if wifi is slow
+                    xQueueSend(q, buf, 100 / portTICK_PERIOD_MS);
+                });
+            }
+
+            uint8_t buf[256];
+            if(xQueueReceive(q, buf, 100 / portTICK_PERIOD_MS) == pdTRUE) {
+                size_t len = buf[0];
+                if(len == 0) {
+                    vQueueDelete(q);
+                    Stm32Serial::getInstance().setLogChunkCallback(nullptr);
+                    return 0; // End
+                }
+                memcpy(buffer, &buf[1], len);
+                return len;
+            }
+            return RESPONSE_TRY_AGAIN;
+        });
+
+        response->addHeader("Content-Disposition", "attachment; filename=" + filename);
+        request->send(response);
+    });
 
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
@@ -317,19 +372,33 @@ void WebServer::handleForget(AsyncWebServerRequest *request, uint8_t *data, size
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
-    size_t index = 0;
-    if (request->hasParam("index")) index = request->getParam("index")->value().toInt();
-    DynamicJsonDocument doc(8192); JsonArray arr = doc.to<JsonArray>();
-    std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(index);
-    for (const auto& log : logs) {
-        JsonObject obj = arr.createNestedObject();
-        obj["ts"] = log.timestamp;
-        obj["lvl"] = (int)log.level;
-        obj["tag"] = log.tag.isEmpty() ? "?" : log.tag;
-        obj["msg"] = log.message;
+    if (request->hasParam("index")) {
+        size_t index = request->getParam("index")->value().toInt();
+        DynamicJsonDocument doc(8192); JsonArray arr = doc.to<JsonArray>();
+        std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(index);
+        for (const auto& log : logs) {
+            JsonObject obj = arr.createNestedObject();
+            obj["ts"] = log.timestamp;
+            obj["lvl"] = (int)log.level;
+            obj["tag"] = log.tag.isEmpty() ? "?" : log.tag;
+            obj["msg"] = log.message;
+        }
+        String json; serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    } else {
+        Stm32Serial::getInstance().requestLogList();
+        // Respond with current cache (might be empty on first call, user clicks Refresh again)
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonArray root = response->getRoot();
+        const auto& list = Stm32Serial::getInstance().getLogList();
+        for(const auto& f : list) {
+            JsonObject obj = root.createNestedObject();
+            obj["name"] = f.name;
+            obj["size"] = f.size;
+        }
+        response->setLength();
+        request->send(response);
     }
-    String json; serializeJson(doc, json);
-    request->send(200, "application/json", json);
 }
 
 void WebServer::handleLogConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {

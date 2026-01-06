@@ -6,6 +6,8 @@
 #include "ui_view_fan.h"
 #include <stdio.h>
 #include "lvgl.h"
+#include "ui_log_manager.h"
+#include "log_manager.h"
 
 // Externs should match LVGL defines or be removed if included
 
@@ -51,6 +53,19 @@ static void event_to_connections(lv_event_t * e) {
 
 static void event_to_fan(lv_event_t * e) {
     UI_CreateFanView();
+}
+
+static void event_toggle_logging(lv_event_t * e) {
+    lv_obj_t * sw = lv_event_get_target(e);
+    bool enabled = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    LogManager_SetEnabled(enabled);
+    if (enabled) {
+        UART_SendLogStatusReq();
+    }
+}
+
+static void event_open_log_mgr(lv_event_t * e) {
+    UI_CreateLogManagerView();
 }
 
 static void add_list_item(lv_obj_t * parent, const char * name, const char * val) {
@@ -119,6 +134,33 @@ static void populate_debug_view(void) {
 
     // Clear the list
     lv_obj_clean(cont_list);
+
+    // --- Log Manager Section ---
+    add_section_header(cont_list, "Log Manager");
+
+    lv_obj_t * item_log = lv_obj_create(cont_list);
+    lv_obj_set_size(item_log, lv_pct(100), 50);
+    lv_obj_set_style_bg_opa(item_log, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(item_log, 0, 0);
+    lv_obj_clear_flag(item_log, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(item_log, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(item_log, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t * sw_log = lv_switch_create(item_log);
+    if (LogManager_IsEnabled()) lv_obj_add_state(sw_log, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw_log, event_toggle_logging, LV_EVENT_VALUE_CHANGED, NULL);
+
+    lv_obj_t * l_log = lv_label_create(item_log);
+    lv_label_set_text(l_log, "Logging Enabled");
+    lv_obj_set_style_text_color(l_log, lv_color_white(), 0);
+
+    lv_obj_t * btn_mgr = lv_btn_create(item_log);
+    lv_obj_set_size(btn_mgr, 120, 35);
+    lv_obj_set_style_bg_color(btn_mgr, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_add_event_cb(btn_mgr, event_open_log_mgr, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * l_mgr = lv_label_create(btn_mgr);
+    lv_label_set_text(l_mgr, "Manage SD");
+    lv_obj_center(l_mgr);
 
     // --- System Info Section ---
     add_section_header(cont_list, "System Info");

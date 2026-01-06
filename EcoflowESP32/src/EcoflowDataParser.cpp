@@ -5,10 +5,12 @@
 #include "dc009_apl_comm.pb.h"
 #include <Arduino.h>
 #include "esp_log.h"
+#include "LogBuffer.h"
 #include <cmath>
 #include <algorithm>
 
 static const char* TAG = "EcoflowDataParser";
+static bool dump_flags[10] = {0}; // DeviceType is small int
 
 // --- Helper Functions ---
 
@@ -401,6 +403,10 @@ static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpl
 
 namespace EcoflowDataParser {
 
+void setDumpNextPacket(DeviceType type) {
+    if ((int)type < 10) dump_flags[(int)type] = true;
+}
+
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
     switch (type) {
@@ -462,7 +468,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     d3.dcOn = d3.dc12vPort;
                     if (d3_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(d3_msg.flow_info_qcusb1);
 
-                    logDelta3Data(d3);
+                    if ((int)type < 10 && dump_flags[(int)type]) {
+                        LogBuffer::getInstance().setForwarding(true);
+                        logDelta3Data(d3); // No full dump for D3 yet? Just log standard.
+                        LogBuffer::getInstance().setForwarding(false);
+                        dump_flags[(int)type] = false;
+                    }
                 }
             }
             break;
@@ -529,7 +540,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
                      if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
 
-                     // logFullDeltaPro3Data(mr521_msg);
+                     if ((int)type < 10 && dump_flags[(int)type]) {
+                         LogBuffer::getInstance().setForwarding(true);
+                         logFullDeltaPro3Data(mr521_msg);
+                         LogBuffer::getInstance().setForwarding(false);
+                         dump_flags[(int)type] = false;
+                     }
                 }
             }
             break;
@@ -562,7 +578,13 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
 
                     logAlternatorChargerData(ac);
-                    logFullAlternatorChargerData(msg);
+
+                    if ((int)type < 10 && dump_flags[(int)type]) {
+                        LogBuffer::getInstance().setForwarding(true);
+                        logFullAlternatorChargerData(msg);
+                        LogBuffer::getInstance().setForwarding(false);
+                        dump_flags[(int)type] = false;
+                    }
                 }
             }
             break;
@@ -616,7 +638,16 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
                     else w2.remainingTime = 0;
 
-                    logWave2Data(w2);
+                    if ((int)type < 10 && dump_flags[(int)type]) {
+                        LogBuffer::getInstance().setForwarding(true);
+                        logWave2Data(w2);
+                        LogBuffer::getInstance().setForwarding(false);
+                        dump_flags[(int)type] = false;
+                    } else {
+                        // logWave2Data(w2); // Comment out to reduce noise, or keep?
+                        // User said: "From the ESP We should only log errors and warnings"
+                        // So I should disable periodic logging unless requested.
+                    }
                 }
             }
             break;

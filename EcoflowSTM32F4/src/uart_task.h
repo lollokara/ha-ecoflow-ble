@@ -17,6 +17,7 @@ void UART_SendPowerOff(void);
 void UART_SendGetDebugInfo(void);
 void UART_SendConnectDevice(uint8_t type);
 void UART_SendForgetDevice(uint8_t type);
+void UART_SendLogStatusReq(void);
 void UART_GetKnownDevices(DeviceList *list);
 
 // Helper for IRQ dispatch

@@ -332,3 +332,148 @@ int pack_ota_apply_message(uint8_t *buffer) {
     buffer[3] = calculate_crc8(&buffer[1], 2);
     return 4;
 }
+
+// --- Log API Implementations ---
+
+int pack_log_list_req_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_LIST_REQ;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_log_list_resp_message(uint8_t *buffer, const LogListRespMsg *msg) {
+    uint8_t len = 1 + (msg->count * sizeof(LogEntryProto)); // count + entries
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_LIST_RESP;
+    buffer[2] = len;
+
+    // We can't just memcpy struct because it has fixed array but count might be smaller
+    buffer[3] = msg->count;
+    memcpy(&buffer[4], msg->files, msg->count * sizeof(LogEntryProto));
+
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_list_resp_message(const uint8_t *buffer, LogListRespMsg *msg) {
+    uint8_t len = buffer[2];
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    msg->count = buffer[3];
+    if (msg->count > 4) msg->count = 4; // Safety
+
+    memcpy(msg->files, &buffer[4], msg->count * sizeof(LogEntryProto));
+    return 0;
+}
+
+int pack_log_download_req_message(uint8_t *buffer, const char* filename, uint32_t offset) {
+    LogDownloadReqMsg msg;
+    strncpy(msg.filename, filename, sizeof(msg.filename));
+    msg.offset = offset;
+
+    uint8_t len = sizeof(LogDownloadReqMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DOWNLOAD_REQ;
+    buffer[2] = len;
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_download_req_message(const uint8_t *buffer, char* filename, uint32_t* offset) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogDownloadReqMsg)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    LogDownloadReqMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    strncpy(filename, msg.filename, 31);
+    filename[31] = 0;
+    *offset = msg.offset;
+    return 0;
+}
+
+int pack_log_data_chunk_message(uint8_t *buffer, const uint8_t* data, uint8_t len) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DATA_CHUNK;
+    buffer[2] = len;
+    memcpy(&buffer[3], data, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int pack_log_delete_req_message(uint8_t *buffer, const char* filename) {
+    uint8_t len = strlen(filename);
+    if (len > 31) len = 31;
+
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_DELETE_REQ;
+    buffer[2] = len;
+    memcpy(&buffer[3], filename, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_delete_req_message(const uint8_t *buffer, char* filename) {
+    uint8_t len = buffer[2];
+    if (len > 31) return -2;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    memcpy(filename, &buffer[3], len);
+    filename[len] = 0; // Null terminate
+    return 0;
+}
+
+int pack_esp_log_data_message(uint8_t *buffer, const char* msg) {
+    uint8_t len = strlen(msg);
+    if (len > 250) len = 250;
+
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_ESP_LOG_DATA;
+    buffer[2] = len;
+    memcpy(&buffer[3], msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_esp_log_data_message(const uint8_t *buffer, char* msg, uint8_t max_len) {
+    uint8_t len = buffer[2];
+    if (len >= max_len) len = max_len - 1;
+
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+
+    memcpy(msg, &buffer[3], len);
+    msg[len] = 0;
+    return 0;
+}
+
+int pack_log_status_req_message(uint8_t *buffer) {
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_STATUS_REQ;
+    buffer[2] = 0;
+    buffer[3] = calculate_crc8(&buffer[1], 2);
+    return 4;
+}
+
+int pack_log_status_resp_message(uint8_t *buffer, const char* config_dump) {
+    uint8_t len = strlen(config_dump);
+    if (len > 250) len = 250;
+
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_STATUS_RESP;
+    buffer[2] = len;
+    memcpy(&buffer[3], config_dump, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
