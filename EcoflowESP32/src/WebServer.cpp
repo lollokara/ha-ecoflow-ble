@@ -89,6 +89,10 @@ void WebServer::setupRoutes() {
     server.on("/api/settings", HTTP_GET, handleSettings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleSettingsSave);
 
+    // Logs Routes
+    server.on("/api/logs", HTTP_GET, handleLogsList);
+    server.on("/api/logs/download", HTTP_GET, handleLogDownload);
+
     // OTA Routes
     server.on("/api/update/status", HTTP_GET, handleUpdateStatus);
 
@@ -426,4 +430,46 @@ void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filenam
         // Trigger OTA Task
         Stm32Serial::getInstance().startOta("/stm32_update.bin");
     }
+}
+
+void WebServer::handleLogsList(AsyncWebServerRequest *request) {
+    String list;
+    if (Stm32Serial::getInstance().requestLogList(list)) {
+        // STM32 sends JSON, so we forward it as application/json
+        request->send(200, "application/json", list);
+    } else {
+        request->send(504, "text/plain", "Timeout waiting for STM32");
+    }
+}
+
+void WebServer::handleLogDownload(AsyncWebServerRequest *request) {
+    if (!request->hasParam("file")) {
+        request->send(400, "text/plain", "Missing 'file' parameter");
+        return;
+    }
+    String filename = request->getParam("file")->value();
+
+    // Initiate transfer on STM32 side
+    Stm32Serial::getInstance().requestFile(filename);
+
+    // Prepare chunked response
+    AsyncWebServerResponse *response = request->beginChunkedResponse("application/octet-stream",
+        [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+            // Check if transfer is complete
+            if (Stm32Serial::getInstance().isFileTransferComplete()) {
+                return 0; // EOF
+            }
+
+            // Try to get data
+            size_t len = Stm32Serial::getInstance().getFileData(buffer, maxLen);
+            if (len == 0) {
+                // No data yet, return RESPONSE_TRY_AGAIN to keep connection open and retry
+                return RESPONSE_TRY_AGAIN;
+            }
+            return len;
+        }
+    );
+
+    response->addHeader("Content-Disposition", "attachment; filename=" + filename);
+    request->send(response);
 }

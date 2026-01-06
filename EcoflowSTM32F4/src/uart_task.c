@@ -5,6 +5,8 @@
 #include "ui/ui_lvgl.h" // For UI_UpdateConnectionStatus
 #include <string.h>
 #include <stdio.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
 #include "queue.h"
 
 extern IWDG_HandleTypeDef hiwdg; // Refresh Watchdog during long ops
@@ -47,6 +49,7 @@ typedef struct {
 } TxMessage;
 
 static QueueHandle_t uartTxQueue;
+static SemaphoreHandle_t uartTxMutex = NULL;
 
 static void rb_init(RingBuffer *rb) {
     rb->head = 0;
@@ -237,9 +240,22 @@ void UART_SendForgetDevice(uint8_t type) {
 void UART_GetKnownDevices(DeviceList *list) { memcpy(list, &knownDevices, sizeof(DeviceList)); }
 
 
+void UART_SendRaw(uint8_t *data, uint16_t len) {
+    if (uartTxMutex) {
+        if (xSemaphoreTake(uartTxMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            HAL_UART_Transmit(&huart6, data, len, 100);
+            xSemaphoreGive(uartTxMutex);
+        }
+    } else {
+        // Fallback if mutex not ready (should not happen after init)
+        HAL_UART_Transmit(&huart6, data, len, 100);
+    }
+}
+
 void StartUARTTask(void * argument) {
     UART_Init();
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
+    uartTxMutex = xSemaphoreCreateMutex();
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
@@ -305,7 +321,7 @@ void StartUARTTask(void * argument) {
             else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(buf, tx.data.device_type);
             else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(buf, tx.data.device_type);
 
-            if (len > 0) HAL_UART_Transmit(&huart6, buf, len, 100);
+            if (len > 0) UART_SendRaw(buf, len);
         }
 
         // 3. State Machine
@@ -316,7 +332,7 @@ void StartUARTTask(void * argument) {
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        UART_SendRaw(tx_buf, len);
                         protocolState = STATE_WAIT_HANDSHAKE_ACK;
                     }
                     break;
@@ -324,7 +340,7 @@ void StartUARTTask(void * argument) {
                     if ((xTaskGetTickCount() - lastHandshakeTime) > pdMS_TO_TICKS(1000)) {
                         lastHandshakeTime = xTaskGetTickCount();
                         len = pack_handshake_message(tx_buf);
-                        HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                        UART_SendRaw(tx_buf, len);
                     }
                     break;
                 case STATE_POLLING:
@@ -333,7 +349,7 @@ void StartUARTTask(void * argument) {
                         if (knownDevices.devices[currentDeviceIndex].connected) {
                             uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
                             len = pack_get_device_status_message(tx_buf, dev_id);
-                            HAL_UART_Transmit(&huart6, tx_buf, len, 100);
+                            UART_SendRaw(tx_buf, len);
                         }
                         currentDeviceIndex++;
                     }

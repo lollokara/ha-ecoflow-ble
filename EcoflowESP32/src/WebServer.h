@@ -33,6 +33,10 @@ private:
     static void handleUpdateEsp32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
     static void handleUpdateStm32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
     static void handleUpdateStatus(AsyncWebServerRequest *request);
+
+    // Logs
+    static void handleLogsList(AsyncWebServerRequest *request);
+    static void handleLogDownload(AsyncWebServerRequest *request);
 };
 
 #endif
