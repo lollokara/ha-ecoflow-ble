@@ -22,4 +22,7 @@ void UART_GetKnownDevices(DeviceList *list);
 // Helper for IRQ dispatch
 void UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
+// Low level send (exposed for LogManager)
+void UART_SendData(uint8_t cmd, uint8_t* data, uint8_t len);
+
 #endif // UART_TASK_H
