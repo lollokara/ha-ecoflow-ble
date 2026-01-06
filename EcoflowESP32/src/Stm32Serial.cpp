@@ -89,6 +89,8 @@ void Stm32Serial::begin() {
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
     }
+    if (_logListReady == NULL) _logListReady = xSemaphoreCreateBinary();
+    if (_fileDataMutex == NULL) _fileDataMutex = xSemaphoreCreateMutex();
 }
 
 void Stm32Serial::sendData(const uint8_t* data, size_t len) {
@@ -299,6 +301,27 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
+    } else if (cmd == CMD_LOG_LIST_RESP) {
+        // Payload: [DeviceList JSON or text]
+        // Protocol defines payload starts at rx_buf[3] with len at rx_buf[2]
+        uint8_t len = rx_buf[2];
+        char* data = (char*)&rx_buf[3];
+        // Ensure null term
+        String s = "";
+        for(int i=0; i<len; i++) s += data[i];
+
+        _logListBuffer = s;
+        xSemaphoreGive(_logListReady);
+    } else if (cmd == CMD_LOG_FILE_DATA) {
+        uint8_t len = rx_buf[2];
+        uint8_t* data = &rx_buf[3];
+
+        if (xSemaphoreTake(_fileDataMutex, 10) == pdTRUE) {
+             _fileDataQueue.insert(_fileDataQueue.end(), data, data + len);
+             xSemaphoreGive(_fileDataMutex);
+        }
+    } else if (cmd == CMD_LOG_FILE_EOF) {
+        _fileTransferComplete = true;
     }
 }
 
@@ -642,4 +665,77 @@ void Stm32Serial::otaTask(void* parameter) {
 
     self->_otaRunning = false;
     vTaskDelete(NULL);
+}
+
+bool Stm32Serial::requestLogList(String& output, uint32_t timeoutMs) {
+    // Clear old data
+    xSemaphoreTake(_logListReady, 0); // Clear semaphore
+    _logListBuffer = "";
+
+    // Send Request: [CMD_LOG_LIST_REQ] (0 payload)
+    // Manually constructing packet for now as pack_ functions for log aren't generated yet?
+    // Wait, I didn't generate pack functions for Logs in C++ code either.
+    // I can do raw send:
+    uint8_t buf[4];
+    buf[0] = 0xAA;
+    buf[1] = CMD_LOG_LIST_REQ;
+    buf[2] = 0x00;
+    buf[3] = calculate_crc8(&buf[1], 2);
+
+    sendData(buf, 4);
+
+    if (xSemaphoreTake(_logListReady, pdMS_TO_TICKS(timeoutMs)) == pdTRUE) {
+        output = _logListBuffer;
+        return true;
+    }
+    return false;
+}
+
+void Stm32Serial::requestFile(const String& filename) {
+    // Clear queue
+    if (xSemaphoreTake(_fileDataMutex, 100) == pdTRUE) {
+        _fileDataQueue.clear();
+        _fileTransferComplete = false;
+        xSemaphoreGive(_fileDataMutex);
+    }
+
+    // Packet: [CMD_LOG_FILE_REQ][LEN][FILENAME]
+    // Use manual pack
+    uint8_t buf[64];
+    buf[0] = 0xAA;
+    buf[1] = CMD_LOG_FILE_REQ;
+    int len = filename.length();
+    if (len > 50) len = 50;
+    buf[2] = len;
+    memcpy(&buf[3], filename.c_str(), len);
+    buf[3+len] = calculate_crc8(&buf[1], 2 + len);
+
+    sendData(buf, 4 + len);
+}
+
+bool Stm32Serial::hasFileData() {
+    bool has = false;
+    if (xSemaphoreTake(_fileDataMutex, 5) == pdTRUE) {
+        has = !_fileDataQueue.empty();
+        xSemaphoreGive(_fileDataMutex);
+    }
+    return has;
+}
+
+size_t Stm32Serial::getFileData(uint8_t* buffer, size_t maxLen) {
+    size_t readLen = 0;
+    if (xSemaphoreTake(_fileDataMutex, 10) == pdTRUE) {
+        readLen = _fileDataQueue.size();
+        if (readLen > maxLen) readLen = maxLen;
+
+        memcpy(buffer, _fileDataQueue.data(), readLen);
+        _fileDataQueue.erase(_fileDataQueue.begin(), _fileDataQueue.begin() + readLen);
+
+        xSemaphoreGive(_fileDataMutex);
+    }
+    return readLen;
+}
+
+bool Stm32Serial::isFileTransferComplete() {
+    return _fileTransferComplete && !hasFileData();
 }

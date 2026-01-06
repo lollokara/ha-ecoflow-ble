@@ -28,6 +28,9 @@
 // Logging Tag
 static const char* TAG = "Main";
 
+// Forward declaration
+static int app_log_vprintf(const char *fmt, va_list args);
+
 /**
  * @brief Processes incoming data from the Debug Serial interface.
  *
@@ -66,6 +69,9 @@ void setup() {
                                        // The memory said: "ESP32 GPIO 16 is the Power Latch control pin; it must be initialized as INPUT_PULLUP in setup() and switched to OUTPUT LOW only when executing the power-off sequence."
                                        // The existing code sets it OUTPUT LOW. I must NOT alter code functionality, so I will document it as is.
 
+    // Register Log Hook
+    esp_log_set_vprintf(app_log_vprintf);
+
     Serial.begin(115200);
     Serial.println("Starting Ecoflow Controller...");
 
@@ -80,6 +86,61 @@ void setup() {
 
     // Initialize the UART communication with the STM32F4
     Stm32Serial::getInstance().begin();
+}
+
+static int app_log_vprintf(const char *fmt, va_list args) {
+    // Only process if level is WARN or ERROR?
+    // esp_log_set_vprintf receives all logs. We need to filter by level ourselves if possible,
+    // but the callback signature doesn't include level.
+    // However, the standard esp_log_writev takes level.
+    // Wait, esp_log_set_vprintf replaces the final output function.
+    // Standard implementation: vprintf(fmt, args).
+
+    // We can't easily filter by level inside vprintf unless the format string contains it (it does for ESP_LOG).
+    // Typical format: "I (1234) TAG: Message" or similar (ansi codes).
+
+    // Simpler approach: Use a temporary buffer
+    char buf[256];
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (len > 0) {
+        // Print to Serial (keep original functionality)
+        // vprintf(fmt, args); // Recursive loop if we use Serial.printf? No, Serial uses specific driver.
+        // But better just write to stdout.
+        fwrite(buf, 1, len, stdout);
+
+        // Filter: Check for "E (" or "W (" at start?
+        // ESP-IDF logs start with color codes usually.
+        // Let's look for "E (" or "W (".
+        if (strstr(buf, "E (") || strstr(buf, "W (") || strstr(buf, "[E]") || strstr(buf, "[W]")) {
+             // Send to STM32: [CMD_LOG_MSG][LEN][... "Main"][0]["Error Msg"][0] ...
+             // Protocol expects [FUNC][0][MSG][0].
+             // We'll parse tag if possible, or just send "ESP32" as func.
+
+             // Construct packet manually to avoid heap allocs if possible
+             // Max payload 255.
+             if (len > 200) len = 200;
+
+             uint8_t packet[260];
+             packet[0] = START_BYTE;
+             packet[1] = CMD_LOG_MSG;
+
+             // Payload: "ESP32\0" + Message
+             const char* func = "ESP32";
+             int func_len = 6; // incl null
+
+             memcpy(&packet[3], func, func_len);
+             memcpy(&packet[3 + func_len], buf, len);
+             packet[3 + func_len + len] = 0; // Ensure null term
+
+             int payload_len = func_len + len + 1;
+             packet[2] = (uint8_t)payload_len;
+
+             packet[3 + payload_len] = calculate_crc8(&packet[1], 2 + payload_len);
+
+             Stm32Serial::getInstance().sendData(packet, 4 + payload_len);
+        }
+    }
+    return len;
 }
 
 /**

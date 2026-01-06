@@ -42,6 +42,11 @@ extern "C" {
 #define CMD_OTA_END   0xA2           ///< End OTA Update
 #define CMD_OTA_APPLY 0xA3           ///< Apply OTA Update
 
+#define CMD_LOG_MSG 0x70             ///< Forward log entry (ESP -> F4)
+#define CMD_LOG_LIST_REQ 0x71        ///< Request list of log files (ESP -> F4)
+#define CMD_LOG_FILE_REQ 0x73        ///< Request specific file content (ESP -> F4)
+#define CMD_DEBUG_DUMP_RESP 0x77     ///< Send device/config dump (ESP -> F4)
+
 // --- F4 -> ESP32 Command IDs ---
 #define CMD_REQUEST_STATUS_UPDATE 0x10 ///< Request immediate update (Generic)
 
@@ -51,6 +56,11 @@ extern "C" {
 #define CMD_GET_DEBUG_INFO 0x60      ///< Request Debug Info
 #define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
 #define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
+
+#define CMD_LOG_LIST_RESP 0x72       ///< Response with file list (F4 -> ESP)
+#define CMD_LOG_FILE_DATA 0x74       ///< Stream file data chunk (F4 -> ESP)
+#define CMD_LOG_FILE_EOF 0x75        ///< End of file stream (F4 -> ESP)
+#define CMD_DEBUG_DUMP_REQ 0x76      ///< Request device/config dump (F4 -> ESP)
 
 #define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
 #define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge

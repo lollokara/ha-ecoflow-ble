@@ -19,6 +19,9 @@ void UART_SendConnectDevice(uint8_t type);
 void UART_SendForgetDevice(uint8_t type);
 void UART_GetKnownDevices(DeviceList *list);
 
+// Thread-Safe Raw Send
+void UART_SendRaw(uint8_t *data, uint16_t len);
+
 // Helper for IRQ dispatch
 void UART_RxCpltCallback(UART_HandleTypeDef *huart);
 

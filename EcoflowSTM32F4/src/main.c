@@ -24,6 +24,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "log_manager.h"
 #include <stdio.h>
 
 // External Handles
@@ -320,6 +321,9 @@ int main(void) {
     xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
     xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
     xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
+
+    // Initialize Log Manager Task
+    LogManager_StartTask();
 
     // Start Scheduler
     vTaskStartScheduler();
