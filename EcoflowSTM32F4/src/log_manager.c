@@ -24,38 +24,49 @@ static uint32_t DownloadOffset = 0;
 static uint32_t DownloadSize = 0;
 
 void LogManager_Init(void) {
+    printf("[Log] Init Start\n");
     // Mount Filesystem
+    // Use option 0 to mount lazily or 1 to mount immediately
+    // Using 1 allows checking errors now
     FRESULT res = f_mount(&SDFatFs, SDPath, 1);
-    if (res == FR_NO_FILESYSTEM) {
-        printf("No Filesystem. Formatting...\n");
+
+    if (res == FR_OK) {
+        printf("[Log] Mount OK\n");
+    } else if (res == FR_NO_FILESYSTEM) {
+        printf("[Log] No Filesystem (%d). Formatting...\n", res);
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
         FRESULT fmt_res = f_mkfs(SDPath, &opt, work, sizeof(work));
         if (fmt_res == FR_OK) {
-            printf("Format Success. Remounting...\n");
+            printf("[Log] Format Success. Remounting...\n");
             FRESULT remount_res = f_mount(&SDFatFs, SDPath, 1);
             if (remount_res != FR_OK) {
-                printf("Remount Failed: %d\n", remount_res);
+                printf("[Log] Remount Failed: %d\n", remount_res);
                 return;
             }
         } else {
-            printf("Format Failed: %d\n", fmt_res);
+            printf("[Log] Format Failed: %d\n", fmt_res);
             return;
         }
-    } else if (res != FR_OK) {
-        printf("FatFs Mount Failed: %d\n", res);
+    } else {
+        printf("[Log] FatFs Mount Failed: %d\n", res);
         return;
     }
 
     // Open current log
-    if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+    FRESULT open_res = f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+    if (open_res == FR_OK) {
+        printf("[Log] Open OK\n");
         f_lseek(&LogFile, f_size(&LogFile)); // Append
         LogOpen = true;
 
         // Check size
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
+            printf("[Log] File too large, rotating...\n");
             LogManager_ForceRotate();
         }
+    } else {
+        printf("[Log] Open Failed: %d\n", open_res);
     }
 }
 
