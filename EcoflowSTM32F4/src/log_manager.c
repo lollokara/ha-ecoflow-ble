@@ -62,6 +62,8 @@ void LogManager_Init(void) {
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
             LogManager_ForceRotate();
         }
+
+        LogManager_Write(3, "SYS", "Log System Initialized");
     }
 }
 
@@ -129,10 +131,13 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
     // [millis] [Tag] Message
     int line_len = snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
 
-    UINT bw;
-    FRESULT res = f_write(&LogFile, line, line_len, &bw);
-    if (res != FR_OK || bw != line_len) {
-        printf("LogManager_Write: f_write fail res=%d bw=%d\n", res, bw);
+    FRESULT res;
+    if (line_len > 0) {
+        UINT bw;
+        res = f_write(&LogFile, line, (UINT)line_len, &bw);
+        if (res != FR_OK || bw != (UINT)line_len) {
+            printf("LogManager_Write: f_write fail res=%d bw=%d\n", res, bw);
+        }
     }
 
     res = f_sync(&LogFile);

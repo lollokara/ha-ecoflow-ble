@@ -393,6 +393,7 @@ int main(void) {
     }
 
     LogManager_Init();
+    LogManager_Write(3, "SYS", "Main: Boot Complete");
 
     MX_IWDG_Init(); // Watchdog Enabled
 
