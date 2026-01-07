@@ -24,6 +24,7 @@
 #include "display_task.h"
 #include "uart_task.h"
 #include "fan_task.h"
+#include "log_manager.h"
 #include "ff.h"
 #include "sd_diskio.h"
 #include <stdio.h>
@@ -390,6 +391,8 @@ int main(void) {
     if (FATFS_LinkDriver(&SD_Driver, SDPath) != 0) {
         printf("FatFs Link Driver Failed\n");
     }
+
+    LogManager_Init();
 
     MX_IWDG_Init(); // Watchdog Enabled
 
