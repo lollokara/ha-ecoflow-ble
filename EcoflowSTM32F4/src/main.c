@@ -37,7 +37,7 @@ TIM_HandleTypeDef htim2;
 IWDG_HandleTypeDef hiwdg;
 SD_HandleTypeDef hsd;
 FATFS SDFatFs;
-char SDPath[4];
+char SDPath[4] = {0}; // Initialize to 0
 
 QueueHandle_t displayQueue; // Global queue for UI events
 
@@ -247,8 +247,17 @@ static void MX_SDIO_SD_Init(void) {
     hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
     hsd.Init.ClockDiv = 4; // Slow down clock (48MHz / (4+2) = 8MHz)
 
+    // Note: HAL_SD_Init internally initializes the card.
+    // If it fails, retry once with lower speed or reset.
     if (HAL_SD_Init(&hsd) != HAL_OK) {
-        printf("SD Init Failed: %lu\n", hsd.ErrorCode);
+        printf("SD Init Failed: %lu. Retrying...\n", hsd.ErrorCode);
+        HAL_SD_DeInit(&hsd);
+        hsd.Init.ClockDiv = 10; // Slower (~4MHz)
+        if (HAL_SD_Init(&hsd) != HAL_OK) {
+             printf("SD Init Retry Failed: %lu\n", hsd.ErrorCode);
+        } else {
+             printf("SD Init Retry Success\n");
+        }
     }
 
     // Force 1-bit mode to verify basic connectivity and avoid D2/D3 issues
