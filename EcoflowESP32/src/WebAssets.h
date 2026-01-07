@@ -48,6 +48,13 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
             transform: translateY(20px);
         }
 
+        /* File Browser Table */
+        .file-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
+        .file-table th, .file-table td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .file-table th { color: var(--text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 0.8em; }
+        .file-table tr:hover { background: rgba(255,255,255,0.02); }
+        .file-icon { margin-right: 8px; color: var(--neon-cyan); }
+
         /* Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -1037,6 +1044,23 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 list.innerHTML = '<div style="text-align:center; color:#555;">No logs found</div>';
                 return;
             }
+
+            // Create Table
+            const table = document.createElement('table');
+            table.className = 'file-table';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th style="width: 50%;">Filename</th>
+                        <th>Size</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="file-list-body"></tbody>
+            `;
+            list.appendChild(table);
+            const tbody = table.querySelector('tbody');
+
             data.forEach(file => {
                 let name = file.name;
                 let size = file.size;
@@ -1044,21 +1068,16 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 if (size > 1024) sizeStr = (size / 1024).toFixed(1) + ' KB';
                 if (size > 1024*1024) sizeStr = (size / (1024*1024)).toFixed(2) + ' MB';
 
-                const div = document.createElement('div');
-                div.className = 'ctrl-row';
-                div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-                div.style.padding = '8px 0';
-                div.innerHTML = `
-                    <div style="flex:1; display:flex; flex-direction:column;">
-                        <span style="font-family:monospace; font-size:0.9em;">${name}</span>
-                        <span style="font-size:0.75em; color:#888;">${sizeStr}</span>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
-                        <button class="btn" style="padding:4px 10px; font-size:0.8em; background:rgba(255,50,50,0.2); color:#ff5252; border:1px solid #ff5252;" onclick="deleteLog('${name}')">Delete</button>
-                    </div>
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="file-icon">📄</span> <span style="font-family:monospace; color:#eee;">${name}</span></td>
+                    <td style="color:#aaa;">${sizeStr}</td>
+                    <td style="text-align: right;">
+                        <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:6px 12px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green); margin-right: 5px;">Download</a>
+                        <button class="btn" style="padding:6px 12px; font-size:0.8em; background:rgba(255,50,50,0.2); color:#ff5252; border:1px solid #ff5252;" onclick="deleteLog('${name}')">Delete</button>
+                    </td>
                 `;
-                list.appendChild(div);
+                tbody.appendChild(tr);
             });
         }).catch(e => {
             el('sd-log-list').innerHTML = '<div style="text-align:center; color:var(--neon-pink);">Error loading list</div>';
