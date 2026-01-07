@@ -3,6 +3,7 @@
 #include "uart_task.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -26,6 +27,8 @@ static uint32_t DownloadSize = 0;
 void LogManager_Init(void) {
     // Mount Filesystem
     FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+    printf("LogManager: f_mount res=%d path=%s\n", res, SDPath);
+
     if (res == FR_NO_FILESYSTEM) {
         printf("No Filesystem. Formatting...\n");
         BYTE work[FF_MAX_SS];
@@ -48,7 +51,10 @@ void LogManager_Init(void) {
     }
 
     // Open current log
-    if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+    res = f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+    printf("LogManager: f_open res=%d\n", res);
+
+    if (res == FR_OK) {
         f_lseek(&LogFile, f_size(&LogFile)); // Append
         LogOpen = true;
 
@@ -101,7 +107,10 @@ void LogManager_ForceRotate(void) {
 }
 
 void LogManager_Write(uint8_t level, const char* tag, const char* message) {
-    if (!LogOpen) return;
+    if (!LogOpen) {
+        printf("LogManager_Write: Dropped (Not Open) [%s] %s\n", tag, message);
+        return;
+    }
 
     // Check size
     if (f_size(&LogFile) > MAX_LOG_SIZE) {
@@ -110,13 +119,26 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
 
     // Format: [Timestamp] [Tag] Message\n
     char line[512];
-    uint32_t time = xTaskGetTickCount();
+    uint32_t time;
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        time = xTaskGetTickCount();
+    } else {
+        time = HAL_GetTick();
+    }
+
     // [millis] [Tag] Message
-    snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
+    int line_len = snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
 
     UINT bw;
-    f_write(&LogFile, line, strlen(line), &bw);
-    f_sync(&LogFile); // Sync frequently or rely on periodic sync? Sync is safer but slower.
+    FRESULT res = f_write(&LogFile, line, line_len, &bw);
+    if (res != FR_OK || bw != line_len) {
+        printf("LogManager_Write: f_write fail res=%d bw=%d\n", res, bw);
+    }
+
+    res = f_sync(&LogFile);
+    if (res != FR_OK) {
+        printf("LogManager_Write: f_sync fail res=%d\n", res);
+    }
 }
 
 void LogManager_Process(void) {
