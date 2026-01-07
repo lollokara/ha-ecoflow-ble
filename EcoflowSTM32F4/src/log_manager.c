@@ -71,6 +71,7 @@ void LogManager_Init(void) {
 }
 
 void LogManager_ForceRotate(void) {
+    printf("[Log] Rotating...\n");
     if (LogOpen) {
         f_close(&LogFile);
         LogOpen = false;
@@ -93,6 +94,7 @@ void LogManager_ForceRotate(void) {
     // Open new
     if (f_open(&LogFile, LOG_FILENAME, FA_CREATE_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         LogOpen = true;
+        printf("[Log] Rotate Success. New log open.\n");
 
         // Header Section 1
         LogManager_Write(0, "SYS", "--- Firmware Versions ---");
@@ -126,7 +128,10 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
     snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
 
     UINT bw;
-    f_write(&LogFile, line, strlen(line), &bw);
+    FRESULT res = f_write(&LogFile, line, strlen(line), &bw);
+    if (res != FR_OK) {
+        printf("[Log] Write Error: %d\n", res);
+    }
     f_sync(&LogFile); // Sync frequently or rely on periodic sync? Sync is safer but slower.
 }
 
@@ -163,6 +168,7 @@ void LogManager_Process(void) {
 }
 
 void LogManager_HandleListReq(void) {
+    printf("[Log] List Request Received\n");
     DIR dir;
     FILINFO fno;
     uint8_t buffer[256];
@@ -175,12 +181,17 @@ void LogManager_HandleListReq(void) {
              }
         }
         f_closedir(&dir);
+    } else {
+        printf("[Log] OpenDir Failed\n");
     }
+
+    printf("[Log] Found %d log files\n", count);
 
     uint8_t idx = 0;
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
+                 printf("[Log] Sending: %s (%lu bytes)\n", fno.fname, fno.fsize);
                  int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                  UART_SendRaw(buffer, len);
                  vTaskDelay(20); // Throttle increased to prevent ESP32 overflow
@@ -191,6 +202,7 @@ void LogManager_HandleListReq(void) {
     }
 
     if (count == 0) {
+         printf("[Log] Sending empty list\n");
          int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
          UART_SendRaw(buffer, len);
     }

@@ -291,6 +291,8 @@ void UART_SendRaw(uint8_t* data, uint16_t len) {
         if (xSemaphoreTake(uartTxMutex, 100) == pdTRUE) {
             HAL_UART_Transmit(&huart6, data, len, 100);
             xSemaphoreGive(uartTxMutex);
+        } else {
+            printf("[UART] Tx Mutex Timeout\n");
         }
     }
 }
