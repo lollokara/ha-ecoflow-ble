@@ -31,6 +31,14 @@ static lv_obj_t * btn_mode_fan;
 static int current_mode = -1; // -1=Uninitialized, 0=Cool, 1=Heat, 2=Fan
 static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
+// Optimization: Track last values to prevent unnecessary LVGL updates
+static int32_t last_setTemp = -999;
+static int32_t last_fanValue = -999;
+static int32_t last_envTemp = -999;
+static int32_t last_subMode = -999;
+static int32_t last_powerMode = -999;
+static int32_t last_mode = -999;
+
 static void create_styles(void) {
     lv_style_init(&style_scr);
     lv_style_set_bg_color(&style_scr, lv_color_hex(0xFF121212));
@@ -340,27 +348,56 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
     int32_t powerMode = get_int32_aligned(&data->powerMode);
     int32_t mode = get_int32_aligned(&data->mode);
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", safe_float_to_int(envTemp));
+    int32_t envTempInt = safe_float_to_int(envTemp);
 
-    if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
+    if (envTempInt != last_envTemp) {
+        lv_label_set_text_fmt(label_cur_temp, "%d C", envTempInt);
+        last_envTemp = envTempInt;
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
-        lv_dropdown_set_selected(dd_sub_mode, subMode);
+    if (setTemp != last_setTemp) {
+        if (lv_slider_is_dragged(arc_set_temp) == false) {
+            lv_arc_set_value(arc_set_temp, setTemp);
+            lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
+            last_setTemp = setTemp;
+        }
     }
 
-    if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
+    bool vis_update_needed = false;
+
+    if (mode != last_mode) {
+        vis_update_needed = true;
+        last_mode = mode;
+    }
+
+    if (subMode != last_subMode) {
+        if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+            lv_dropdown_set_selected(dd_sub_mode, subMode);
+        }
+        last_subMode = subMode;
+        vis_update_needed = true;
+    }
+
+    if (fanValue != last_fanValue) {
+        if (lv_slider_is_dragged(slider_fan) == false) {
+            lv_slider_set_value(slider_fan, fanValue, LV_ANIM_ON);
+            lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)fanValue);
+            last_fanValue = fanValue;
+        }
     }
 
     // Update Power Button State
-    if (btn_pwr) {
-        if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
-        else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
+    if (powerMode != last_powerMode) {
+        if (btn_pwr) {
+            if (powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+            else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
+        }
+        last_powerMode = powerMode;
+        vis_update_needed = true;
     }
 
-    update_visibility(mode, subMode, powerMode != 0);
+    // Visibility / Mode UI (Heavy Operation - Only update on change)
+    if (vis_update_needed) {
+        update_visibility(mode, subMode, powerMode != 0);
+    }
 }
