@@ -584,14 +584,19 @@ static void create_info_card(lv_obj_t * parent, const char* icon_code, const cha
 
 static void update_card_style(InfoCardObj * obj, int val) {
     if (val > 0) {
-        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
-        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
-        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
-        // Dark grey or black icon on white looks good.
-        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+        // Active State: Dark Mode Integrity (Teal Border + Subtle BG)
+        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF383838), 0);
+        lv_obj_set_style_border_color(obj->card, lv_palette_main(LV_PALETTE_TEAL), 0);
+        lv_obj_set_style_border_width(obj->card, 2, 0);
+
+        lv_obj_set_style_text_color(obj->title, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
     } else {
-        // Revert to Dark Theme
+        // Inactive State: Default Dark
         lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_border_width(obj->card, 0, 0);
+
         lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
         lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
         lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
@@ -600,14 +605,19 @@ static void update_card_style(InfoCardObj * obj, int val) {
 
 static void update_card_style_active(InfoCardObj * obj, bool active) {
     if (active) {
-        lv_obj_set_style_bg_color(obj->card, lv_color_white(), 0); // Light BG
-        lv_obj_set_style_text_color(obj->title, lv_color_black(), 0); // Dark Text
-        lv_obj_set_style_text_color(obj->value, lv_color_black(), 0);
-        // Dark grey or black icon on white looks good.
-        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_GREY), 0);
+        // Active State: Dark Mode Integrity (Teal Border + Subtle BG)
+        lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF383838), 0);
+        lv_obj_set_style_border_color(obj->card, lv_palette_main(LV_PALETTE_TEAL), 0);
+        lv_obj_set_style_border_width(obj->card, 2, 0);
+
+        lv_obj_set_style_text_color(obj->title, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
+        lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
     } else {
-        // Revert to Dark Theme
+        // Inactive State: Default Dark
         lv_obj_set_style_bg_color(obj->card, lv_color_hex(0xFF282828), 0);
+        lv_obj_set_style_border_width(obj->card, 0, 0);
+
         lv_obj_set_style_text_color(obj->title, lv_palette_main(LV_PALETTE_GREY), 0);
         lv_obj_set_style_text_color(obj->value, lv_color_white(), 0);
         lv_obj_set_style_text_color(obj->icon, lv_palette_main(LV_PALETTE_TEAL), 0);
@@ -1087,6 +1097,13 @@ static void create_dashboard(void) {
     lv_obj_add_flag(card_car.card, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(card_car.card, event_car_tile_click, LV_EVENT_CLICKED, NULL);
 
+    // Visual Affordance for Clickable Car Card
+    lv_obj_t * chevron = lv_label_create(card_car.card);
+    ui_set_icon(chevron, MDI_ICON_SETTINGS); // Use Settings icon as affordance
+    lv_obj_set_style_text_font(chevron, &ui_font_mdi, 0);
+    lv_obj_set_style_text_color(chevron, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_align(chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+
     // --- Right Column (Outputs) ---
     create_info_card(scr_dash, MDI_ICON_USB, "USB", 620, 60, &card_usb);
     label_usb_val = card_usb.value;
@@ -1535,6 +1552,16 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             if (first_run || soc != last_soc) {
                 lv_arc_set_value(arc_batt, soc);
                 lv_label_set_text_fmt(label_soc, "%d%%", soc);
+
+                // Low Battery Warning
+                if (soc < 20) {
+                     lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_RED), LV_PART_INDICATOR);
+                     lv_obj_set_style_text_color(label_soc, lv_palette_main(LV_PALETTE_RED), 0);
+                } else {
+                     lv_obj_set_style_arc_color(arc_batt, lv_palette_main(LV_PALETTE_TEAL), LV_PART_INDICATOR);
+                     lv_obj_set_style_text_color(label_soc, lv_color_white(), 0);
+                }
+
                 last_soc = soc;
             }
         }
