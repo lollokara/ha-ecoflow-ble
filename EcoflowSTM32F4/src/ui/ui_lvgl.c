@@ -30,6 +30,7 @@ static uint32_t last_touch_time = 0;
 static uint32_t last_alt_cmd_time = 0; // Timestamp for Alt Charger interaction
 static bool is_sleeping = false;
 bool is_charging_active = false;
+static uint8_t last_known_brightness = 100;
 
 // --- State Variables (Settings) ---
 static int lim_input_w = 600;       // 400 - 3000
@@ -170,7 +171,7 @@ void UI_ResetIdleTimer(void) {
     if (is_sleeping) {
         is_sleeping = false;
         // Immediate Wake up
-        SetBacklight(100);
+        SetBacklight(last_known_brightness);
     }
 }
 
@@ -1279,7 +1280,7 @@ void UI_LVGL_Init(void) {
 void UI_LVGL_Update(DeviceStatus* dev) {
     // Handle Sleep Logic (Dimming)
     uint32_t now = xTaskGetTickCount();
-    uint8_t target_brightness = 100;
+    uint8_t target_brightness = last_known_brightness;
 
     // Update Animation Phase (0.0 to 1.0) for wave effect
     anim_phase += 0.05f;
@@ -1287,7 +1288,10 @@ void UI_LVGL_Update(DeviceStatus* dev) {
     if (arc_batt) lv_obj_invalidate(arc_batt); // Trigger redraw for animation
 
     if (dev) {
-         if (dev->brightness > 0) target_brightness = dev->brightness;
+         if (dev->brightness > 0) {
+             target_brightness = dev->brightness;
+             last_known_brightness = target_brightness;
+         }
     }
 
     if ((now - last_touch_time) > (60000 / portTICK_PERIOD_MS)) { // 60s
