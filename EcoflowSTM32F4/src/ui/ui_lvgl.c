@@ -1236,7 +1236,10 @@ static void create_dashboard(void) {
 /**
  * @brief Initializes LVGL and creates the UI.
  */
+extern IWDG_HandleTypeDef hiwdg;
+
 void UI_LVGL_Init(void) {
+    HAL_IWDG_Refresh(&hiwdg);
     lv_init();
 
     extern void lv_port_disp_init(void);
