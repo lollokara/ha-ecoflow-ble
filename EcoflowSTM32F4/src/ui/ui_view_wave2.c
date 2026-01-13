@@ -27,7 +27,9 @@ static lv_obj_t * btn_mode_heat;
 static lv_obj_t * btn_mode_fan;
 
 // State Tracking
-static int current_mode = 0; // 0=Cool, 1=Heat, 2=Fan
+static int current_mode = -1; // 0=Cool, 1=Heat, 2=Fan
+static int last_sub_mode = -1;
+static int last_power_mode = -1;
 static uint32_t last_cmd_time = 0; // Timestamp of last user interaction
 
 static void create_styles(void) {
@@ -82,8 +84,6 @@ static void event_temp_change(lv_event_t * e) {
 }
 
 static void update_mode_ui(int mode) {
-    current_mode = mode;
-
     // Reset styles
     lv_obj_remove_style(btn_mode_cool, &style_btn_selected, 0);
     lv_obj_add_style(btn_mode_cool, &style_btn_default, 0);
@@ -330,27 +330,37 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
         return;
     }
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)data->envTemp);
+    lv_label_set_text_fmt(label_cur_temp, "%d C", (int)get_float_aligned(&data->envTemp));
 
+    int setTemp = get_int32_aligned(&data->setTemp);
     if (lv_slider_is_dragged(arc_set_temp) == false) {
-        lv_arc_set_value(arc_set_temp, data->setTemp);
-        lv_label_set_text_fmt(label_set_temp_val, "%d C", data->setTemp);
+        lv_arc_set_value(arc_set_temp, setTemp);
+        lv_label_set_text_fmt(label_set_temp_val, "%d C", setTemp);
     }
 
-    if (lv_dropdown_get_selected(dd_sub_mode) != data->subMode) {
-        lv_dropdown_set_selected(dd_sub_mode, data->subMode);
+    int subMode = get_int32_aligned(&data->subMode);
+    if (lv_dropdown_get_selected(dd_sub_mode) != subMode) {
+        lv_dropdown_set_selected(dd_sub_mode, subMode);
     }
 
+    int fanVal = get_int32_aligned(&data->fanValue);
     if (lv_slider_is_dragged(slider_fan) == false) {
-        lv_slider_set_value(slider_fan, data->fanValue, LV_ANIM_ON);
-        lv_label_set_text_fmt(label_fan_val, "Fan: %d", (int)data->fanValue);
+        lv_slider_set_value(slider_fan, fanVal, LV_ANIM_ON);
+        lv_label_set_text_fmt(label_fan_val, "Fan: %d", fanVal);
     }
 
     // Update Power Button State
+    int pwrMode = get_int32_aligned(&data->powerMode);
     if (btn_pwr) {
-        if (data->powerMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
+        if (pwrMode != 0) lv_obj_add_state(btn_pwr, LV_STATE_CHECKED);
         else lv_obj_clear_state(btn_pwr, LV_STATE_CHECKED);
     }
 
-    update_visibility(data->mode, data->subMode, data->powerMode != 0);
+    int mode = get_int32_aligned(&data->mode);
+    if (mode != current_mode || subMode != last_sub_mode || pwrMode != last_power_mode) {
+        current_mode = mode;
+        last_sub_mode = subMode;
+        last_power_mode = pwrMode;
+        update_visibility(mode, subMode, pwrMode != 0);
+    }
 }

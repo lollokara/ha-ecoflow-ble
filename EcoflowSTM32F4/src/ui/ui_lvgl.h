@@ -7,6 +7,19 @@ extern "C" {
 
 #include "ecoflow_protocol.h"
 #include <stdbool.h>
+#include <string.h>
+
+static inline float get_float_aligned(const float *ptr) {
+    float val;
+    memcpy(&val, ptr, sizeof(float));
+    return val;
+}
+
+static inline int32_t get_int32_aligned(const int32_t *ptr) {
+    int32_t val;
+    memcpy(&val, ptr, sizeof(int32_t));
+    return val;
+}
 
 void UI_LVGL_Init(void);
 void UI_LVGL_Update(DeviceStatus* dev);
