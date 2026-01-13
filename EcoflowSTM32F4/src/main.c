@@ -281,11 +281,12 @@ void SetBacklight(uint8_t percent) {
  * @brief Main Application Entry Point.
  */
 int main(void) {
-    // Relocate Vector Table to Application Address (0x08008000)
+    // Relocate Vector Table to Application Address
     // Note: When booting from Bank 2 (BFB2 set), 0x08000000 is the alias for Bank 2.
-    // So 0x08008000 is the correct offset relative to the START of the current bank.
-    // Reverted to 0x08008000 (standard). 0x00008000 was risky.
-    SCB->VTOR = 0x08008000;
+    // However, for Dual Bank boot stability, using the aliased 0x00000000 base
+    // plus offset ensures we point to the running bank correctly.
+    // Changed to 0x00008000 as requested for stability.
+    SCB->VTOR = 0x00008000;
     __DSB();
 
     // Enable Interrupts (Bootloader disables them)
@@ -315,9 +316,9 @@ int main(void) {
     }
 
     // Create FreeRTOS Tasks
-    xTaskCreate(StartDisplayTask, "Display", 8192, NULL, 2, NULL);
-    xTaskCreate(StartUARTTask, "UART", 4096, NULL, 3, NULL);
-    xTaskCreate(StartFanTask, "Fan", 1024, NULL, 2, NULL);
+    xTaskCreate(StartDisplayTask, "Display", 16384, NULL, 2, NULL);
+    xTaskCreate(StartUARTTask, "UART", 8192, NULL, 3, NULL);
+    xTaskCreate(StartFanTask, "Fan", 4096, NULL, 2, NULL);
 
     // Start Scheduler
     vTaskStartScheduler();
