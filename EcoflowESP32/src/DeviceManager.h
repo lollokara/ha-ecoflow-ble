@@ -103,11 +103,13 @@ private:
     EcoflowESP32 w2;
     EcoflowESP32 d3p;
     EcoflowESP32 ac;
+    EcoflowESP32 bladeInstance;
 
     DeviceSlot slotD3;
     DeviceSlot slotW2;
     DeviceSlot slotD3P;
     DeviceSlot slotAC;
+    DeviceSlot slotBlade;
 
     Preferences prefs;
 
@@ -115,6 +117,7 @@ private:
     std::deque<int8_t> _wave2History;
     std::deque<int16_t> _d3SolarHistory;
     std::deque<int16_t> _d3pSolarHistory;
+    std::deque<int16_t> _bladeHistory;
     uint32_t _lastHistorySample = 0;
 
     // BLE Scanning members
