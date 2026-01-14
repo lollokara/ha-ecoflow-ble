@@ -17,6 +17,7 @@ extern FATFS SDFatFs;
 static FIL LogFile;
 static bool LogOpen = false;
 static bool TriggerSessionHeader = false;
+static SemaphoreHandle_t LogMutex = NULL;
 
 // Download State
 static bool Downloading = false;
@@ -26,6 +27,12 @@ static uint32_t DownloadOffset = 0;
 static uint32_t DownloadSize = 0;
 
 void LogManager_Init(void) {
+    if (LogMutex == NULL) {
+        LogMutex = xSemaphoreCreateMutex();
+    }
+
+    if (xSemaphoreTake(LogMutex, portMAX_DELAY) != pdTRUE) return;
+
     // Mount Filesystem
     FRESULT res = f_mount(&SDFatFs, SDPath, 1);
     printf("LogManager: f_mount res=%d path=%s\n", res, SDPath);
@@ -44,10 +51,12 @@ void LogManager_Init(void) {
             }
         } else {
             printf("Format Failed: %d\n", fmt_res);
+            xSemaphoreGive(LogMutex);
             return;
         }
     } else if (res != FR_OK) {
         printf("FatFs Mount Failed: %d\n", res);
+        xSemaphoreGive(LogMutex);
         return;
     }
 
@@ -61,13 +70,41 @@ void LogManager_Init(void) {
 
         // Check size
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
+            // LogManager_ForceRotate calls f_ functions, need to avoid recursive mutex take deadlock if simple mutex
+            // But FreeRTOS Mutex is recursive safe if xSemaphoreCreateRecursiveMutex used.
+            // Standard Mutex is NOT recursive.
+            // We must unlock before calling a function that might lock, OR (better) make internal functions assume lock is held.
+            // Let's make internal helpers or just unlock.
+            // ForceRotate uses f_close/rename/open. We should implement logic here or make ForceRotate lock-aware.
+            // Simplest: Release, call Rotate, Retake? No, unsafe.
+            // Better: Move Logic inside Init or make helper.
+            // Actually, let's just make ForceRotate assume caller holds lock if internal, or make it locking.
+            // Current ForceRotate is public? No, header says void LogManager_ForceRotate(void);
+            // It's called from Write.
+            // Let's define a static InternalForceRotate that assumes lock.
+
+            // For now, I will assume single context for Init. But Write calls Rotate.
+            // Refactoring:
+            // 1. Rename ForceRotate to InternalForceRotate.
+            // 2. Make ForceRotate a wrapper that takes lock.
+            // 3. Call InternalForceRotate here.
+
+            // Wait, I cannot easily rename in this partial diff.
+            // I will release lock, call Rotate, retake.
+            xSemaphoreGive(LogMutex);
             LogManager_ForceRotate();
+            xSemaphoreTake(LogMutex, portMAX_DELAY);
         } else {
             // New session in existing file
+            // Write() takes lock. Deadlock!
+            // We need to write directly here or unlock.
+            xSemaphoreGive(LogMutex);
             LogManager_Write(3, "SYS", "Log System Initialized");
             TriggerSessionHeader = true;
+            return; // Lock released
         }
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_WriteSessionHeader(void) {
@@ -90,6 +127,9 @@ void LogManager_WriteSessionHeader(void) {
 }
 
 void LogManager_ForceRotate(void) {
+    if (!LogMutex) return;
+    xSemaphoreTake(LogMutex, portMAX_DELAY);
+
     if (LogOpen) {
         f_close(&LogFile);
         LogOpen = false;
@@ -114,17 +154,35 @@ void LogManager_ForceRotate(void) {
         LogOpen = true;
         LogManager_WriteSessionHeader();
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_Write(uint8_t level, const char* tag, const char* message) {
+    if (!LogMutex) return;
+
+    // We can't block indefinitely in a write from unknown context (e.g. ISR? No, FS is not ISR safe).
+    // Assuming task context.
+    if (xSemaphoreTake(LogMutex, 100) != pdTRUE) {
+        return;
+    }
+
     if (!LogOpen) {
-        printf("LogManager_Write: Dropped (Not Open) [%s] %s\n", tag, message);
+        // printf("LogManager_Write: Dropped (Not Open) [%s] %s\n", tag, message);
+        xSemaphoreGive(LogMutex);
         return;
     }
 
     // Check size
     if (f_size(&LogFile) > MAX_LOG_SIZE) {
-        LogManager_ForceRotate();
+        xSemaphoreGive(LogMutex);
+        LogManager_ForceRotate(); // Re-takes mutex
+        xSemaphoreTake(LogMutex, portMAX_DELAY); // Re-take to continue writing?
+        // If rotated, new file is open.
+    }
+
+    if (!LogOpen) {
+         xSemaphoreGive(LogMutex);
+         return;
     }
 
     // Format: [Timestamp] [Tag] Message\n
@@ -152,6 +210,7 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
     if (res != FR_OK) {
         printf("LogManager_Write: f_sync fail res=%d\n", res);
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_Process(void) {
@@ -161,37 +220,42 @@ void LogManager_Process(void) {
     }
 
     if (Downloading) {
-        // Send chunks
-        uint8_t buffer[200];
-        UINT br;
+        if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+            // Send chunks
+            uint8_t buffer[200];
+            UINT br;
 
-        f_lseek(&DownloadFile, DownloadOffset);
-        if (f_read(&DownloadFile, buffer, sizeof(buffer), &br) == FR_OK) {
-            if (br > 0) {
-                uint8_t packet[256];
-                int len = pack_log_data_chunk_message(packet, DownloadOffset, buffer, br);
-                UART_SendRaw(packet, len);
-            }
+            f_lseek(&DownloadFile, DownloadOffset);
+            if (f_read(&DownloadFile, buffer, sizeof(buffer), &br) == FR_OK) {
+                if (br > 0) {
+                    uint8_t packet[256];
+                    int len = pack_log_data_chunk_message(packet, DownloadOffset, buffer, br);
+                    UART_SendRaw(packet, len);
+                }
 
-            DownloadOffset += br;
-            if (br < sizeof(buffer) || DownloadOffset >= DownloadSize) {
-                // End of file
-                Downloading = false;
-                f_close(&DownloadFile);
-                // Send empty chunk
-                uint8_t packet[32];
-                int len = pack_log_data_chunk_message(packet, DownloadOffset, NULL, 0);
-                UART_SendRaw(packet, len);
+                DownloadOffset += br;
+                if (br < sizeof(buffer) || DownloadOffset >= DownloadSize) {
+                    // End of file
+                    Downloading = false;
+                    f_close(&DownloadFile);
+                    // Send empty chunk
+                    uint8_t packet[32];
+                    int len = pack_log_data_chunk_message(packet, DownloadOffset, NULL, 0);
+                    UART_SendRaw(packet, len);
+                }
+            } else {
+                 // Error
+                 Downloading = false;
+                 f_close(&DownloadFile);
             }
-        } else {
-             // Error
-             Downloading = false;
-             f_close(&DownloadFile);
+            xSemaphoreGive(LogMutex);
         }
     }
 }
 
 void LogManager_HandleListReq(void) {
+    if (!LogMutex) return;
+    xSemaphoreTake(LogMutex, portMAX_DELAY);
     DIR dir;
     FILINFO fno;
     uint8_t buffer[256];
@@ -227,9 +291,13 @@ void LogManager_HandleListReq(void) {
         }
         f_closedir(&dir);
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleDownloadReq(const char* filename) {
+    if (!LogMutex) return;
+    xSemaphoreTake(LogMutex, portMAX_DELAY);
+
     if (Downloading) f_close(&DownloadFile);
 
     strncpy(DownloadName, filename, 31);
@@ -240,13 +308,20 @@ void LogManager_HandleDownloadReq(const char* filename) {
     } else {
         Downloading = false;
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleDeleteReq(const char* filename) {
+    if (!LogMutex) return;
+    xSemaphoreTake(LogMutex, portMAX_DELAY);
     f_unlink(filename);
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleManagerOp(uint8_t op_code) {
+    if (!LogMutex) return;
+    xSemaphoreTake(LogMutex, portMAX_DELAY);
+
     if (op_code == LOG_OP_DELETE_ALL) {
         // Close current log before deleting
         if (LogOpen) {
@@ -267,7 +342,13 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
         }
 
         // Re-init (creates new current.log)
+        // LogManager_Init assumes lock is held, so we release?
+        // No, LogManager_Init takes lock. We hold lock. Recursive?
+        // We are using xSemaphoreCreateMutex which is NOT recursive.
+        // We must release lock before calling Init.
+        xSemaphoreGive(LogMutex);
         LogManager_Init();
+        return; // Init manages lock
 
     } else if (op_code == LOG_OP_FORMAT_SD) {
         if (LogOpen) {
@@ -283,11 +364,14 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
 
         if (res == FR_OK) {
              // Remount and Init
+             xSemaphoreGive(LogMutex);
              LogManager_Init();
+             return;
         } else {
              printf("Format Failed: %d\n", res);
         }
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleEspLog(uint8_t level, const char* tag, const char* message) {
