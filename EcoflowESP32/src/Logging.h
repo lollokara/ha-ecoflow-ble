@@ -51,3 +51,4 @@ static void LogToStm(esp_log_level_t level, const char* file, const char* func, 
 #define LOG_STM_V(tag, fmt, ...) LogToStm(ESP_LOG_VERBOSE, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)
 
 #endif // LOGGING_H
+// End of file
