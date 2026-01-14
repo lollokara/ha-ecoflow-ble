@@ -56,6 +56,7 @@ static bool is_flow_on(uint32_t x) {
 
 static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
     LOG_STM_I(TAG, "--- Full Delta 3 Dump ---");
+    vTaskDelay(10);
     if (msg.has_cms_batt_soc) LOG_STM_I(TAG, "cms_batt_soc: %.2f", msg.cms_batt_soc);
     if (msg.has_bms_batt_soc) LOG_STM_I(TAG, "bms_batt_soc: %.2f", msg.bms_batt_soc);
     if (msg.has_pow_get_ac_in) LOG_STM_I(TAG, "pow_get_ac_in: %.2f", msg.pow_get_ac_in);
@@ -64,6 +65,7 @@ static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
     if (msg.has_pow_out_sum_w) LOG_STM_I(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
     if (msg.has_pow_get_12v) LOG_STM_I(TAG, "pow_get_12v: %.2f", msg.pow_get_12v);
     if (msg.has_pow_get_pv) LOG_STM_I(TAG, "pow_get_pv: %.2f", msg.pow_get_pv);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_pv_type) LOG_STM_I(TAG, "plug_in_info_pv_type: %d", (int)msg.plug_in_info_pv_type);
     if (msg.has_pow_get_typec1) LOG_STM_I(TAG, "pow_get_typec1: %.2f", msg.pow_get_typec1);
     if (msg.has_pow_get_typec2) LOG_STM_I(TAG, "pow_get_typec2: %.2f", msg.pow_get_typec2);
@@ -72,6 +74,7 @@ static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_ac_charger_flag) LOG_STM_I(TAG, "plug_in_info_ac_charger_flag: %d", (int)msg.plug_in_info_ac_charger_flag);
     if (msg.has_energy_backup_en) LOG_STM_I(TAG, "energy_backup_en: %d", (int)msg.energy_backup_en);
     if (msg.has_energy_backup_start_soc) LOG_STM_I(TAG, "energy_backup_start_soc: %d", (int)msg.energy_backup_start_soc);
+    vTaskDelay(5);
     if (msg.has_pow_get_bms) LOG_STM_I(TAG, "pow_get_bms: %.2f", msg.pow_get_bms);
     if (msg.has_cms_min_dsg_soc) LOG_STM_I(TAG, "cms_min_dsg_soc: %d", (int)msg.cms_min_dsg_soc);
     if (msg.has_cms_max_chg_soc) LOG_STM_I(TAG, "cms_max_chg_soc: %d", (int)msg.cms_max_chg_soc);
@@ -80,32 +83,25 @@ static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
     if (msg.has_flow_info_ac_out) LOG_STM_I(TAG, "flow_info_ac_out: %d", (int)msg.flow_info_ac_out);
     if (msg.has_plug_in_info_ac_in_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_pow_max);
     if (msg.has_flow_info_qcusb1) LOG_STM_I(TAG, "flow_info_qcusb1: %d", (int)msg.flow_info_qcusb1);
-}
-
-static void logDelta3Data(const Delta3Data& d) {
-    LOG_STM_I(TAG, "--- Delta 3 Summary ---");
-    LOG_STM_I(TAG, "Batt: %.1f%% (In: %.1fW, Out: %.1fW)", d.batteryLevel, d.batteryInputPower, d.batteryOutputPower);
-    LOG_STM_I(TAG, "AC In: %.1fW, AC Out: %.1fW", d.acInputPower, d.acOutputPower);
-    LOG_STM_I(TAG, "DC In: %.1fW (State: %d, Solar: %.1fW)", d.dcPortInputPower, d.dcPortState, d.solarInputPower);
-    LOG_STM_I(TAG, "Total In: %.1fW, Out: %.1fW", d.inputPower, d.outputPower);
-    LOG_STM_I(TAG, "12V Out: %.1fW, USB-C: %.1fW/%.1fW, USB-A: %.1fW/%.1fW",
-             d.dc12vOutputPower, d.usbcOutputPower, d.usbc2OutputPower, d.usbaOutputPower, d.usba2OutputPower);
-    LOG_STM_I(TAG, "SOC Limits: %d%% - %d%%, AC Chg Speed: %dW", d.batteryChargeLimitMin, d.batteryChargeLimitMax, d.acChargingSpeed);
-    LOG_STM_I(TAG, "Flags: AC Plugged=%d, Backup=%d, AC Ports=%d, 12V Port=%d", d.pluggedInAc, d.energyBackup, d.acPorts, d.dc12vPort);
+    vTaskDelay(5);
 }
 
 static void logWave2Data(const Wave2Data& w) {
     LOG_STM_I(TAG, "--- Full Wave 2 Dump ---");
+    vTaskDelay(10);
     LOG_STM_I(TAG, "Mode: %d (Sub: %d), PwrMode: %d", w.mode, w.subMode, w.powerMode);
     LOG_STM_I(TAG, "Temps: Env=%.2f, Out=%.2f, Set=%d", w.envTemp, w.outLetTemp, w.setTemp);
     LOG_STM_I(TAG, "Batt: %d%% (Stat: %d), Rem: %dm/%dm", w.batSoc, w.batChgStatus, w.batChgRemainTime, w.batDsgRemainTime);
+    vTaskDelay(5);
     LOG_STM_I(TAG, "Power: Bat=%dW, MPPT=%dW, PSDR=%dW", w.batPwrWatt, w.mpptPwrWatt, w.psdrPwrWatt);
     LOG_STM_I(TAG, "Fan: %d, Water: %d, RGB: %d", w.fanValue, w.waterValue, w.rgbState);
     LOG_STM_I(TAG, "Err: %u, BMS Err: %d", w.errCode, w.bmsErr);
+    vTaskDelay(5);
 }
 
 static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     LOG_STM_I(TAG, "--- Full D3P Dump ---");
+    vTaskDelay(10);
     if (msg.has_errcode) LOG_STM_I(TAG, "errcode: %d", (int)msg.errcode);
     if (msg.has_sys_status) LOG_STM_I(TAG, "sys_status: %d", (int)msg.sys_status);
     if (msg.has_pow_in_sum_w) LOG_STM_I(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
@@ -116,6 +112,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_energy_backup_start_soc) LOG_STM_I(TAG, "energy_backup_start_soc: %d", (int)msg.energy_backup_start_soc);
     if (msg.has_pow_get_qcusb1) LOG_STM_I(TAG, "pow_get_qcusb1: %.2f", msg.pow_get_qcusb1);
     if (msg.has_pow_get_qcusb2) LOG_STM_I(TAG, "pow_get_qcusb2: %.2f", msg.pow_get_qcusb2);
+    vTaskDelay(5);
     if (msg.has_pow_get_typec1) LOG_STM_I(TAG, "pow_get_typec1: %.2f", msg.pow_get_typec1);
     if (msg.has_pow_get_typec2) LOG_STM_I(TAG, "pow_get_typec2: %.2f", msg.pow_get_typec2);
     if (msg.has_flow_info_qcusb1) LOG_STM_I(TAG, "flow_info_qcusb1: %d", (int)msg.flow_info_qcusb1);
@@ -126,6 +123,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_screen_off_time) LOG_STM_I(TAG, "screen_off_time: %d", (int)msg.screen_off_time);
     if (msg.has_ac_standby_time) LOG_STM_I(TAG, "ac_standby_time: %d", (int)msg.ac_standby_time);
     if (msg.has_dc_standby_time) LOG_STM_I(TAG, "dc_standby_time: %d", (int)msg.dc_standby_time);
+    vTaskDelay(5);
     if (msg.has_ac_always_on_flag) LOG_STM_I(TAG, "ac_always_on_flag: %d", (int)msg.ac_always_on_flag);
     if (msg.has_ac_always_on_mini_soc) LOG_STM_I(TAG, "ac_always_on_mini_soc: %d", (int)msg.ac_always_on_mini_soc);
     if (msg.has_xboost_en) LOG_STM_I(TAG, "xboost_en: %d", (int)msg.xboost_en);
@@ -137,6 +135,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_pow_get_pv_h) LOG_STM_I(TAG, "pow_get_pv_h: %.2f", msg.pow_get_pv_h);
     if (msg.has_pow_get_pv_l) LOG_STM_I(TAG, "pow_get_pv_l: %.2f", msg.pow_get_pv_l);
     if (msg.has_pow_get_12v) LOG_STM_I(TAG, "pow_get_12v: %.2f", msg.pow_get_12v);
+    vTaskDelay(5);
     if (msg.has_pow_get_24v) LOG_STM_I(TAG, "pow_get_24v: %.2f", msg.pow_get_24v);
     if (msg.has_plug_in_info_pv_h_flag) LOG_STM_I(TAG, "plug_in_info_pv_h_flag: %d", (int)msg.plug_in_info_pv_h_flag);
     if (msg.has_plug_in_info_pv_h_type) LOG_STM_I(TAG, "plug_in_info_pv_h_type: %d", (int)msg.plug_in_info_pv_h_type);
@@ -148,6 +147,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_flow_info_ac_hv_out) LOG_STM_I(TAG, "flow_info_ac_hv_out: %d", (int)msg.flow_info_ac_hv_out);
     if (msg.has_flow_info_ac_lv_out) LOG_STM_I(TAG, "flow_info_ac_lv_out: %d", (int)msg.flow_info_ac_lv_out);
     if (msg.has_flow_info_5p8_in) LOG_STM_I(TAG, "flow_info_5p8_in: %d", (int)msg.flow_info_5p8_in);
+    vTaskDelay(5);
     if (msg.has_flow_info_5p8_out) LOG_STM_I(TAG, "flow_info_5p8_out: %d", (int)msg.flow_info_5p8_out);
     if (msg.has_pow_get_llc) LOG_STM_I(TAG, "pow_get_llc: %.2f", msg.pow_get_llc);
     if (msg.has_pow_get_ac) LOG_STM_I(TAG, "pow_get_ac: %.2f", msg.pow_get_ac);
@@ -160,6 +160,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_ac_in_feq) LOG_STM_I(TAG, "plug_in_info_ac_in_feq: %d", (int)msg.plug_in_info_ac_in_feq);
     if (msg.has_plug_in_info_5p8_flag) LOG_STM_I(TAG, "plug_in_info_5p8_flag: %d", (int)msg.plug_in_info_5p8_flag);
     if (msg.has_plug_in_info_5p8_type) LOG_STM_I(TAG, "plug_in_info_5p8_type: %d", (int)msg.plug_in_info_5p8_type);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_5p8_detail) LOG_STM_I(TAG, "plug_in_info_5p8_detail: %d", (int)msg.plug_in_info_5p8_detail);
     if (msg.has_pow_get_pv2) LOG_STM_I(TAG, "pow_get_pv2: %.2f", msg.pow_get_pv2);
     if (msg.has_btn_ac_out_lv_switch) LOG_STM_I(TAG, "btn_ac_out_lv_switch: %d", (int)msg.btn_ac_out_lv_switch);
@@ -172,6 +173,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_flow_info_dcp2_out) LOG_STM_I(TAG, "flow_info_dcp2_out: %d", (int)msg.flow_info_dcp2_out);
     if (msg.has_plug_in_info_pv2_dc_amp_max) LOG_STM_I(TAG, "plug_in_info_pv2_dc_amp_max: %d", (int)msg.plug_in_info_pv2_dc_amp_max);
     if (msg.has_plug_in_info_pv2_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv2_chg_amp_max: %d", (int)msg.plug_in_info_pv2_chg_amp_max);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_pv2_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv2_chg_vol_max: %d", (int)msg.plug_in_info_pv2_chg_vol_max);
     if (msg.has_plug_in_info_dcp2_in_flag) LOG_STM_I(TAG, "plug_in_info_dcp2_in_flag: %d", (int)msg.plug_in_info_dcp2_in_flag);
     if (msg.has_plug_in_info_dcp2_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_dcp2_dsg_chg_type: %d", (int)msg.plug_in_info_dcp2_dsg_chg_type);
@@ -183,6 +185,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_cms_batt_temp) LOG_STM_I(TAG, "cms_batt_temp: %d", (int)msg.cms_batt_temp);
     if (msg.has_pow_get_dc_bidi) LOG_STM_I(TAG, "pow_get_dc_bidi: %.2f", msg.pow_get_dc_bidi);
     if (msg.has_plug_in_info_dc_bidi_flag) LOG_STM_I(TAG, "plug_in_info_dc_bidi_flag: %d", (int)msg.plug_in_info_dc_bidi_flag);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_acp_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_acp_chg_pow_max: %d", (int)msg.plug_in_info_acp_chg_pow_max);
     if (msg.has_plug_in_info_acp_chg_hal_pow_max) LOG_STM_I(TAG, "plug_in_info_acp_chg_hal_pow_max: %d", (int)msg.plug_in_info_acp_chg_hal_pow_max);
     if (msg.has_plug_in_info_acp_dsg_pow_max) LOG_STM_I(TAG, "plug_in_info_acp_dsg_pow_max: %d", (int)msg.plug_in_info_acp_dsg_pow_max);
@@ -195,6 +198,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_acp_err_code) LOG_STM_I(TAG, "plug_in_info_acp_err_code: %d", (int)msg.plug_in_info_acp_err_code);
     if (msg.has_plug_in_info_acp_firm_ver) LOG_STM_I(TAG, "plug_in_info_acp_firm_ver: %d", (int)msg.plug_in_info_acp_firm_ver);
     if (msg.has_generator_conn_dev_errcode) LOG_STM_I(TAG, "generator_conn_dev_errcode: %d", (int)msg.generator_conn_dev_errcode);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_ac_in_chg_mode) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_mode: %d", (int)msg.plug_in_info_ac_in_chg_mode);
     if (msg.has_generator_low_power_en) LOG_STM_I(TAG, "generator_low_power_en: %d", (int)msg.generator_low_power_en);
     if (msg.has_generator_low_power_threshold) LOG_STM_I(TAG, "generator_low_power_threshold: %d", (int)msg.generator_low_power_threshold);
@@ -208,6 +212,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_sp_charger_car_batt_vol) LOG_STM_I(TAG, "sp_charger_car_batt_vol: %.2f", msg.sp_charger_car_batt_vol);
     if (msg.has_bms_err_code) LOG_STM_I(TAG, "bms_err_code: %d", (int)msg.bms_err_code);
     if (msg.has_wireless_oil_self_start) LOG_STM_I(TAG, "wireless_oil_self_start: %d", (int)msg.wireless_oil_self_start);
+    vTaskDelay(5);
     if (msg.has_wireless_oil_on_soc) LOG_STM_I(TAG, "wireless_oil_on_soc: %d", (int)msg.wireless_oil_on_soc);
     if (msg.has_wireless_oil_off_soc) LOG_STM_I(TAG, "wireless_oil_off_soc: %d", (int)msg.wireless_oil_off_soc);
     if (msg.has_bypass_out_disable) LOG_STM_I(TAG, "bypass_out_disable: %d", (int)msg.bypass_out_disable);
@@ -221,6 +226,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_flow_info_4p8_2_out) LOG_STM_I(TAG, "flow_info_4p8_2_out: %d", (int)msg.flow_info_4p8_2_out);
     if (msg.has_pow_get_bms) LOG_STM_I(TAG, "pow_get_bms: %.2f", msg.pow_get_bms);
     if (msg.has_pow_get_4p8_1) LOG_STM_I(TAG, "pow_get_4p8_1: %.2f", msg.pow_get_4p8_1);
+    vTaskDelay(5);
     if (msg.has_pow_get_4p8_2) LOG_STM_I(TAG, "pow_get_4p8_2: %.2f", msg.pow_get_4p8_2);
     if (msg.has_plug_in_info_4p8_1_in_flag) LOG_STM_I(TAG, "plug_in_info_4p8_1_in_flag: %d", (int)msg.plug_in_info_4p8_1_in_flag);
     if (msg.has_plug_in_info_4p8_1_type) LOG_STM_I(TAG, "plug_in_info_4p8_1_type: %d", (int)msg.plug_in_info_4p8_1_type);
@@ -235,6 +241,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_fast_charge_switch) LOG_STM_I(TAG, "fast_charge_switch: %d", (int)msg.fast_charge_switch);
     if (msg.has_plug_in_info_4p8_1_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_4p8_1_dsg_chg_type: %d", (int)msg.plug_in_info_4p8_1_dsg_chg_type);
     if (msg.has_plug_in_info_4p8_1_firm_ver) LOG_STM_I(TAG, "plug_in_info_4p8_1_firm_ver: %d", (int)msg.plug_in_info_4p8_1_firm_ver);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_4p8_2_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_4p8_2_dsg_chg_type: %d", (int)msg.plug_in_info_4p8_2_dsg_chg_type);
     if (msg.has_plug_in_info_4p8_2_firm_ver) LOG_STM_I(TAG, "plug_in_info_4p8_2_firm_ver: %d", (int)msg.plug_in_info_4p8_2_firm_ver);
     if (msg.has_plug_in_info_5p8_dsg_chg) LOG_STM_I(TAG, "plug_in_info_5p8_dsg_chg: %d", (int)msg.plug_in_info_5p8_dsg_chg);
@@ -249,6 +256,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_4p8_2_charger_flag) LOG_STM_I(TAG, "plug_in_info_4p8_2_charger_flag: %d", (int)msg.plug_in_info_4p8_2_charger_flag);
     if (msg.has_plug_in_info_4p8_2_run_state) LOG_STM_I(TAG, "plug_in_info_4p8_2_run_state: %d", (int)msg.plug_in_info_4p8_2_run_state);
     if (msg.has_plug_in_info_ac_in_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_pow_max);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_5p8_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_5p8_chg_pow_max: %d", (int)msg.plug_in_info_5p8_chg_pow_max);
     if (msg.has_ac_out_freq) LOG_STM_I(TAG, "ac_out_freq: %d", (int)msg.ac_out_freq);
     if (msg.has_dev_sleep_state) LOG_STM_I(TAG, "dev_sleep_state: %d", (int)msg.dev_sleep_state);
@@ -262,6 +270,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_llc_hv_lv_flag) LOG_STM_I(TAG, "llc_hv_lv_flag: %d", (int)msg.llc_hv_lv_flag);
     if (msg.has_llc_inv_err_code) LOG_STM_I(TAG, "llc_inv_err_code: %d", (int)msg.llc_inv_err_code);
     if (msg.has_plug_in_info_pv_h_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv_h_chg_vol_max: %d", (int)msg.plug_in_info_pv_h_chg_vol_max);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_pv_l_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv_l_chg_vol_max: %d", (int)msg.plug_in_info_pv_l_chg_vol_max);
     if (msg.has_plug_in_info_pv_l_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_l_chg_amp_max: %d", (int)msg.plug_in_info_pv_l_chg_amp_max);
     if (msg.has_plug_in_info_pv_h_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_h_chg_amp_max: %d", (int)msg.plug_in_info_pv_h_chg_amp_max);
@@ -275,6 +284,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_bms_min_cell_temp) LOG_STM_I(TAG, "bms_min_cell_temp: %d", (int)msg.bms_min_cell_temp);
     if (msg.has_bms_max_cell_temp) LOG_STM_I(TAG, "bms_max_cell_temp: %d", (int)msg.bms_max_cell_temp);
     if (msg.has_bms_min_mos_temp) LOG_STM_I(TAG, "bms_min_mos_temp: %d", (int)msg.bms_min_mos_temp);
+    vTaskDelay(5);
     if (msg.has_bms_max_mos_temp) LOG_STM_I(TAG, "bms_max_mos_temp: %d", (int)msg.bms_max_mos_temp);
     if (msg.has_cms_batt_soc) LOG_STM_I(TAG, "cms_batt_soc: %.2f", msg.cms_batt_soc);
     if (msg.has_cms_batt_soh) LOG_STM_I(TAG, "cms_batt_soh: %.2f", msg.cms_batt_soh);
@@ -289,6 +299,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_bms_chg_dsg_state) LOG_STM_I(TAG, "bms_chg_dsg_state: %d", (int)msg.bms_chg_dsg_state);
     if (msg.has_cms_chg_dsg_state) LOG_STM_I(TAG, "cms_chg_dsg_state: %d", (int)msg.cms_chg_dsg_state);
     if (msg.has_ac_hv_always_on) LOG_STM_I(TAG, "ac_hv_always_on: %d", (int)msg.ac_hv_always_on);
+    vTaskDelay(5);
     if (msg.has_ac_lv_always_on) LOG_STM_I(TAG, "ac_lv_always_on: %d", (int)msg.ac_lv_always_on);
     if (msg.has_time_task_conflict_flag) LOG_STM_I(TAG, "time_task_conflict_flag: %d", (int)msg.time_task_conflict_flag);
     if (msg.has_time_task_change_cnt) LOG_STM_I(TAG, "time_task_change_cnt: %d", (int)msg.time_task_change_cnt);
@@ -303,6 +314,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_generator_run_time) LOG_STM_I(TAG, "generator_run_time: %d", (int)msg.generator_run_time);
     if (msg.has_generator_total_output) LOG_STM_I(TAG, "generator_total_output: %d", (int)msg.generator_total_output);
     if (msg.has_generator_abnormal_state) LOG_STM_I(TAG, "generator_abnormal_state: %d", (int)msg.generator_abnormal_state);
+    vTaskDelay(5);
     if (msg.has_fuels_oil_val) LOG_STM_I(TAG, "fuels_oil_val: %d", (int)msg.fuels_oil_val);
     if (msg.has_fuels_liquefied_gas_type) LOG_STM_I(TAG, "fuels_liquefied_gas_type: %d", (int)msg.fuels_liquefied_gas_type);
     if (msg.has_fuels_liquefied_gas_uint) LOG_STM_I(TAG, "fuels_liquefied_gas_uint: %d", (int)msg.fuels_liquefied_gas_uint);
@@ -317,6 +329,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_generator_sub_battery_temp) LOG_STM_I(TAG, "generator_sub_battery_temp: %d", (int)msg.generator_sub_battery_temp);
     if (msg.has_generator_sub_battery_soc) LOG_STM_I(TAG, "generator_sub_battery_soc: %d", (int)msg.generator_sub_battery_soc);
     if (msg.has_generator_sub_battery_state) LOG_STM_I(TAG, "generator_sub_battery_state: %d", (int)msg.generator_sub_battery_state);
+    vTaskDelay(5);
     if (msg.has_generator_maintence_state) LOG_STM_I(TAG, "generator_maintence_state: %d", (int)msg.generator_maintence_state);
     if (msg.has_generator_pcs_err_code) LOG_STM_I(TAG, "generator_pcs_err_code: %d", (int)msg.generator_pcs_err_code);
     if (msg.has_ups_alram) LOG_STM_I(TAG, "ups_alram: %d", (int)msg.ups_alram);
@@ -331,6 +344,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_pv_charger_flag) LOG_STM_I(TAG, "plug_in_info_pv_charger_flag: %d", (int)msg.plug_in_info_pv_charger_flag);
     if (msg.has_plug_in_info_pv_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_chg_amp_max: %d", (int)msg.plug_in_info_pv_chg_amp_max);
     if (msg.has_plug_in_info_pv_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv_chg_vol_max: %d", (int)msg.plug_in_info_pv_chg_vol_max);
+    vTaskDelay(5);
     if (msg.has_flow_info_ac_out) LOG_STM_I(TAG, "flow_info_ac_out: %d", (int)msg.flow_info_ac_out);
     if (msg.has_pow_get_ac_out) LOG_STM_I(TAG, "pow_get_ac_out: %.2f", msg.pow_get_ac_out);
     if (msg.has_flow_info_pv2) LOG_STM_I(TAG, "flow_info_pv2: %d", (int)msg.flow_info_pv2);
@@ -346,6 +360,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_dcp_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_dcp_dsg_chg_type: %d", (int)msg.plug_in_info_dcp_dsg_chg_type);
     if (msg.has_plug_in_info_dcp_firm_ver) LOG_STM_I(TAG, "plug_in_info_dcp_firm_ver: %d", (int)msg.plug_in_info_dcp_firm_ver);
     if (msg.has_plug_in_info_dcp_charger_flag) LOG_STM_I(TAG, "plug_in_info_dcp_charger_flag: %d", (int)msg.plug_in_info_dcp_charger_flag);
+    vTaskDelay(5);
     if (msg.has_plug_in_info_dcp_run_state) LOG_STM_I(TAG, "plug_in_info_dcp_run_state: %d", (int)msg.plug_in_info_dcp_run_state);
     if (msg.has_dcdc_err_code) LOG_STM_I(TAG, "dcdc_err_code: %d", (int)msg.dcdc_err_code);
     if (msg.has_plug_in_info_dcp_err_code) LOG_STM_I(TAG, "plug_in_info_dcp_err_code: %d", (int)msg.plug_in_info_dcp_err_code);
@@ -361,6 +376,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_ac_in_chg_hal_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_hal_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_hal_pow_max);
     if (msg.has_cms_batt_pow_out_max) LOG_STM_I(TAG, "cms_batt_pow_out_max: %d", (int)msg.cms_batt_pow_out_max);
     if (msg.has_cms_batt_pow_in_max) LOG_STM_I(TAG, "cms_batt_pow_in_max: %d", (int)msg.cms_batt_pow_in_max);
+    vTaskDelay(5);
     if (msg.has_cms_batt_full_energy) LOG_STM_I(TAG, "cms_batt_full_energy: %d", (int)msg.cms_batt_full_energy);
     if (msg.has_storm_pattern_enable) LOG_STM_I(TAG, "storm_pattern_enable: %d", (int)msg.storm_pattern_enable);
     if (msg.has_storm_pattern_open_flag) LOG_STM_I(TAG, "storm_pattern_open_flag: %d", (int)msg.storm_pattern_open_flag);
@@ -375,23 +391,19 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_installment_payment_start_utc_time) LOG_STM_I(TAG, "installment_payment_start_utc_time: %d", (int)msg.installment_payment_start_utc_time);
     if (msg.has_installment_payment_overdue_limit_utc_time) LOG_STM_I(TAG, "installment_payment_overdue_limit_utc_time: %d", (int)msg.installment_payment_overdue_limit_utc_time);
     if (msg.has_sp_charger_chg_open) LOG_STM_I(TAG, "sp_charger_chg_open: %d", (int)msg.sp_charger_chg_open);
+    vTaskDelay(5);
     if (msg.has_sp_charger_chg_pow_limit) LOG_STM_I(TAG, "sp_charger_chg_pow_limit: %.2f", msg.sp_charger_chg_pow_limit);
     if (msg.has_module_bluetooth_snr) LOG_STM_I(TAG, "module_bluetooth_snr: %.2f", msg.module_bluetooth_snr);
     if (msg.has_module_bluetooth_rssi) LOG_STM_I(TAG, "module_bluetooth_rssi: %.2f", msg.module_bluetooth_rssi);
     if (msg.has_module_wifi_snr) LOG_STM_I(TAG, "module_wifi_snr: %.2f", msg.module_wifi_snr);
     if (msg.has_module_wifi_rssi) LOG_STM_I(TAG, "module_wifi_rssi: %.2f", msg.module_wifi_rssi);
     if (msg.has_sp_charger_chg_pow_max) LOG_STM_I(TAG, "sp_charger_chg_pow_max: %.2f", msg.sp_charger_chg_pow_max);
-}
-
-static void logAlternatorChargerData(const AlternatorChargerData& d) {
-    LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---");
-    LOG_STM_I(TAG, "Mode: %d, Open: %d", d.chargerMode, d.chargerOpen);
-    LOG_STM_I(TAG, "Car Batt: %.1fV, Limit: %dW", d.carBatteryVoltage, d.powerLimit);
-    LOG_STM_I(TAG, "DC Power: %.1fW", d.dcPower);
+    vTaskDelay(5);
 }
 
 static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpload& msg) {
     LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---");
+    vTaskDelay(10);
     if (msg.has_errcode) LOG_STM_I(TAG, "errcode: %d", (int)msg.errcode);
     if (msg.has_pow_in_sum_w) LOG_STM_I(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
     if (msg.has_pow_out_sum_w) LOG_STM_I(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
@@ -404,6 +416,7 @@ static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpl
     if (msg.has_sp_charger_car_batt_vol) LOG_STM_I(TAG, "sp_charger_car_batt_vol: %.2f", msg.sp_charger_car_batt_vol);
     if (msg.has_cms_batt_soc) LOG_STM_I(TAG, "cms_batt_soc: %.2f", msg.cms_batt_soc);
     if (msg.has_cms_dsg_rem_time) LOG_STM_I(TAG, "cms_dsg_rem_time: %d", (int)msg.cms_dsg_rem_time);
+    vTaskDelay(5);
     if (msg.has_cms_chg_rem_time) LOG_STM_I(TAG, "cms_chg_rem_time: %d", (int)msg.cms_chg_rem_time);
     if (msg.has_cms_chg_dsg_state) LOG_STM_I(TAG, "cms_chg_dsg_state: %d", (int)msg.cms_chg_dsg_state);
     if (msg.has_pow_get_dcp) LOG_STM_I(TAG, "pow_get_dcp: %.2f", msg.pow_get_dcp);
@@ -417,6 +430,7 @@ static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpl
     if (msg.has_sp_charger_chg_open) LOG_STM_I(TAG, "sp_charger_chg_open: %d", (int)msg.sp_charger_chg_open);
     if (msg.has_sp_charger_chg_pow_limit) LOG_STM_I(TAG, "sp_charger_chg_pow_limit: %.2f", msg.sp_charger_chg_pow_limit);
     if (msg.has_module_bluetooth_snr) LOG_STM_I(TAG, "module_bluetooth_snr: %.2f", msg.module_bluetooth_snr);
+    vTaskDelay(5);
     if (msg.has_module_bluetooth_rssi) LOG_STM_I(TAG, "module_bluetooth_rssi: %.2f", msg.module_bluetooth_rssi);
     if (msg.has_module_wifi_snr) LOG_STM_I(TAG, "module_wifi_snr: %.2f", msg.module_wifi_snr);
     if (msg.has_module_wifi_rssi) LOG_STM_I(TAG, "module_wifi_rssi: %.2f", msg.module_wifi_rssi);
@@ -430,6 +444,7 @@ static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpl
     if (msg.has_sp_charger_car_batt_urgent_chg_state) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_state: %d", (int)msg.sp_charger_car_batt_urgent_chg_state);
     if (msg.has_sp_charger_dev_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_max: %.2f", msg.sp_charger_dev_batt_chg_amp_max);
     if (msg.has_sp_charger_car_batt_urgent_chg_switch) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_switch: %d", (int)msg.sp_charger_car_batt_urgent_chg_switch);
+    vTaskDelay(5);
 }
 
 namespace EcoflowDataParser {
@@ -439,7 +454,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
     switch (type) {
         case DeviceType::DELTA_3: {
             if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
-                pd335_sys_DisplayPropertyUpload d3_msg = pd335_sys_DisplayPropertyUpload_init_zero;
+                static pd335_sys_DisplayPropertyUpload d3_msg; // Static to accumulate
                 pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
                 if (pb_decode(&stream, pd335_sys_DisplayPropertyUpload_fields, &d3_msg)) {
@@ -507,7 +522,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
         case DeviceType::DELTA_PRO_3: {
             if (pkt.getSrc() == 0x02 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
-                mr521_DisplayPropertyUpload mr521_msg = mr521_DisplayPropertyUpload_init_zero;
+                static mr521_DisplayPropertyUpload mr521_msg;
                 pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
                 if (pb_decode(&stream, mr521_DisplayPropertyUpload_fields, &mr521_msg)) {
@@ -578,7 +593,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
         case DeviceType::ALTERNATOR_CHARGER: {
             if (pkt.getSrc() == 0x14 && pkt.getCmdSet() == 0xFE && (pkt.getCmdId() == 0x11 || pkt.getCmdId() == 0x15)) {
-                dc009_apl_comm_DisplayPropertyUpload msg = dc009_apl_comm_DisplayPropertyUpload_init_zero;
+                static dc009_apl_comm_DisplayPropertyUpload msg;
                 pb_istream_t stream = pb_istream_from_buffer(pkt.getPayload().data(), pkt.getPayload().size());
 
                 if (pb_decode(&stream, dc009_apl_comm_DisplayPropertyUpload_fields, &msg)) {

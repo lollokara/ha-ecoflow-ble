@@ -306,7 +306,7 @@ void LogManager_HandleListReq(void) {
                 if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                     int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                     UART_SendRaw(buffer, len);
-                    vTaskDelay(20); // Throttle - Mutex NOT held here
+                    vTaskDelay(5); // Throttle - Mutex NOT held here
                     idx++;
                 }
             }
