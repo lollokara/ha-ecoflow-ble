@@ -323,8 +323,7 @@ void LogManager_HandleListReq(void) {
                     int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                     UART_SendRaw(buffer, len);
                     idx++;
-                    // Throttle: Delay every 10 packets to improve throughput while yielding occasionally
-                    if (idx % 10 == 0) vTaskDelay(5);
+                    vTaskDelay(2); // Throttle every packet for reliability
                 } else if (res != FR_OK || fno.fname[0] == 0) {
                     // End of dir reached, but idx < count (Under-run)
                     // Fill with dummy packets
@@ -332,7 +331,7 @@ void LogManager_HandleListReq(void) {
                         int len = pack_log_list_resp_message(buffer, count, idx, 0, "");
                         UART_SendRaw(buffer, len);
                         idx++;
-                        if (idx % 10 == 0) vTaskDelay(5);
+                        vTaskDelay(2);
                     }
                     break;
                 }

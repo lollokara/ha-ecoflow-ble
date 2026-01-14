@@ -25,7 +25,8 @@ static void LogToStm(esp_log_level_t level, const char* file, const char* func, 
     if (filename2) filename = filename2 + 1;
 
     // Local Output
-    ESP_LOG_LEVEL(level, "ESP32", "[%s] %s: %s", filename, func, loc_buf);
+    // Disable local logging to prevent GPIO 1 (TX0) interference with Light Sensor (ADC1 CH0)
+    // ESP_LOG_LEVEL(level, "ESP32", "[%s] %s: %s", filename, func, loc_buf);
 
     // 2. STM32 Log
     // Format: [Filename] Function() Message

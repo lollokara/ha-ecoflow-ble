@@ -85,6 +85,7 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
 }
 
 void Stm32Serial::begin() {
+    Serial1.setRxBufferSize(4096); // Increase buffer for Log List bursts
     Serial1.begin(921600, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
