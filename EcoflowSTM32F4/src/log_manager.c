@@ -15,6 +15,12 @@
 extern char SDPath[4];
 extern FATFS SDFatFs;
 
+// Forward Declarations
+void LogManager_Write(uint8_t level, const char* tag, const char* message);
+static void LogManager_Write_Internal(uint8_t level, const char* tag, const char* message);
+void LogManager_WriteSessionHeader(void);
+void LogManager_ForceRotate(void);
+
 static FIL LogFile;
 static bool LogOpen = false;
 static bool TriggerSessionHeader = false;
