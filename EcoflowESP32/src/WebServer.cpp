@@ -23,14 +23,16 @@ public:
     }
     bool _sourceValid() const { return true; }
     virtual size_t _fillBuffer(uint8_t *data, size_t len){
-        if (Stm32Serial::getInstance().isLogDownloadComplete()) {
-            return 0;
-        }
-        size_t read = Stm32Serial::getInstance().readLogChunk(data, len);
-        if (read == 0) {
-            // Wait a bit for data to arrive from UART
-            vTaskDelay(10);
+        size_t read = 0;
+        uint32_t start = millis();
+        // Wait for data or completion, with timeout to prevent blocking Async task too long
+        while (read == 0 && !Stm32Serial::getInstance().isLogDownloadComplete()) {
             read = Stm32Serial::getInstance().readLogChunk(data, len);
+            if (read == 0) {
+                // If timeout reached, return 0 (EOF)
+                if (millis() - start > 1500) break;
+                vTaskDelay(10);
+            }
         }
         return read;
     }

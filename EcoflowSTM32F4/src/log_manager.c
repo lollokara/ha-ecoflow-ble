@@ -358,6 +358,10 @@ void LogManager_HandleDownloadReq(const char* filename) {
         DownloadSize = f_size(&DownloadFile);
     } else {
         Downloading = false;
+        // Send EOF to signal failure immediately
+        uint8_t packet[32];
+        int len = pack_log_data_chunk_message(packet, 0, NULL, 0);
+        UART_SendRaw(packet, len);
     }
     xSemaphoreGive(LogMutex);
 }
