@@ -10,9 +10,17 @@
 
 static const char* TAG = "EcoflowDataParser";
 static uint32_t dumpTimestamp = 0;
+static bool dumpPendingDelta3 = false;
+static bool dumpPendingWave2 = false;
+static bool dumpPendingD3P = false;
+static bool dumpPendingAlt = false;
 
 void EcoflowDataParser::triggerDebugDump() {
     dumpTimestamp = millis();
+    dumpPendingDelta3 = true;
+    dumpPendingWave2 = true;
+    dumpPendingD3P = true;
+    dumpPendingAlt = true;
 }
 
 // --- Helper Functions ---
@@ -67,7 +75,7 @@ static void logDelta3Data(const Delta3Data& d) {
 }
 
 static void logWave2Data(const Wave2Data& w) {
-    LOG_STM_I(TAG, "=== Wave 2 Data ===");
+    LOG_STM_I(TAG, "--- Full Wave 2 Dump ---");
     LOG_STM_I(TAG, "Mode: %d (Sub: %d), PwrMode: %d", w.mode, w.subMode, w.powerMode);
     LOG_STM_I(TAG, "Temps: Env=%.2f, Out=%.2f, Set=%d", w.envTemp, w.outLetTemp, w.setTemp);
     LOG_STM_I(TAG, "Batt: %d%% (Stat: %d), Rem: %dm/%dm", w.batSoc, w.batChgStatus, w.batChgRemainTime, w.batDsgRemainTime);
@@ -77,7 +85,7 @@ static void logWave2Data(const Wave2Data& w) {
 }
 
 static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
-    LOG_STM_I(TAG, "--- Full D3P Dump ---");
+    LOG_STM_I(TAG, "--- Full D3P Dump ---"); // Debug Dump
     if (msg.has_errcode) LOG_STM_I(TAG, "errcode: %d", (int)msg.errcode);
     if (msg.has_sys_status) LOG_STM_I(TAG, "sys_status: %d", (int)msg.sys_status);
     if (msg.has_pow_in_sum_w) LOG_STM_I(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
@@ -363,7 +371,7 @@ static void logAlternatorChargerData(const AlternatorChargerData& d) {
 }
 
 static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpload& msg) {
-    LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---");
+    LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---"); // Debug Dump
     if (msg.has_errcode) LOG_STM_I(TAG, "errcode: %d", (int)msg.errcode);
     if (msg.has_pow_in_sum_w) LOG_STM_I(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
     if (msg.has_pow_out_sum_w) LOG_STM_I(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
@@ -467,8 +475,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     d3.dcOn = d3.dc12vPort;
                     if (d3_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(d3_msg.flow_info_qcusb1);
 
-                    // logDelta3Data(d3); // Reduce spam
-                    if (millis() - dumpTimestamp < 10000) logDelta3Data(d3);
+                    if (dumpPendingDelta3 && (millis() - dumpTimestamp < 10000)) {
+                        logDelta3Data(d3);
+                        dumpPendingDelta3 = false;
+                    }
                 }
             }
             break;
@@ -535,7 +545,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
                      if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
 
-                     if (millis() - dumpTimestamp < 10000) logFullDeltaPro3Data(mr521_msg);
+                     if (dumpPendingD3P && (millis() - dumpTimestamp < 10000)) {
+                         logFullDeltaPro3Data(mr521_msg);
+                         dumpPendingD3P = false;
+                     }
                 }
             }
             break;
@@ -567,8 +580,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (msg.has_sp_charger_car_batt_chg_amp_max) ac.reverseChargingCurrentMax = msg.sp_charger_car_batt_chg_amp_max;
                     if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
 
-                    // logAlternatorChargerData(ac);
-                    if (millis() - dumpTimestamp < 10000) logFullAlternatorChargerData(msg);
+                    if (dumpPendingAlt && (millis() - dumpTimestamp < 10000)) {
+                        logFullAlternatorChargerData(msg);
+                        dumpPendingAlt = false;
+                    }
                 }
             }
             break;
@@ -622,7 +637,10 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
                     else w2.remainingTime = 0;
 
-                    if (millis() - dumpTimestamp < 10000) logWave2Data(w2);
+                    if (dumpPendingWave2 && (millis() - dumpTimestamp < 10000)) {
+                        logWave2Data(w2);
+                        dumpPendingWave2 = false;
+                    }
                 }
             }
             break;

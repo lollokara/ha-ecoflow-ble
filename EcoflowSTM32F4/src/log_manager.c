@@ -63,7 +63,21 @@ void LogManager_Init(void) {
             LogManager_ForceRotate();
         }
 
-        LogManager_Write(3, "SYS", "Log System Initialized");
+        LOG_STM_INFO("SYS", "Log System Initialized");
+
+        // Section 1: Firmware Versions
+        LOG_STM_INFO("SYS", "--- Section 1: Firmware Versions ---");
+        LOG_STM_INFO("SYS", "STM32 F4: v1.0.0");
+
+        // Request Section 2 (Config) & 3 (Debug Dump) from ESP32
+        uint8_t buf[32];
+        int len;
+
+        len = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
+        UART_SendRaw(buf, len);
+
+        len = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
+        UART_SendRaw(buf, len);
     }
 }
 
@@ -184,6 +198,7 @@ void LogManager_HandleListReq(void) {
     uint8_t buffer[256];
     uint8_t count = 0;
 
+    // Count first
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
@@ -193,22 +208,23 @@ void LogManager_HandleListReq(void) {
         f_closedir(&dir);
     }
 
+    if (count == 0) {
+         int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
+         UART_SendRaw(buffer, len);
+         return;
+    }
+
     uint8_t idx = 0;
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                  int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                  UART_SendRaw(buffer, len);
-                 vTaskDelay(20); // Throttle
+                 vTaskDelay(10); // Throttle
                  idx++;
              }
         }
         f_closedir(&dir);
-    }
-
-    if (count == 0) {
-         int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
-         UART_SendRaw(buffer, len);
     }
 }
 

@@ -15,6 +15,25 @@ void LogManager_Process(void);
 void LogManager_Write(uint8_t level, const char* tag, const char* message);
 void LogManager_ForceRotate(void);
 
+// Logging Macros
+#define LOG_STM_INFO(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "[%s] %s() " fmt, __FILE__, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(3, tag, _buf); \
+} while(0)
+
+#define LOG_STM_WARN(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "[%s] %s() " fmt, __FILE__, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(1, tag, _buf); \
+} while(0)
+
+#define LOG_STM_ERROR(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "[%s] %s() " fmt, __FILE__, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(0, tag, _buf); \
+} while(0)
+
 // UART Command Handlers
 void LogManager_HandleListReq(void);
 void LogManager_HandleDownloadReq(const char* filename);
