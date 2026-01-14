@@ -336,6 +336,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                 }
             } else {
                 _downloadComplete = true;
+                ESP_LOGI(TAG, "Log Download Complete (EOF Received)");
             }
             xSemaphoreGive(_downloadMutex);
         }
