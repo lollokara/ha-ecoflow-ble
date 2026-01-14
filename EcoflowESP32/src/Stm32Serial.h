@@ -73,7 +73,7 @@ public:
 
     // Log Management
     void requestLogList();
-    const std::vector<LogEntryProto>& getLogList() const { return _logList; }
+    std::vector<LogEntryProto> getLogList();
 
     void requestLogDownload(const char* filename);
     void requestDeleteLog(const char* filename);
@@ -98,6 +98,7 @@ private:
 
     bool _otaRunning = false;
     SemaphoreHandle_t _txMutex = NULL;
+    SemaphoreHandle_t _logListMutex = NULL;
 
     std::vector<LogEntryProto> _logList;
     LogChunkCallback _logChunkCb;

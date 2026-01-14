@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
+#include "uart_task.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -50,8 +51,10 @@ static void RotateLogIfNeeded(void) {
     f_rename(LOG_FILENAME, newName);
 
     // Re-open new file
-    f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_OPEN_APPEND | FA_CREATE_ALWAYS);
-    WriteLogHeader();
+    if (f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        WriteLogHeader();
+        UART_SendLogStatusReq();
+    }
 }
 
 void LogManager_SetEnabled(bool enabled) {
@@ -62,9 +65,12 @@ void LogManager_SetEnabled(bool enabled) {
         }
 
         if (is_mounted) {
-            if (f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_OPEN_APPEND | FA_CREATE_ALWAYS) == FR_OK) {
+            if (f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_OPEN_APPEND) == FR_OK) {
                 logging_enabled = true;
-                if (f_size(&logFile) == 0) WriteLogHeader();
+                if (f_size(&logFile) == 0) {
+                    WriteLogHeader();
+                    UART_SendLogStatusReq();
+                }
                 RotateLogIfNeeded();
             }
         }
@@ -110,10 +116,18 @@ bool LogManager_FormatSD(void) {
     uint8_t work[512]; // Working buffer for mkfs
     FRESULT res = f_mkfs("", 0, work, sizeof(work));
 
-    if (res == FR_OK && was_enabled) {
-        // Re-enable
-         f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_OPEN_APPEND | FA_CREATE_ALWAYS);
-         logging_enabled = true;
+    if (res == FR_OK) {
+        f_mount(&fs, "", 1); // Remount
+        is_mounted = true;
+        if (was_enabled) {
+             f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_OPEN_APPEND | FA_CREATE_ALWAYS);
+             logging_enabled = true;
+             // Don't trigger dump here, user can toggle if needed, or assume clean start
+             if (f_size(&logFile) == 0) {
+                 WriteLogHeader();
+                 UART_SendLogStatusReq();
+             }
+        }
     }
 
     xSemaphoreGive(logMutex);
@@ -125,6 +139,7 @@ void LogManager_DeleteAllLogs(void) {
 
     DIR dir;
     FILINFO fno;
+    bool was_enabled = false;
 
     if (f_opendir(&dir, "") == FR_OK) {
         while (1) {
@@ -134,6 +149,7 @@ void LogManager_DeleteAllLogs(void) {
                 if (logging_enabled && strcmp(fno.fname, LOG_FILENAME) == 0) {
                      f_close(&logFile);
                      logging_enabled = false;
+                     was_enabled = true;
                 }
                 f_unlink(fno.fname);
             }
@@ -141,10 +157,12 @@ void LogManager_DeleteAllLogs(void) {
         f_closedir(&dir);
     }
 
-    // Restart log if it was enabled
-    if (!logging_enabled) {
-        // User might want to keep it disabled or restart.
-        // Function says "Delete all logs". Usually implies resetting state.
+    if (was_enabled) {
+         if (f_open(&logFile, LOG_FILENAME, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+             logging_enabled = true;
+             WriteLogHeader();
+             UART_SendLogStatusReq();
+         }
     }
 
     xSemaphoreGive(logMutex);

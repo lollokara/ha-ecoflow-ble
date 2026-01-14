@@ -80,6 +80,11 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
     return ~crc;
 }
 
+Stm32Serial::Stm32Serial() {
+    _txMutex = xSemaphoreCreateMutex();
+    _logListMutex = xSemaphoreCreateMutex();
+}
+
 /**
  * @brief Initializes the UART interface.
  *
@@ -337,6 +342,13 @@ void Stm32Serial::requestLogList() {
     uint8_t buf[8];
     int len = pack_log_list_req_message(buf);
     sendData(buf, len);
+}
+
+std::vector<LogEntryProto> Stm32Serial::getLogList() {
+    xSemaphoreTake(_logListMutex, portMAX_DELAY);
+    std::vector<LogEntryProto> list = _logList;
+    xSemaphoreGive(_logListMutex);
+    return list;
 }
 
 void Stm32Serial::requestLogDownload(const char* filename) {

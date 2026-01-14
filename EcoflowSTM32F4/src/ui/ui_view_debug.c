@@ -59,9 +59,6 @@ static void event_toggle_logging(lv_event_t * e) {
     lv_obj_t * sw = lv_event_get_target(e);
     bool enabled = lv_obj_has_state(sw, LV_STATE_CHECKED);
     LogManager_SetEnabled(enabled);
-    if (enabled) {
-        UART_SendLogStatusReq();
-    }
 }
 
 static void event_open_log_mgr(lv_event_t * e) {
