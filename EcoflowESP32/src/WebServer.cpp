@@ -11,6 +11,7 @@ AsyncWebServer WebServer::server(80);
 
 AsyncWebServerRequest* WebServer::_pendingLogRequest = nullptr;
 uint32_t WebServer::_pendingLogRequestTime = 0;
+SemaphoreHandle_t WebServer::_requestMutex = NULL;
 
 // Custom Response Class for SD Log Streaming
 class LogResponse : public AsyncAbstractResponse {
@@ -19,7 +20,8 @@ public:
     LogResponse(String name) : _name(name) {
         _code = 200;
         _contentType = "application/octet-stream";
-        // Stm32Serial download already started by delayed handler
+        // Stm32Serial download already started by delayed handler.
+        // DO NOT call startLogDownload here as it would reset the buffer.
     }
     ~LogResponse() {
         Stm32Serial::getInstance().abortLogDownload();
@@ -32,10 +34,8 @@ public:
         while (read == 0 && !Stm32Serial::getInstance().isLogDownloadComplete()) {
             read = Stm32Serial::getInstance().readLogChunk(data, len);
             if (read == 0) {
-                // Return immediately if no data (assume stream will continue, or let it close if we want strictness)
-                // With delayed start, we should have data buffered.
-                // If we run dry, we can wait a TINY bit (e.g. 10ms) but NOT 5 seconds.
-                if (millis() - start > 100) break;
+                // If we run dry, wait briefly. 500ms is safe for AsyncTCP (rx timeout is usually >3s).
+                if (millis() - start > 500) break;
                 vTaskDelay(5);
             }
         }
@@ -85,6 +85,8 @@ static float get_esp_temp() {
 }
 
 void WebServer::begin() {
+    if (!_requestMutex) _requestMutex = xSemaphoreCreateMutex();
+
     Preferences prefs;
     prefs.begin("ecoflow", true);
     String ssid = prefs.getString("wifi_ssid", "");
@@ -105,25 +107,28 @@ void WebServer::begin() {
 }
 
 void WebServer::update() {
-    if (_pendingLogRequest) {
-        // Check if download is ready (buffer > 8KB or Complete)
-        // 8KB gives ~100ms head start at 90KB/s UART
-        size_t buffered = Stm32Serial::getInstance().getDownloadBufferSize();
-        bool complete = Stm32Serial::getInstance().isLogDownloadComplete();
+    if (xSemaphoreTake(_requestMutex, 0) == pdTRUE) {
+        if (_pendingLogRequest) {
+            // Check if download is ready (buffer > 8KB or Complete)
+            // 8KB gives ~100ms head start at 90KB/s UART
+            size_t buffered = Stm32Serial::getInstance().getDownloadBufferSize();
+            bool complete = Stm32Serial::getInstance().isLogDownloadComplete();
 
-        if (complete || buffered > 8192) {
-            ESP_LOGI(TAG, "Starting Delayed Response. Buffered: %d, Complete: %d", buffered, complete);
-            String name = _pendingLogRequest->getParam("name")->value(); // Should be safe
-            AsyncWebServerResponse *response = new LogResponse(name);
-            response->addHeader("Content-Disposition", "attachment; filename=" + name);
-            _pendingLogRequest->send(response);
-            _pendingLogRequest = nullptr;
-        } else if (millis() - _pendingLogRequestTime > 10000) {
-             ESP_LOGW(TAG, "Log Download Timeout (Startup)");
-             _pendingLogRequest->send(504, "text/plain", "Timeout waiting for log stream");
-             _pendingLogRequest = nullptr;
-             Stm32Serial::getInstance().abortLogDownload();
+            if (complete || buffered > 8192) {
+                ESP_LOGI(TAG, "Starting Delayed Response. Buffered: %d, Complete: %d", buffered, complete);
+                String name = _pendingLogRequest->getParam("name")->value(); // Should be safe
+                AsyncWebServerResponse *response = new LogResponse(name);
+                response->addHeader("Content-Disposition", "attachment; filename=" + name);
+                _pendingLogRequest->send(response);
+                _pendingLogRequest = nullptr;
+            } else if (millis() - _pendingLogRequestTime > 10000) {
+                 ESP_LOGW(TAG, "Log Download Timeout (Startup)");
+                 _pendingLogRequest->send(504, "text/plain", "Timeout waiting for log stream");
+                 _pendingLogRequest = nullptr;
+                 Stm32Serial::getInstance().abortLogDownload();
+            }
         }
+        xSemaphoreGive(_requestMutex);
     }
 }
 
@@ -166,7 +171,9 @@ void WebServer::setupRoutes() {
             return;
         }
 
+        xSemaphoreTake(_requestMutex, portMAX_DELAY);
         if (_pendingLogRequest) {
+            xSemaphoreGive(_requestMutex);
             request->send(503, "text/plain", "Download in progress");
             return;
         }
@@ -177,12 +184,16 @@ void WebServer::setupRoutes() {
         Stm32Serial::getInstance().startLogDownload(name);
         _pendingLogRequest = request;
         _pendingLogRequestTime = millis();
+        xSemaphoreGive(_requestMutex);
 
         request->onDisconnect([](){
-            ESP_LOGW(TAG, "Client Disconnected during wait");
-            if (_pendingLogRequest) {
-                Stm32Serial::getInstance().abortLogDownload();
-                _pendingLogRequest = nullptr;
+            if (xSemaphoreTake(_requestMutex, 100) == pdTRUE) {
+                if (_pendingLogRequest) {
+                    ESP_LOGW(TAG, "Client Disconnected during wait");
+                    Stm32Serial::getInstance().abortLogDownload();
+                    _pendingLogRequest = nullptr;
+                }
+                xSemaphoreGive(_requestMutex);
             }
         });
     });

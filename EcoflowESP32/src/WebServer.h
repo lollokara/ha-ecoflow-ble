@@ -19,6 +19,7 @@ private:
     static AsyncWebServer server;
     static AsyncWebServerRequest* _pendingLogRequest;
     static uint32_t _pendingLogRequestTime;
+    static SemaphoreHandle_t _requestMutex;
 
     static void setupRoutes();
     static void handleStatus(AsyncWebServerRequest *request);
