@@ -97,12 +97,9 @@ void LogManager_Init(void) {
             xSemaphoreTake(LogMutex, portMAX_DELAY);
         } else {
             // New session in existing file
-            // Write() takes lock. Deadlock!
-            // We need to write directly here or unlock.
-            xSemaphoreGive(LogMutex);
-            LogManager_Write(3, "SYS", "Log System Initialized");
+            // We hold lock, use Internal
+            LogManager_Write_Internal(3, "SYS", "Log System Initialized");
             TriggerSessionHeader = true;
-            return; // Lock released
         }
     }
     xSemaphoreGive(LogMutex);
@@ -112,11 +109,12 @@ void LogManager_WriteSessionHeader(void) {
     if (!LogOpen) return;
 
     // Header Section 1
-    LogManager_Write(0, "SYS", "--- Firmware Versions ---");
-    LogManager_Write(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
-    LogManager_Write(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
+    LogManager_Write_Internal(0, "SYS", "--- Firmware Versions ---");
+    LogManager_Write_Internal(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
+    LogManager_Write_Internal(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
 
     // Request Section 2 & 3
+    // UART_SendRaw uses its own mutex, safe to call while holding LogMutex or not
     uint8_t buf[32];
     int len;
 
@@ -128,9 +126,7 @@ void LogManager_WriteSessionHeader(void) {
 }
 
 void LogManager_ForceRotate(void) {
-    if (!LogMutex) return;
-    xSemaphoreTake(LogMutex, portMAX_DELAY);
-
+    // Assumes LogMutex is held by caller (Write_Internal)
     if (LogOpen) {
         f_close(&LogFile);
         LogOpen = false;
@@ -155,38 +151,25 @@ void LogManager_ForceRotate(void) {
         LogOpen = true;
         LogManager_WriteSessionHeader();
     }
-    xSemaphoreGive(LogMutex);
 }
 
-void LogManager_Write(uint8_t level, const char* tag, const char* message) {
-    if (!LogMutex) return;
+// Internal Write function - Assumes LogMutex is held by caller
+static void LogManager_Write_Internal(uint8_t level, const char* tag, const char* message) {
+    if (!LogOpen) return;
 
-    // We can't block indefinitely in a write from unknown context (e.g. ISR? No, FS is not ISR safe).
-    // Assuming task context.
-    if (xSemaphoreTake(LogMutex, 100) != pdTRUE) {
-        return;
-    }
-
-    if (!LogOpen) {
-        // printf("LogManager_Write: Dropped (Not Open) [%s] %s\n", tag, message);
-        xSemaphoreGive(LogMutex);
-        return;
-    }
-
-    // Check size
+    // Check size and rotate if needed
+    // Recursion risk if ForceRotate calls WriteSessionHeader calls Write_Internal
+    // ForceRotate logic:
+    // Close -> Rename -> Open -> WriteSessionHeader -> Write_Internal
+    // This is safe as long as ForceRotate does NOT call ForceRotate.
+    // However, if new file is somehow > MAX immediately (impossible), we loop.
+    // Standard check:
     if (f_size(&LogFile) > MAX_LOG_SIZE) {
-        xSemaphoreGive(LogMutex);
-        LogManager_ForceRotate(); // Re-takes mutex
-        xSemaphoreTake(LogMutex, portMAX_DELAY); // Re-take to continue writing?
-        // If rotated, new file is open.
+        LogManager_ForceRotate();
     }
 
-    if (!LogOpen) {
-         xSemaphoreGive(LogMutex);
-         return;
-    }
+    if (!LogOpen) return;
 
-    // Format: [Timestamp] [Tag] Message\n
     char line[512];
     uint32_t time;
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -195,7 +178,6 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
         time = HAL_GetTick();
     }
 
-    // [millis] [Tag] Message
     int line_len = snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
 
     FRESULT res;
@@ -203,21 +185,27 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
         UINT bw;
         res = f_write(&LogFile, line, (UINT)line_len, &bw);
         if (res != FR_OK || bw != (UINT)line_len) {
-            printf("LogManager_Write: f_write fail res=%d bw=%d\n", res, bw);
+            // Error handling
         }
     }
+    f_sync(&LogFile);
+}
 
-    res = f_sync(&LogFile);
-    if (res != FR_OK) {
-        printf("LogManager_Write: f_sync fail res=%d\n", res);
+void LogManager_Write(uint8_t level, const char* tag, const char* message) {
+    if (!LogMutex) return;
+    if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+        LogManager_Write_Internal(level, tag, message);
+        xSemaphoreGive(LogMutex);
     }
-    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_Process(void) {
     if (TriggerSessionHeader) {
-        LogManager_WriteSessionHeader();
-        TriggerSessionHeader = false;
+        if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+            LogManager_WriteSessionHeader();
+            TriggerSessionHeader = false;
+            xSemaphoreGive(LogMutex);
+        }
     }
 
     if (Downloading) {
@@ -265,6 +253,7 @@ void LogManager_HandleListReq(void) {
     // Use global SDPath or fallback to "0:/" if empty (handled by ff usually)
     const char* path = SDPath[0] ? SDPath : "0:/";
 
+    // Count files - Must hold mutex for opendir/readdir sequence
     if (f_opendir(&dir, path) == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
@@ -274,25 +263,54 @@ void LogManager_HandleListReq(void) {
         f_closedir(&dir);
     }
 
+    // Release mutex before sending initial response (could block) or starting long loop
+    xSemaphoreGive(LogMutex);
+
     if (count == 0) {
          int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
          UART_SendRaw(buffer, len);
          return;
     }
 
-    uint8_t idx = 0;
-    if (f_opendir(&dir, path) == FR_OK) {
-        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
-             if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
-                 int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
-                 UART_SendRaw(buffer, len);
-                 vTaskDelay(20); // Throttle
-                 idx++;
-             }
+    // Stream files
+    // We open dir, then loop. In each loop, we take mutex to read next entry, then release to send/wait.
+    // This prevents blocking other tasks for the entire duration.
+
+    if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
+        FRESULT res = f_opendir(&dir, path);
+        xSemaphoreGive(LogMutex);
+
+        if (res == FR_OK) {
+            uint8_t idx = 0;
+            while(1) {
+                // Read next entry with lock
+                bool found = false;
+                if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+                    res = f_readdir(&dir, &fno);
+                    xSemaphoreGive(LogMutex);
+                    if (res == FR_OK && fno.fname[0]) {
+                        found = true;
+                    }
+                } else {
+                    break; // Timeout getting lock, abort
+                }
+
+                if (!found) break; // End of dir or error
+
+                if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
+                    int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
+                    UART_SendRaw(buffer, len);
+                    vTaskDelay(20); // Throttle - Mutex NOT held here
+                    idx++;
+                }
+            }
+
+            // Close dir with lock
+            xSemaphoreTake(LogMutex, portMAX_DELAY);
+            f_closedir(&dir);
+            xSemaphoreGive(LogMutex);
         }
-        f_closedir(&dir);
     }
-    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleDownloadReq(const char* filename) {
