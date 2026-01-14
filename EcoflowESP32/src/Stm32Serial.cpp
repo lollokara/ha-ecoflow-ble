@@ -554,6 +554,14 @@ bool Stm32Serial::isLogDownloadComplete() {
     return c;
 }
 
+size_t Stm32Serial::getDownloadBufferSize() {
+    if(!_downloadMutex) return 0;
+    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    size_t s = _downloadBuffer.size();
+    xSemaphoreGive(_downloadMutex);
+    return s;
+}
+
 void Stm32Serial::abortLogDownload() {
     // Placeholder
 }

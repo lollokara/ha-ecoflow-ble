@@ -81,6 +81,7 @@ public:
     void startLogDownload(const String& name);
     size_t readLogChunk(uint8_t* buffer, size_t maxLen);
     bool isLogDownloadComplete(void);
+    size_t getDownloadBufferSize(void);
     void abortLogDownload(void);
 
 private:

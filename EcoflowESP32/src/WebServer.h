@@ -13,9 +13,13 @@
 class WebServer {
 public:
     static void begin();
+    static void update();
 
 private:
     static AsyncWebServer server;
+    static AsyncWebServerRequest* _pendingLogRequest;
+    static uint32_t _pendingLogRequestTime;
+
     static void setupRoutes();
     static void handleStatus(AsyncWebServerRequest *request);
     static void handleControl(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);

@@ -102,6 +102,9 @@ void loop() {
     static uint32_t last_data_refresh = 0;
     static uint32_t last_device_list_update = 0;
 
+    // Process WebServer delayed tasks (e.g. log downloads)
+    WebServer::update();
+
     // Update light sensor readings
     LightSensor::getInstance().update();
 
