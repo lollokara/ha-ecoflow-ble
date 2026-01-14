@@ -55,7 +55,7 @@ static bool is_flow_on(uint32_t x) {
 }
 
 static void logDelta3Data(const Delta3Data& d) {
-    LOG_STM_I(TAG, "=== Delta 3 Data ===");
+    LOG_STM_I(TAG, "--- Full Delta 3 Dump ---");
     LOG_STM_I(TAG, "Batt: %.1f%% (In: %.1fW, Out: %.1fW)", d.batteryLevel, d.batteryInputPower, d.batteryOutputPower);
     LOG_STM_I(TAG, "AC In: %.1fW, AC Out: %.1fW", d.acInputPower, d.acOutputPower);
     LOG_STM_I(TAG, "DC In: %.1fW (State: %d, Solar: %.1fW)", d.dcPortInputPower, d.dcPortState, d.solarInputPower);
@@ -67,7 +67,7 @@ static void logDelta3Data(const Delta3Data& d) {
 }
 
 static void logWave2Data(const Wave2Data& w) {
-    LOG_STM_I(TAG, "=== Wave 2 Data ===");
+    LOG_STM_I(TAG, "--- Full Wave 2 Dump ---");
     LOG_STM_I(TAG, "Mode: %d (Sub: %d), PwrMode: %d", w.mode, w.subMode, w.powerMode);
     LOG_STM_I(TAG, "Temps: Env=%.2f, Out=%.2f, Set=%d", w.envTemp, w.outLetTemp, w.setTemp);
     LOG_STM_I(TAG, "Batt: %d%% (Stat: %d), Rem: %dm/%dm", w.batSoc, w.batChgStatus, w.batChgRemainTime, w.batDsgRemainTime);
@@ -356,7 +356,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
 }
 
 static void logAlternatorChargerData(const AlternatorChargerData& d) {
-    LOG_STM_I(TAG, "=== Alternator Charger Data ===");
+    LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---");
     LOG_STM_I(TAG, "Mode: %d, Open: %d", d.chargerMode, d.chargerOpen);
     LOG_STM_I(TAG, "Car Batt: %.1fV, Limit: %dW", d.carBatteryVoltage, d.powerLimit);
     LOG_STM_I(TAG, "DC Power: %.1fW", d.dcPower);

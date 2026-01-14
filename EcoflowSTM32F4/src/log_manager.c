@@ -61,10 +61,31 @@ void LogManager_Init(void) {
         // Check size
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
             LogManager_ForceRotate();
+        } else {
+            // New session in existing file
+            LogManager_Write(3, "SYS", "Log System Initialized");
+            LogManager_WriteSessionHeader();
         }
-
-        LogManager_Write(3, "SYS", "Log System Initialized");
     }
+}
+
+void LogManager_WriteSessionHeader(void) {
+    if (!LogOpen) return;
+
+    // Header Section 1
+    LogManager_Write(0, "SYS", "--- Firmware Versions ---");
+    LogManager_Write(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
+    LogManager_Write(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
+
+    // Request Section 2 & 3
+    uint8_t buf[32];
+    int len;
+
+    len = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
+    UART_SendRaw(buf, len);
+
+    len = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
+    UART_SendRaw(buf, len);
 }
 
 void LogManager_ForceRotate(void) {
@@ -90,21 +111,7 @@ void LogManager_ForceRotate(void) {
     // Open new
     if (f_open(&LogFile, LOG_FILENAME, FA_CREATE_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         LogOpen = true;
-
-        // Header Section 1
-        LogManager_Write(0, "SYS", "--- Firmware Versions ---");
-        LogManager_Write(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
-        LogManager_Write(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
-
-        // Request Section 2 & 3
-        uint8_t buf[32];
-        int len;
-
-        len = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
-        UART_SendRaw(buf, len);
-
-        len = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
-        UART_SendRaw(buf, len);
+        LogManager_WriteSessionHeader();
     }
 }
 
