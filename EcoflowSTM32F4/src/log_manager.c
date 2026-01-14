@@ -294,7 +294,10 @@ void LogManager_HandleListReq(void) {
             // Loop until we reach count. If dir ends early, fill with dummy.
             while(idx < count) {
                 bool found = false;
-                if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+                // Use portMAX_DELAY to ensure we don't spin if writer holds lock.
+                // We are in the UART Task context (or whatever called HandleListReq),
+                // so blocking here delays other UART ops but prevents timeout/deadlock on list.
+                if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
                     res = f_readdir(&dir, &fno);
                     xSemaphoreGive(LogMutex);
                     if (res == FR_OK && fno.fname[0]) {
@@ -305,6 +308,7 @@ void LogManager_HandleListReq(void) {
                         }
                     } else {
                         // End of dir or error
+                        // Ensure we signal termination if this was the last read
                     }
                 }
 

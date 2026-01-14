@@ -392,8 +392,8 @@ int main(void) {
         printf("FatFs Link Driver Failed\n");
     }
 
-    LogManager_Init();
-    LogManager_Write(3, "SYS", "Main: Boot Complete");
+    // LogManager_Init() moved to StartUARTTask to ensure Scheduler/Mutex availability
+    // LogManager_Write(3, "SYS", "Main: Boot Complete"); // Defer logging until init
 
     MX_IWDG_Init(); // Watchdog Enabled
 

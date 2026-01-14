@@ -297,9 +297,12 @@ void UART_SendRaw(uint8_t* data, uint16_t len) {
 
 void StartUARTTask(void * argument) {
     UART_Init();
-    // LogManager_Init(); // Moved to main.c
 
     uartTxMutex = xSemaphoreCreateMutex();
+
+    // Initialize Log Manager in Task Context (Safe for Mutex/FS)
+    LogManager_Init();
+    LogManager_Write(3, "SYS", "UART Task: Boot Complete");
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
     uint8_t tx_buf[32];
     int len;
