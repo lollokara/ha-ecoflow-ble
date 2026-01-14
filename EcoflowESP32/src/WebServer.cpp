@@ -31,7 +31,7 @@ public:
             if (read == 0) {
                 // If timeout reached, return 0 (EOF)
                 if (millis() - start > 3000) break;
-                vTaskDelay(10);
+                vTaskDelay(1);
             }
         }
         return read;
