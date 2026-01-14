@@ -68,17 +68,19 @@ void LogManager_Init(void) {
         // Section 1: Firmware Versions
         LOG_STM_INFO("SYS", "--- Section 1: Firmware Versions ---");
         LOG_STM_INFO("SYS", "STM32 F4: v1.0.0");
-
-        // Request Section 2 (Config) & 3 (Debug Dump) from ESP32
-        uint8_t buf[32];
-        int len;
-
-        len = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
-        UART_SendRaw(buf, len);
-
-        len = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
-        UART_SendRaw(buf, len);
     }
+}
+
+void LogManager_RequestBootData(void) {
+    // Request Section 2 (Config) & 3 (Debug Dump) from ESP32
+    uint8_t buf[32];
+    int len;
+
+    len = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
+    UART_SendRaw(buf, len);
+
+    len = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
+    UART_SendRaw(buf, len);
 }
 
 void LogManager_ForceRotate(void) {

@@ -7,6 +7,7 @@
 
 // Log Manager Initialization
 void LogManager_Init(void);
+void LogManager_RequestBootData(void);
 
 // Main Process Loop (call frequently)
 void LogManager_Process(void);

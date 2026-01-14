@@ -301,6 +301,10 @@ void StartUARTTask(void * argument) {
 
     uartTxMutex = xSemaphoreCreateMutex();
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
+
+    // Request Boot Data from ESP32 (now safe to use UART)
+    LogManager_RequestBootData();
+
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
