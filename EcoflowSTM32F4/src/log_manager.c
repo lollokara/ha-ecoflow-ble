@@ -351,6 +351,12 @@ void LogManager_HandleDownloadReq(const char* filename) {
 
     if (Downloading) f_close(&DownloadFile);
 
+    // Close LogFile if we are trying to download the active log (avoids sharing violation)
+    if (LogOpen && strcmp(filename, LOG_FILENAME) == 0) {
+        f_close(&LogFile);
+        LogOpen = false;
+    }
+
     strncpy(DownloadName, filename, 31);
     if (f_open(&DownloadFile, filename, FA_READ) == FR_OK) {
         Downloading = true;
@@ -358,6 +364,15 @@ void LogManager_HandleDownloadReq(const char* filename) {
         DownloadSize = f_size(&DownloadFile);
     } else {
         Downloading = false;
+
+        // Restore LogFile if we closed it and failed to open for download
+        if (!LogOpen && strcmp(filename, LOG_FILENAME) == 0) {
+             if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+                 f_lseek(&LogFile, f_size(&LogFile));
+                 LogOpen = true;
+             }
+        }
+
         // Send EOF to signal failure immediately
         uint8_t packet[32];
         int len = pack_log_data_chunk_message(packet, 0, NULL, 0);
