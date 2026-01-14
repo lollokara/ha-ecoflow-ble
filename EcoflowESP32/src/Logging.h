@@ -31,11 +31,15 @@ static void LogToStm(esp_log_level_t level, const char* file, const char* func, 
     // Format: [Filename] Function() Message
     // Example: [EcoflowDataParser.cpp] logFullDeltaPro3Data() --- Full D3P Dump ---
     char stm_buf[512];
+    // NOTE: The user asked for "Logs itself with the structure of: [Name of the file...]".
+    // STM32 side LogManager_Write will add "[Timestamp] " at the beginning.
+    // By passing an empty tag to LogManager_Write (via sendEspLog), we avoid double tagging like "[ESP32]".
     snprintf(stm_buf, sizeof(stm_buf), "[%s] %s() %s", filename, func, loc_buf);
 
     // Send
     // Level mapping: ESP_LOG_INFO (3) -> Protocol Level (3)
-    Stm32Serial::getInstance().sendEspLog((uint8_t)level, "ESP32", stm_buf);
+    // Pass empty string as tag so STM32 LogManager doesn't add [Tag] brackets.
+    Stm32Serial::getInstance().sendEspLog((uint8_t)level, "", stm_buf);
 }
 
 // Macros to replace ESP_LOGx
