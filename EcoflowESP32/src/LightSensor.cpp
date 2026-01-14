@@ -10,6 +10,12 @@ LightSensor::LightSensor() {
 }
 
 void LightSensor::begin() {
+    // Explicitly set ADC resolution and attenuation for ESP32-S3
+    analogReadResolution(12);
+    // ADC_11db is deprecated in newer cores but usually maps to 11dB (0-3.3V)
+    // On ESP32-S3, this is the default full range.
+    analogSetAttenuation(ADC_11db);
+
     pinMode(_pin, INPUT);
     _prefs.begin("lightsensor", false);
     _minADC = _prefs.getInt("min", 0);
@@ -25,11 +31,11 @@ void LightSensor::update() {
 
     // Read new value
     int val = analogRead(_pin);
-    // Invert because typically LDR pullup means lower value = brighter light?
-    // Or depends on wiring. Standard LDR circuit:
-    // VCC -> LDR -> Pin -> R -> GND ==> Bright = High V (High ADC)
-    // VCC -> R -> Pin -> LDR -> GND ==> Bright = Low V (Low ADC)
-    // Assuming Bright = High ADC for now, or calibratable.
+
+    // Simple outlier filter: If value is 0 or 4095, only accept it if it persists (debounce)
+    // But averaging handles this mostly.
+    // However, if we get random spikes, we can clamp them.
+    // Let's just trust the average for now, but ensure initialization doesn't start with 0s if it's bright.
 
     _readings[_readIndex] = val;
     _total = _total + _readings[_readIndex];

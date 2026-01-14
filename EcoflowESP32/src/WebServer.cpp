@@ -118,7 +118,8 @@ void WebServer::setupRoutes() {
     server.on("/api/sd_logs", HTTP_GET, [](AsyncWebServerRequest *request){
         Stm32Serial::getInstance().requestLogList();
         std::vector<Stm32Serial::LogEntry> logs = Stm32Serial::getInstance().getLogList();
-        AsyncJsonResponse *response = new AsyncJsonResponse();
+        // Increase buffer size to 32KB to accommodate large file lists and prevent "Error loading list"
+        AsyncJsonResponse *response = new AsyncJsonResponse(true, 32768);
         JsonArray root = response->getRoot();
         for(const auto& log : logs) {
             JsonObject obj = root.createNestedObject();
@@ -166,14 +167,9 @@ void WebServer::setupRoutes() {
     }, handleUpdateStm32);
 }
 
-// ... (Existing Handlers: Status, History, Control, Connect, Disconnect, Forget, Logs, LogConfig, RawCommand, Settings, SettingsSave) ...
-// Copying existing handlers here to keep file complete
-// (For brevity in tool response, I will assume existing handlers are unchanged,
-//  but I must output the full file content to overwrite correctly.
-//  I'll include them from previous `read_file` output.)
-
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(4096);
+    // Increased buffer size to 16KB to prevent truncation of "light_adc" or device data
+    DynamicJsonDocument doc(16384);
     doc["esp_temp"] = get_esp_temp();
     doc["light_adc"] = LightSensor::getInstance().getRaw();
 
