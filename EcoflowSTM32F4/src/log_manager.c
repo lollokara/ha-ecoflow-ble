@@ -259,7 +259,7 @@ void LogManager_HandleListReq(void) {
     DIR dir;
     FILINFO fno;
     uint8_t buffer[256];
-    uint8_t count = 0;
+    uint16_t count = 0;
 
     const char* path = SDPath[0] ? SDPath : "0:/";
 
@@ -290,7 +290,7 @@ void LogManager_HandleListReq(void) {
         xSemaphoreGive(LogMutex);
 
         if (res == FR_OK) {
-            uint8_t idx = 0;
+            uint16_t idx = 0;
             // Loop until we reach count. If dir ends early, fill with dummy.
             while(idx < count) {
                 bool found = false;
@@ -316,7 +316,8 @@ void LogManager_HandleListReq(void) {
                     int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                     UART_SendRaw(buffer, len);
                     idx++;
-                    vTaskDelay(5);
+                    // Throttle: Delay every 10 packets to improve throughput while yielding occasionally
+                    if (idx % 10 == 0) vTaskDelay(5);
                 } else if (res != FR_OK || fno.fname[0] == 0) {
                     // End of dir reached, but idx < count (Under-run)
                     // Fill with dummy packets
@@ -324,7 +325,7 @@ void LogManager_HandleListReq(void) {
                         int len = pack_log_list_resp_message(buffer, count, idx, 0, "");
                         UART_SendRaw(buffer, len);
                         idx++;
-                        vTaskDelay(5);
+                        if (idx % 10 == 0) vTaskDelay(5);
                     }
                     break;
                 }

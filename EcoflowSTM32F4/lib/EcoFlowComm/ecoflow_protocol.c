@@ -40,8 +40,8 @@ int pack_log_list_req_message(uint8_t *buffer) {
     return 4;
 }
 
-int pack_log_list_resp_message(uint8_t *buffer, uint8_t total, uint8_t index, uint32_t size, const char* name) {
-    // Structure: [Total:1][Index:1][Size:4][Name:32] = 38 bytes
+int pack_log_list_resp_message(uint8_t *buffer, uint16_t total, uint16_t index, uint32_t size, const char* name) {
+    // Structure: [Total:2][Index:2][Size:4][Name:32] = 40 bytes
     LogListEntryMsg msg;
     msg.total_files = total;
     msg.index = index;
@@ -58,7 +58,7 @@ int pack_log_list_resp_message(uint8_t *buffer, uint8_t total, uint8_t index, ui
     return 4 + len;
 }
 
-int unpack_log_list_resp_message(const uint8_t *buffer, uint8_t *total, uint8_t *index, uint32_t *size, char* name) {
+int unpack_log_list_resp_message(const uint8_t *buffer, uint16_t *total, uint16_t *index, uint32_t *size, char* name) {
     uint8_t len = buffer[2];
     if (len != sizeof(LogListEntryMsg)) return -2;
 

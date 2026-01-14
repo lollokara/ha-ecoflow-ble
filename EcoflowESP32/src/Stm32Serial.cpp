@@ -306,7 +306,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
     } else if (cmd == CMD_GET_DEBUG_DUMP) {
         EcoflowDataParser::triggerDebugDump();
     } else if (cmd == CMD_LOG_LIST_RESP) {
-        uint8_t total, idx;
+        uint16_t total, idx;
         uint32_t size;
         char name[32];
         if (unpack_log_list_resp_message(rx_buf, &total, &idx, &size, name) == 0) {
@@ -502,7 +502,7 @@ void Stm32Serial::requestLogList() {
 
 std::vector<Stm32Serial::LogEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
-    while(!_logListReady && millis() - start < 15000) {
+    while(!_logListReady && millis() - start < 20000) {
         if (_logListReady) break;
         vTaskDelay(10);
     }

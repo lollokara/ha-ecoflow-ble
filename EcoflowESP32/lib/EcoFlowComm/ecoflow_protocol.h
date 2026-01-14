@@ -331,8 +331,8 @@ typedef struct {
 } LogListRespEntry;
 
 typedef struct {
-    uint8_t total_files;
-    uint8_t index;
+    uint16_t total_files;
+    uint16_t index;
     uint32_t size;
     char name[32];
 } LogListEntryMsg;
@@ -416,8 +416,8 @@ int pack_ota_apply_message(uint8_t *buffer);
 
 // Log API
 int pack_log_list_req_message(uint8_t *buffer);
-int pack_log_list_resp_message(uint8_t *buffer, uint8_t total, uint8_t index, uint32_t size, const char* name);
-int unpack_log_list_resp_message(const uint8_t *buffer, uint8_t *total, uint8_t *index, uint32_t *size, char* name);
+int pack_log_list_resp_message(uint8_t *buffer, uint16_t total, uint16_t index, uint32_t size, const char* name);
+int unpack_log_list_resp_message(const uint8_t *buffer, uint16_t *total, uint16_t *index, uint32_t *size, char* name);
 
 int pack_log_download_req_message(uint8_t *buffer, const char* name);
 int unpack_log_download_req_message(const uint8_t *buffer, char* name);
