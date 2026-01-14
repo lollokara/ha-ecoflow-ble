@@ -502,7 +502,7 @@ void Stm32Serial::requestLogList() {
 
 std::vector<Stm32Serial::LogEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
-    while(!_logListReady && millis() - start < 15000) {
+    while(!_logListReady && millis() - start < 30000) {
         vTaskDelay(10);
     }
     xSemaphoreTake(_logListMutex, portMAX_DELAY);

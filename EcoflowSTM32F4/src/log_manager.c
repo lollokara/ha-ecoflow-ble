@@ -291,14 +291,12 @@ void LogManager_HandleListReq(void) {
             while(1) {
                 // Read next entry with lock
                 bool found = false;
-                if (xSemaphoreTake(LogMutex, 100) == pdTRUE) {
+                if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
                     res = f_readdir(&dir, &fno);
                     xSemaphoreGive(LogMutex);
                     if (res == FR_OK && fno.fname[0]) {
                         found = true;
                     }
-                } else {
-                    break; // Timeout getting lock, abort
                 }
 
                 if (!found) break; // End of dir or error
