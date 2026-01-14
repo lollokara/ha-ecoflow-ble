@@ -8,7 +8,8 @@ enum class DeviceType {
     DELTA_3 = 1,
     DELTA_PRO_3 = 2,
     WAVE_2 = 3,
-    ALTERNATOR_CHARGER = 4
+    ALTERNATOR_CHARGER = 4,
+    BLADE = 5
 };
 
 enum class ButtonInput {

@@ -43,6 +43,7 @@ private:
 class EncPacket {
 public:
     static const uint16_t PREFIX = 0x5A5A;
+    static const uint16_t PREFIX_BLADE = 0x02AA;
     static const uint8_t FRAME_TYPE_COMMAND = 0x00;
     static const uint8_t FRAME_TYPE_PROTOCOL = 0x01;
     static const uint8_t PAYLOAD_TYPE_VX_PROTOCOL = 0x00;
@@ -51,7 +52,7 @@ public:
               uint8_t needs_ack = 0, uint8_t is_ack = 0);
 
     const std::vector<uint8_t>& getPayload() const { return _payload; }
-    std::vector<uint8_t> toBytes(EcoflowCrypto* crypto = nullptr) const;
+    std::vector<uint8_t> toBytes(EcoflowCrypto* crypto = nullptr, bool isBlade = false) const;
 
     static std::vector<Packet> parsePackets(const uint8_t* data, size_t len, EcoflowCrypto& crypto, std::vector<uint8_t>& rxBuffer, bool isAuthenticated = false);
     static std::vector<uint8_t> parseSimple(const uint8_t* data, size_t len);
