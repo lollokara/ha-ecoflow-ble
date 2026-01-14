@@ -130,7 +130,7 @@ void WebServer::setupRoutes() {
         request->send(response);
     });
 
-    server.on("/api/sd_logs/download", HTTP_GET, [](AsyncWebServerRequest *request){
+    server.on("/api/download_log", HTTP_GET, [](AsyncWebServerRequest *request){
         if (!request->hasParam("name")) {
             request->send(400, "text/plain", "Missing name");
             return;

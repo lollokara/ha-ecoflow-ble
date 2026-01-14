@@ -1073,7 +1073,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <td><span class="file-icon">📄</span> <span style="font-family:monospace; color:#eee;">${name}</span></td>
                     <td style="color:#aaa;">${sizeStr}</td>
                     <td style="text-align: right;">
-                        <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:6px 12px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green); margin-right: 5px;">Download</a>
+                        <a href="${API}/download_log?name=${name}" target="_blank" class="btn" style="padding:6px 12px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green); margin-right: 5px;">Download</a>
                         <button class="btn" style="padding:6px 12px; font-size:0.8em; background:rgba(255,50,50,0.2); color:#ff5252; border:1px solid #ff5252;" onclick="deleteLog('${name}')">Delete</button>
                     </td>
                 `;
