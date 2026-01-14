@@ -3,6 +3,7 @@
 #include "uart_task.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include <stdarg.h>
