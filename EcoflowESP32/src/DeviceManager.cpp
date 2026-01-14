@@ -65,6 +65,11 @@ DeviceManager::DeviceManager() {
     slotAC.type = DeviceType::ALTERNATOR_CHARGER;
     slotAC.isConnected = false;
 
+    slotBlade.instance = &bladeInstance;
+    slotBlade.name = "BLADE";
+    slotBlade.type = DeviceType::BLADE;
+    slotBlade.isConnected = false;
+
     _scanMutex = xSemaphoreCreateMutex();
 }
 
@@ -97,6 +102,10 @@ void DeviceManager::initialize() {
         ESP_LOGI("DeviceManager", "Restoring AC: %s", slotAC.serialNumber.c_str());
         slotAC.instance->begin(ECOFLOW_USER_ID, slotAC.serialNumber, slotAC.macAddress, DeviceType::ALTERNATOR_CHARGER);
     }
+    if( !slotBlade.macAddress.empty()) {
+        ESP_LOGI("DeviceManager", "Restoring BLADE: %s", slotBlade.serialNumber.c_str());
+        slotBlade.instance->begin(ECOFLOW_USER_ID, slotBlade.serialNumber, slotBlade.macAddress, DeviceType::BLADE);
+    }
 }
 
 /**
@@ -113,12 +122,14 @@ void DeviceManager::update() {
     slotW2.instance->update();
     slotD3P.instance->update();
     slotAC.instance->update();
+    slotBlade.instance->update();
 
     // Sync status flags
     slotD3.isConnected = slotD3.instance->isConnected();
     slotW2.isConnected = slotW2.instance->isConnected();
     slotD3P.isConnected = slotD3P.instance->isConnected();
     slotAC.isConnected = slotAC.instance->isConnected();
+    slotBlade.isConnected = slotBlade.instance->isConnected();
 
     // 3. Manage the scanning state (auto-reconnect or timeout).
     _manageScanning();
@@ -156,6 +167,9 @@ void DeviceManager::disconnect(DeviceType type) {
         } else if (type == DeviceType::ALTERNATOR_CHARGER) {
             prefs.remove("ac_mac");
             prefs.remove("ac_sn");
+        } else if (type == DeviceType::BLADE) {
+            prefs.remove("blade_mac");
+            prefs.remove("blade_sn");
         }
         slot->macAddress = "";
         slot->serialNumber = "";
@@ -165,12 +179,14 @@ void DeviceManager::disconnect(DeviceType type) {
 EcoflowESP32* DeviceManager::getDevice(DeviceType type) {
     if (type == DeviceType::DELTA_PRO_3) return &d3p;
     if (type == DeviceType::ALTERNATOR_CHARGER) return &ac;
+    if (type == DeviceType::BLADE) return &bladeInstance;
     return (type == DeviceType::DELTA_3) ? &d3 : &w2;
 }
 
 DeviceSlot* DeviceManager::getSlot(DeviceType type) {
     if (type == DeviceType::DELTA_PRO_3) return &slotD3P;
     if (type == DeviceType::ALTERNATOR_CHARGER) return &slotAC;
+    if (type == DeviceType::BLADE) return &slotBlade;
     return (type == DeviceType::DELTA_3) ? &slotD3 : &slotW2;
 }
 
@@ -179,7 +195,7 @@ bool DeviceManager::isScanning() {
 }
 
 bool DeviceManager::isAnyConnecting() {
-    return d3.isConnecting() || w2.isConnecting() || d3p.isConnecting() || ac.isConnecting();
+    return d3.isConnecting() || w2.isConnecting() || d3p.isConnecting() || ac.isConnecting() || bladeInstance.isConnecting();
 }
 
 //--------------------------------------------------------------------------
@@ -202,6 +218,7 @@ void DeviceManager::printStatus(Print& out) {
     printSlot(slotW2);
     printSlot(slotD3P);
     printSlot(slotAC);
+    printSlot(slotBlade);
 }
 
 void DeviceManager::forget(DeviceType type) {
@@ -220,6 +237,7 @@ String DeviceManager::getDeviceStatusJson() {
     json += "\"w2\":{\"connected\":" + String(slotW2.isConnected) + ", \"sn\":\"" + String(slotW2.serialNumber.c_str()) + "\", \"batt\":" + String(w2.getBatteryLevel()) + "},";
     json += "\"d3p\":{\"connected\":" + String(slotD3P.isConnected) + ", \"sn\":\"" + String(slotD3P.serialNumber.c_str()) + "\", \"batt\":" + String(d3p.getBatteryLevel()) + "},";
     json += "\"ac\":{\"connected\":" + String(slotAC.isConnected) + ", \"sn\":\"" + String(slotAC.serialNumber.c_str()) + "\", \"batt\":" + String(ac.getBatteryLevel()) + "}";
+    json += ",\"blade\":{\"connected\":" + String(slotBlade.isConnected) + ", \"sn\":\"" + String(slotBlade.serialNumber.c_str()) + "\", \"batt\":" + String((int)bladeInstance.getData().delta3.batteryLevel) + "}";
     json += "}";
     return json;
 }
@@ -297,11 +315,13 @@ void DeviceManager::_manageScanning() {
         bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting();
         bool d3pNeedsConnect = !slotD3P.isConnected && !slotD3P.macAddress.empty() && !d3p.isConnecting();
         bool acNeedsConnect = !slotAC.isConnected && !slotAC.macAddress.empty() && !ac.isConnecting();
+        bool bladeNeedsConnect = !slotBlade.isConnected && !slotBlade.macAddress.empty() && !bladeInstance.isConnecting();
 
         if (d3NeedsConnect) startScan(DeviceType::DELTA_3);
         else if (w2NeedsConnect) startScan(DeviceType::WAVE_2);
         else if (d3pNeedsConnect) startScan(DeviceType::DELTA_PRO_3);
         else if (acNeedsConnect) startScan(DeviceType::ALTERNATOR_CHARGER);
+        else if (bladeNeedsConnect) startScan(DeviceType::BLADE);
     }
 }
 
@@ -336,6 +356,12 @@ void DeviceManager::loadDevices() {
         slotAC.macAddress = mac.c_str();
         slotAC.serialNumber = sn.c_str();
     }
+    mac = prefs.getString("blade_mac", "");
+    sn = prefs.getString("blade_sn", "");
+    if (!mac.isEmpty() && !sn.isEmpty()) {
+        slotBlade.macAddress = mac.c_str();
+        slotBlade.serialNumber = sn.c_str();
+    }
 }
 
 /**
@@ -362,6 +388,11 @@ void DeviceManager::saveDevice(DeviceType type, const std::string& mac, const st
         prefs.putString("ac_sn", sn.c_str());
         slotAC.macAddress = mac;
         slotAC.serialNumber = sn;
+    } else if (type == DeviceType::BLADE) {
+        prefs.putString("blade_mac", mac.c_str());
+        prefs.putString("blade_sn", sn.c_str());
+        slotBlade.macAddress = mac;
+        slotBlade.serialNumber = sn;
     }
 }
 
@@ -482,6 +513,8 @@ void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
             targetSlot = &slotD3P;
         } else if (isTargetDevice(sn, DeviceType::ALTERNATOR_CHARGER) && !slotAC.isConnected && !ac.isConnecting()) {
             targetSlot = &slotAC;
+        } else if (isTargetDevice(sn, DeviceType::BLADE) && !slotBlade.isConnected && !bladeInstance.isConnecting()) {
+            targetSlot = &slotBlade;
         }
 
         if (targetSlot) {
@@ -516,6 +549,8 @@ bool DeviceManager::isTargetDevice(const std::string& sn, DeviceType type) {
         return (sn.rfind("MR51", 0) == 0);
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
         return (sn.rfind("F371", 0) == 0 || sn.rfind("F372", 0) == 0 || sn.rfind("DC01", 0) == 0);
+    } else if (type == DeviceType::BLADE) {
+        return (sn.rfind("H101", 0) == 0);
     }
     return false;
 }

@@ -34,6 +34,20 @@ std::vector<EcoflowESP32*> EcoflowESP32::_instances;
  */
 void EcoflowESP32::notifyCallback(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     ESP_LOGV(TAG, "Notify callback received %d bytes", length);
+    ESP_LOGI(TAG, "Received %d bytes from %s device", length, "UNKNOWN"); // Will be updated when we know device type
+    
+    // CRITICAL DEBUG: Show actual packet structure  
+    if (length >= 20) {
+        ESP_LOGI(TAG, "Packet analysis: first_20_bytes=%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+                pData[0], pData[1], pData[2], pData[3], pData[4], pData[5], pData[6], pData[7], pData[8], pData[9],
+                pData[10], pData[11], pData[12], pData[13], pData[14], pData[15], pData[16], pData[17], pData[18], pData[19]);
+        
+        // Check claimed vs actual length for Blade packets
+        if (length >= 6 && pData[0] == 0xAA && pData[1] == 0x02) {
+            uint16_t claimed_len = pData[4] | (pData[5] << 8);
+            ESP_LOGI(TAG, "BLADE packet: claimed_frame_len=%d, actual_received=%d", claimed_len, length);
+        }
+    }
 
     NimBLEClient* pClient = pRemoteCharacteristic->getRemoteService()->getClient();
     for (auto* instance : _instances) {
@@ -188,8 +202,17 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 case ConnectionState::SERVICE_DISCOVERY: {
                     NimBLERemoteService* pSvc = self->_pClient->getService("00000001-0000-1000-8000-00805f9b34fb");
                     if (pSvc) {
-                        self->_pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
-                        self->_pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+                        bool isBlade = (self->_deviceSn.rfind("H101", 0) == 0);
+                        
+                        if (isBlade) {
+                            ESP_LOGI(TAG, "Blade device detected, using Blade-specific UUIDs");
+                            // Blade devices use different characteristic UUIDs and simpler protocol
+                            self->_pWriteChr = pSvc->getCharacteristic("0000abf1-0000-1000-8000-00805f9b34fb");
+                            self->_pReadChr = pSvc->getCharacteristic("0000abf2-0000-1000-8000-00805f9b34fb");
+                        } else {
+                            self->_pWriteChr = pSvc->getCharacteristic("00000002-0000-1000-8000-00805f9b34fb");
+                            self->_pReadChr = pSvc->getCharacteristic("00000003-0000-1000-8000-00805f9b34fb");
+                        }
                         if (self->_pReadChr && self->_pWriteChr) {
                             self->_state = ConnectionState::SUBSCRIBING_NOTIFICATIONS;
                         }
@@ -239,10 +262,20 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
         if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
           if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE ||
               self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
-            std::vector<uint8_t> raw_payload =
-                EncPacket::parseSimple(notification->data, notification->length);
-            if (!raw_payload.empty()) {
-              self->_handleAuthHandshake(raw_payload);
+            
+            // For Blade devices, skip complex auth processing
+            if (self->_deviceType == DeviceType::BLADE) {
+              ESP_LOGI(TAG, "Blade device - raw packet processing");
+              // Just acknowledge the packet reception for Blade devices
+            } else {
+              // Standard devices use parsePackets (with buffering) for auth
+              std::vector<Packet> packets = EncPacket::parsePackets(
+                  notification->data, notification->length, self->_crypto,
+                  self->_rxBuffer, false); // Not authenticated yet during handshake
+              for (auto &packet : packets) {
+                ESP_LOGI(TAG, "Parsed auth packet - processing handshake");
+                self->_handleAuthHandshake(packet.getPayload());
+              }
             }
           } else {
             std::vector<Packet> packets = EncPacket::parsePackets(
@@ -295,23 +328,28 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
  */
 void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
   ESP_LOGV(TAG, "_handleAuthHandshake: received %d bytes", payload.size());
+  ESP_LOGI(TAG, "_handleAuthHandshake: Processing auth packet in state %d", (int)_state);
 
   if (_state == ConnectionState::PUBLIC_KEY_EXCHANGE) {
+    ESP_LOGI(TAG, "_handleAuthHandshake: Processing public key exchange");
     if (payload.size() >= 43 && payload[0] == 0x01) {
       uint8_t peer_pub_key[41];
       peer_pub_key[0] = 0x04; // Uncompressed point
       memcpy(peer_pub_key + 1, payload.data() + 3, 40);
       if (_crypto.compute_shared_secret(peer_pub_key, sizeof(peer_pub_key))) {
+        ESP_LOGI(TAG, "_handleAuthHandshake: Shared secret computed successfully");
         _state = ConnectionState::REQUESTING_SESSION_KEY;
         std::vector<uint8_t> req_payload = {0x02};
         EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND,
                              EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-        _sendCommand(enc_packet.toBytes());
+        bool isBlade = (_deviceSn.rfind("H101", 0) == 0);
+        _sendCommand(enc_packet.toBytes(nullptr, isBlade));
       } else {
         ESP_LOGE(TAG, "Failed to compute shared secret");
       }
     }
   } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
+    ESP_LOGI(TAG, "_handleAuthHandshake: Processing session key response");
     if (payload.size() > 1) {
       std::vector<uint8_t> decrypted_payload;
       size_t encrypted_len = payload.size() - 1;
@@ -344,7 +382,9 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
         EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL,
                                   EncPacket::PAYLOAD_TYPE_VX_PROTOCOL,
                                   auth_status_pkt.toBytes());
-        _sendCommand(enc_auth_status.toBytes(&_crypto));
+        // _sendCommand(enc_auth_status.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
+        bool isBlade = (_deviceSn.rfind("H101", 0) == 0);
+        _sendCommand(enc_auth_status.toBytes(&_crypto, isBlade));
       }
     } else {
       ESP_LOGE(TAG, "Invalid session key payload size");
@@ -354,6 +394,14 @@ void EcoflowESP32::_handleAuthHandshake(const std::vector<uint8_t> &payload) {
 
 void EcoflowESP32::_startAuthentication() {
     ESP_LOGI(TAG, "Starting authentication");
+    
+    if (_deviceType == DeviceType::BLADE) {
+        ESP_LOGI(TAG, "Using Blade simple authentication protocol");
+        _startBladeAuthentication();
+        return;
+    }
+    
+    // Standard EcoFlow authentication for non-Blade devices
     //_txSeq = esp_random();
     _txSeq = 1;
     if (!_crypto.generate_keys()) {
@@ -369,11 +417,35 @@ void EcoflowESP32::_startAuthentication() {
 
     ESP_LOGD(TAG, "Initiating handshake: Sending public key...");
     EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, payload);
-    if (_sendCommand(enc_packet.toBytes())) {
+    bool isBlade = (_deviceSn.rfind("H101", 0) == 0);
+    if (_sendCommand(enc_packet.toBytes(nullptr, isBlade))) {
         _state = ConnectionState::PUBLIC_KEY_EXCHANGE;
         _lastAuthActivity = millis();
     } else {
         ESP_LOGE(TAG, "Failed to send public key packet.");
+        _pClient->disconnect();
+    }
+}
+
+void EcoflowESP32::_startBladeAuthentication() {
+    ESP_LOGI(TAG, "Starting Blade simple authentication");
+    
+    // From Python script: Auth command that works
+    // aa020100a00d000000000000214545260110ed
+    std::vector<uint8_t> auth_command = {
+        0xAA, 0x02, 0x01, 0x00, 0xA0, 0x0D, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x21, 0x45, 0x45, 0x26,
+        0x01, 0x10, 0xED
+    };
+    
+    ESP_LOGI(TAG, "Sending Blade auth command");
+    if (_pWriteChr && _pWriteChr->canWrite()) {
+        _pWriteChr->writeValue(auth_command.data(), auth_command.size());
+        _state = ConnectionState::AUTHENTICATED;
+        _lastAuthActivity = millis();
+        ESP_LOGI(TAG, "Blade authentication sent successfully");
+    } else {
+        ESP_LOGE(TAG, "Cannot write to Blade auth characteristic");
         _pClient->disconnect();
     }
 }
@@ -405,7 +477,8 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
         if (shouldReply && pkt->getDest() == 0x21) {
             Packet reply(pkt->getDest(), pkt->getSrc(), pkt->getCmdSet(), pkt->getCmdId(), pkt->getPayload(), 0x01, 0x01, pkt->getVersion(), pkt->getSeq(), 0x0d);
             EncPacket enc_reply(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, reply.toBytes());
-            _sendCommand(enc_reply.toBytes(&_crypto));
+            bool isBlade = (_deviceSn.rfind("H101", 0) == 0);
+            _sendCommand(enc_reply.toBytes(&_crypto, isBlade));
         }
     } else {
         _handleAuthPacket(pkt);
@@ -428,7 +501,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
                 _state = ConnectionState::REQUESTING_SESSION_KEY;
                 std::vector<uint8_t> req_payload = {0x02};
                 EncPacket enc_packet(EncPacket::FRAME_TYPE_COMMAND, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, req_payload);
-                _sendCommand(enc_packet.toBytes());
+                _sendCommand(enc_packet.toBytes(nullptr, _deviceType == DeviceType::BLADE));
             }
         }
     } else if (_state == ConnectionState::REQUESTING_SESSION_KEY) {
@@ -443,7 +516,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
             Packet auth_status_pkt(0x21, 0x35, 0x35, 0x89, {}, 0x01, 0x01, auth_version, auth_seq, 0x0d);
             EncPacket enc_auth_status(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_status_pkt.toBytes());
-            _sendCommand(enc_auth_status.toBytes(&_crypto));
+            _sendCommand(enc_auth_status.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
         }
     } else if (_state == ConnectionState::REQUESTING_AUTH_STATUS) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x89) {
@@ -462,7 +535,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
 
             Packet auth_pkt(0x21, 0x35, 0x35, 0x86, auth_payload, 0x01, 0x01, auth_version, auth_seq, 0x0d);
             EncPacket enc_auth(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, auth_pkt.toBytes());
-            _sendCommand(enc_auth.toBytes(&_crypto));
+            _sendCommand(enc_auth.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload.size() > 0 && payload[0] == 0x00) {
@@ -504,7 +577,7 @@ void EcoflowESP32::_sendConfigPacket(const pd335_sys_ConfigWrite& config) {
     std::vector<uint8_t> payload(buffer, buffer + stream.bytes_written);
     Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    _sendCommand(enc_packet.toBytes(&_crypto));
+    _sendCommand(enc_packet.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
 }
 
 //--------------------------------------------------------------------------
@@ -609,7 +682,8 @@ bool EcoflowESP32::requestData() {
 
     Packet packet(0x20, dest, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    return _sendCommand(enc_packet.toBytes(&_crypto));
+    bool isBlade = (_deviceSn.rfind("H101", 0) == 0);
+    return _sendCommand(enc_packet.toBytes(&_crypto, isBlade));
 }
 
 bool EcoflowESP32::setAC(bool on) {
@@ -639,7 +713,7 @@ void EcoflowESP32::_sendConfigPacket(const mr521_ConfigWrite& config) {
     // D3P: dest 0x02
     Packet packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    _sendCommand(enc_packet.toBytes(&_crypto));
+    _sendCommand(enc_packet.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
 }
 
 void EcoflowESP32::_sendConfigPacket(const dc009_apl_comm_ConfigWrite& config) {
@@ -656,7 +730,7 @@ void EcoflowESP32::_sendConfigPacket(const dc009_apl_comm_ConfigWrite& config) {
     // AltChg: dest 0x14
     Packet packet(0x20, 0x14, 0xFE, 0x11, payload, 0x01, 0x01, _protocolVersion, _txSeq++);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    _sendCommand(enc_packet.toBytes(&_crypto));
+    _sendCommand(enc_packet.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
 }
 
 //--------------------------------------------------------------------------
@@ -774,7 +848,7 @@ bool EcoflowESP32::_sendWave2Command(uint8_t cmdId, const std::vector<uint8_t>& 
     // However, EcoflowESP32::_protocolVersion handles this.
 
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
-    return _sendCommand(enc_packet.toBytes(&_crypto));
+    return _sendCommand(enc_packet.toBytes(&_crypto, _deviceType == DeviceType::BLADE));
 }
 
 void EcoflowESP32::setAmbientLight(uint8_t status) {
