@@ -16,6 +16,7 @@ extern FATFS SDFatFs;
 
 static FIL LogFile;
 static bool LogOpen = false;
+static bool TriggerSessionHeader = false;
 
 // Download State
 static bool Downloading = false;
@@ -64,7 +65,7 @@ void LogManager_Init(void) {
         } else {
             // New session in existing file
             LogManager_Write(3, "SYS", "Log System Initialized");
-            LogManager_WriteSessionHeader();
+            TriggerSessionHeader = true;
         }
     }
 }
@@ -154,6 +155,11 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
 }
 
 void LogManager_Process(void) {
+    if (TriggerSessionHeader) {
+        LogManager_WriteSessionHeader();
+        TriggerSessionHeader = false;
+    }
+
     if (Downloading) {
         // Send chunks
         uint8_t buffer[200];
