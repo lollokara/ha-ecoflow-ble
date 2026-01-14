@@ -118,12 +118,6 @@ void LogManager_WriteSessionHeader(void) {
 }
 
 void LogManager_ForceRotate(void) {
-    // Assumes LogMutex is held by caller (Write_Internal) if locking implemented there?
-    // Current implementation: LogManager_ForceRotate is called by Write_Internal which assumes lock.
-    // However, LogManager_ForceRotate is also called by Init.
-    // Wait, Init releases lock, calls ForceRotate, Retakes.
-    // So ForceRotate must TAKE lock.
-
     if (xSemaphoreTake(LogMutex, portMAX_DELAY) != pdTRUE) return;
 
     if (LogOpen) {
@@ -147,12 +141,6 @@ void LogManager_ForceRotate(void) {
     // Open new
     if (f_open(&LogFile, LOG_FILENAME, FA_CREATE_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         LogOpen = true;
-        // Recursive call? No, ForceRotate is called, then it calls WriteSessionHeader -> Write_Internal
-        // Write_Internal checks size. New file size 0. Safe.
-        // But Write_Internal assumes lock?
-        // We hold lock here.
-        // Write_Internal assumes caller holds lock?
-        // Let's check Write_Internal.
     }
 
     if (LogOpen) {
@@ -233,7 +221,8 @@ void LogManager_Process(void) {
             UINT br;
 
             f_lseek(&DownloadFile, DownloadOffset);
-            if (f_read(&DownloadFile, buffer, sizeof(buffer), &br) == FR_OK) {
+            FRESULT res = f_read(&DownloadFile, buffer, sizeof(buffer), &br);
+            if (res == FR_OK) {
                 if (br > 0) {
                     uint8_t packet[256];
                     int len = pack_log_data_chunk_message(packet, DownloadOffset, buffer, br);
@@ -243,8 +232,21 @@ void LogManager_Process(void) {
                 DownloadOffset += br;
                 if (br < sizeof(buffer) || DownloadOffset >= DownloadSize) {
                     // End of file
+                    printf("DL: EOF. Off=%lu Size=%lu\n", DownloadOffset, DownloadSize);
                     Downloading = false;
                     f_close(&DownloadFile);
+
+                    // Restore LogFile if needed
+                    if (!LogOpen) {
+                         if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+                             f_lseek(&LogFile, f_size(&LogFile));
+                             LogOpen = true;
+                             printf("DL: ActiveLog Restored (EOF)\n");
+                         } else {
+                             printf("DL: ActiveLog Restore Failed (EOF)\n");
+                         }
+                    }
+
                     // Send empty chunk
                     uint8_t packet[32];
                     int len = pack_log_data_chunk_message(packet, DownloadOffset, NULL, 0);
@@ -252,8 +254,18 @@ void LogManager_Process(void) {
                 }
             } else {
                  // Error
+                 printf("DL: Read Error res=%d\n", res);
                  Downloading = false;
                  f_close(&DownloadFile);
+
+                 // Restore LogFile if needed (Error case)
+                 if (!LogOpen) {
+                      if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
+                          f_lseek(&LogFile, f_size(&LogFile));
+                          LogOpen = true;
+                          printf("DL: ActiveLog Restored (Error)\n");
+                      }
+                 }
             }
             xSemaphoreGive(LogMutex);
         }
@@ -281,8 +293,6 @@ void LogManager_HandleListReq(void) {
     }
 
     // Must release mutex for UART send (avoid deadlock if UART calls LogManager_Write)
-    // Actually UART_SendRaw takes UART mutex, not LogMutex.
-    // But keeping LogMutex held for long time blocks logging.
     xSemaphoreGive(LogMutex);
 
     if (count == 0) {
@@ -301,9 +311,6 @@ void LogManager_HandleListReq(void) {
             // Loop until we reach count. If dir ends early, fill with dummy.
             while(idx < count) {
                 bool found = false;
-                // Use portMAX_DELAY to ensure we don't spin if writer holds lock.
-                // We are in the UART Task context (or whatever called HandleListReq),
-                // so blocking here delays other UART ops but prevents timeout/deadlock on list.
                 if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
                     res = f_readdir(&dir, &fno);
                     xSemaphoreGive(LogMutex);
@@ -315,7 +322,6 @@ void LogManager_HandleListReq(void) {
                         }
                     } else {
                         // End of dir or error
-                        // Ensure we signal termination if this was the last read
                     }
                 }
 
@@ -335,7 +341,6 @@ void LogManager_HandleListReq(void) {
                     }
                     break;
                 }
-                // If not found but also not end (e.g. skipped non-log file), loop continues
             }
 
             xSemaphoreTake(LogMutex, portMAX_DELAY);
@@ -355,21 +360,28 @@ void LogManager_HandleDownloadReq(const char* filename) {
     if (LogOpen && strcmp(filename, LOG_FILENAME) == 0) {
         f_close(&LogFile);
         LogOpen = false;
+        printf("DL: ActiveLog Closed for '%s'\n", filename);
     }
 
     strncpy(DownloadName, filename, 31);
-    if (f_open(&DownloadFile, filename, FA_READ) == FR_OK) {
+    FRESULT res = f_open(&DownloadFile, filename, FA_READ);
+    if (res == FR_OK) {
         Downloading = true;
         DownloadOffset = 0;
         DownloadSize = f_size(&DownloadFile);
+        printf("DL: Opened '%s' size=%lu\n", filename, DownloadSize);
     } else {
         Downloading = false;
+        printf("DL: Failed to open '%s' res=%d\n", filename, res);
 
         // Restore LogFile if we closed it and failed to open for download
         if (!LogOpen && strcmp(filename, LOG_FILENAME) == 0) {
              if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
                  f_lseek(&LogFile, f_size(&LogFile));
                  LogOpen = true;
+                 printf("DL: ActiveLog Restored\n");
+             } else {
+                 printf("DL: ActiveLog Restore Failed\n");
              }
         }
 
