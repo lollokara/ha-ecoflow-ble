@@ -38,7 +38,15 @@ void LogManager_Init(void) {
         LogMutex = xSemaphoreCreateMutex();
     }
 
-    if (xSemaphoreTake(LogMutex, portMAX_DELAY) != pdTRUE) return;
+    // Only take mutex if scheduler is running (avoid crash during startup)
+    bool lockTaken = false;
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
+            lockTaken = true;
+        } else {
+            return;
+        }
+    }
 
     // Mount Filesystem
     FRESULT res = f_mount(&SDFatFs, SDPath, 1);
@@ -58,12 +66,12 @@ void LogManager_Init(void) {
             }
         } else {
             printf("Format Failed: %d\n", fmt_res);
-            xSemaphoreGive(LogMutex);
+            if(lockTaken) xSemaphoreGive(LogMutex);
             return;
         }
     } else if (res != FR_OK) {
         printf("FatFs Mount Failed: %d\n", res);
-        xSemaphoreGive(LogMutex);
+        if(lockTaken) xSemaphoreGive(LogMutex);
         return;
     }
 
@@ -77,30 +85,9 @@ void LogManager_Init(void) {
 
         // Check size
         if (f_size(&LogFile) > MAX_LOG_SIZE) {
-            // LogManager_ForceRotate calls f_ functions, need to avoid recursive mutex take deadlock if simple mutex
-            // But FreeRTOS Mutex is recursive safe if xSemaphoreCreateRecursiveMutex used.
-            // Standard Mutex is NOT recursive.
-            // We must unlock before calling a function that might lock, OR (better) make internal functions assume lock is held.
-            // Let's make internal helpers or just unlock.
-            // ForceRotate uses f_close/rename/open. We should implement logic here or make ForceRotate lock-aware.
-            // Simplest: Release, call Rotate, Retake? No, unsafe.
-            // Better: Move Logic inside Init or make helper.
-            // Actually, let's just make ForceRotate assume caller holds lock if internal, or make it locking.
-            // Current ForceRotate is public? No, header says void LogManager_ForceRotate(void);
-            // It's called from Write.
-            // Let's define a static InternalForceRotate that assumes lock.
-
-            // For now, I will assume single context for Init. But Write calls Rotate.
-            // Refactoring:
-            // 1. Rename ForceRotate to InternalForceRotate.
-            // 2. Make ForceRotate a wrapper that takes lock.
-            // 3. Call InternalForceRotate here.
-
-            // Wait, I cannot easily rename in this partial diff.
-            // I will release lock, call Rotate, retake.
-            xSemaphoreGive(LogMutex);
+            // We hold lock (if lockTaken). ForceRotate assumes lock is held by caller.
+            // So we just call it.
             LogManager_ForceRotate();
-            xSemaphoreTake(LogMutex, portMAX_DELAY);
         } else {
             // New session in existing file
             // We hold lock, use Internal
@@ -108,7 +95,7 @@ void LogManager_Init(void) {
             TriggerSessionHeader = true;
         }
     }
-    xSemaphoreGive(LogMutex);
+    if(lockTaken) xSemaphoreGive(LogMutex);
 }
 
 void LogManager_WriteSessionHeader(void) {
@@ -306,7 +293,7 @@ void LogManager_HandleListReq(void) {
                 if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                     int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                     UART_SendRaw(buffer, len);
-                    vTaskDelay(20); // Throttle - Mutex NOT held here
+                    vTaskDelay(10); // Throttle - Mutex NOT held here
                     idx++;
                 }
             }
