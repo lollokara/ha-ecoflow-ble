@@ -68,6 +68,8 @@ public:
     // Helper to send raw data safely
     void sendData(const uint8_t* data, size_t len);
 
+    void sendLogResendReq(uint32_t offset);
+
     // Send Log to STM32
     void sendEspLog(uint8_t level, const char* tag, const char* msg);
 
@@ -100,6 +102,7 @@ private:
     static void otaTask(void* parameter);
 
     bool _otaRunning = false;
+    uint32_t _expectedLogOffset = 0;
     SemaphoreHandle_t _txMutex = NULL;
 };
 

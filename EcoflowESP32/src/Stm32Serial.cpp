@@ -86,7 +86,7 @@ static uint32_t calculate_crc32(uint32_t crc, const uint8_t *buf, size_t len) {
 
 void Stm32Serial::begin() {
     Serial1.setRxBufferSize(16384); // Increase buffer for Log List bursts
-    Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+    Serial1.begin(460800, SERIAL_8N1, RX_PIN, TX_PIN);
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
     }
@@ -148,6 +148,13 @@ void Stm32Serial::update() {
                         processPacket(rx_buf, rx_idx);
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
+                        // If we are downloading, a CRC fail means we missed a chunk.
+                        // We can't know the exact offset from the corrupted packet safely,
+                        // but we know what we expect.
+                        if (!_downloadComplete && _downloadMutex) {
+                             // Only if we started a download recently
+                             sendLogResendReq(_expectedLogOffset);
+                        }
                     }
                     collecting = false;
                     rx_idx = 0;
@@ -324,8 +331,18 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         }
     } else if (cmd == CMD_LOG_DATA_CHUNK) {
         if (len >= 9) {
+            uint32_t offset;
             uint16_t dataLen;
+            memcpy(&offset, &rx_buf[3], 4);
             memcpy(&dataLen, &rx_buf[7], 2);
+
+            if (offset != _expectedLogOffset) {
+                ESP_LOGW(TAG, "Log Offset Mismatch: Exp %u, Got %u", _expectedLogOffset, offset);
+                // Missed packet(s). Request Resend.
+                sendLogResendReq(_expectedLogOffset);
+                return;
+            }
+
             if (!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
             xSemaphoreTake(_downloadMutex, portMAX_DELAY);
             if (dataLen > 0) {
@@ -333,6 +350,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                     size_t current = _downloadBuffer.size();
                     _downloadBuffer.resize(current + dataLen);
                     memcpy(&_downloadBuffer[current], &rx_buf[9], dataLen);
+                    _expectedLogOffset += dataLen;
                 }
             } else {
                 _downloadComplete = true;
@@ -526,10 +544,17 @@ void Stm32Serial::startLogDownload(const String& name) {
     _downloadBuffer.clear();
     _downloadBuffer.reserve(4096);
     _downloadComplete = false;
+    _expectedLogOffset = 0;
     xSemaphoreGive(_downloadMutex);
 
     uint8_t buf[64];
     int len = pack_log_download_req_message(buf, name.c_str());
+    sendData(buf, len);
+}
+
+void Stm32Serial::sendLogResendReq(uint32_t offset) {
+    uint8_t buf[16];
+    int len = pack_log_resend_req_message(buf, offset);
     sendData(buf, len);
 }
 

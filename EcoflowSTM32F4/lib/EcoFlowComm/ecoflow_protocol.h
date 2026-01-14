@@ -49,6 +49,7 @@ extern "C" {
 #define CMD_LOG_DELETE_REQ    0x72   ///< Request to delete a specific log
 #define CMD_ESP_LOG_DATA      0x73   ///< Send ESP32 Log (Error/Warning) to F4
 #define CMD_LOG_MANAGER_OP    0x74   ///< Perform Log Manager Op (Format, Delete All)
+#define CMD_LOG_RESEND_REQ    0x7B   ///< Request resend of log chunk
 
 // F4 -> ESP32
 #define CMD_LOG_LIST_RESP     0x75   ///< Response with Log File List
@@ -366,6 +367,10 @@ typedef struct {
     uint8_t op_code;
 } LogManagerOpMsg;
 
+typedef struct {
+    uint32_t offset;
+} LogResendReqMsg;
+
 #pragma pack(pop)
 
 // --- API Functions (Serialization/Deserialization) ---
@@ -434,6 +439,9 @@ int pack_esp_log_message(uint8_t *buffer, uint8_t level, const char* tag, const 
 int pack_simple_cmd_message(uint8_t *buffer, uint8_t cmd); // For GET_FULL_CONFIG, GET_DEBUG_DUMP, LOG_OP_RESP
 int pack_log_manager_op_message(uint8_t *buffer, uint8_t op);
 int unpack_log_manager_op_message(const uint8_t *buffer, uint8_t *op);
+
+int pack_log_resend_req_message(uint8_t *buffer, uint32_t offset);
+int unpack_log_resend_req_message(const uint8_t *buffer, uint32_t *offset);
 
 #ifdef __cplusplus
 }

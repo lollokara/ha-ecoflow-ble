@@ -18,6 +18,7 @@ void LogManager_ForceRotate(void);
 // UART Command Handlers
 void LogManager_HandleListReq(void);
 void LogManager_HandleDownloadReq(const char* filename);
+void LogManager_SeekDownload(uint32_t offset);
 void LogManager_HandleDeleteReq(const char* filename);
 void LogManager_HandleManagerOp(uint8_t op_code);
 void LogManager_HandleEspLog(uint8_t level, const char* tag, const char* message);

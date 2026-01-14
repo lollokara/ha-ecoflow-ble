@@ -205,6 +205,30 @@ int unpack_log_manager_op_message(const uint8_t *buffer, uint8_t *op) {
     return 0;
 }
 
+int pack_log_resend_req_message(uint8_t *buffer, uint32_t offset) {
+    uint8_t len = sizeof(LogResendReqMsg);
+    buffer[0] = START_BYTE;
+    buffer[1] = CMD_LOG_RESEND_REQ;
+    buffer[2] = len;
+    LogResendReqMsg msg;
+    msg.offset = offset;
+    memcpy(&buffer[3], &msg, len);
+    buffer[3 + len] = calculate_crc8(&buffer[1], 2 + len);
+    return 4 + len;
+}
+
+int unpack_log_resend_req_message(const uint8_t *buffer, uint32_t *offset) {
+    uint8_t len = buffer[2];
+    if (len != sizeof(LogResendReqMsg)) return -2;
+    uint8_t received_crc = buffer[3 + len];
+    uint8_t calculated_crc = calculate_crc8(&buffer[1], 2 + len);
+    if (received_crc != calculated_crc) return -1;
+    LogResendReqMsg msg;
+    memcpy(&msg, &buffer[3], len);
+    *offset = msg.offset;
+    return 0;
+}
+
 int pack_handshake_ack_message(uint8_t *buffer) {
     buffer[0] = START_BYTE;
     buffer[1] = CMD_HANDSHAKE_ACK;

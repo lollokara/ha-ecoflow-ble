@@ -122,7 +122,7 @@ static void UART_Init(void) {
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
     huart6.Instance = USART6;
-    huart6.Init.BaudRate = 115200;
+    huart6.Init.BaudRate = 460800;
     huart6.Init.WordLength = UART_WORDLENGTH_8B;
     huart6.Init.StopBits = UART_STOPBITS_1;
     huart6.Init.Parity = UART_PARITY_NONE;
@@ -182,6 +182,12 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         uint8_t op;
         if (unpack_log_manager_op_message(packet, &op) == 0) {
             LogManager_HandleManagerOp(op);
+        }
+    }
+    else if (cmd == CMD_LOG_RESEND_REQ) {
+        uint32_t offset;
+        if (unpack_log_resend_req_message(packet, &offset) == 0) {
+            LogManager_SeekDownload(offset);
         }
     }
     else if (cmd == CMD_ESP_LOG_DATA) {

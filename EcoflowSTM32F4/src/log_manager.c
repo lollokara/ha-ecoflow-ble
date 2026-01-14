@@ -393,6 +393,17 @@ void LogManager_HandleDownloadReq(const char* filename) {
     xSemaphoreGive(LogMutex);
 }
 
+void LogManager_SeekDownload(uint32_t offset) {
+    if (!LogMutex) return;
+    if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
+        if (Downloading) {
+            DownloadOffset = offset;
+            printf("DL: Seek to %lu\n", offset);
+        }
+        xSemaphoreGive(LogMutex);
+    }
+}
+
 void LogManager_HandleDeleteReq(const char* filename) {
     if (!LogMutex) return;
     xSemaphoreTake(LogMutex, portMAX_DELAY);
