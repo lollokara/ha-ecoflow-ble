@@ -29,13 +29,14 @@ static void LogToStm(esp_log_level_t level, const char* file, const char* func, 
 
     // 2. STM32 Log
     // Format: [Filename] Function() Message
-    // Example: [EcoflowDataParser.cpp] logFullDeltaPro3Data() --- Full D3P Dump ---
-    char stm_buf[512];
-    snprintf(stm_buf, sizeof(stm_buf), "[%s] %s() %s", filename, func, loc_buf);
+    // Target Format on STM32: [Timestamp] [Filename] Function() Message
+    // Stm32Serial sends (tag, msg). STM32 writes [Timestamp] [tag] msg.
+    // So we pass 'filename' as tag, and 'Function() Message' as msg.
+    char stm_msg[512];
+    snprintf(stm_msg, sizeof(stm_msg), "%s() %s", func, loc_buf);
 
     // Send
-    // Level mapping: ESP_LOG_INFO (3) -> Protocol Level (3)
-    Stm32Serial::getInstance().sendEspLog((uint8_t)level, "ESP32", stm_buf);
+    Stm32Serial::getInstance().sendEspLog((uint8_t)level, filename, stm_msg);
 }
 
 // Macros to replace ESP_LOGx

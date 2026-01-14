@@ -279,11 +279,30 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         }
     } else if (cmd == CMD_GET_FULL_CONFIG) {
         sendEspLog(ESP_LOG_INFO, "CFG", "--- ESP32 Config ---");
-        char buf[64];
+        char buf[128];
+        snprintf(buf, sizeof(buf), "Version: %s %s", __DATE__, __TIME__);
+        sendEspLog(ESP_LOG_INFO, "CFG", buf);
         snprintf(buf, sizeof(buf), "MAC: %s", WiFi.macAddress().c_str());
         sendEspLog(ESP_LOG_INFO, "CFG", buf);
         snprintf(buf, sizeof(buf), "IP: %s", WiFi.localIP().toString().c_str());
         sendEspLog(ESP_LOG_INFO, "CFG", buf);
+
+        // Connected Devices Dump
+        sendEspLog(ESP_LOG_INFO, "CFG", "--- Connected Devices ---");
+        DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
+        const char* names[] = {"Delta 3", "Wave 2", "Delta Pro 3", "Alt Charger"};
+
+        for(int i=0; i<4; i++) {
+             DeviceSlot* s = DeviceManager::getInstance().getSlot(types[i]);
+             if(s && (s->isConnected || !s->macAddress.empty())) {
+                 snprintf(buf, sizeof(buf), "%s: SN=%s, MAC=%s, Conn=%d",
+                    names[i],
+                    s->serialNumber.empty() ? "N/A" : s->serialNumber.c_str(),
+                    s->macAddress.empty() ? "N/A" : s->macAddress.c_str(),
+                    s->isConnected);
+                 sendEspLog(ESP_LOG_INFO, "CFG", buf);
+             }
+        }
     } else if (cmd == CMD_GET_DEBUG_DUMP) {
         EcoflowDataParser::triggerDebugDump();
     } else if (cmd == CMD_LOG_LIST_RESP) {

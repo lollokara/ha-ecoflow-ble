@@ -9,10 +9,10 @@
 #include <algorithm>
 
 static const char* TAG = "EcoflowDataParser";
-static uint32_t dumpTimestamp = 0;
+static uint32_t currentDumpId = 0;
 
 void EcoflowDataParser::triggerDebugDump() {
-    dumpTimestamp = millis();
+    currentDumpId++;
 }
 
 // --- Helper Functions ---
@@ -54,8 +54,36 @@ static bool is_flow_on(uint32_t x) {
     return (x & 0b11) >= 0b10;
 }
 
+static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
+    LOG_STM_I(TAG, "--- Full Delta 3 Dump ---");
+    if (msg.has_cms_batt_soc) LOG_STM_I(TAG, "cms_batt_soc: %.2f", msg.cms_batt_soc);
+    if (msg.has_bms_batt_soc) LOG_STM_I(TAG, "bms_batt_soc: %.2f", msg.bms_batt_soc);
+    if (msg.has_pow_get_ac_in) LOG_STM_I(TAG, "pow_get_ac_in: %.2f", msg.pow_get_ac_in);
+    if (msg.has_pow_get_ac_out) LOG_STM_I(TAG, "pow_get_ac_out: %.2f", msg.pow_get_ac_out);
+    if (msg.has_pow_in_sum_w) LOG_STM_I(TAG, "pow_in_sum_w: %.2f", msg.pow_in_sum_w);
+    if (msg.has_pow_out_sum_w) LOG_STM_I(TAG, "pow_out_sum_w: %.2f", msg.pow_out_sum_w);
+    if (msg.has_pow_get_12v) LOG_STM_I(TAG, "pow_get_12v: %.2f", msg.pow_get_12v);
+    if (msg.has_pow_get_pv) LOG_STM_I(TAG, "pow_get_pv: %.2f", msg.pow_get_pv);
+    if (msg.has_plug_in_info_pv_type) LOG_STM_I(TAG, "plug_in_info_pv_type: %d", (int)msg.plug_in_info_pv_type);
+    if (msg.has_pow_get_typec1) LOG_STM_I(TAG, "pow_get_typec1: %.2f", msg.pow_get_typec1);
+    if (msg.has_pow_get_typec2) LOG_STM_I(TAG, "pow_get_typec2: %.2f", msg.pow_get_typec2);
+    if (msg.has_pow_get_qcusb1) LOG_STM_I(TAG, "pow_get_qcusb1: %.2f", msg.pow_get_qcusb1);
+    if (msg.has_pow_get_qcusb2) LOG_STM_I(TAG, "pow_get_qcusb2: %.2f", msg.pow_get_qcusb2);
+    if (msg.has_plug_in_info_ac_charger_flag) LOG_STM_I(TAG, "plug_in_info_ac_charger_flag: %d", (int)msg.plug_in_info_ac_charger_flag);
+    if (msg.has_energy_backup_en) LOG_STM_I(TAG, "energy_backup_en: %d", (int)msg.energy_backup_en);
+    if (msg.has_energy_backup_start_soc) LOG_STM_I(TAG, "energy_backup_start_soc: %d", (int)msg.energy_backup_start_soc);
+    if (msg.has_pow_get_bms) LOG_STM_I(TAG, "pow_get_bms: %.2f", msg.pow_get_bms);
+    if (msg.has_cms_min_dsg_soc) LOG_STM_I(TAG, "cms_min_dsg_soc: %d", (int)msg.cms_min_dsg_soc);
+    if (msg.has_cms_max_chg_soc) LOG_STM_I(TAG, "cms_max_chg_soc: %d", (int)msg.cms_max_chg_soc);
+    if (msg.has_bms_max_cell_temp) LOG_STM_I(TAG, "bms_max_cell_temp: %d", (int)msg.bms_max_cell_temp);
+    if (msg.has_flow_info_12v) LOG_STM_I(TAG, "flow_info_12v: %d", (int)msg.flow_info_12v);
+    if (msg.has_flow_info_ac_out) LOG_STM_I(TAG, "flow_info_ac_out: %d", (int)msg.flow_info_ac_out);
+    if (msg.has_plug_in_info_ac_in_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_pow_max);
+    if (msg.has_flow_info_qcusb1) LOG_STM_I(TAG, "flow_info_qcusb1: %d", (int)msg.flow_info_qcusb1);
+}
+
 static void logDelta3Data(const Delta3Data& d) {
-    LOG_STM_I(TAG, "=== Delta 3 Data ===");
+    LOG_STM_I(TAG, "--- Delta 3 Summary ---");
     LOG_STM_I(TAG, "Batt: %.1f%% (In: %.1fW, Out: %.1fW)", d.batteryLevel, d.batteryInputPower, d.batteryOutputPower);
     LOG_STM_I(TAG, "AC In: %.1fW, AC Out: %.1fW", d.acInputPower, d.acOutputPower);
     LOG_STM_I(TAG, "DC In: %.1fW (State: %d, Solar: %.1fW)", d.dcPortInputPower, d.dcPortState, d.solarInputPower);
@@ -67,7 +95,7 @@ static void logDelta3Data(const Delta3Data& d) {
 }
 
 static void logWave2Data(const Wave2Data& w) {
-    LOG_STM_I(TAG, "=== Wave 2 Data ===");
+    LOG_STM_I(TAG, "--- Full Wave 2 Dump ---");
     LOG_STM_I(TAG, "Mode: %d (Sub: %d), PwrMode: %d", w.mode, w.subMode, w.powerMode);
     LOG_STM_I(TAG, "Temps: Env=%.2f, Out=%.2f, Set=%d", w.envTemp, w.outLetTemp, w.setTemp);
     LOG_STM_I(TAG, "Batt: %d%% (Stat: %d), Rem: %dm/%dm", w.batSoc, w.batChgStatus, w.batChgRemainTime, w.batDsgRemainTime);
@@ -356,7 +384,7 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
 }
 
 static void logAlternatorChargerData(const AlternatorChargerData& d) {
-    LOG_STM_I(TAG, "=== Alternator Charger Data ===");
+    LOG_STM_I(TAG, "--- Full Alternator Charger Dump ---");
     LOG_STM_I(TAG, "Mode: %d, Open: %d", d.chargerMode, d.chargerOpen);
     LOG_STM_I(TAG, "Car Batt: %.1fV, Limit: %dW", d.carBatteryVoltage, d.powerLimit);
     LOG_STM_I(TAG, "DC Power: %.1fW", d.dcPower);
@@ -467,8 +495,11 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     d3.dcOn = d3.dc12vPort;
                     if (d3_msg.has_flow_info_qcusb1) d3.usbOn = is_flow_on(d3_msg.flow_info_qcusb1);
 
-                    // logDelta3Data(d3); // Reduce spam
-                    if (millis() - dumpTimestamp < 10000) logDelta3Data(d3);
+                    static uint32_t lastDumpId = 0;
+                    if (currentDumpId > lastDumpId) {
+                        logFullDelta3Data(d3_msg);
+                        lastDumpId = currentDumpId;
+                    }
                 }
             }
             break;
@@ -535,7 +566,11 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
                      if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
 
-                     if (millis() - dumpTimestamp < 10000) logFullDeltaPro3Data(mr521_msg);
+                     static uint32_t lastDumpId = 0;
+                     if (currentDumpId > lastDumpId) {
+                         logFullDeltaPro3Data(mr521_msg);
+                         lastDumpId = currentDumpId;
+                     }
                 }
             }
             break;
@@ -567,8 +602,11 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (msg.has_sp_charger_car_batt_chg_amp_max) ac.reverseChargingCurrentMax = msg.sp_charger_car_batt_chg_amp_max;
                     if (msg.has_sp_charger_dev_batt_chg_amp_max) ac.chargingCurrentMax = msg.sp_charger_dev_batt_chg_amp_max;
 
-                    // logAlternatorChargerData(ac);
-                    if (millis() - dumpTimestamp < 10000) logFullAlternatorChargerData(msg);
+                    static uint32_t lastDumpId = 0;
+                    if (currentDumpId > lastDumpId) {
+                        logFullAlternatorChargerData(msg);
+                        lastDumpId = currentDumpId;
+                    }
                 }
             }
             break;
@@ -622,7 +660,11 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     else if (w2.batDsgRemainTime > 0 && w2.batDsgRemainTime < 6000) w2.remainingTime = w2.batDsgRemainTime;
                     else w2.remainingTime = 0;
 
-                    if (millis() - dumpTimestamp < 10000) logWave2Data(w2);
+                    static uint32_t lastDumpId = 0;
+                    if (currentDumpId > lastDumpId) {
+                        logWave2Data(w2);
+                        lastDumpId = currentDumpId;
+                    }
                 }
             }
             break;
