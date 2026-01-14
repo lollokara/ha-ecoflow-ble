@@ -302,9 +302,6 @@ void StartUARTTask(void * argument) {
     uartTxMutex = xSemaphoreCreateMutex();
     uartTxQueue = xQueueCreate(10, sizeof(TxMessage));
 
-    // Request Boot Data from ESP32 (now safe to use UART)
-    LogManager_RequestBootData();
-
     uint8_t tx_buf[32];
     int len;
     uint8_t b;
@@ -395,6 +392,29 @@ void StartUARTTask(void * argument) {
                     }
                     break;
                 case STATE_POLLING:
+                    {
+                        static bool bootDataRequested = false;
+                        static uint32_t lastDumpReq = 0;
+
+                        if (!bootDataRequested) {
+                            // First, get config (Section 2)
+                            uint8_t buf[32];
+                            int l = pack_simple_cmd_message(buf, CMD_GET_FULL_CONFIG);
+                            UART_SendRaw(buf, l);
+
+                            bootDataRequested = true;
+                            lastDumpReq = xTaskGetTickCount();
+                        } else {
+                            // Later (2s), request Debug Dump (Section 3) to prevent flooding
+                            static bool dumpRequested = false;
+                            if (!dumpRequested && (xTaskGetTickCount() - lastDumpReq > pdMS_TO_TICKS(2000))) {
+                                uint8_t buf[32];
+                                int l = pack_simple_cmd_message(buf, CMD_GET_DEBUG_DUMP);
+                                UART_SendRaw(buf, l);
+                                dumpRequested = true;
+                            }
+                        }
+                    }
                     if (knownDevices.count > 0) {
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
                         if (knownDevices.devices[currentDeviceIndex].connected) {

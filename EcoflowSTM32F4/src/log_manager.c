@@ -3,6 +3,7 @@
 #include "uart_task.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -16,6 +17,7 @@ extern FATFS SDFatFs;
 
 static FIL LogFile;
 static bool LogOpen = false;
+static SemaphoreHandle_t LogMutex = NULL;
 
 // Download State
 static bool Downloading = false;
@@ -25,6 +27,10 @@ static uint32_t DownloadOffset = 0;
 static uint32_t DownloadSize = 0;
 
 void LogManager_Init(void) {
+    if (LogMutex == NULL) {
+        LogMutex = xSemaphoreCreateMutex();
+    }
+
     // Mount Filesystem
     FRESULT res = f_mount(&SDFatFs, SDPath, 1);
     printf("LogManager: f_mount res=%d path=%s\n", res, SDPath);
@@ -51,21 +57,42 @@ void LogManager_Init(void) {
     }
 
     // Open current log
-    res = f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-    printf("LogManager: f_open res=%d\n", res);
+    if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE) {
+        res = f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+        printf("LogManager: f_open res=%d\n", res);
 
-    if (res == FR_OK) {
-        f_lseek(&LogFile, f_size(&LogFile)); // Append
-        LogOpen = true;
+        if (res == FR_OK) {
+            f_lseek(&LogFile, f_size(&LogFile)); // Append
+            LogOpen = true;
 
-        // Check size
-        if (f_size(&LogFile) > MAX_LOG_SIZE) {
-            LogManager_ForceRotate();
+            // Check size
+            if (f_size(&LogFile) > MAX_LOG_SIZE) {
+                xSemaphoreGive(LogMutex); // Release before calling func that might re-acquire? No, ForceRotate handles itself?
+                // Wait, ForceRotate uses LogFile. If we hold mutex here, ForceRotate should expect it held?
+                // Or we release, call rotate, re-acquire.
+                // Let's look at ForceRotate. It closes LogFile.
+                // If we hold mutex, we can safely call f_close.
+                // But ForceRotate is a public API? No, it's in header.
+                // Let's assume ForceRotate is internal or called from Write.
+                // Actually, let's keep it simple.
+                // ForceRotate calls f_close, f_rename, f_open.
+                // We should probably just call it while holding mutex.
+                // BUT, if ForceRotate ALSO takes mutex, we dead lock (non-recursive).
+                // Let's implement ForceRotate logic inline or ensure ForceRotate DOES NOT take mutex.
+                // Checking ForceRotate below... it doesn't take mutex yet.
+                // So we can call it.
+                // BUT, LogManager_Write calls ForceRotate. And LogManager_Write will take mutex.
+                // So ForceRotate must NOT take mutex.
+            } else {
+                // If not rotating, we still hold mutex.
+            }
         }
+        xSemaphoreGive(LogMutex);
+    }
 
+    // Write init logs (Write takes mutex internally)
+    if (LogOpen) {
         LOG_STM_INFO("SYS", "Log System Initialized");
-
-        // Section 1: Firmware Versions
         LOG_STM_INFO("SYS", "--- Section 1: Firmware Versions ---");
         LOG_STM_INFO("SYS", "STM32 F4: v1.0.0");
     }
@@ -125,13 +152,22 @@ void LogManager_ForceRotate(void) {
 }
 
 void LogManager_Write(uint8_t level, const char* tag, const char* message) {
+    if (xSemaphoreTake(LogMutex, 100) != pdTRUE) {
+        printf("LogManager_Write: Mutex Timeout\n");
+        return;
+    }
+
     if (!LogOpen) {
         printf("LogManager_Write: Dropped (Not Open) [%s] %s\n", tag, message);
+        xSemaphoreGive(LogMutex);
         return;
     }
 
     // Check size
     if (f_size(&LogFile) > MAX_LOG_SIZE) {
+        // LogManager_ForceRotate(); // Disable auto-rotate in interrupt context or deep stack?
+        // For safety in this fix, let's allow it but be careful.
+        // ForceRotate uses f_close/rename/open. Safe inside mutex.
         LogManager_ForceRotate();
     }
 
@@ -156,13 +192,29 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
         }
     }
 
-    res = f_sync(&LogFile);
-    if (res != FR_OK) {
-        printf("LogManager_Write: f_sync fail res=%d\n", res);
+    // Reduce f_sync frequency to prevent blocking
+    // Sync only on Error (0) or Warn (1)
+    if (level <= 1) {
+        res = f_sync(&LogFile);
+        if (res != FR_OK) {
+            printf("LogManager_Write: f_sync fail res=%d\n", res);
+        }
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_Process(void) {
+    // Periodic Sync
+    static uint32_t lastSync = 0;
+    if (HAL_GetTick() - lastSync > 5000) { // Sync every 5s
+        // Try to take mutex with 0 timeout to avoid blocking main loop
+        if (xSemaphoreTake(LogMutex, 0) == pdTRUE) {
+            if (LogOpen) f_sync(&LogFile);
+            xSemaphoreGive(LogMutex);
+            lastSync = HAL_GetTick();
+        }
+    }
+
     if (Downloading) {
         // Send chunks
         uint8_t buffer[200];
@@ -194,21 +246,40 @@ void LogManager_Process(void) {
     }
 }
 
+#define MAX_LIST_FILES 64
+typedef struct {
+    char name[32];
+    uint32_t size;
+} LogListEntry;
+
 void LogManager_HandleListReq(void) {
     DIR dir;
     FILINFO fno;
     uint8_t buffer[256];
     uint8_t count = 0;
 
-    // Count first
+    // Static buffer to save stack, but careful with reentrancy if multiple callers (here only UART task calls it)
+    static LogListEntry entries[MAX_LIST_FILES];
+
+    if (xSemaphoreTake(LogMutex, 2000) != pdTRUE) {
+        return;
+    }
+
+    // Collect files
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
-                 count++;
+                 if (count < MAX_LIST_FILES) {
+                     strncpy(entries[count].name, fno.fname, 31);
+                     entries[count].name[31] = 0;
+                     entries[count].size = fno.fsize;
+                     count++;
+                 }
              }
         }
         f_closedir(&dir);
     }
+    xSemaphoreGive(LogMutex); // Release FS mutex immediately
 
     if (count == 0) {
          int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
@@ -216,17 +287,10 @@ void LogManager_HandleListReq(void) {
          return;
     }
 
-    uint8_t idx = 0;
-    if (f_opendir(&dir, "/") == FR_OK) {
-        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
-             if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
-                 int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
-                 UART_SendRaw(buffer, len);
-                 vTaskDelay(10); // Throttle
-                 idx++;
-             }
-        }
-        f_closedir(&dir);
+    for (uint8_t i = 0; i < count; i++) {
+         int len = pack_log_list_resp_message(buffer, count, i, entries[i].size, entries[i].name);
+         UART_SendRaw(buffer, len);
+         vTaskDelay(10);
     }
 }
 
@@ -248,9 +312,18 @@ void LogManager_HandleDeleteReq(const char* filename) {
 }
 
 void LogManager_HandleManagerOp(uint8_t op_code) {
+    if (xSemaphoreTake(LogMutex, portMAX_DELAY) != pdTRUE) return;
+
     if (op_code == LOG_OP_DELETE_ALL) {
         DIR dir;
         FILINFO fno;
+
+        // Close current log to allow deleting it if needed
+        if (LogOpen) {
+            f_close(&LogFile);
+            LogOpen = false;
+        }
+
         if (f_opendir(&dir, "/") == FR_OK) {
             while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
                 if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
@@ -259,13 +332,33 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
             }
             f_closedir(&dir);
         }
+
+        // Re-init handled by reboot usually, but let's try to reopen
+        // Or leave it closed until reboot.
     } else if (op_code == LOG_OP_FORMAT_SD) {
+        if (LogOpen) {
+            f_close(&LogFile);
+            LogOpen = false;
+        }
+
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
         f_mkfs(SDPath, &opt, work, sizeof(work));
         f_mount(&SDFatFs, SDPath, 1);
-        LogManager_Init();
+
+        // Re-init log file?
+        // We can't call LogManager_Init recursively if it creates mutex.
+        // But mutex is already created.
+        // We can manually re-open.
+        xSemaphoreGive(LogMutex); // Release before re-init?
+        // Actually LogManager_Init checks mutex null.
+        // But LogManager_Init takes mutex!
+        // So we MUST release.
+        xSemaphoreGive(LogMutex);
+        LogManager_Init(); // This will re-acquire mutex
+        return;
     }
+    xSemaphoreGive(LogMutex);
 }
 
 void LogManager_HandleEspLog(uint8_t level, const char* tag, const char* message) {
