@@ -11,14 +11,15 @@
 static const char* TAG = "EcoflowDataParser";
 static uint32_t dumpTimestamp = 0;
 
-void EcoflowDataParser::triggerDebugDump() {
+namespace EcoflowDataParser {
+
+void triggerDebugDump() {
     dumpTimestamp = millis();
 }
 
 // --- Helper Functions ---
 
 bool pb_decode_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    // We don't need to actually decode strings for this application, just skip
     return pb_read(stream, NULL, stream->bytes_left);
 }
 
@@ -37,7 +38,6 @@ static uint32_t get_uint32_le(const uint8_t* data) {
 }
 
 static int16_t swap_endian_and_parse_signed_int(const uint8_t* data) {
-    // Little Endian Signed Short
     int16_t val = (int16_t)(data[0] | (data[1] << 8));
     return val;
 }
@@ -55,7 +55,6 @@ static bool is_flow_on(uint32_t x) {
 }
 
 static void logDelta3Data(const Delta3Data& d) {
-    // Header for Delta 3
     LOG_STM_I(TAG, "--- Full Delta 3 Dump ---");
     LOG_STM_I(TAG, "batteryLevel: %.2f", d.batteryLevel);
     LOG_STM_I(TAG, "batteryInputPower: %.2f", d.batteryInputPower);
@@ -231,39 +230,6 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_plug_in_info_pv_h_charger_flag) LOG_STM_I(TAG, "plug_in_info_pv_h_charger_flag: %d", (int)msg.plug_in_info_pv_h_charger_flag);
     if (msg.has_plug_in_info_pv_l_dc_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_l_dc_amp_max: %d", (int)msg.plug_in_info_pv_l_dc_amp_max);
     if (msg.has_plug_in_info_pv_h_dc_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_h_dc_amp_max: %d", (int)msg.plug_in_info_pv_h_dc_amp_max);
-    if (msg.has_fast_charge_switch) LOG_STM_I(TAG, "fast_charge_switch: %d", (int)msg.fast_charge_switch);
-    if (msg.has_plug_in_info_4p8_1_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_4p8_1_dsg_chg_type: %d", (int)msg.plug_in_info_4p8_1_dsg_chg_type);
-    if (msg.has_plug_in_info_4p8_1_firm_ver) LOG_STM_I(TAG, "plug_in_info_4p8_1_firm_ver: %d", (int)msg.plug_in_info_4p8_1_firm_ver);
-    if (msg.has_plug_in_info_4p8_2_dsg_chg_type) LOG_STM_I(TAG, "plug_in_info_4p8_2_dsg_chg_type: %d", (int)msg.plug_in_info_4p8_2_dsg_chg_type);
-    if (msg.has_plug_in_info_4p8_2_firm_ver) LOG_STM_I(TAG, "plug_in_info_4p8_2_firm_ver: %d", (int)msg.plug_in_info_4p8_2_firm_ver);
-    if (msg.has_plug_in_info_5p8_dsg_chg) LOG_STM_I(TAG, "plug_in_info_5p8_dsg_chg: %d", (int)msg.plug_in_info_5p8_dsg_chg);
-    if (msg.has_plug_in_info_5p8_firm_ver) LOG_STM_I(TAG, "plug_in_info_5p8_firm_ver: %d", (int)msg.plug_in_info_5p8_firm_ver);
-    if (msg.has_en_beep) LOG_STM_I(TAG, "en_beep: %d", (int)msg.en_beep);
-    if (msg.has_llc_GFCI_flag) LOG_STM_I(TAG, "llc_GFCI_flag: %d", (int)msg.llc_GFCI_flag);
-    if (msg.has_plug_in_info_ac_charger_flag) LOG_STM_I(TAG, "plug_in_info_ac_charger_flag: %d", (int)msg.plug_in_info_ac_charger_flag);
-    if (msg.has_plug_in_info_5p8_charger_flag) LOG_STM_I(TAG, "plug_in_info_5p8_charger_flag: %d", (int)msg.plug_in_info_5p8_charger_flag);
-    if (msg.has_plug_in_info_5p8_run_state) LOG_STM_I(TAG, "plug_in_info_5p8_run_state: %d", (int)msg.plug_in_info_5p8_run_state);
-    if (msg.has_plug_in_info_4p8_1_charger_flag) LOG_STM_I(TAG, "plug_in_info_4p8_1_charger_flag: %d", (int)msg.plug_in_info_4p8_1_charger_flag);
-    if (msg.has_plug_in_info_4p8_1_run_state) LOG_STM_I(TAG, "plug_in_info_4p8_1_run_state: %d", (int)msg.plug_in_info_4p8_1_run_state);
-    if (msg.has_plug_in_info_4p8_2_charger_flag) LOG_STM_I(TAG, "plug_in_info_4p8_2_charger_flag: %d", (int)msg.plug_in_info_4p8_2_charger_flag);
-    if (msg.has_plug_in_info_4p8_2_run_state) LOG_STM_I(TAG, "plug_in_info_4p8_2_run_state: %d", (int)msg.plug_in_info_4p8_2_run_state);
-    if (msg.has_plug_in_info_ac_in_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_pow_max);
-    if (msg.has_plug_in_info_5p8_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_5p8_chg_pow_max: %d", (int)msg.plug_in_info_5p8_chg_pow_max);
-    if (msg.has_ac_out_freq) LOG_STM_I(TAG, "ac_out_freq: %d", (int)msg.ac_out_freq);
-    if (msg.has_dev_sleep_state) LOG_STM_I(TAG, "dev_sleep_state: %d", (int)msg.dev_sleep_state);
-    if (msg.has_pd_err_code) LOG_STM_I(TAG, "pd_err_code: %d", (int)msg.pd_err_code);
-    if (msg.has_llc_err_code) LOG_STM_I(TAG, "llc_err_code: %d", (int)msg.llc_err_code);
-    if (msg.has_mppt_err_code) LOG_STM_I(TAG, "mppt_err_code: %d", (int)msg.mppt_err_code);
-    if (msg.has_plug_in_info_5p8_err_code) LOG_STM_I(TAG, "plug_in_info_5p8_err_code: %d", (int)msg.plug_in_info_5p8_err_code);
-    if (msg.has_plug_in_info_4p8_1_err_code) LOG_STM_I(TAG, "plug_in_info_4p8_1_err_code: %d", (int)msg.plug_in_info_4p8_1_err_code);
-    if (msg.has_plug_in_info_4p8_2_err_code) LOG_STM_I(TAG, "plug_in_info_4p8_2_err_code: %d", (int)msg.plug_in_info_4p8_2_err_code);
-    if (msg.has_pcs_fan_err_flag) LOG_STM_I(TAG, "pcs_fan_err_flag: %d", (int)msg.pcs_fan_err_flag);
-    if (msg.has_llc_hv_lv_flag) LOG_STM_I(TAG, "llc_hv_lv_flag: %d", (int)msg.llc_hv_lv_flag);
-    if (msg.has_llc_inv_err_code) LOG_STM_I(TAG, "llc_inv_err_code: %d", (int)msg.llc_inv_err_code);
-    if (msg.has_plug_in_info_pv_h_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv_h_chg_vol_max: %d", (int)msg.plug_in_info_pv_h_chg_vol_max);
-    if (msg.has_plug_in_info_pv_l_chg_vol_max) LOG_STM_I(TAG, "plug_in_info_pv_l_chg_vol_max: %d", (int)msg.plug_in_info_pv_l_chg_vol_max);
-    if (msg.has_plug_in_info_pv_l_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_l_chg_amp_max: %d", (int)msg.plug_in_info_pv_l_chg_amp_max);
-    if (msg.has_plug_in_info_pv_h_chg_amp_max) LOG_STM_I(TAG, "plug_in_info_pv_h_chg_amp_max: %d", (int)msg.plug_in_info_pv_h_chg_amp_max);
     if (msg.has_plug_in_info_5p8_dsg_pow_max) LOG_STM_I(TAG, "plug_in_info_5p8_dsg_pow_max: %d", (int)msg.plug_in_info_5p8_dsg_pow_max);
     if (msg.has_plug_in_info_ac_out_dsg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_out_dsg_pow_max: %d", (int)msg.plug_in_info_ac_out_dsg_pow_max);
     if (msg.has_bms_batt_soc) LOG_STM_I(TAG, "bms_batt_soc: %.2f", msg.bms_batt_soc);
@@ -380,15 +346,8 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_module_wifi_snr) LOG_STM_I(TAG, "module_wifi_snr: %.2f", msg.module_wifi_snr);
     if (msg.has_module_wifi_rssi) LOG_STM_I(TAG, "module_wifi_rssi: %.2f", msg.module_wifi_rssi);
     if (msg.has_sp_charger_chg_pow_max) LOG_STM_I(TAG, "sp_charger_chg_pow_max: %.2f", msg.sp_charger_chg_pow_max);
-    if (msg.has_sp_charger_extension_line_p_setting) LOG_STM_I(TAG, "sp_charger_extension_line_p_setting: %.2f", msg.sp_charger_extension_line_p_setting);
-    if (msg.has_sp_charger_extension_line_n_setting) LOG_STM_I(TAG, "sp_charger_extension_line_n_setting: %.2f", msg.sp_charger_extension_line_n_setting);
-    if (msg.has_sp_charger_driving_chg_setting) LOG_STM_I(TAG, "sp_charger_driving_chg_setting: %d", (int)msg.sp_charger_driving_chg_setting);
-    if (msg.has_sp_charger_car_batt_chg_amp_limit) LOG_STM_I(TAG, "sp_charger_car_batt_chg_amp_limit: %.2f", msg.sp_charger_car_batt_chg_amp_limit);
-    if (msg.has_sp_charger_dev_batt_chg_amp_limit) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_limit: %.2f", msg.sp_charger_dev_batt_chg_amp_limit);
-    if (msg.has_sp_charger_car_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_car_batt_chg_amp_max: %.2f", msg.sp_charger_car_batt_chg_amp_max);
-    if (msg.has_sp_charger_car_batt_urgent_chg_state) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_state: %d", (int)msg.sp_charger_car_batt_urgent_chg_state);
-    if (msg.has_sp_charger_dev_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_max: %.2f", msg.sp_charger_dev_batt_chg_amp_max);
-    if (msg.has_sp_charger_car_batt_urgent_chg_switch) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_switch: %d", (int)msg.sp_charger_car_batt_urgent_chg_switch);
+    if (msg.has_sp_charger_car_batt_vol_setting) LOG_STM_I(TAG, "sp_charger_car_batt_vol_setting: %d", (int)msg.sp_charger_car_batt_vol_setting);
+    if (msg.has_sp_charger_car_batt_vol) LOG_STM_I(TAG, "sp_charger_car_batt_vol: %.2f", msg.sp_charger_car_batt_vol);
 }
 
 static void logAlternatorChargerData(const AlternatorChargerData& d) {
@@ -439,8 +398,6 @@ static void logFullAlternatorChargerData(const dc009_apl_comm_DisplayPropertyUpl
     if (msg.has_sp_charger_dev_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_max: %.2f", msg.sp_charger_dev_batt_chg_amp_max);
     if (msg.has_sp_charger_car_batt_urgent_chg_switch) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_switch: %d", (int)msg.sp_charger_car_batt_urgent_chg_switch);
 }
-
-namespace EcoflowDataParser {
 
 void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
 
