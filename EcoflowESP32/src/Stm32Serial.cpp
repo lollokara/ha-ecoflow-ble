@@ -135,10 +135,6 @@ void Stm32Serial::update() {
 
             if (rx_idx == 3) {
                 expected_len = rx_buf[2];
-                if (expected_len > 250) {
-                    collecting = false;
-                    rx_idx = 0;
-                }
             } else if (rx_idx > 3) {
                  if (rx_idx == (4 + expected_len)) {
                     uint8_t received_crc = rx_buf[rx_idx - 1];
