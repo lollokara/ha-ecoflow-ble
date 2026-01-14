@@ -49,9 +49,16 @@ void LogManager_Init(void) {
 
     if (res == FR_NO_FILESYSTEM) {
         printf("No Filesystem. Formatting...\n");
+        // Refresh IWDG before long format operation
+        extern IWDG_HandleTypeDef hiwdg;
+        HAL_IWDG_Refresh(&hiwdg);
+
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
         FRESULT fmt_res = f_mkfs(SDPath, &opt, work, sizeof(work));
+
+        HAL_IWDG_Refresh(&hiwdg); // Refresh after format
+
         if (fmt_res == FR_OK) {
             printf("Format Success. Remounting...\n");
             FRESULT remount_res = f_mount(&SDFatFs, SDPath, 1);

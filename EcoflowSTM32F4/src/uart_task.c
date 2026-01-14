@@ -311,6 +311,7 @@ void StartUARTTask(void * argument) {
     TickType_t lastHandshakeTime = 0;
 
     for(;;) {
+        HAL_IWDG_Refresh(&hiwdg); // Refresh IWDG in high-priority task
         // Process Log Streaming
         LogManager_Process();
         // 1. Process RX
