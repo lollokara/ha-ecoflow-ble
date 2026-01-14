@@ -197,7 +197,10 @@ void LogManager_HandleListReq(void) {
     uint8_t buffer[256];
     uint8_t count = 0;
 
-    if (f_opendir(&dir, "/") == FR_OK) {
+    // Use global SDPath or fallback to "0:/" if empty (handled by ff usually)
+    const char* path = SDPath[0] ? SDPath : "0:/";
+
+    if (f_opendir(&dir, path) == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                  count++;
@@ -206,8 +209,14 @@ void LogManager_HandleListReq(void) {
         f_closedir(&dir);
     }
 
+    if (count == 0) {
+         int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
+         UART_SendRaw(buffer, len);
+         return;
+    }
+
     uint8_t idx = 0;
-    if (f_opendir(&dir, "/") == FR_OK) {
+    if (f_opendir(&dir, path) == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                  int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
@@ -217,11 +226,6 @@ void LogManager_HandleListReq(void) {
              }
         }
         f_closedir(&dir);
-    }
-
-    if (count == 0) {
-         int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
-         UART_SendRaw(buffer, len);
     }
 }
 
@@ -244,9 +248,16 @@ void LogManager_HandleDeleteReq(const char* filename) {
 
 void LogManager_HandleManagerOp(uint8_t op_code) {
     if (op_code == LOG_OP_DELETE_ALL) {
+        // Close current log before deleting
+        if (LogOpen) {
+            f_close(&LogFile);
+            LogOpen = false;
+        }
+
         DIR dir;
         FILINFO fno;
-        if (f_opendir(&dir, "/") == FR_OK) {
+        const char* path = SDPath[0] ? SDPath : "0:/";
+        if (f_opendir(&dir, path) == FR_OK) {
             while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
                 if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                     f_unlink(fno.fname);
@@ -254,12 +265,28 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
             }
             f_closedir(&dir);
         }
+
+        // Re-init (creates new current.log)
+        LogManager_Init();
+
     } else if (op_code == LOG_OP_FORMAT_SD) {
+        if (LogOpen) {
+            f_close(&LogFile);
+            LogOpen = false;
+        }
+        // Unmount
+        f_mount(0, SDPath, 0);
+
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
-        f_mkfs(SDPath, &opt, work, sizeof(work));
-        f_mount(&SDFatFs, SDPath, 1);
-        LogManager_Init();
+        FRESULT res = f_mkfs(SDPath, &opt, work, sizeof(work));
+
+        if (res == FR_OK) {
+             // Remount and Init
+             LogManager_Init();
+        } else {
+             printf("Format Failed: %d\n", res);
+        }
     }
 }
 
