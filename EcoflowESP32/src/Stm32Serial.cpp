@@ -9,6 +9,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include "EcoflowDataParser.h"
+#include "Logging.h"
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
@@ -502,7 +503,7 @@ void Stm32Serial::requestLogList() {
 
 std::vector<Stm32Serial::LogEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
-    while(!_logListReady && millis() - start < 5000) {
+    while(!_logListReady && millis() - start < 15000) {
         vTaskDelay(10);
     }
     xSemaphoreTake(_logListMutex, portMAX_DELAY);

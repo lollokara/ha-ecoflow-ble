@@ -80,6 +80,7 @@ static void logFullDelta3Data(const pd335_sys_DisplayPropertyUpload& msg) {
     if (msg.has_flow_info_ac_out) LOG_STM_I(TAG, "flow_info_ac_out: %d", (int)msg.flow_info_ac_out);
     if (msg.has_plug_in_info_ac_in_chg_pow_max) LOG_STM_I(TAG, "plug_in_info_ac_in_chg_pow_max: %d", (int)msg.plug_in_info_ac_in_chg_pow_max);
     if (msg.has_flow_info_qcusb1) LOG_STM_I(TAG, "flow_info_qcusb1: %d", (int)msg.flow_info_qcusb1);
+    if (msg.has_errcode) LOG_STM_I(TAG, "errcode: %d", (int)msg.errcode);
 }
 
 static void logDelta3Data(const Delta3Data& d) {
@@ -102,6 +103,16 @@ static void logWave2Data(const Wave2Data& w) {
     LOG_STM_I(TAG, "Power: Bat=%dW, MPPT=%dW, PSDR=%dW", w.batPwrWatt, w.mpptPwrWatt, w.psdrPwrWatt);
     LOG_STM_I(TAG, "Fan: %d, Water: %d, RGB: %d", w.fanValue, w.waterValue, w.rgbState);
     LOG_STM_I(TAG, "Err: %u, BMS Err: %d", w.errCode, w.bmsErr);
+}
+
+static void logDeltaPro3Data(const DeltaPro3Data& d) {
+    LOG_STM_I(TAG, "--- Delta Pro 3 Summary ---");
+    LOG_STM_I(TAG, "Batt: %.1f%% (Main: %.1f%%)", d.batteryLevel, d.batteryLevelMain);
+    LOG_STM_I(TAG, "AC In: %.1fW, AC Out: LV=%.1fW/HV=%.1fW", d.acInputPower, d.acLvOutputPower, d.acHvOutputPower);
+    LOG_STM_I(TAG, "DC: In LV=%.1fW/HV=%.1fW, Out 12V=%.1fW", d.dcLvInputPower, d.dcHvInputPower, d.dc12vOutputPower);
+    LOG_STM_I(TAG, "Solar: LV=%.1fW, HV=%.1fW", d.solarLvPower, d.solarHvPower);
+    LOG_STM_I(TAG, "Total: In=%.1fW, Out=%.1fW", d.inputPower, d.outputPower);
+    LOG_STM_I(TAG, "USB: C=%.1fW/%.1fW, A=%.1fW/%.1fW", d.usbcOutputPower, d.usbc2OutputPower, d.usbaOutputPower, d.usba2OutputPower);
 }
 
 static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
@@ -500,6 +511,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                         logFullDelta3Data(d3_msg);
                         lastDumpId = currentDumpId;
                     }
+
+                    static uint32_t lastLogTime = 0;
+                    if (millis() - lastLogTime > 5000) {
+                        logDelta3Data(d3);
+                        lastLogTime = millis();
+                    }
                 }
             }
             break;
@@ -571,6 +588,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                          logFullDeltaPro3Data(mr521_msg);
                          lastDumpId = currentDumpId;
                      }
+
+                     static uint32_t lastLogTime = 0;
+                     if (millis() - lastLogTime > 5000) {
+                         logDeltaPro3Data(d3p);
+                         lastLogTime = millis();
+                     }
                 }
             }
             break;
@@ -606,6 +629,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (currentDumpId > lastDumpId) {
                         logFullAlternatorChargerData(msg);
                         lastDumpId = currentDumpId;
+                    }
+
+                    static uint32_t lastLogTime = 0;
+                    if (millis() - lastLogTime > 5000) {
+                        logAlternatorChargerData(ac);
+                        lastLogTime = millis();
                     }
                 }
             }
@@ -664,6 +693,12 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (currentDumpId > lastDumpId) {
                         logWave2Data(w2);
                         lastDumpId = currentDumpId;
+                    }
+
+                    static uint32_t lastLogTime = 0;
+                    if (millis() - lastLogTime > 5000) {
+                        logWave2Data(w2);
+                        lastLogTime = millis();
                     }
                 }
             }

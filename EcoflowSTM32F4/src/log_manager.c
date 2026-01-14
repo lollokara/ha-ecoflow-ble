@@ -115,9 +115,15 @@ void LogManager_WriteSessionHeader(void) {
     if (!LogOpen) return;
 
     // Header Section 1
-    LogManager_Write_Internal(0, "SYS", "--- Firmware Versions ---");
-    LogManager_Write_Internal(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
-    LogManager_Write_Internal(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
+    char logBuf[256];
+    snprintf(logBuf, sizeof(logBuf), "%s() --- Firmware Versions ---", __FUNCTION__);
+    LogManager_Write_Internal(0, "log_manager.c", logBuf);
+
+    snprintf(logBuf, sizeof(logBuf), "%s() STM32 F4: v1.0.0", __FUNCTION__);
+    LogManager_Write_Internal(0, "log_manager.c", logBuf);
+
+    snprintf(logBuf, sizeof(logBuf), "%s() ESP32: v1.0.0", __FUNCTION__);
+    LogManager_Write_Internal(0, "log_manager.c", logBuf);
 
     // Request Section 2 & 3
     // UART_SendRaw uses its own mutex, safe to call while holding LogMutex or not
@@ -306,7 +312,7 @@ void LogManager_HandleListReq(void) {
                 if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                     int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                     UART_SendRaw(buffer, len);
-                    vTaskDelay(20); // Throttle - Mutex NOT held here
+                    vTaskDelay(1); // Throttle - Mutex NOT held here
                     idx++;
                 }
             }

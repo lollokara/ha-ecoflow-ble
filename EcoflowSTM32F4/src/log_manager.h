@@ -13,6 +13,27 @@ void LogManager_Process(void);
 
 // Logging API
 void LogManager_Write(uint8_t level, const char* tag, const char* message);
+
+#include <stdio.h>
+#include <string.h>
+
+#define LOG_STM_INFO(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "%s() " fmt, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(3, tag, _buf); \
+} while(0)
+
+#define LOG_STM_WARN(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "%s() " fmt, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(2, tag, _buf); \
+} while(0)
+
+#define LOG_STM_ERROR(tag, fmt, ...) do { \
+    char _buf[256]; \
+    snprintf(_buf, sizeof(_buf), "%s() " fmt, __FUNCTION__, ##__VA_ARGS__); \
+    LogManager_Write(1, tag, _buf); \
+} while(0)
 void LogManager_ForceRotate(void);
 
 // UART Command Handlers
