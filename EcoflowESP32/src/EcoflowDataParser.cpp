@@ -55,25 +55,52 @@ static bool is_flow_on(uint32_t x) {
 }
 
 static void logDelta3Data(const Delta3Data& d) {
-    LOG_STM_I(TAG, "=== Delta 3 Data ===");
-    LOG_STM_I(TAG, "Batt: %.1f%% (In: %.1fW, Out: %.1fW)", d.batteryLevel, d.batteryInputPower, d.batteryOutputPower);
-    LOG_STM_I(TAG, "AC In: %.1fW, AC Out: %.1fW", d.acInputPower, d.acOutputPower);
-    LOG_STM_I(TAG, "DC In: %.1fW (State: %d, Solar: %.1fW)", d.dcPortInputPower, d.dcPortState, d.solarInputPower);
-    LOG_STM_I(TAG, "Total In: %.1fW, Out: %.1fW", d.inputPower, d.outputPower);
-    LOG_STM_I(TAG, "12V Out: %.1fW, USB-C: %.1fW/%.1fW, USB-A: %.1fW/%.1fW",
-             d.dc12vOutputPower, d.usbcOutputPower, d.usbc2OutputPower, d.usbaOutputPower, d.usba2OutputPower);
-    LOG_STM_I(TAG, "SOC Limits: %d%% - %d%%, AC Chg Speed: %dW", d.batteryChargeLimitMin, d.batteryChargeLimitMax, d.acChargingSpeed);
-    LOG_STM_I(TAG, "Flags: AC Plugged=%d, Backup=%d, AC Ports=%d, 12V Port=%d", d.pluggedInAc, d.energyBackup, d.acPorts, d.dc12vPort);
+    // Header for Delta 3
+    LOG_STM_I(TAG, "--- Full Delta 3 Dump ---");
+    LOG_STM_I(TAG, "batteryLevel: %.2f", d.batteryLevel);
+    LOG_STM_I(TAG, "batteryInputPower: %.2f", d.batteryInputPower);
+    LOG_STM_I(TAG, "batteryOutputPower: %.2f", d.batteryOutputPower);
+    LOG_STM_I(TAG, "acInputPower: %.2f", d.acInputPower);
+    LOG_STM_I(TAG, "acOutputPower: %.2f", d.acOutputPower);
+    LOG_STM_I(TAG, "dcPortInputPower: %.2f", d.dcPortInputPower);
+    LOG_STM_I(TAG, "dcPortState: %d", (int)d.dcPortState);
+    LOG_STM_I(TAG, "solarInputPower: %.2f", d.solarInputPower);
+    LOG_STM_I(TAG, "inputPower: %.2f", d.inputPower);
+    LOG_STM_I(TAG, "outputPower: %.2f", d.outputPower);
+    LOG_STM_I(TAG, "dc12vOutputPower: %.2f", d.dc12vOutputPower);
+    LOG_STM_I(TAG, "usbcOutputPower: %.2f", d.usbcOutputPower);
+    LOG_STM_I(TAG, "usbc2OutputPower: %.2f", d.usbc2OutputPower);
+    LOG_STM_I(TAG, "usbaOutputPower: %.2f", d.usbaOutputPower);
+    LOG_STM_I(TAG, "usba2OutputPower: %.2f", d.usba2OutputPower);
+    LOG_STM_I(TAG, "batteryChargeLimitMin: %d", (int)d.batteryChargeLimitMin);
+    LOG_STM_I(TAG, "batteryChargeLimitMax: %d", (int)d.batteryChargeLimitMax);
+    LOG_STM_I(TAG, "acChargingSpeed: %d", (int)d.acChargingSpeed);
+    LOG_STM_I(TAG, "pluggedInAc: %d", (int)d.pluggedInAc);
+    LOG_STM_I(TAG, "energyBackup: %d", (int)d.energyBackup);
+    LOG_STM_I(TAG, "acPorts: %d", (int)d.acPorts);
+    LOG_STM_I(TAG, "dc12vPort: %d", (int)d.dc12vPort);
 }
 
 static void logWave2Data(const Wave2Data& w) {
-    LOG_STM_I(TAG, "=== Wave 2 Data ===");
-    LOG_STM_I(TAG, "Mode: %d (Sub: %d), PwrMode: %d", w.mode, w.subMode, w.powerMode);
-    LOG_STM_I(TAG, "Temps: Env=%.2f, Out=%.2f, Set=%d", w.envTemp, w.outLetTemp, w.setTemp);
-    LOG_STM_I(TAG, "Batt: %d%% (Stat: %d), Rem: %dm/%dm", w.batSoc, w.batChgStatus, w.batChgRemainTime, w.batDsgRemainTime);
-    LOG_STM_I(TAG, "Power: Bat=%dW, MPPT=%dW, PSDR=%dW", w.batPwrWatt, w.mpptPwrWatt, w.psdrPwrWatt);
-    LOG_STM_I(TAG, "Fan: %d, Water: %d, RGB: %d", w.fanValue, w.waterValue, w.rgbState);
-    LOG_STM_I(TAG, "Err: %u, BMS Err: %d", w.errCode, w.bmsErr);
+    LOG_STM_I(TAG, "--- Full Wave 2 Dump ---");
+    LOG_STM_I(TAG, "mode: %d", (int)w.mode);
+    LOG_STM_I(TAG, "subMode: %d", (int)w.subMode);
+    LOG_STM_I(TAG, "powerMode: %d", (int)w.powerMode);
+    LOG_STM_I(TAG, "envTemp: %.2f", w.envTemp);
+    LOG_STM_I(TAG, "outLetTemp: %.2f", w.outLetTemp);
+    LOG_STM_I(TAG, "setTemp: %d", (int)w.setTemp);
+    LOG_STM_I(TAG, "batSoc: %d", (int)w.batSoc);
+    LOG_STM_I(TAG, "batChgStatus: %d", (int)w.batChgStatus);
+    LOG_STM_I(TAG, "batChgRemainTime: %d", (int)w.batChgRemainTime);
+    LOG_STM_I(TAG, "batDsgRemainTime: %d", (int)w.batDsgRemainTime);
+    LOG_STM_I(TAG, "batPwrWatt: %d", (int)w.batPwrWatt);
+    LOG_STM_I(TAG, "mpptPwrWatt: %d", (int)w.mpptPwrWatt);
+    LOG_STM_I(TAG, "psdrPwrWatt: %d", (int)w.psdrPwrWatt);
+    LOG_STM_I(TAG, "fanValue: %d", (int)w.fanValue);
+    LOG_STM_I(TAG, "waterValue: %d", (int)w.waterValue);
+    LOG_STM_I(TAG, "rgbState: %d", (int)w.rgbState);
+    LOG_STM_I(TAG, "errCode: %u", (unsigned int)w.errCode);
+    LOG_STM_I(TAG, "bmsErr: %d", (int)w.bmsErr);
 }
 
 static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
@@ -353,6 +380,15 @@ static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {
     if (msg.has_module_wifi_snr) LOG_STM_I(TAG, "module_wifi_snr: %.2f", msg.module_wifi_snr);
     if (msg.has_module_wifi_rssi) LOG_STM_I(TAG, "module_wifi_rssi: %.2f", msg.module_wifi_rssi);
     if (msg.has_sp_charger_chg_pow_max) LOG_STM_I(TAG, "sp_charger_chg_pow_max: %.2f", msg.sp_charger_chg_pow_max);
+    if (msg.has_sp_charger_extension_line_p_setting) LOG_STM_I(TAG, "sp_charger_extension_line_p_setting: %.2f", msg.sp_charger_extension_line_p_setting);
+    if (msg.has_sp_charger_extension_line_n_setting) LOG_STM_I(TAG, "sp_charger_extension_line_n_setting: %.2f", msg.sp_charger_extension_line_n_setting);
+    if (msg.has_sp_charger_driving_chg_setting) LOG_STM_I(TAG, "sp_charger_driving_chg_setting: %d", (int)msg.sp_charger_driving_chg_setting);
+    if (msg.has_sp_charger_car_batt_chg_amp_limit) LOG_STM_I(TAG, "sp_charger_car_batt_chg_amp_limit: %.2f", msg.sp_charger_car_batt_chg_amp_limit);
+    if (msg.has_sp_charger_dev_batt_chg_amp_limit) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_limit: %.2f", msg.sp_charger_dev_batt_chg_amp_limit);
+    if (msg.has_sp_charger_car_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_car_batt_chg_amp_max: %.2f", msg.sp_charger_car_batt_chg_amp_max);
+    if (msg.has_sp_charger_car_batt_urgent_chg_state) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_state: %d", (int)msg.sp_charger_car_batt_urgent_chg_state);
+    if (msg.has_sp_charger_dev_batt_chg_amp_max) LOG_STM_I(TAG, "sp_charger_dev_batt_chg_amp_max: %.2f", msg.sp_charger_dev_batt_chg_amp_max);
+    if (msg.has_sp_charger_car_batt_urgent_chg_switch) LOG_STM_I(TAG, "sp_charger_car_batt_urgent_chg_switch: %d", (int)msg.sp_charger_car_batt_urgent_chg_switch);
 }
 
 static void logAlternatorChargerData(const AlternatorChargerData& d) {
