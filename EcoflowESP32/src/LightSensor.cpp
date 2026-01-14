@@ -17,20 +17,40 @@ void LightSensor::begin() {
 }
 
 void LightSensor::update() {
-    if (millis() - _lastUpdate < 100) return; // 10Hz sampling
+    if (millis() - _lastUpdate < 50) return; // 20Hz sampling for better smoothing
     _lastUpdate = millis();
 
-    // Subtract the last reading
-    _total = _total - _readings[_readIndex];
-
-    // Read new value
     int val = analogRead(_pin);
-    // Invert because typically LDR pullup means lower value = brighter light?
-    // Or depends on wiring. Standard LDR circuit:
-    // VCC -> LDR -> Pin -> R -> GND ==> Bright = High V (High ADC)
-    // VCC -> R -> Pin -> LDR -> GND ==> Bright = Low V (Low ADC)
-    // Assuming Bright = High ADC for now, or calibratable.
 
+    // Outlier Rejection: If val deviates significantly from average (and average is established), ignore it
+    // But allow it to adapt if sustained.
+    // Use a simple median-ish approach or just stronger smoothing?
+    // Let's implement a weighted check.
+
+    // First run?
+    if (_total == 0 && _average == 0) {
+         for (int i = 0; i < WINDOW_SIZE; i++) _readings[i] = val;
+         _total = val * WINDOW_SIZE;
+         _average = val;
+    }
+
+    // Spike filter: If deviation > 500, clamp it or ignore it.
+    // However, turning on a light IS a spike.
+    // We want to filter *noise*. Noise is usually high frequency.
+    // Let's rely on the moving average but increase window size?
+    // Or ignore one-off spikes.
+
+    static int consecutive_outliers = 0;
+    if (abs(val - _average) > 800) {
+        consecutive_outliers++;
+        if (consecutive_outliers < 5) {
+            return; // Ignore first few spikes
+        }
+    } else {
+        consecutive_outliers = 0;
+    }
+
+    _total = _total - _readings[_readIndex];
     _readings[_readIndex] = val;
     _total = _total + _readings[_readIndex];
     _readIndex = (_readIndex + 1);
