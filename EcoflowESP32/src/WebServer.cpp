@@ -28,6 +28,7 @@ public:
     }
     bool _sourceValid() const { return true; }
     virtual size_t _fillBuffer(uint8_t *data, size_t len){
+        if (len == 0) return 0;
         size_t read = 0;
         uint32_t start = millis();
         // Wait for data or completion, with timeout to prevent blocking Async task too long
@@ -37,7 +38,7 @@ public:
                 // If we run dry, wait briefly. 3000ms is safe for AsyncTCP (rx timeout is usually >3s).
                 // Increased to 3000ms to handle potential UART retries or gaps.
                 if (millis() - start > 3000) {
-                    ESP_LOGW(TAG, "Log Download Timeout. Buffered: %d", Stm32Serial::getInstance().getDownloadBufferSize());
+                    ESP_LOGW(TAG, "Log Download Timeout. Buffered: %d, ReqLen: %d", Stm32Serial::getInstance().getDownloadBufferSize(), len);
                     break;
                 }
                 vTaskDelay(5);
