@@ -65,7 +65,10 @@ static int remote_vprintf(const char *fmt, va_list args) {
         if (msgStart == NULL) msgStart = buf;
 
         // Recursion prevention: Do not forward logs from Stm32Serial itself
-        if (strcmp(tag, "Stm32Serial") != 0 && strcmp(tag, "EcoflowDataParser") != 0) {
+        // Filter out noisy tags to prevent WDT resets during high-traffic operations (like BLE Scan)
+        if (strcmp(tag, "Stm32Serial") != 0 &&
+            strcmp(tag, "EcoflowDataParser") != 0 &&
+            strcmp(tag, "NimBLEScan") != 0) {
              Stm32Serial::getInstance().sendEspLog(level, tag, msgStart);
         }
     }
