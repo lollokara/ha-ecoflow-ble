@@ -322,6 +322,7 @@ void StartUARTTask(void * argument) {
         LogManager_Process();
         // 1. Process RX
         while (rb_pop(&rx_ring_buffer, &b)) {
+            HAL_IWDG_Refresh(&hiwdg); // Prevent Watchdog timeout during burst processing (e.g. Logs)
             switch (parseState) {
                 case PARSE_START:
                     if (b == START_BYTE) {
