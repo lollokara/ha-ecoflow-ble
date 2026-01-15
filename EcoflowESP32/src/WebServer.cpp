@@ -20,6 +20,8 @@ public:
     LogResponse(String name) : _name(name) {
         _code = 200;
         _contentType = "application/octet-stream";
+        _sendContentLength = false;
+        _chunked = true;
         // Stm32Serial download already started by delayed handler.
         // DO NOT call startLogDownload here as it would reset the buffer.
     }
