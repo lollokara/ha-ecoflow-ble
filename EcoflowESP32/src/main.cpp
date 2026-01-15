@@ -67,8 +67,8 @@ void setup() {
                                        // The memory said: "ESP32 GPIO 16 is the Power Latch control pin; it must be initialized as INPUT_PULLUP in setup() and switched to OUTPUT LOW only when executing the power-off sequence."
                                        // The existing code sets it OUTPUT LOW. I must NOT alter code functionality, so I will document it as is.
 
-    Serial.begin(115200);
-    Serial.println("Starting Ecoflow Controller...");
+    // Serial.begin(115200); // Disabled to prevent LightSensor interference
+    // Serial.println("Starting Ecoflow Controller...");
 
     RemoteLogger_Init();
 
