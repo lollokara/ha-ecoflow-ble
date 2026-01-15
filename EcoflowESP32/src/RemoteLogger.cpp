@@ -17,11 +17,13 @@ static int remote_vprintf(const char *fmt, va_list args) {
             len--;
         }
 
-        uint8_t level = ESP_LOG_INFO;
+        // Aggressive filtering of noisy logs to prevent UART saturation and WDT resets
+        // Specifically NimBLE scan results which flood the logs
+        if (strstr(buf, "NimBLE") != NULL) {
+            return len; // Ignore NimBLE logs entirely
+        }
 
-        // Attempt to parse standard ESP log format: "L (Timestamp) TAG: Message"
-        // E.g. "I (123) NimBLE: Connected"
-        // Or "E (123) TAG: Message"
+        uint8_t level = ESP_LOG_INFO;
 
         char* tagStart = NULL;
         char* msgStart = NULL;
@@ -34,16 +36,8 @@ static int remote_vprintf(const char *fmt, va_list args) {
         else if (strncmp(buf, "D (", 3) == 0) level = ESP_LOG_DEBUG;
         else if (strncmp(buf, "V (", 3) == 0) level = ESP_LOG_VERBOSE;
 
-        // Try to find the tag and message separator ": "
-        // Format is typically: Level (Time) Tag: Message
-        // But Arduino logs might be different: "[Time][Level][File:Line] Func: Msg"
-
         if (buf[0] == '[') {
              // Arduino format: [Time][Level][File:Line] Func: Msg
-             // We can just send the whole thing as message with a generic tag or try to parse
-             // User wants "[File] Func() Msg"
-             // If we can't parse easily, just sending the whole line is better than nothing.
-             // But we need to avoid infinite recursion with Stm32Serial logging.
              strncpy(tag, "ESP32", 32);
              msgStart = buf;
         } else {
@@ -65,10 +59,8 @@ static int remote_vprintf(const char *fmt, va_list args) {
         if (msgStart == NULL) msgStart = buf;
 
         // Recursion prevention: Do not forward logs from Stm32Serial itself
-        // Filter out noisy tags to prevent WDT resets during high-traffic operations (like BLE Scan)
-        if (strcmp(tag, "Stm32Serial") != 0 &&
-            strcmp(tag, "EcoflowDataParser") != 0 &&
-            strcmp(tag, "NimBLEScan") != 0) {
+        // Note: EcoflowDataParser logs ARE forwarded as they contain the requested dumps
+        if (strcmp(tag, "Stm32Serial") != 0) {
              Stm32Serial::getInstance().sendEspLog(level, tag, msgStart);
         }
     }
