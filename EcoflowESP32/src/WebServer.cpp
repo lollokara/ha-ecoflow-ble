@@ -34,8 +34,12 @@ public:
         while (read == 0 && !Stm32Serial::getInstance().isLogDownloadComplete()) {
             read = Stm32Serial::getInstance().readLogChunk(data, len);
             if (read == 0) {
-                // If we run dry, wait briefly. 500ms is safe for AsyncTCP (rx timeout is usually >3s).
-                if (millis() - start > 500) break;
+                // If we run dry, wait briefly. 3000ms is safe for AsyncTCP (rx timeout is usually >3s).
+                // Increased to 3000ms to handle potential UART retries or gaps.
+                if (millis() - start > 3000) {
+                    ESP_LOGW(TAG, "Log Download Timeout. Buffered: %d", Stm32Serial::getInstance().getDownloadBufferSize());
+                    break;
+                }
                 vTaskDelay(5);
             }
         }
