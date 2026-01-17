@@ -127,16 +127,16 @@ private:
      * @class ManagerScanCallbacks
      * @brief Internal class to handle callbacks for BLE scan results.
      */
-    class ManagerScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
+    class ManagerScanCallbacks : public NimBLEScanCallbacks {
         DeviceManager* _parent;
     public:
         ManagerScanCallbacks(DeviceManager* parent) : _parent(parent) {}
-        void onResult(NimBLEAdvertisedDevice* advertisedDevice) override;
+        void onResult(const NimBLEAdvertisedDevice* advertisedDevice) override;
     };
 
     void startScan(DeviceType type);
     void stopScan();
-    void onDeviceFound(NimBLEAdvertisedDevice* device);
+    void onDeviceFound(const NimBLEAdvertisedDevice* device);
     bool isTargetDevice(const std::string& sn, DeviceType type);
     void saveDevice(DeviceType type, const std::string& mac, const std::string& sn);
     void loadDevices();

@@ -62,8 +62,8 @@ void EcoflowClientCallback::onConnect(NimBLEClient* pClient) {
     }
 }
 
-void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient) {
-    ESP_LOGI(TAG, "Disconnected from device");
+void EcoflowClientCallback::onDisconnect(NimBLEClient* pClient, int reason) {
+    ESP_LOGI(TAG, "Disconnected from device, reason: %d", reason);
     if (_instance) {
         _instance->onDisconnect(pClient);
     }
