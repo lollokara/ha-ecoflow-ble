@@ -6,6 +6,8 @@
 #define DISP_HOR_RES 800
 #define DISP_VER_RES 480
 
+extern IWDG_HandleTypeDef hiwdg;
+
 static void disp_init(void);
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
@@ -62,6 +64,7 @@ void lv_port_disp_init(void)
 
 static void disp_init(void)
 {
+    HAL_IWDG_Refresh(&hiwdg);
     BSP_LCD_Init();
     BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
     BSP_LCD_SelectLayer(0);

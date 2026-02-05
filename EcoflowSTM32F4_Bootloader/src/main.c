@@ -33,6 +33,8 @@ RingBuffer rx_ring_buffer;
 uint8_t rx_byte_isr;
 
 // Register Definitions
+// On STM32F469, BFB2 is Bit 4 of OPTCR (RM0386).
+// This differs from F429 where it is Bit 23.
 #ifndef FLASH_OPTCR_BFB2
 #define FLASH_OPTCR_BFB2 (1 << 4)
 #endif
@@ -604,10 +606,14 @@ void Bootloader_OTA_Loop(void) {
 
             // Toggle BFB2 (Bit 4)
             if (bfb2_active) {
-                // If BFB2 was 1 (Bank 1 Active), we want Bank 2 Active (BFB2=0).
+                // If BFB2 was 1 (Bank 2 Active), we want Bank 1 Active (BFB2=0).
+                // We are currently in Bank 2, so Inactive is Bank 1.
+                // OTA updated Bank 1. We swap to it.
                 optcr &= ~FLASH_OPTCR_BFB2;
             } else {
-                // If BFB2 was 0 (Bank 2 Active), we want Bank 1 Active (BFB2=1).
+                // If BFB2 was 0 (Bank 1 Active), we want Bank 2 Active (BFB2=1).
+                // We are currently in Bank 1, so Inactive is Bank 2.
+                // OTA updated Bank 2. We swap to it.
                 optcr |= FLASH_OPTCR_BFB2;
             }
 
