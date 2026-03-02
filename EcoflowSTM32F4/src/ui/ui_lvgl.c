@@ -35,6 +35,7 @@ bool is_charging_active = false;
 static int lim_input_w = 600;       // 400 - 3000
 static int lim_discharge_p = 5;     // 0 - 30 %
 static int lim_charge_p = 100;      // 50 - 100 %
+static bool sys_beep_en = false;
 
 // Alternator Charger Settings
 static int alt_start_v = 130;       // 13.0V (100-140)
@@ -83,6 +84,7 @@ static lv_obj_t * label_lim_chg_val;
 static lv_obj_t * slider_lim_in;
 static lv_obj_t * slider_lim_out;
 static lv_obj_t * slider_lim_chg;
+static lv_obj_t * sw_beep_global;
 
 // Alt Charger Settings Widgets
 static lv_obj_t * label_alt_start_v;
@@ -398,6 +400,13 @@ static void event_slider_charge(lv_event_t * e) {
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         UART_SendSetValue(SET_VAL_MAX_SOC, lim_charge_p);
     }
+}
+
+// --- Beep Toggle Callback ---
+static void event_beep_toggle(lv_event_t * e) {
+    lv_obj_t * sw = lv_event_get_target(e);
+    bool state = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    UART_SendSetValue(SET_VAL_BEEP, state ? 1 : 0);
 }
 
 // --- Alt Charger Slider Callbacks ---
@@ -738,6 +747,23 @@ static void create_settings(void) {
     lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_lim_chg, event_calib_touch, LV_EVENT_CLICKED, NULL);
+
+    // 3.5 Beep Toggle
+    lv_obj_t * p_beep = lv_obj_create(cont);
+    lv_obj_set_size(p_beep, 650, 60);
+    lv_obj_set_style_bg_opa(p_beep, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(p_beep, 0, 0);
+
+    lv_obj_t * l_beep = lv_label_create(p_beep);
+    lv_label_set_text(l_beep, "System Beep");
+    lv_obj_set_style_text_color(l_beep, lv_color_white(), 0);
+    lv_obj_set_style_text_font(l_beep, &lv_font_montserrat_32, 0);
+    lv_obj_align(l_beep, LV_ALIGN_LEFT_MID, 0, 0);
+
+    sw_beep_global = lv_switch_create(p_beep);
+    lv_obj_align(sw_beep_global, LV_ALIGN_RIGHT_MID, -20, 0);
+    lv_obj_add_style(sw_beep_global, &style_btn_green, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw_beep_global, event_beep_toggle, LV_EVENT_VALUE_CHANGED, NULL);
 
     // --- Alternator Charger Section ---
     lv_obj_t * l_alt = lv_label_create(cont);
@@ -1664,6 +1690,18 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             if (slider_lim_out && !lv_slider_is_dragged(slider_lim_out)) {
                 lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
                 lv_obj_invalidate(arc_batt);
+            }
+        }
+
+        bool new_beep = false;
+        if (dev->id == DEV_TYPE_DELTA_PRO_3) new_beep = dev->data.d3p.beepEnable;
+        else new_beep = dev->data.d3.beepEnable;
+
+        if (new_beep != sys_beep_en) {
+            sys_beep_en = new_beep;
+            if (sw_beep_global) {
+                if (sys_beep_en) lv_obj_add_state(sw_beep_global, LV_STATE_CHECKED);
+                else lv_obj_clear_state(sw_beep_global, LV_STATE_CHECKED);
             }
         }
     } else if (dev->id == DEV_TYPE_ALT_CHARGER) {

@@ -247,6 +247,10 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
                     case SET_VAL_ALT_REV_LIMIT: alt->setCarBatteryChargeLimit((float)value); break;
                     case SET_VAL_ALT_CHG_LIMIT: alt->setDeviceBatteryChargeLimit((float)value); break;
                     case SET_VAL_ALT_ENABLE: alt->setChargerOpen(value ? true : false); break;
+                    case SET_VAL_BEEP:
+                        if (d3p) d3p->setBeepEnabled(value ? true : false);
+                        else if (d3) d3->setBeepEnabled(value ? true : false);
+                        break;
                  }
              }
         }
@@ -427,6 +431,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.solarInputPower = src.solarInputPower;
         dst.acChargingSpeed = src.acChargingSpeed;
         dst.maxAcChargingPower = src.maxAcChargingPower;
+        dst.beepEnable = src.beepEnable;
         dst.acOn = src.acOn;
         dst.dcOn = src.dcOn;
         dst.usbOn = src.usbOn;
@@ -487,6 +492,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.soh = src.soh;
         dst.dischargeRemainingTime = src.dischargeRemainingTime;
         dst.chargeRemainingTime = src.chargeRemainingTime;
+        dst.beepEnable = src.beepEnable;
     } else if (type == DeviceType::ALTERNATOR_CHARGER) {
         strncpy(status.name, "Alt Charger", 15);
         const AlternatorChargerData& src = dev->getData().alternatorCharger;
