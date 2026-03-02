@@ -1519,6 +1519,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
 
     static bool last_ac_on = false;
     static bool last_dc_on = false;
+    static bool last_ac_plugged_in = false;
     static bool first_run = true;
 
     int temp_int = safe_float_to_int(temp);
@@ -1550,7 +1551,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
             update_card_style(&card_solar, in_solar);
             last_solar = in_solar;
         }
-        if (first_run || in_ac != last_grid) {
+        if (first_run || in_ac != last_grid || (dev->id == DEV_TYPE_DELTA_PRO_3 && ac_plugged_in != last_ac_plugged_in)) {
             lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
             if (dev->id == DEV_TYPE_DELTA_PRO_3) {
                 update_card_style_active(&card_grid, ac_plugged_in);
@@ -1558,6 +1559,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 update_card_style(&card_grid, in_ac);
             }
             last_grid = in_ac;
+            last_ac_plugged_in = ac_plugged_in;
         }
         if (first_run || in_alt != last_car) {
             lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
@@ -1709,95 +1711,6 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                 }
             }
         }
-    }
-
-    if (is_main_device) {
-        // Simple filter: Ignore 0 if we already had a valid value
-        if (temp_int == 0 && last_temp != -999 && last_temp != 0) {
-             // Ignore glitch
-        } else {
-            if (first_run || temp_int != last_temp) {
-                lv_label_set_text_fmt(label_temp, "Batt: %d C", temp_int);
-                last_temp = temp_int;
-            }
-        }
-
-        if (soc == 0 && last_soc > 0) {
-             // Ignore glitch (jumping to 0%)
-        } else {
-            if (first_run || soc != last_soc) {
-                lv_arc_set_value(arc_batt, soc);
-                lv_label_set_text_fmt(label_soc, "%d%%", soc);
-                last_soc = soc;
-            }
-        }
-
-        if (first_run || in_solar != last_solar) {
-            lv_label_set_text_fmt(label_solar_val, "%d W", in_solar);
-            update_card_style(&card_solar, in_solar);
-            last_solar = in_solar;
-        }
-        if (first_run || in_ac != last_grid) {
-            lv_label_set_text_fmt(label_grid_val, "%d W", in_ac);
-            update_card_style(&card_grid, in_ac);
-            last_grid = in_ac;
-        }
-        if (first_run || in_alt != last_car) {
-            lv_label_set_text_fmt(label_car_val, "%d W", in_alt);
-            update_card_style(&card_car, in_alt);
-            last_car = in_alt;
-        }
-        if (first_run || out_usb != last_usb) {
-            lv_label_set_text_fmt(label_usb_val, "%d W", out_usb);
-            update_card_style(&card_usb, out_usb);
-            last_usb = out_usb;
-        }
-        if (first_run || out_12v != last_12v) {
-            lv_label_set_text_fmt(label_12v_val, "%d W", out_12v);
-            update_card_style(&card_12v, out_12v);
-            last_12v = out_12v;
-        }
-        if (first_run || out_ac != last_ac) {
-            lv_label_set_text_fmt(label_ac_val, "%d W", out_ac);
-            update_card_style(&card_ac, out_ac);
-            last_ac = out_ac;
-        }
-
-        // Toggle Styles based on PORT state, not power
-        bool ac_on = false;
-        bool dc_on = false;
-
-        if (dev->id == DEV_TYPE_DELTA_PRO_3) {
-            ac_on = dev->data.d3p.acHvPort; // Or acLvPort, D3P typically uses HV for output
-            dc_on = dev->data.d3p.dc12vPort;
-        } else if (dev->id == DEV_TYPE_DELTA_3) {
-            ac_on = dev->data.d3.acOn;
-            dc_on = dev->data.d3.dcOn;
-        }
-
-        if (first_run || ac_on != last_ac_on) {
-            if (ac_on) {
-                lv_label_set_text(lbl_ac_t, "AC\nON");
-                lv_obj_add_state(btn_ac_toggle, LV_STATE_CHECKED);
-            } else {
-                lv_label_set_text(lbl_ac_t, "AC\nOFF");
-                lv_obj_clear_state(btn_ac_toggle, LV_STATE_CHECKED);
-            }
-            last_ac_on = ac_on;
-        }
-
-        if (first_run || dc_on != last_dc_on) {
-            if (dc_on) {
-                lv_label_set_text(lbl_dc_t, "12V\nON");
-                lv_obj_add_state(btn_dc_toggle, LV_STATE_CHECKED);
-            } else {
-                lv_label_set_text(lbl_dc_t, "12V\nOFF");
-                lv_obj_clear_state(btn_dc_toggle, LV_STATE_CHECKED);
-            }
-            last_dc_on = dc_on;
-        }
-
-        first_run = false;
     }
 
     // Update Disconnected State
