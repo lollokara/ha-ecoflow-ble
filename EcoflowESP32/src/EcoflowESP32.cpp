@@ -465,11 +465,15 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
-        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload.size() > 0 && payload[0] == 0x00) {
-            _state = ConnectionState::AUTHENTICATED;
-            ESP_LOGI(TAG, "Authentication successful!");
+        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86) {
+            if (payload.size() > 0 && payload[0] == 0x00) {
+                _state = ConnectionState::AUTHENTICATED;
+                ESP_LOGI(TAG, "Authentication successful!");
+            } else {
+                ESP_LOGE(TAG, "Authentication failed! Payload[0]: 0x%02x", payload.size() > 0 ? payload[0] : 0xFF);
+            }
         } else {
-            ESP_LOGE(TAG, "Authentication failed!");
+            ESP_LOGD(TAG, "Ignoring non-auth packet during authentication: CmdSet=0x%02x, CmdId=0x%02x", pkt->getCmdSet(), pkt->getCmdId());
         }
     }
 }
