@@ -139,6 +139,7 @@ void EcoflowESP32::disconnectAndForget() {
         delete _pAdvertisedDevice;
         _pAdvertisedDevice = nullptr;
     }
+    _rxBuffer.clear();
 }
 
 
@@ -287,6 +288,7 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
         delete _pAdvertisedDevice;
         _pAdvertisedDevice = nullptr;
     }
+    _rxBuffer.clear();
 }
 
 /**
@@ -465,11 +467,13 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             _sendCommand(enc_auth.toBytes(&_crypto));
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
-        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86 && payload.size() > 0 && payload[0] == 0x00) {
-            _state = ConnectionState::AUTHENTICATED;
-            ESP_LOGI(TAG, "Authentication successful!");
-        } else {
-            ESP_LOGE(TAG, "Authentication failed!");
+        if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86) {
+            if (payload.size() > 0 && payload[0] == 0x00) {
+                _state = ConnectionState::AUTHENTICATED;
+                ESP_LOGI(TAG, "Authentication successful!");
+            } else {
+                ESP_LOGE(TAG, "Authentication failed!");
+            }
         }
     }
 }
