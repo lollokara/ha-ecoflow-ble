@@ -1394,21 +1394,23 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                       if (!last_w2_connected) { // Clear red if coming from disconnected
                           lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
                       }
-                      lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
                       lv_obj_add_state(btn_wave2, LV_STATE_CHECKED);
                       lv_label_set_text_fmt(lbl_wave_txt, "Wave 2\n%d W", (int)watts);
                  } else {
                       if (!last_w2_connected) {
                           lv_obj_remove_style(btn_wave2, &style_btn_red, 0);
                       }
-                      lv_obj_add_style(btn_wave2, &style_btn_green, LV_STATE_CHECKED);
                       lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
                       lv_label_set_text(lbl_wave_txt, "Wave 2");
                  }
             } else {
                  // Disconnected -> Red
-                 lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
-                 lv_obj_add_style(btn_wave2, &style_btn_red, 0);
+                 static bool first_w2_disc = true;
+                 if (last_w2_connected || first_w2_disc) { // Only add red style when actually disconnecting or on init
+                     lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                     lv_obj_add_style(btn_wave2, &style_btn_red, 0);
+                     first_w2_disc = false;
+                 }
                  lv_label_set_text(lbl_wave_txt, "Wave 2\nDisc.");
             }
 

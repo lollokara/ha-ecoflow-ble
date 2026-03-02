@@ -98,20 +98,26 @@ static void update_mode_ui(int mode) {
 
     // Reset styles
     lv_obj_remove_style(btn_mode_cool, &style_btn_selected, 0);
+    lv_obj_remove_style(btn_mode_cool, &style_btn_default, 0);
     lv_obj_add_style(btn_mode_cool, &style_btn_default, 0);
 
     lv_obj_remove_style(btn_mode_heat, &style_btn_selected, 0);
+    lv_obj_remove_style(btn_mode_heat, &style_btn_default, 0);
     lv_obj_add_style(btn_mode_heat, &style_btn_default, 0);
 
     lv_obj_remove_style(btn_mode_fan, &style_btn_selected, 0);
+    lv_obj_remove_style(btn_mode_fan, &style_btn_default, 0);
     lv_obj_add_style(btn_mode_fan, &style_btn_default, 0);
 
     // Apply selected style
     if (mode == 0) { // Cool
+        lv_obj_remove_style(btn_mode_cool, &style_btn_default, 0);
         lv_obj_add_style(btn_mode_cool, &style_btn_selected, 0);
     } else if (mode == 1) { // Heat
+        lv_obj_remove_style(btn_mode_heat, &style_btn_default, 0);
         lv_obj_add_style(btn_mode_heat, &style_btn_selected, 0);
     } else if (mode == 2) { // Fan
+        lv_obj_remove_style(btn_mode_fan, &style_btn_default, 0);
         lv_obj_add_style(btn_mode_fan, &style_btn_selected, 0);
     }
 }
