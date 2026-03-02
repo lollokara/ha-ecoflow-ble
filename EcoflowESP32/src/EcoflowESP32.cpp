@@ -113,7 +113,7 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
     }
 
     if (!_ble_queue) {
-        _ble_queue = xQueueCreate(10, sizeof(BleNotification*));
+        _ble_queue = xQueueCreate(50, sizeof(BleNotification*));
     }
 
     if (!_ble_task_handle) {
@@ -236,7 +236,7 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
         }
 
         BleNotification *notification;
-        if (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
+        while (xQueueReceive(self->_ble_queue, &notification, 0) == pdTRUE) {
           if (self->_state == ConnectionState::PUBLIC_KEY_EXCHANGE ||
               self->_state == ConnectionState::REQUESTING_SESSION_KEY) {
             std::vector<uint8_t> raw_payload =
