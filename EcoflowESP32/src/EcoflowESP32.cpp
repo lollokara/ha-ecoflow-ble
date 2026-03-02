@@ -139,6 +139,15 @@ void EcoflowESP32::disconnectAndForget() {
         delete _pAdvertisedDevice;
         _pAdvertisedDevice = nullptr;
     }
+    _rxBuffer.clear();
+
+    if (_ble_queue) {
+        BleNotification* notif;
+        while (xQueueReceive(_ble_queue, &notif, 0) == pdTRUE) {
+            delete[] notif->data;
+            delete notif;
+        }
+    }
 }
 
 
@@ -279,6 +288,15 @@ void EcoflowESP32::onConnect(NimBLEClient* pClient) {
     _state = ConnectionState::SERVICE_DISCOVERY;
     _lastAuthActivity = millis();
     _lastRxTime = millis();
+    _rxBuffer.clear();
+
+    if (_ble_queue) {
+        BleNotification* notif;
+        while (xQueueReceive(_ble_queue, &notif, 0) == pdTRUE) {
+            delete[] notif->data;
+            delete notif;
+        }
+    }
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
@@ -286,6 +304,15 @@ void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
     if (_pAdvertisedDevice) {
         delete _pAdvertisedDevice;
         _pAdvertisedDevice = nullptr;
+    }
+    _rxBuffer.clear();
+
+    if (_ble_queue) {
+        BleNotification* notif;
+        while (xQueueReceive(_ble_queue, &notif, 0) == pdTRUE) {
+            delete[] notif->data;
+            delete notif;
+        }
     }
 }
 
@@ -388,17 +415,11 @@ void EcoflowESP32::_handlePacket(Packet* pkt) {
     if (isAuthenticated()) {
         EcoflowDataParser::parsePacket(*pkt, _data, _deviceType);
 
-        // For Protocol V2 (Wave 2), prevent infinite loops by NOT replying to Control/Status commands (0x51-0x5E)
-        // These packets are likely notifications that share the same ID as the Set command.
-        // Replying to them triggers the device to treat the ACK as a new Set command, creating a loop.
+        // For Protocol V2 (Wave 2), prevent infinite loops and connection drops by NOT replying
+        // to incoming background telemetry or status packets. Wave 2 does not expect or require ACKs.
         bool shouldReply = true;
         if (_protocolVersion == 2) {
-             uint8_t cmdId = pkt->getCmdId();
-             // Range 0x51-0x5E covers all known Set/Control commands for Wave 2
-             if (cmdId >= 0x51 && cmdId <= 0x5E) {
-                 ESP_LOGD(TAG, "Skipping reply for Wave 2 Control Packet (CmdId: 0x%02x)", cmdId);
-                 shouldReply = false;
-             }
+             shouldReply = false;
         }
 
         // Reply to packets that require it to keep the data flowing
