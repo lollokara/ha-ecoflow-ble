@@ -789,6 +789,23 @@ void EcoflowESP32::setBeep(uint8_t on) {
     _sendWave2Command(0x56, {on});
 }
 
+bool EcoflowESP32::setBeepEnabled(bool on) {
+    if (_deviceType == DeviceType::DELTA_PRO_3) {
+        mr521_ConfigWrite config = mr521_ConfigWrite_init_zero;
+        config.has_cfg_beep_en = true;
+        config.cfg_beep_en = on;
+        _sendConfigPacket(config);
+        return true;
+    } else if (_deviceType == DeviceType::DELTA_3) {
+        pd335_sys_ConfigWrite config = pd335_sys_ConfigWrite_init_zero;
+        config.has_cfg_beep_en = true;
+        config.cfg_beep_en = on;
+        _sendConfigPacket(config);
+        return true;
+    }
+    return false;
+}
+
 void EcoflowESP32::setFanSpeed(uint8_t speed) {
     _sendWave2Command(0x5E, {speed});
 }

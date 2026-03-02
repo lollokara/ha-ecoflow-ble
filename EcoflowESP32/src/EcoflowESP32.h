@@ -156,6 +156,9 @@ public:
     void setAmbientLight(uint8_t status);
     void setAutomaticDrain(uint8_t enable);
     void setBeep(uint8_t on);
+
+    // Delta Series
+    bool setBeepEnabled(bool on);
     void setFanSpeed(uint8_t speed);
     void setMainMode(uint8_t mode);
     void setPowerState(uint8_t on);

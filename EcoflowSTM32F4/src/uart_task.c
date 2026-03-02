@@ -94,6 +94,7 @@ typedef enum {
 static ProtocolState protocolState = STATE_HANDSHAKE;
 static DeviceList knownDevices = {0};
 static uint8_t currentDeviceIndex = 0;
+static uint32_t last_device_rx_time[MAX_DEVICES] = {0};
 
 // Packet Parsing State
 typedef enum {
@@ -224,9 +225,13 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
         if (protocolState == STATE_WAIT_DEVICE_LIST || protocolState == STATE_POLLING) {
             unpack_device_list_message(packet, &knownDevices);
 
-            // Sync with UI cache immediately
+            // Sync with UI cache immediately and handle disconnections for timeout
             for(int i=0; i<knownDevices.count; i++) {
-                UI_UpdateConnectionStatus(knownDevices.devices[i].id, knownDevices.devices[i].connected);
+                uint8_t dev_id = knownDevices.devices[i].id;
+                UI_UpdateConnectionStatus(dev_id, knownDevices.devices[i].connected);
+                if (!knownDevices.devices[i].connected && dev_id > 0 && dev_id <= MAX_DEVICES) {
+                    last_device_rx_time[dev_id - 1] = 0; // Reset timer on disconnect
+                }
             }
 
             DisplayEvent event;
@@ -244,6 +249,9 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
     else if (cmd == CMD_DEVICE_STATUS) {
         DeviceStatus status;
         if (unpack_device_status_message(packet, &status) == 0) {
+             if (status.id > 0 && status.id <= MAX_DEVICES) {
+                 last_device_rx_time[status.id - 1] = xTaskGetTickCount();
+             }
              DisplayEvent event;
              event.type = DISPLAY_EVENT_UPDATE_BATTERY;
              memcpy(&event.data.deviceStatus, &status, sizeof(DeviceStatus));
@@ -406,6 +414,18 @@ void StartUARTTask(void * argument) {
                         if (currentDeviceIndex >= knownDevices.count) currentDeviceIndex = 0;
                         if (knownDevices.devices[currentDeviceIndex].connected) {
                             uint8_t dev_id = knownDevices.devices[currentDeviceIndex].id;
+
+                            if (dev_id > 0 && dev_id <= MAX_DEVICES) {
+                                uint32_t now = xTaskGetTickCount();
+                                if (last_device_rx_time[dev_id - 1] == 0) {
+                                    last_device_rx_time[dev_id - 1] = now;
+                                } else if ((now - last_device_rx_time[dev_id - 1]) > pdMS_TO_TICKS(15000)) {
+                                    // Stale data timeout (15 seconds), try reconnecting
+                                    UART_SendConnectDevice(dev_id);
+                                    last_device_rx_time[dev_id - 1] = now; // reset to avoid spamming
+                                }
+                            }
+
                             len = pack_get_device_status_message(tx_buf, dev_id);
                             UART_SendRaw(tx_buf, len);
                         }
