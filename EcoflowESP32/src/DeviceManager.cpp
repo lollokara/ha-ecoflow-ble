@@ -294,7 +294,14 @@ void DeviceManager::_manageScanning() {
     } else if (!isAnyConnecting()) {
         // If not scanning and no device is connecting, check if we need to start a scan
         bool d3NeedsConnect = !slotD3.isConnected && !slotD3.macAddress.empty() && !d3.isConnecting();
+
+        // Prevent W2 scanning if D3P is connected but its AC output is off,
+        // as the W2 is unpowered and excessive scans will fail.
         bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting();
+        if (slotD3P.isConnected && !d3p.isAcOn()) {
+            w2NeedsConnect = false;
+        }
+
         bool d3pNeedsConnect = !slotD3P.isConnected && !slotD3P.macAddress.empty() && !d3p.isConnecting();
         bool acNeedsConnect = !slotAC.isConnected && !slotAC.macAddress.empty() && !ac.isConnecting();
 
