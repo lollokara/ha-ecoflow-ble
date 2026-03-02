@@ -468,7 +468,7 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
         }
     } else if (_state == ConnectionState::AUTHENTICATING) {
         if (pkt->getCmdSet() == 0x35 && pkt->getCmdId() == 0x86) {
-            if (payload.size() > 0 && payload[0] == 0x00) {
+            if (payload.size() > 0 && (payload[0] == 0x00 || payload[0] == 0x04)) {
                 _state = ConnectionState::AUTHENTICATED;
                 ESP_LOGI(TAG, "Authentication successful!");
             } else {
