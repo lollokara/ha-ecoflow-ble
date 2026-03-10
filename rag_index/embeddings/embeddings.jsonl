@@ -814,6 +814,7 @@
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h lines 101-125\n  */\n\n/**\n  * @}\n  "}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h lines 1-100\n/**\n  *******************"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h lines 101-114\n  * @}\n  */\n\n/**\n  * @}"}
+{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-36\n# Agent Instructions for Ecoflow Cyber Deck\n\nWelcome to the Eco"}
 {"id": "docs/Device_STM32.md:chunk0", "path": "docs/Device_STM32.md", "text": "Code chunk from docs/Device_STM32.md lines 1-94\n# \u2261 STM32 INTERFACE // VISUAL CORE\n\n> **HARDWARE:** "}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_settings.c:chunk0", "path": "EcoflowSTM32F4/src/ui/ui_view_settings.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_settings.c lines 1-96\n#include \"ui_core.h\"\n\n// --- Wid"}
 {"id": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md:chunk0", "path": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md lines 1-73\n# Contributor Covenant Code of "}
@@ -875,5 +876,5 @@
 {"id": "docs/device_reference/Wave_2.md:chunk0", "path": "docs/device_reference/Wave_2.md", "text": "Code chunk from docs/device_reference/Wave_2.md lines 1-37\n# \u2261 DATA REFERENCE // WAVE 2\n\n> **DEVICE "}
 {"id": "EcoflowSTM32F4/lib/FatFs/ffsystem.c:chunk0", "path": "EcoflowSTM32F4/lib/FatFs/ffsystem.c", "text": "Code chunk from EcoflowSTM32F4/lib/FatFs/ffsystem.c lines 1-67\n#include \"ff.h\"\n#include <stdio.h>\n\n#"}
 {"id": "EcoflowSTM32F4/src/lv_conf.h:chunk0", "path": "EcoflowSTM32F4/src/lv_conf.h", "text": "Code chunk from EcoflowSTM32F4/src/lv_conf.h lines 1-54\n#ifndef LV_CONF_H\n#define LV_CONF_H\n\n#includ"}
-{"id": "rag_search.py:chunk0", "path": "rag_search.py", "text": "Definition of main in rag_search.py\ndef main():\n    parser = argparse.ArgumentParser(description=\"Se"}
 {"id": "EcoflowESP32/src/dc009_apl_comm.pb.c:chunk0", "path": "EcoflowESP32/src/dc009_apl_comm.pb.c", "text": "Code chunk from EcoflowESP32/src/dc009_apl_comm.pb.c lines 1-45\n/* Automatically generated nanopb co"}
+{"id": "EcoflowSTM32F4/include/README:chunk0", "path": "EcoflowSTM32F4/include/README", "text": "Code chunk from EcoflowSTM32F4/include/README lines 1-37\n\nThis directory is intended for project hea"}

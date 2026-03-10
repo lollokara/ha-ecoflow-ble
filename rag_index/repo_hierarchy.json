@@ -7,7 +7,8 @@
     "generate_rag_index.py",
     "README.md",
     "update_index.py",
-    "rag_search.py"
+    "rag_search.py",
+    "AGENTS.md"
   ],
   "subdirs": {
     "verification": {
