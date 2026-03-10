@@ -1,0 +1,695 @@
+{
+  "dir": "/",
+  "summary": "Root directory",
+  "files": [
+    "gen_logger.py",
+    "d3p_logger.inc",
+    "generate_rag_index.py",
+    "README.md",
+    "update_index.py",
+    "rag_search.py"
+  ],
+  "subdirs": {
+    "verification": {
+      "dir": "verification",
+      "summary": "Directory verification",
+      "files": [
+        "verify_ota_ui.py"
+      ],
+      "subdirs": {}
+    },
+    "docs": {
+      "dir": "docs",
+      "summary": "Directory docs",
+      "files": [
+        "Home.md",
+        "Device_RP2040.md",
+        "Protocol.md",
+        "Device_STM32.md",
+        "Device_ESP32.md"
+      ],
+      "subdirs": {
+        "device_reference": {
+          "dir": "device_reference",
+          "summary": "Directory device_reference",
+          "files": [
+            "Delta_Pro_3.md",
+            "Alternator_Charger.md",
+            "Wave_2.md",
+            "Delta_3.md"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
+    "EcoflowRP2040": {
+      "dir": "EcoflowRP2040",
+      "summary": "Directory EcoflowRP2040",
+      "files": [
+        "platformio.ini"
+      ],
+      "subdirs": {
+        "src": {
+          "dir": "src",
+          "summary": "Directory src",
+          "files": [
+            "main.cpp"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
+    "EcoflowSTM32F4_Bootloader": {
+      "dir": "EcoflowSTM32F4_Bootloader",
+      "summary": "Directory EcoflowSTM32F4_Bootloader",
+      "files": [
+        "platformio.ini",
+        "stm32f469ni_flash.ld",
+        "extra_script.py"
+      ],
+      "subdirs": {
+        "src": {
+          "dir": "src",
+          "summary": "Directory src",
+          "files": [
+            "main.c"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
+    "proto": {
+      "dir": "proto",
+      "summary": "Directory proto",
+      "files": [
+        "pd335_sys.proto"
+      ],
+      "subdirs": {}
+    },
+    "EcoflowSTM32F4": {
+      "dir": "EcoflowSTM32F4",
+      "summary": "Directory EcoflowSTM32F4",
+      "files": [
+        "platformio.ini",
+        "merge_firmware.py",
+        "stm32f469ni_flash.ld",
+        "extra_script.py"
+      ],
+      "subdirs": {
+        "include": {
+          "dir": "include",
+          "summary": "Directory include",
+          "files": [
+            "README",
+            "FreeRTOSConfig.h"
+          ],
+          "subdirs": {}
+        },
+        "Inc": {
+          "dir": "Inc",
+          "summary": "Directory Inc",
+          "files": [
+            "display_task.h",
+            "uart_task.h",
+            "log_manager.h"
+          ],
+          "subdirs": {}
+        },
+        "test": {
+          "dir": "test",
+          "summary": "Directory test",
+          "files": [
+            "README"
+          ],
+          "subdirs": {}
+        },
+        "lib": {
+          "dir": "lib",
+          "summary": "Directory lib",
+          "files": [
+            "README"
+          ],
+          "subdirs": {
+            "Fonts": {
+              "dir": "Fonts",
+              "summary": "Directory Fonts",
+              "files": [
+                "font24.c",
+                "font12.c",
+                "font20.c",
+                "font8.c",
+                "fonts.h",
+                "font16.c"
+              ],
+              "subdirs": {}
+            },
+            "FatFs": {
+              "dir": "FatFs",
+              "summary": "Directory FatFs",
+              "files": [
+                "diskio.c",
+                "ff_gen_drv.c",
+                "ff_gen_drv.h",
+                "sd_diskio.h",
+                "ffsystem.c",
+                "ff.h",
+                "sd_diskio.c",
+                "diskio.h",
+                "ffconf.h"
+              ],
+              "subdirs": {}
+            },
+            "bsp": {
+              "dir": "bsp",
+              "summary": "Directory bsp",
+              "files": [
+                "stm32469i_discovery.c",
+                "library.json",
+                "stm32469i_discovery_lcd.h",
+                "README.md",
+                "stm32469i_discovery_sdram.c",
+                "stm32469i_discovery.h",
+                "Release_Notes.html",
+                "CONTRIBUTING.md",
+                "LICENSE.md",
+                "stm32469i_discovery_lcd.c",
+                "stm32469i_discovery_ts.c",
+                "stm32469i_discovery_sdram.h",
+                "CODE_OF_CONDUCT.md",
+                "SECURITY.md",
+                "stm32469i_discovery_ts.h"
+              ],
+              "subdirs": {
+                "Components": {
+                  "dir": "Components",
+                  "summary": "Directory Components",
+                  "files": [],
+                  "subdirs": {
+                    "ft3x67": {
+                      "dir": "ft3x67",
+                      "summary": "Directory ft3x67",
+                      "files": [
+                        "ft3x67.c",
+                        "ft3x67.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "n25q256a": {
+                      "dir": "n25q256a",
+                      "summary": "Directory n25q256a",
+                      "files": [
+                        "n25q256a.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ili9325": {
+                      "dir": "ili9325",
+                      "summary": "Directory ili9325",
+                      "files": [
+                        "ili9325.h",
+                        "ili9325.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "Common": {
+                      "dir": "Common",
+                      "summary": "Directory Common",
+                      "files": [
+                        "ts.h",
+                        "audio.h",
+                        "accelero.h",
+                        "camera.h",
+                        "tsensor.h",
+                        "magneto.h",
+                        "gyro.h",
+                        "epd.h",
+                        "io.h",
+                        "lcd.h",
+                        "idd.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ov2640": {
+                      "dir": "ov2640",
+                      "summary": "Directory ov2640",
+                      "files": [
+                        "ov2640.c",
+                        "ov2640.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ov5640": {
+                      "dir": "ov5640",
+                      "summary": "Directory ov5640",
+                      "files": [
+                        "ov5640.c",
+                        "ov5640.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "mfxstm32l152": {
+                      "dir": "mfxstm32l152",
+                      "summary": "Directory mfxstm32l152",
+                      "files": [
+                        "mfxstm32l152.c",
+                        "mfxstm32l152.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "st7735": {
+                      "dir": "st7735",
+                      "summary": "Directory st7735",
+                      "files": [
+                        "st7735.c",
+                        "st7735.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lis302dl": {
+                      "dir": "lis302dl",
+                      "summary": "Directory lis302dl",
+                      "files": [
+                        "lis302dl.h",
+                        "lis302dl.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "stmpe811": {
+                      "dir": "stmpe811",
+                      "summary": "Directory stmpe811",
+                      "files": [
+                        "stmpe811.c",
+                        "stmpe811.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "i3g4250d": {
+                      "dir": "i3g4250d",
+                      "summary": "Directory i3g4250d",
+                      "files": [
+                        "i3g4250d.c",
+                        "i3g4250d.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "wm8994": {
+                      "dir": "wm8994",
+                      "summary": "Directory wm8994",
+                      "files": [
+                        "wm8994.h",
+                        "wm8994.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ft6x06": {
+                      "dir": "ft6x06",
+                      "summary": "Directory ft6x06",
+                      "files": [
+                        "ft6x06.h",
+                        "ft6x06.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "exc7200": {
+                      "dir": "exc7200",
+                      "summary": "Directory exc7200",
+                      "files": [
+                        "exc7200.h",
+                        "exc7200.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ampire640480": {
+                      "dir": "ampire640480",
+                      "summary": "Directory ampire640480",
+                      "files": [
+                        "ampire640480.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lan8742": {
+                      "dir": "lan8742",
+                      "summary": "Directory lan8742",
+                      "files": [
+                        "lan8742.c",
+                        "lan8742.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "cs43l22": {
+                      "dir": "cs43l22",
+                      "summary": "Directory cs43l22",
+                      "files": [
+                        "cs43l22.h",
+                        "cs43l22.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "nt35510": {
+                      "dir": "nt35510",
+                      "summary": "Directory nt35510",
+                      "files": [
+                        "nt35510.c",
+                        "nt35510.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ts3510": {
+                      "dir": "ts3510",
+                      "summary": "Directory ts3510",
+                      "files": [
+                        "ts3510.h",
+                        "ts3510.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lis3dsh": {
+                      "dir": "lis3dsh",
+                      "summary": "Directory lis3dsh",
+                      "files": [
+                        "lis3dsh.h",
+                        "lis3dsh.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "l3gd20": {
+                      "dir": "l3gd20",
+                      "summary": "Directory l3gd20",
+                      "files": [
+                        "l3gd20.c",
+                        "l3gd20.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "n25q512a": {
+                      "dir": "n25q512a",
+                      "summary": "Directory n25q512a",
+                      "files": [
+                        "n25q512a.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "st7789h2": {
+                      "dir": "st7789h2",
+                      "summary": "Directory st7789h2",
+                      "files": [
+                        "st7789h2.h",
+                        "st7789h2.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lsm303dlhc": {
+                      "dir": "lsm303dlhc",
+                      "summary": "Directory lsm303dlhc",
+                      "files": [
+                        "lsm303dlhc.h",
+                        "lsm303dlhc.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ili9341": {
+                      "dir": "ili9341",
+                      "summary": "Directory ili9341",
+                      "files": [
+                        "ili9341.c",
+                        "ili9341.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "otm8009a": {
+                      "dir": "otm8009a",
+                      "summary": "Directory otm8009a",
+                      "files": [
+                        "otm8009a.h",
+                        "otm8009a.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "s25fl512s": {
+                      "dir": "s25fl512s",
+                      "summary": "Directory s25fl512s",
+                      "files": [
+                        "s25fl512s.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ampire480272": {
+                      "dir": "ampire480272",
+                      "summary": "Directory ampire480272",
+                      "files": [
+                        "ampire480272.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "n25q128a": {
+                      "dir": "n25q128a",
+                      "summary": "Directory n25q128a",
+                      "files": [
+                        "n25q128a.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "stmpe1600": {
+                      "dir": "stmpe1600",
+                      "summary": "Directory stmpe1600",
+                      "files": [
+                        "stmpe1600.c",
+                        "stmpe1600.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "dp83848": {
+                      "dir": "dp83848",
+                      "summary": "Directory dp83848",
+                      "files": [
+                        "dp83848.h",
+                        "dp83848.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "s5k5cag": {
+                      "dir": "s5k5cag",
+                      "summary": "Directory s5k5cag",
+                      "files": [
+                        "s5k5cag.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ls016b8uy": {
+                      "dir": "ls016b8uy",
+                      "summary": "Directory ls016b8uy",
+                      "files": [
+                        "ls016b8uy.c",
+                        "ls016b8uy.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lsm303agr": {
+                      "dir": "lsm303agr",
+                      "summary": "Directory lsm303agr",
+                      "files": [
+                        "lsm303agr.c",
+                        "lsm303agr.h"
+                      ],
+                      "subdirs": {}
+                    }
+                  }
+                },
+                "_htmresc": {
+                  "dir": "_htmresc",
+                  "summary": "Directory _htmresc",
+                  "files": [
+                    "mini-st_2020.css"
+                  ],
+                  "subdirs": {}
+                },
+                "Fonts": {
+                  "dir": "Fonts",
+                  "summary": "Directory Fonts",
+                  "files": [
+                    "font24.c",
+                    "font12.c",
+                    "font20.c",
+                    "font8.c",
+                    "fonts.h",
+                    "font16.c"
+                  ],
+                  "subdirs": {}
+                }
+              }
+            },
+            "EcoFlowComm": {
+              "dir": "EcoFlowComm",
+              "summary": "Directory EcoFlowComm",
+              "files": [
+                "library.json",
+                "ecoflow_protocol.h",
+                "ecoflow_protocol.c"
+              ],
+              "subdirs": {}
+            }
+          }
+        },
+        "src": {
+          "dir": "src",
+          "summary": "Directory src",
+          "files": [
+            "lv_port_disp.c",
+            "lv_port_disp.h",
+            "display_task.c",
+            "flash_ops.c",
+            "retarget.c",
+            "lv_conf.h",
+            "main.c",
+            "stm32f4xx_it.c",
+            "display_task.h",
+            "stm32f4xx_it.h",
+            "fan_task.h",
+            "log_manager.c",
+            "flash_ops.h",
+            "fan_task.c",
+            "lv_port_indev.h",
+            "fan_protocol.h",
+            "lv_port_indev.c",
+            "uart_task.h",
+            "log_manager.h",
+            "uart_task.c",
+            "uart_callback.c"
+          ],
+          "subdirs": {
+            "ui": {
+              "dir": "ui",
+              "summary": "Directory ui",
+              "files": [
+                "ui_lvgl.h",
+                "ui_view_wave2.h",
+                "ui_view_debug.c",
+                "ui_view_fan.h",
+                "ui_core.h",
+                "ui_view_connections.h",
+                "ui_utils.h",
+                "ui_font_mdi.c",
+                "ui_primitives.c",
+                "ui_view_wave2.c",
+                "ui_icons.h",
+                "ui_view_fan.c",
+                "ui_lvgl.c",
+                "ui_view_connections.c",
+                "ui_view_log_manager.h",
+                "ui_view_settings.c",
+                "ui_view_debug.h",
+                "ui_view_log_manager.c"
+              ],
+              "subdirs": {}
+            }
+          }
+        }
+      }
+    },
+    "EcoflowESP32": {
+      "dir": "EcoflowESP32",
+      "summary": "Directory EcoflowESP32",
+      "files": [
+        "README.md",
+        "platformio.ini",
+        "library.properties",
+        "sdkconfig.defaults"
+      ],
+      "subdirs": {
+        "lib": {
+          "dir": "lib",
+          "summary": "Directory lib",
+          "files": [],
+          "subdirs": {
+            "EcoFlowComm": {
+              "dir": "EcoFlowComm",
+              "summary": "Directory EcoFlowComm",
+              "files": [
+                "library.json",
+                "ecoflow_protocol.h",
+                "ecoflow_protocol.c"
+              ],
+              "subdirs": {}
+            }
+          }
+        },
+        "src": {
+          "dir": "src",
+          "summary": "Directory src",
+          "files": [
+            "Display.cpp",
+            "types.h",
+            "EcoflowESP32.cpp",
+            "EcoflowDataParser.cpp",
+            "main.cpp",
+            "platform-specific.inc",
+            "LightSensor.cpp",
+            "pb_utils.h",
+            "EcoflowData.h",
+            "mr521.pb.c",
+            "EcoflowProtocol.h",
+            "LogBuffer.cpp",
+            "CmdUtils.h",
+            "RemoteLogger.cpp",
+            "Stm32Serial.h",
+            "dc009_apl_comm.pb.h",
+            "CmdUtils.cpp",
+            "LightSensor.h",
+            "DeviceManager.h",
+            "Font.h",
+            "EcoflowCrypto.cpp",
+            "Display.h",
+            "Logging.h",
+            "EcoflowProtocol.cpp",
+            "WebServer.cpp",
+            "EcoflowDataParser.h",
+            "dc009_apl_comm.pb.c",
+            "DeviceManager.cpp",
+            "EcoflowESP32.h",
+            "Stm32Serial.cpp",
+            "keydata.cpp",
+            "RemoteLogger.h",
+            "WebServer.h",
+            "pd335_sys.pb.c",
+            "LogBuffer.h",
+            "EcoflowCrypto.h",
+            "WebAssets.h",
+            "keydata.h"
+          ],
+          "subdirs": {
+            "proto": {
+              "dir": "proto",
+              "summary": "Directory proto",
+              "files": [
+                "mr521.proto",
+                "dc009_apl_comm.proto"
+              ],
+              "subdirs": {}
+            }
+          }
+        }
+      }
+    },
+    "Test Scripts": {
+      "dir": "Test Scripts",
+      "summary": "Directory Test Scripts",
+      "files": [
+        "verify_ui_v2.py",
+        "verify_layout_v3.py",
+        "verify_power_logic.py",
+        "generate_keydata_header.py",
+        "verify_optimistic.py"
+      ],
+      "subdirs": {
+        "tools": {
+          "dir": "tools",
+          "summary": "Directory tools",
+          "files": [
+            "generate_mdi_font.py"
+          ],
+          "subdirs": {}
+        }
+      }
+    }
+  }
+}

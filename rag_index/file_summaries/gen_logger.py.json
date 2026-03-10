@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to gen_logger module.",
+  "chunks": [
+    {
+      "content": "import re\n\nwith open(\"EcoflowESP32/src/mr521.pb.h\", \"r\") as f:\n    lines = f.readlines()\n\nin_struct = False\nfields = []\ncurrent_field = None\n\nfor line in lines:\n    line = line.strip()\n    if \"typedef struct _mr521_DisplayPropertyUpload {\" in line:\n        in_struct = True\n        continue\n    if in_struct:\n        if \"} mr521_DisplayPropertyUpload;\" in line:\n            break\n\n        # Look for has_ fields\n        m_has = re.match(r\"bool has_(\\w+);\", line)\n        if m_has:\n            current_field = m_has.group(1)\n            continue\n\n        # Look for value fields\n        if current_field:\n            # Matches: type name;\n            # e.g. uint32_t errcode;\n            # e.g. float pow_in_sum_w;\n            m_val = re.match(r\"(\\w+)\\s+(\\w+);\", line)\n            if m_val:\n                f_type = m_val.group(1)\n                f_name = m_val.group(2)\n                if f_name == current_field:\n                    fields.append((f_name, f_type))\n                    current_field = None\n\nprint(\"static void logFullDeltaPro3Data(const mr521_DisplayPropertyUpload& msg) {\")\nprint('    ESP_LOGI(TAG, \"--- Full D3P Dump ---\");')\nfor name, ftype in fields:\n    fmt = \"\"\n    val = \"msg.\" + name\n    if ftype == \"float\":\n        fmt = \"%.2f\"\n    elif ftype in [\"uint32_t\", \"int32_t\", \"bool\", \"mr521_AC_IN_CHG_MODE\", \"mr521_SP_CHARGER_CHG_MODE\", \"mr521_SERVE_MIDDLEMEN\", \"mr521_INSTALLMENT_PAYMENT_OVERDUE_LIMIT\", \"mr521_INSTALLMENT_PAYMENT_STATE\"]:\n        fmt = \"%d\"\n        val = \"(int)\" + val\n    else:\n        continue # Skip structs/callbacks for now\n\n    print(f'    if (msg.has_{name}) ESP_LOGI(TAG, \"{name}: {fmt}\", {val});')\nprint(\"}\")",
+      "metadata": {
+        "start_line": 1,
+        "lang": "python",
+        "desc": "Code chunk from gen_logger.py lines 1-52"
+      },
+      "id": "gen_logger.py:chunk0"
+    }
+  ]
+}

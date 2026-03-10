@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~2 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#include \"RemoteLogger.h\"\n#include \"Stm32Serial.h\"\n#include \"esp_log.h\"\n#include <stdio.h>\n#include <stdarg.h>\n#include <string.h>\n\nstatic vprintf_like_t old_vprintf;\n\nstatic int remote_vprintf(const char *fmt, va_list args) {\n    char buf[256];\n    int len = vsnprintf(buf, sizeof(buf), fmt, args);\n    if (len > 0) {\n        // ESP-IDF log format usually starts with color code or 'E'/'W'\n        // Simple check for Error/Warning markers\n        // Standard format: \"E (123) TAG: Message\"\n        // Note: colors might be present.\n\n        uint8_t level = ESP_LOG_INFO;\n        bool interesting = false;\n\n        if (strstr(buf, \"E (\")) { level = ESP_LOG_ERROR; interesting = true; }\n        else if (strstr(buf, \"W (\")) { level = ESP_LOG_WARN; interesting = true; }\n\n        // Also capture our specific \"Dump\" tags regardless of level if they don't match E/W\n        // but `EcoflowDataParser` uses `ESP_LOGI`.\n        // So we should look for specific tags too.\n\n        bool isDump = strstr(buf, \"EcoflowDataParser\") != NULL;\n\n        if (interesting || isDump) {\n             // Extract Tag and Message\n             char* closeParen = strchr(buf, ')');\n             if (closeParen) {\n                 char* colon = strchr(closeParen, ':');\n                 if (colon) {\n                     char tag[32];\n                     int tagLen = colon - (closeParen + 2);\n                     if (tagLen > 31) tagLen = 31;\n                     if (tagLen > 0) {\n                         strncpy(tag, closeParen + 2, tagLen);\n                         tag[tagLen] = 0;\n\n                         // Avoid recursion\n                         if (strcmp(tag, \"Stm32Serial\") != 0) {\n                             Stm32Serial::getInstance().sendEspLog(level, tag, colon + 2);\n                         }\n                     }\n                 }\n             }\n        }\n    }\n\n    if (old_vprintf) return old_vprintf(fmt, args);\n    return len;\n}\n\nvoid RemoteLogger_Init(void) {\n    old_vprintf = esp_log_set_vprintf(remote_vprintf);\n}",
+      "metadata": {
+        "start_line": 1,
+        "lang": "cpp",
+        "desc": "Code chunk from EcoflowESP32/src/RemoteLogger.cpp lines 1-60"
+      },
+      "id": "EcoflowESP32/src/RemoteLogger.cpp:chunk0"
+    }
+  ]
+}

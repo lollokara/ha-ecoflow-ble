@@ -1,0 +1,104 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    font8.c\n  * @author  MCD Application Team\n  * @brief   This file provides text Font8 for STM32 board's LCD driver.\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2014 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Includes ------------------------------------------------------------------*/\n#include \"fonts.h\"\n\n/** @addtogroup Utilities\n  * @{\n  */\n\n/** @addtogroup STM32_EVAL\n  * @{\n  */\n\n/** @addtogroup Common\n  * @{\n  */\n\n/** @addtogroup FONTS\n  * @brief      This file provides text Font8 for STM32xx-EVAL's LCD driver.\n  * @{\n  */\n\n/** @defgroup FONTS_Private_Types\n  * @{\n  */\n/**\n  * @}\n  */\n\n\n/** @defgroup FONTS_Private_Defines\n  * @{\n  */\n/**\n  * @}\n  */\n\n\n/** @defgroup FONTS_Private_Macros\n  * @{\n  */\n/**\n  * @}\n  */\n\n\n/** @defgroup FONTS_Private_Variables\n  * @{\n  */\n//\n//  Font data for Courier New 12pt\n//\n\nconst uint8_t Font8_Table[] =\n{\n\t// @0 ' ' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @8 '!' (5 pixels wide)\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @16 '\"' (5 pixels wide)\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 1-100"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk0"
+    },
+    {
+      "content": "\n\t// @24 '#' (5 pixels wide)\n\t0x28, //   # #\n\t0x50, //  # #\n\t0xF8, // #####\n\t0x50, //  # #\n\t0xF8, // #####\n\t0x50, //  # #\n\t0xA0, // # #\n\t0x00, //\n\n\t// @32 '$' (5 pixels wide)\n\t0x20, //   #\n\t0x30, //   ##\n\t0x60, //  ##\n\t0x30, //   ##\n\t0x10, //    #\n\t0x60, //  ##\n\t0x20, //   #\n\t0x00, //\n\n\t// @40 '%' (5 pixels wide)\n\t0x20, //   #\n\t0x20, //   #\n\t0x18, //    ##\n\t0x60, //  ##\n\t0x10, //    #\n\t0x10, //    #\n\t0x00, //\n\t0x00, //\n\n\t// @48 '&' (5 pixels wide)\n\t0x00, //\n\t0x38, //   ###\n\t0x20, //   #\n\t0x60, //  ##\n\t0x50, //  # #\n\t0x78, //  ####\n\t0x00, //\n\t0x00, //\n\n\t// @56 ''' (5 pixels wide)\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @64 '(' (5 pixels wide)\n\t0x10, //    #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x10, //    #\n\t0x00, //\n\n\t// @72 ')' (5 pixels wide)\n\t0x40, //  #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x40, //  #\n\t0x00, //\n\n\t// @80 '*' (5 pixels wide)\n\t0x20, //   #\n\t0x70, //  ###\n\t0x20, //   #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @88 '+' (5 pixels wide)\n\t0x00, //\n\t0x20, //   #\n\t0x20, //   #\n\t0xF8, // #####\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @96 ',' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x10, //    #\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 101-200"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk1"
+    },
+    {
+      "content": "\n\t// @104 '-' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @112 '.' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @120 '/' (5 pixels wide)\n\t0x10, //    #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x40, //  #\n\t0x40, //  #\n\t0x80, // #\n\t0x00, //\n\n\t// @128 '0' (5 pixels wide)\n\t0x20, //   #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @136 '1' (5 pixels wide)\n\t0x60, //  ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0xF8, // #####\n\t0x00, //\n\t0x00, //\n\n\t// @144 '2' (5 pixels wide)\n\t0x20, //   #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x20, //   #\n\t0x40, //  #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @152 '3' (5 pixels wide)\n\t0x20, //   #\n\t0x50, //  # #\n\t0x10, //    #\n\t0x20, //   #\n\t0x10, //    #\n\t0x60, //  ##\n\t0x00, //\n\t0x00, //\n\n\t// @160 '4' (5 pixels wide)\n\t0x10, //    #\n\t0x30, //   ##\n\t0x50, //  # #\n\t0x78, //  ####\n\t0x10, //    #\n\t0x38, //   ###\n\t0x00, //\n\t0x00, //\n\n\t// @168 '5' (5 pixels wide)\n\t0x70, //  ###\n\t0x40, //  #\n\t0x60, //  ##\n\t0x10, //    #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @176 '6' (5 pixels wide)\n\t0x30, //   ##\n\t0x40, //  #\n\t0x60, //  ##\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x60, //  ##\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 201,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 201-300"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk2"
+    },
+    {
+      "content": "\n\t// @184 '7' (5 pixels wide)\n\t0x70, //  ###\n\t0x50, //  # #\n\t0x10, //    #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @192 '8' (5 pixels wide)\n\t0x20, //   #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @200 '9' (5 pixels wide)\n\t0x30, //   ##\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x30, //   ##\n\t0x10, //    #\n\t0x60, //  ##\n\t0x00, //\n\t0x00, //\n\n\t// @208 ':' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @216 ';' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x10, //    #\n\t0x00, //\n\t0x10, //    #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @224 '<' (5 pixels wide)\n\t0x00, //\n\t0x10, //    #\n\t0x20, //   #\n\t0xC0, // ##\n\t0x20, //   #\n\t0x10, //    #\n\t0x00, //\n\t0x00, //\n\n\t// @232 '=' (5 pixels wide)\n\t0x00, //\n\t0x70, //  ###\n\t0x00, //\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @240 '>' (5 pixels wide)\n\t0x00, //\n\t0x40, //  #\n\t0x20, //   #\n\t0x18, //    ##\n\t0x20, //   #\n\t0x40, //  #\n\t0x00, //\n\t0x00, //\n\n\t// @248 '?' (5 pixels wide)\n\t0x20, //   #\n\t0x50, //  # #\n\t0x10, //    #\n\t0x20, //   #\n\t0x00, //\n\t0x20, //   #\n\t0x00, //\n\t0x00, //\n\n\t// @256 '@' (5 pixels wide)\n\t0x30, //   ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x58, //  # ##\n\t0x48, //  #  #\n\t0x40, //  #\n\t0x38, //   ###\n\t0x00, //",
+      "metadata": {
+        "start_line": 301,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 301-400"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk3"
+    },
+    {
+      "content": "\n\t// @264 'A' (5 pixels wide)\n\t0x60, //  ##\n\t0x20, //   #\n\t0x50, //  # #\n\t0x70, //  ###\n\t0x88, // #   #\n\t0xD8, // ## ##\n\t0x00, //\n\t0x00, //\n\n\t// @272 'B' (5 pixels wide)\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x70, //  ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xF0, // ####\n\t0x00, //\n\t0x00, //\n\n\t// @280 'C' (5 pixels wide)\n\t0x70, //  ###\n\t0x50, //  # #\n\t0x40, //  #\n\t0x40, //  #\n\t0x40, //  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @288 'D' (5 pixels wide)\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xF0, // ####\n\t0x00, //\n\t0x00, //\n\n\t// @296 'E' (5 pixels wide)\n\t0xF8, // #####\n\t0x48, //  #  #\n\t0x60, //  ##\n\t0x40, //  #\n\t0x48, //  #  #\n\t0xF8, // #####\n\t0x00, //\n\t0x00, //\n\n\t// @304 'F' (5 pixels wide)\n\t0xF8, // #####\n\t0x48, //  #  #\n\t0x60, //  ##\n\t0x40, //  #\n\t0x40, //  #\n\t0xE0, // ###\n\t0x00, //\n\t0x00, //\n\n\t// @312 'G' (5 pixels wide)\n\t0x70, //  ###\n\t0x40, //  #\n\t0x40, //  #\n\t0x58, //  # ##\n\t0x50, //  # #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @320 'H' (5 pixels wide)\n\t0xE8, // ### #\n\t0x48, //  #  #\n\t0x78, //  ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xE8, // ### #\n\t0x00, //\n\t0x00, //\n\n\t// @328 'I' (5 pixels wide)\n\t0x70, //  ###\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @336 'J' (5 pixels wide)\n\t0x38, //   ###\n\t0x10, //    #\n\t0x10, //    #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 401,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 401-500"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk4"
+    },
+    {
+      "content": "\n\t// @344 'K' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x50, //  # #\n\t0x60, //  ##\n\t0x70, //  ###\n\t0x50, //  # #\n\t0xD8, // ## ##\n\t0x00, //\n\t0x00, //\n\n\t// @352 'L' (5 pixels wide)\n\t0xE0, // ###\n\t0x40, //  #\n\t0x40, //  #\n\t0x40, //  #\n\t0x48, //  #  #\n\t0xF8, // #####\n\t0x00, //\n\t0x00, //\n\n\t// @360 'M' (5 pixels wide)\n\t0xD8, // ## ##\n\t0xD8, // ## ##\n\t0xD8, // ## ##\n\t0xA8, // # # #\n\t0x88, // #   #\n\t0xD8, // ## ##\n\t0x00, //\n\t0x00, //\n\n\t// @368 'N' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x68, //  ## #\n\t0x68, //  ## #\n\t0x58, //  # ##\n\t0x58, //  # ##\n\t0xE8, // ### #\n\t0x00, //\n\t0x00, //\n\n\t// @376 'O' (5 pixels wide)\n\t0x30, //   ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @384 'P' (5 pixels wide)\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x70, //  ###\n\t0x40, //  #\n\t0xE0, // ###\n\t0x00, //\n\t0x00, //\n\n\t// @392 'Q' (5 pixels wide)\n\t0x30, //   ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x18, //    ##\n\t0x00, //\n\n\t// @400 'R' (5 pixels wide)\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x70, //  ###\n\t0x48, //  #  #\n\t0xE8, // ### #\n\t0x00, //\n\t0x00, //\n\n\t// @408 'S' (5 pixels wide)\n\t0x70, //  ###\n\t0x50, //  # #\n\t0x20, //   #\n\t0x10, //    #\n\t0x50, //  # #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @416 'T' (5 pixels wide)\n\t0xF8, // #####\n\t0xA8, // # # #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 501,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 501-600"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk5"
+    },
+    {
+      "content": "\n\t// @424 'U' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @432 'V' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x88, // #   #\n\t0x48, //  #  #\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @440 'W' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x88, // #   #\n\t0xA8, // # # #\n\t0xA8, // # # #\n\t0xA8, // # # #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\n\t// @448 'X' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x50, //  # #\n\t0x20, //   #\n\t0x20, //   #\n\t0x50, //  # #\n\t0xD8, // ## ##\n\t0x00, //\n\t0x00, //\n\n\t// @456 'Y' (5 pixels wide)\n\t0xD8, // ## ##\n\t0x88, // #   #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @464 'Z' (5 pixels wide)\n\t0x78, //  ####\n\t0x48, //  #  #\n\t0x10, //    #\n\t0x20, //   #\n\t0x48, //  #  #\n\t0x78, //  ####\n\t0x00, //\n\t0x00, //\n\n\t// @472 '[' (5 pixels wide)\n\t0x30, //   ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x30, //   ##\n\t0x00, //\n\n\t// @480 '\\' (5 pixels wide)\n\t0x80, // #\n\t0x40, //  #\n\t0x40, //  #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x10, //    #\n\t0x00, //\n\n\t// @488 ']' (5 pixels wide)\n\t0x60, //  ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x60, //  ##\n\t0x00, //\n\n\t// @496 '^' (5 pixels wide)\n\t0x20, //   #\n\t0x20, //   #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 601,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 601-700"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk6"
+    },
+    {
+      "content": "\n\t// @504 '_' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0xF8, // #####\n\n\t// @512 '`' (5 pixels wide)\n\t0x20, //   #\n\t0x10, //    #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\n\t// @520 'a' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x30, //   ##\n\t0x10, //    #\n\t0x70, //  ###\n\t0x78, //  ####\n\t0x00, //\n\t0x00, //\n\n\t// @528 'b' (5 pixels wide)\n\t0xC0, // ##\n\t0x40, //  #\n\t0x70, //  ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xF0, // ####\n\t0x00, //\n\t0x00, //\n\n\t// @536 'c' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x70, //  ###\n\t0x40, //  #\n\t0x40, //  #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @544 'd' (5 pixels wide)\n\t0x18, //    ##\n\t0x08, //     #\n\t0x38, //   ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x38, //   ###\n\t0x00, //\n\t0x00, //\n\n\t// @552 'e' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x70, //  ###\n\t0x70, //  ###\n\t0x40, //  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @560 'f' (5 pixels wide)\n\t0x10, //    #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @568 'g' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x38, //   ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x38, //   ###\n\t0x08, //     #\n\t0x30, //   ##\n\n\t// @576 'h' (5 pixels wide)\n\t0xC0, // ##\n\t0x40, //  #\n\t0x70, //  ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xE8, // ### #\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 701,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 701-800"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk7"
+    },
+    {
+      "content": "\n\t// @584 'i' (5 pixels wide)\n\t0x20, //   #\n\t0x00, //\n\t0x60, //  ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @592 'j' (5 pixels wide)\n\t0x20, //   #\n\t0x00, //\n\t0x70, //  ###\n\t0x10, //    #\n\t0x10, //    #\n\t0x10, //    #\n\t0x10, //    #\n\t0x70, //  ###\n\n\t// @600 'k' (5 pixels wide)\n\t0xC0, // ##\n\t0x40, //  #\n\t0x58, //  # ##\n\t0x70, //  ###\n\t0x50, //  # #\n\t0xD8, // ## ##\n\t0x00, //\n\t0x00, //\n\n\t// @608 'l' (5 pixels wide)\n\t0x60, //  ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //\n\n\t// @616 'm' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xD0, // ## #\n\t0xA8, // # # #\n\t0xA8, // # # #\n\t0xA8, // # # #\n\t0x00, //\n\t0x00, //\n\n\t// @624 'n' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0xC8, // ##  #\n\t0x00, //\n\t0x00, //\n\n\t// @632 'o' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x30, //   ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @640 'p' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xF0, // ####\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x70, //  ###\n\t0x40, //  #\n\t0xE0, // ###\n\n\t// @648 'q' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x38, //   ###\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x38, //   ###\n\t0x08, //     #\n\t0x18, //    ##\n\n\t// @656 'r' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x78, //  ####\n\t0x20, //   #\n\t0x20, //   #\n\t0x70, //  ###\n\t0x00, //\n\t0x00, //",
+      "metadata": {
+        "start_line": 801,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 801-900"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk8"
+    },
+    {
+      "content": "\n\t// @664 's' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x30, //   ##\n\t0x20, //   #\n\t0x10, //    #\n\t0x60, //  ##\n\t0x00, //\n\t0x00, //\n\n\t// @672 't' (5 pixels wide)\n\t0x00, //\n\t0x40, //  #\n\t0xF0, // ####\n\t0x40, //  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @680 'u' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xD8, // ## ##\n\t0x48, //  #  #\n\t0x48, //  #  #\n\t0x38, //   ###\n\t0x00, //\n\t0x00, //\n\n\t// @688 'v' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xC8, // ##  #\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x30, //   ##\n\t0x00, //\n\t0x00, //\n\n\t// @696 'w' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xD8, // ## ##\n\t0xA8, // # # #\n\t0xA8, // # # #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\n\t// @704 'x' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x48, //  #  #\n\t0x30, //   ##\n\t0x30, //   ##\n\t0x48, //  #  #\n\t0x00, //\n\t0x00, //\n\n\t// @712 'y' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0xD8, // ## ##\n\t0x50, //  # #\n\t0x50, //  # #\n\t0x20, //   #\n\t0x20, //   #\n\t0x60, //  ##\n\n\t// @720 'z' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x78, //  ####\n\t0x50, //  # #\n\t0x28, //   # #\n\t0x78, //  ####\n\t0x00, //\n\t0x00, //\n\n\t// @728 '{' (5 pixels wide)\n\t0x10, //    #\n\t0x20, //   #\n\t0x20, //   #\n\t0x60, //  ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x10, //    #\n\t0x00, //\n\n\t// @736 '|' (5 pixels wide)\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x20, //   #\n\t0x00, //",
+      "metadata": {
+        "start_line": 901,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 901-1000"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk9"
+    },
+    {
+      "content": "\n\t// @744 '}' (5 pixels wide)\n\t0x40, //  #\n\t0x20, //   #\n\t0x20, //   #\n\t0x30, //   ##\n\t0x20, //   #\n\t0x20, //   #\n\t0x40, //  #\n\t0x00, //\n\n\t// @752 '~' (5 pixels wide)\n\t0x00, //\n\t0x00, //\n\t0x00, //\n\t0x28, //   # #\n\t0x50, //  # #\n\t0x00, //\n\t0x00, //\n\t0x00, //\n};\n\nsFONT Font8 = {\n  Font8_Table,\n  5, /* Width */\n  8, /* Height */\n};\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */",
+      "metadata": {
+        "start_line": 1001,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Fonts/font8.c lines 1001-1047"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c:chunk10"
+    }
+  ]
+}

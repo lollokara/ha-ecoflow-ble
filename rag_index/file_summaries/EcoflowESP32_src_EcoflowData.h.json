@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#ifndef ECOFLOW_DATA_H\n#define ECOFLOW_DATA_H\n\n#include <stdint.h>\n#include <string>\n\nstruct Delta3Data {\n    // Fields from delta3_classic.py\n    float batteryLevel = 0;\n    float acInputPower = 0;\n    float acOutputPower = 0;\n    float inputPower = 0;\n    float outputPower = 0;\n    float dc12vOutputPower = 0;\n    float dcPortInputPower = 0;\n    int dcPortState = -1; // Unknown=-1, Off=0, Car=1, Solar=2\n\n    float usbcOutputPower = 0;\n    float usbc2OutputPower = 0;\n    float usbaOutputPower = 0;\n    float usba2OutputPower = 0;\n\n    bool pluggedInAc = false;\n    bool energyBackup = false;\n    int energyBackupBatteryLevel = 0;\n\n    float batteryInputPower = 0;\n    float batteryOutputPower = 0;\n\n    int batteryChargeLimitMin = 0;\n    int batteryChargeLimitMax = 100;\n\n    int cellTemperature = 0;\n    bool dc12vPort = false;\n    bool acPorts = false;\n\n    float solarInputPower = 0;\n    int acChargingSpeed = 0;\n    int maxAcChargingPower = 1500;\n\n    // Common fields inferred/mapped\n    bool acOn = false;\n    bool dcOn = false;\n    bool usbOn = false;\n};\n\nstruct Wave2Data {\n    // Fields from kt210_ble_parser.py (108 bytes)\n    int mode = 0;\n    int subMode = 0;\n    int setTemp = 0;\n    int fanValue = 0;\n    float envTemp = 0.0f;\n    int tempSys = 0;\n    int displayIdleTime = 0;\n    int displayIdleMode = 0;\n    int timeEn = 0;\n    int timeSetVal = 0;\n    int timeRemainVal = 0;\n    int beepEnable = 0;\n    uint32_t errCode = 0;\n    int refEn = 0;\n    int bmsPid = 0;\n    int wteFthEn = 0;\n    int tempDisplay = 0;\n    int powerMode = 0;\n    int powerSrc = 0;\n    int psdrPwrWatt = 0;\n    int batPwrWatt = 0;\n    int mpptPwrWatt = 0;\n    uint32_t batDsgRemainTime = 0;\n    uint32_t batChgRemainTime = 0;\n    int batSoc = 0;\n    int batChgStatus = 0;\n    float outLetTemp = 0.0f;\n    int mpptWork = 0;\n    int bmsErr = 0;\n    int rgbState = 0;\n    int waterValue = 0;\n    int bmsBoundFlag = 0;\n    int bmsUndervoltage = 0;\n    int ver = 0;\n\n    // Helpers\n    int remainingTime = 0;\n};\n\nstruct DeltaPro3Data {\n    float batteryLevel = 0;\n    float batteryLevelMain = 0; // Added field\n    float acInputPower = 0;\n    float acLvOutputPower = 0;\n    float acHvOutputPower = 0;\n    float inputPower = 0;\n    float outputPower = 0;\n    float dc12vOutputPower = 0;\n    float dcLvInputPower = 0;\n    float dcHvInputPower = 0;\n    int dcLvInputState = -1;\n    int dcHvInputState = -1;",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 1-100"
+      },
+      "id": "EcoflowESP32/src/EcoflowData.h:chunk0"
+    },
+    {
+      "content": "    float usbcOutputPower = 0;\n    float usbc2OutputPower = 0;\n    float usbaOutputPower = 0;\n    float usba2OutputPower = 0;\n    int acChargingSpeed = 0;\n    int maxAcChargingPower = 0;\n    bool pluggedInAc = false;\n    bool energyBackup = false;\n    int energyBackupBatteryLevel = 0;\n    int batteryChargeLimitMin = 0;\n    int batteryChargeLimitMax = 100;\n    int cellTemperature = 0;\n    bool dc12vPort = false;\n    bool acLvPort = false;\n    bool acHvPort = false;\n    float solarLvPower = 0;\n    float solarHvPower = 0;\n    bool gfiMode = false;\n    float expansion1Power = 0;\n    float expansion2Power = 0;\n    int acInputStatus = 0;\n    float soh = 0;\n    uint32_t dischargeRemainingTime = 0;\n    uint32_t chargeRemainingTime = 0;\n};\n\nstruct AlternatorChargerData {\n    float batteryLevel = 0;\n    float batteryTemperature = 0;\n    float dcPower = 0;\n    float carBatteryVoltage = 0;\n    float startVoltage = 0;\n    int startVoltageMin = 11;\n    int startVoltageMax = 31;\n    int chargerMode = 0; // 0=Idle, 1=Charge, 2=Maintenance, 3=Reverse\n    bool chargerOpen = false;\n    int powerLimit = 0;\n    int powerMax = 0;\n    float reverseChargingCurrentLimit = 0;\n    float chargingCurrentLimit = 0;\n    float reverseChargingCurrentMax = 0;\n    float chargingCurrentMax = 0;\n};\n\nstruct EcoflowData {\n    bool isConnected = false;\n\n    // Substructs\n    Delta3Data delta3;\n    Wave2Data wave2;\n    DeltaPro3Data deltaPro3;\n    AlternatorChargerData alternatorCharger;\n};\n\n#endif // ECOFLOW_DATA_H",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 101-155"
+      },
+      "id": "EcoflowESP32/src/EcoflowData.h:chunk1"
+    }
+  ]
+}

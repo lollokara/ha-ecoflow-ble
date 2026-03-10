@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#ifndef LOGGING_H\n#define LOGGING_H\n\n#include \"esp_log.h\"\n#include \"Stm32Serial.h\"\n#include <stdio.h>\n#include <stdarg.h>\n\n// Helper to format and send\nstatic void LogToStm(esp_log_level_t level, const char* file, const char* func, const char* format, ...) {\n    // 1. Local Log\n    va_list args;\n    va_start(args, format);\n    // We can't easily forward va_list to ESP_LOG macros because they expect string literals or VA_ARGS.\n    // So we format first.\n    char loc_buf[256];\n    vsnprintf(loc_buf, sizeof(loc_buf), format, args);\n    va_end(args);\n\n    // Get just the filename from the path\n    const char* filename = strrchr(file, '/');\n    if (filename) filename++; else filename = file;\n    // Windows path separator check just in case\n    const char* filename2 = strrchr(filename, '\\\\');\n    if (filename2) filename = filename2 + 1;\n\n    // Local Output\n    // Disable local logging to prevent GPIO 1 (TX0) interference with Light Sensor (ADC1 CH0)\n    // ESP_LOG_LEVEL(level, \"ESP32\", \"[%s] %s: %s\", filename, func, loc_buf);\n\n    // 2. STM32 Log\n    // Format: [Filename] Function() Message\n    // Target Format on STM32: [Timestamp] [Filename] Function() Message\n    // Stm32Serial sends (tag, msg). STM32 writes [Timestamp] [tag] msg.\n    // So we pass 'filename' as tag, and 'Function() Message' as msg.\n    char stm_msg[512];\n    snprintf(stm_msg, sizeof(stm_msg), \"%s() %s\", func, loc_buf);\n\n    // Send\n    Stm32Serial::getInstance().sendEspLog((uint8_t)level, filename, stm_msg);\n}\n\n// Macros to replace ESP_LOGx\n// We use a specific TAG \"ESP32\" for local logs generated via this macro to keep it consistent,\n// or we could pass the original TAG.\n// User requirement: \"replace all esp_log calls\"\n// We'll define LOG_INFO_STM(tag, format, ...) to match typical usage patterns or just replace calls.\n\n#define LOG_STM_E(tag, fmt, ...) LogToStm(ESP_LOG_ERROR, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)\n#define LOG_STM_W(tag, fmt, ...) LogToStm(ESP_LOG_WARN, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)\n#define LOG_STM_I(tag, fmt, ...) LogToStm(ESP_LOG_INFO, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)\n#define LOG_STM_D(tag, fmt, ...) LogToStm(ESP_LOG_DEBUG, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)\n#define LOG_STM_V(tag, fmt, ...) LogToStm(ESP_LOG_VERBOSE, __FILE__, __FUNCTION__, fmt, ##__VA_ARGS__)\n\n#endif // LOGGING_H",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowESP32/src/Logging.h lines 1-55"
+      },
+      "id": "EcoflowESP32/src/Logging.h:chunk0"
+    }
+  ]
+}

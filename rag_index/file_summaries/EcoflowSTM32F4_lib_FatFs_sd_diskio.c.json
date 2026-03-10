@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+  "chunks": [
+    {
+      "content": "#include \"sd_diskio.h\"\n#include \"stm32f4xx_hal.h\"\n\n#define SD_TIMEOUT 30000 // 30s timeout\n\nextern SD_HandleTypeDef hsd;\n\nstatic volatile DSTATUS Stat = STA_NOINIT;\n\nstatic DSTATUS SD_check_status(BYTE lun);\nstatic DSTATUS SD_initialize(BYTE lun);\nstatic DSTATUS SD_status(BYTE lun);\nstatic DRESULT SD_read(BYTE lun, BYTE *buff, LBA_t sector, UINT count);\nstatic DRESULT SD_write(BYTE lun, const BYTE *buff, LBA_t sector, UINT count);\nstatic DRESULT SD_ioctl(BYTE lun, BYTE cmd, void *buff);\n\nconst Diskio_drvTypeDef SD_Driver =\n{\n  SD_initialize,\n  SD_status,\n  SD_read,\n  SD_write,\n  SD_ioctl\n};\n\nstatic DSTATUS SD_check_status(BYTE lun)\n{\n  Stat = STA_NOINIT;\n  if (HAL_SD_GetCardState(&hsd) == HAL_SD_CARD_TRANSFER)\n  {\n    Stat &= ~STA_NOINIT;\n  }\n  return Stat;\n}\n\nstatic DSTATUS SD_initialize(BYTE lun)\n{\n  // We assume HAL_SD_Init is called in main.c\n  return SD_check_status(lun);\n}\n\nstatic DSTATUS SD_status(BYTE lun)\n{\n  return SD_check_status(lun);\n}\n\nstatic DRESULT SD_read(BYTE lun, BYTE *buff, LBA_t sector, UINT count)\n{\n  DRESULT res = RES_ERROR;\n  if (HAL_SD_ReadBlocks(&hsd, (uint8_t*)buff, sector, count, SD_TIMEOUT) == HAL_OK)\n  {\n    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {}\n    res = RES_OK;\n  }\n  return res;\n}\n\nstatic DRESULT SD_write(BYTE lun, const BYTE *buff, LBA_t sector, UINT count)\n{\n  DRESULT res = RES_ERROR;\n  if (HAL_SD_WriteBlocks(&hsd, (uint8_t*)buff, sector, count, SD_TIMEOUT) == HAL_OK)\n  {\n    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {}\n    res = RES_OK;\n  }\n  return res;\n}\n\nstatic DRESULT SD_ioctl(BYTE lun, BYTE cmd, void *buff)\n{\n  DRESULT res = RES_ERROR;\n  HAL_SD_CardInfoTypeDef CardInfo;\n\n  if (Stat & STA_NOINIT) return RES_NOTRDY;\n\n  switch (cmd)\n  {\n     case CTRL_SYNC:\n       res = RES_OK;\n       break;\n\n     case GET_SECTOR_COUNT:\n       HAL_SD_GetCardInfo(&hsd, &CardInfo);\n       *(DWORD*)buff = CardInfo.LogBlockNbr;\n       res = RES_OK;\n       break;\n\n     case GET_SECTOR_SIZE:\n       HAL_SD_GetCardInfo(&hsd, &CardInfo);\n       *(WORD*)buff = CardInfo.LogBlockSize;\n       res = RES_OK;\n       break;\n\n     case GET_BLOCK_SIZE:\n       HAL_SD_GetCardInfo(&hsd, &CardInfo);\n       *(DWORD*)buff = CardInfo.LogBlockSize / 512;\n       res = RES_OK;\n       break;\n\n     default:",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/FatFs/sd_diskio.c lines 1-100"
+      },
+      "id": "EcoflowSTM32F4/lib/FatFs/sd_diskio.c:chunk0"
+    },
+    {
+      "content": "       res = RES_PARERR;\n  }\n  return res;\n}",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/FatFs/sd_diskio.c lines 101-104"
+      },
+      "id": "EcoflowSTM32F4/lib/FatFs/sd_diskio.c:chunk1"
+    }
+  ]
+}
