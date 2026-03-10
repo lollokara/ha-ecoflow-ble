@@ -1,0 +1,32 @@
+{
+  "full_summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in exc7200.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    exc7200.c\n  * @author  MCD Application Team\n  * @brief   This file provides a set of functions needed to manage the EXC7200\n  *          Touch-screen controller.\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2015 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Includes ------------------------------------------------------------------*/\n#include \"exc7200.h\"\n\n/** @addtogroup BSP\n  * @{\n  */\n\n/** @addtogroup Component\n  * @{\n  */\n\n/** @defgroup EXC7200\n  * @{\n  */\n\n/* Private typedef -----------------------------------------------------------*/\n\n/** @defgroup EXC7200_Private_Types_Definitions\n  * @{\n  */\n\n/* Private define ------------------------------------------------------------*/\n\n/** @defgroup EXC7200_Private_Defines\n  * @{\n  */\n\n/* Private macro -------------------------------------------------------------*/\n\n/** @defgroup EXC7200_Private_Macros\n  * @{\n  */\n\n/* Private variables ---------------------------------------------------------*/\n\n/** @defgroup EXC7200_Private_Variables\n  * @{\n  */\n\n/* Touch screen driver structure initialization */\nTS_DrvTypeDef exc7200_ts_drv =\n{\n  exc7200_Init,\n  exc7200_ReadID,\n  exc7200_Reset,\n\n  exc7200_TS_Start,\n  exc7200_TS_DetectTouch,\n  exc7200_TS_GetXY,\n\n  exc7200_TS_EnableIT,\n  exc7200_TS_ClearIT,\n  exc7200_TS_ITStatus,\n  exc7200_TS_DisableIT,\n};\n\nuint8_t aBufferTS[10];\n\n/**\n  * @}\n  */\n\n/* Private function prototypes -----------------------------------------------*/\n\n/** @defgroup exc7200_Private_Function_Prototypes\n  * @{\n  */\n\n/* Private functions ---------------------------------------------------------*/\n\n/** @defgroup exc7200_Private_Functions\n  * @{\n  */\n\n/**\n  * @brief  Initialize the exc7200 and configure the needed hardware resources\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None\n  */\nvoid exc7200_Init(uint16_t DeviceAddr)\n{",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c lines 1-100"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c:chunk0"
+    },
+    {
+      "content": "  /* Initialize IO BUS layer */\n  IOE_Init();\n\n}\n\n/**\n  * @brief  Reset the exc7200 by Software.\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None\n  */\nvoid exc7200_Reset(uint16_t DeviceAddr)\n{\n\n}\n\n/**\n  * @brief  Read the exc7200 IO Expander device ID.\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval The Device ID (two bytes).\n  */\nuint16_t exc7200_ReadID(uint16_t DeviceAddr)\n{\n  return 0;\n}\n\n/**\n  * @brief  Configures the touch Screen Controller (Single point detection)\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None.\n  */\nvoid exc7200_TS_Start(uint16_t DeviceAddr)\n{\n}\n\n/**\n  * @brief  Return if there is touch detected or not.\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval Touch detected state.\n  */\nuint8_t exc7200_TS_DetectTouch(uint16_t DeviceAddr)\n{\n  /* Read TS data : Send I2C Slave address + 1 Bit0=1 for:read */\n  IOE_ReadMultiple(DeviceAddr | 1, EXC7200_READ_CMD, aBufferTS, 10);\n\n  /* check for first byte */\n  if (aBufferTS[1]==0x83)\n  {\n    return 1;\n  }\n\n  return 0;\n}\n\n/**\n  * @brief  Get the touch screen X and Y positions values\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @param  X: Pointer to X position value\n  * @param  Y: Pointer to Y position value\n  * @retval None.\n  */\nvoid exc7200_TS_GetXY(uint16_t DeviceAddr, uint16_t *X, uint16_t *Y)\n{\n  /* Calculate positions */\n  *X = (((aBufferTS[3]&0x00ff) << 4) | ((aBufferTS[2]&0x00f0) >> 4)) << 1;\n  *Y = (((aBufferTS[5]&0x00ff) << 4) | ((aBufferTS[4]&0x00f0) >> 4)) << 1;\n\n  /* Dummy Read to deactivate read mode */\n  IOE_ReadMultiple(DeviceAddr, EXC7200_READ_CMD, aBufferTS, 10);\n}\n\n/**\n  * @brief  Configure the selected source to generate a global interrupt or not\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None\n  */\nvoid exc7200_TS_EnableIT(uint16_t DeviceAddr)\n{\n}\n\n/**\n  * @brief  Configure the selected source to generate a global interrupt or not\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None\n  */\nvoid exc7200_TS_DisableIT(uint16_t DeviceAddr)\n{\n}\n\n/**\n  * @brief  Configure the selected source to generate a global interrupt or not\n  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval TS interrupts status\n  */\nuint8_t exc7200_TS_ITStatus(uint16_t DeviceAddr)\n{\n  return 0;\n}\n\n/**\n  * @brief  Configure the selected source to generate a global interrupt or not",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c lines 101-200"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c:chunk1"
+    },
+    {
+      "content": "  * @param  DeviceAddr: Device address on communication Bus.\n  * @retval None\n  */\nvoid exc7200_TS_ClearIT(uint16_t DeviceAddr)\n{\n}\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */",
+      "metadata": {
+        "start_line": 201,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c lines 201-222"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c:chunk2"
+    }
+  ]
+}

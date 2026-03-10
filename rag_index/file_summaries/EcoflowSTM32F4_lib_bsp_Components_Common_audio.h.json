@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    audio.h\n  * @author  MCD Application Team\n  * @version V4.0.1\n  * @date    21-July-2015\n  * @brief   This header file contains the common defines and functions prototypes\n  *          for the Audio driver.\n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; COPYRIGHT(c) 2015 STMicroelectronics</center></h2>\n  *\n  * Redistribution and use in source and binary forms, with or without modification,\n  * are permitted provided that the following conditions are met:\n  *   1. Redistributions of source code must retain the above copyright notice,\n  *      this list of conditions and the following disclaimer.\n  *   2. Redistributions in binary form must reproduce the above copyright notice,\n  *      this list of conditions and the following disclaimer in the documentation\n  *      and/or other materials provided with the distribution.\n  *   3. Neither the name of STMicroelectronics nor the names of its contributors\n  *      may be used to endorse or promote products derived from this software\n  *      without specific prior written permission.\n  *\n  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"\n  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\n  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\n  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE\n  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\n  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\n  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\n  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\n  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef __AUDIO_H\n#define __AUDIO_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include <stdint.h>\n\n/** @addtogroup BSP\n  * @{\n  */\n\n/** @addtogroup Components\n  * @{\n  */\n\n/** @addtogroup AUDIO\n  * @{\n  */\n\n/** @defgroup AUDIO_Exported_Constants\n  * @{\n  */\n\n/* Codec audio Standards */\n#define CODEC_STANDARD                0x04\n#define I2S_STANDARD                  I2S_STANDARD_PHILIPS\n\n/**\n  * @}\n  */\n\n/** @defgroup AUDIO_Exported_Types\n  * @{\n  */\n\n/** @defgroup AUDIO_Driver_structure  Audio Driver structure\n  * @{\n  */\ntypedef struct\n{\n  uint32_t  (*Init)(uint16_t, uint16_t, uint8_t, uint32_t);\n  void      (*DeInit)(void);\n  uint32_t  (*ReadID)(uint16_t);\n  uint32_t  (*Play)(uint16_t, uint16_t*, uint16_t);\n  uint32_t  (*Pause)(uint16_t);\n  uint32_t  (*Resume)(uint16_t);\n  uint32_t  (*Stop)(uint16_t, uint32_t);\n  uint32_t  (*SetFrequency)(uint16_t, uint32_t);\n  uint32_t  (*SetVolume)(uint16_t, uint8_t);\n  uint32_t  (*SetMute)(uint16_t, uint32_t);\n  uint32_t  (*SetOutputMode)(uint16_t, uint8_t);\n  uint32_t  (*Reset)(uint16_t);\n}AUDIO_DrvTypeDef;\n/**\n  * @}\n  */\n\n/**",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/audio.h lines 1-100"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Components/Common/audio.h:chunk0"
+    },
+    {
+      "content": "  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* __AUDIO_H */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/audio.h lines 101-122"
+      },
+      "id": "EcoflowSTM32F4/lib/bsp/Components/Common/audio.h:chunk1"
+    }
+  ]
+}

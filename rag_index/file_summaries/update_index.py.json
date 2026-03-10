@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to update_index module.",
+  "chunks": [
+    {
+      "content": "def get_git_diff_files():\n    try:\n        # Get files changed in the working tree\n        result = subprocess.run([\"git\", \"diff\", \"--name-only\"], capture_output=True, text=True, check=True)\n        # Get files that are staged\n        result_staged = subprocess.run([\"git\", \"diff\", \"--cached\", \"--name-only\"], capture_output=True, text=True, check=True)\n        # Get untracked files\n        result_untracked = subprocess.run([\"git\", \"ls-files\", \"--others\", \"--exclude-standard\"], capture_output=True, text=True, check=True)\n        \n        files = result.stdout.splitlines() + result_staged.stdout.splitlines() + result_untracked.stdout.splitlines()\n        return list(set(files))\n    except subprocess.CalledProcessError:\n        print(\"Not a git repository or git error.\")\n        return []",
+      "metadata": {
+        "start_line": 8,
+        "lang": "python",
+        "desc": "Definition of get_git_diff_files in update_index.py"
+      },
+      "id": "update_index.py:chunk0"
+    },
+    {
+      "content": "def main():\n    changed_files = get_git_diff_files()\n    if not changed_files:\n        print(\"No changed files to update.\")\n        return\n        \n    print(f\"Found {len(changed_files)} changed files. Re-running full index generation for simplicity and correctness.\")\n    # For a real scalable system, we would just update the specific files in the index,\n    # but for this script, re-running is safer to maintain consistency across catalog, summaries, and embeddings.\n    generate_main()",
+      "metadata": {
+        "start_line": 23,
+        "lang": "python",
+        "desc": "Definition of main in update_index.py"
+      },
+      "id": "update_index.py:chunk1"
+    }
+  ]
+}

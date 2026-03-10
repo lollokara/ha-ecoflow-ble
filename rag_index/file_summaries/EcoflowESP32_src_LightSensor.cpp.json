@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#include \"LightSensor.h\"\n\nLightSensor& LightSensor::getInstance() {\n    static LightSensor instance;\n    return instance;\n}\n\nLightSensor::LightSensor() {\n    for (int i = 0; i < WINDOW_SIZE; i++) _readings[i] = 0;\n}\n\nvoid LightSensor::begin() {\n    // Explicitly set ADC resolution and attenuation for ESP32-S3\n    analogReadResolution(12);\n    // ADC_11db is deprecated in newer cores but usually maps to 11dB (0-3.3V)\n    // On ESP32-S3, this is the default full range.\n    analogSetAttenuation(ADC_11db);\n\n    pinMode(_pin, INPUT);\n    _prefs.begin(\"lightsensor\", false);\n    _minADC = _prefs.getInt(\"min\", 0);\n    _maxADC = _prefs.getInt(\"max\", 4095);\n}\n\nvoid LightSensor::update() {\n    if (millis() - _lastUpdate < 100) return; // 10Hz sampling\n    _lastUpdate = millis();\n\n    // Subtract the last reading\n    _total = _total - _readings[_readIndex];\n\n    // Read new value\n    int val = analogRead(_pin);\n\n    // Simple outlier filter: If value is 0 or 4095, only accept it if it persists (debounce)\n    // But averaging handles this mostly.\n    // However, if we get random spikes, we can clamp them.\n    // Let's just trust the average for now, but ensure initialization doesn't start with 0s if it's bright.\n\n    _readings[_readIndex] = val;\n    _total = _total + _readings[_readIndex];\n    _readIndex = (_readIndex + 1);\n    if (_readIndex >= WINDOW_SIZE) _readIndex = 0;\n\n    _average = _total / WINDOW_SIZE;\n}\n\nint LightSensor::getRaw() const {\n    return _average;\n}\n\nuint8_t LightSensor::getBrightnessPercent() const {\n    // Map average ADC to 10-100%\n    // Inverted Logic based on user feedback (High ADC = Dark, Low ADC = Bright)\n    // ADC 0 (Bright) -> 100%\n    // ADC 4095 (Dark) -> 10%\n    int val = _average;\n    if (val < _minADC) val = _minADC;\n    if (val > _maxADC) val = _maxADC;\n\n    int pct = map(val, _minADC, _maxADC, 100, 10);\n    return (uint8_t)constrain(pct, 10, 100);\n}\n\nint LightSensor::getMin() const { return _minADC; }\nint LightSensor::getMax() const { return _maxADC; }\n\nvoid LightSensor::setCalibration(int min, int max) {\n    _minADC = min;\n    _maxADC = max;\n    _prefs.putInt(\"min\", min);\n    _prefs.putInt(\"max\", max);\n}",
+      "metadata": {
+        "start_line": 1,
+        "lang": "cpp",
+        "desc": "Code chunk from EcoflowESP32/src/LightSensor.cpp lines 1-73"
+      },
+      "id": "EcoflowESP32/src/LightSensor.cpp:chunk0"
+    }
+  ]
+}

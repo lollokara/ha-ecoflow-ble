@@ -1,0 +1,14 @@
+{
+  "full_summary": "Markdown file with 38 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "# \u2261 DATA REFERENCE // DELTA 3\n\n> **DEVICE ID:** `0x01`\n> **PROTOCOL:** V3 (Protobuf)\n> **ACCESS LEVEL:** FULL\n\nThe Delta 3 exposes a comprehensive set of telemetry data via the `pd335_sys_DisplayPropertyUpload` protobuf message.\n\n## \u2261 TELEMETRY FIELDS\n\n| Field Name | Type | Unit | Description |\n| :--- | :--- | :--- | :--- |\n| **batteryLevel** | `float` | % | State of Charge (SOC) (0-100%). |\n| **inputPower** | `float` | W | Total Input Power (AC + DC/Solar). |\n| **outputPower** | `float` | W | Total Output Power (AC + DC + USB). |\n| **acInputPower** | `float` | W | Grid AC Input Power. |\n| **acOutputPower** | `float` | W | Inverter Output Power. |\n| **dc12vOutputPower** | `float` | W | Car Lighter Port Output (12V). |\n| **dcPortInputPower** | `float` | W | Input from XT60 Port (Solar/Car). |\n| **usbOutputPower** | `float` | W | Aggregate USB-A and USB-C Output. |\n| **acChargingSpeed** | `int32` | W | Configured AC Charging Limit. |\n| **batteryChargeLimitMin** | `int32` | % | Minimum SOC (Discharge Limit). |\n| **batteryChargeLimitMax** | `int32` | % | Maximum SOC (Charge Limit). |\n| **cellTemperature** | `int32` | \u00b0C | Maximum Cell Temperature. |\n| **energyBackup** | `bool` | - | Energy Backup Mode Enabled. |\n\n## \u2261 STATE FLAGS\n\n| Flag | Description |\n| :--- | :--- |\n| **acPorts** | AC Inverter is Active (On/Off). |\n| **dc12vPort** | 12V DC Output is Active (On/Off). |\n| **usbOn** | USB Ports are providing power. |\n| **pluggedInAc** | AC Grid Cable connected. |\n\n---\n\n> *Reference: `pd335_sys.pb.c` / `Delta3DataStruct`*",
+      "metadata": {
+        "start_line": 1,
+        "lang": "markdown",
+        "desc": "Code chunk from docs/device_reference/Delta_3.md lines 1-38"
+      },
+      "id": "docs/device_reference/Delta_3.md:chunk0"
+    }
+  ]
+}

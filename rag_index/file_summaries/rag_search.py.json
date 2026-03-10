@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to rag_search module.",
+  "chunks": [
+    {
+      "content": "def main():\n    parser = argparse.ArgumentParser(description=\"Search the RAG index\")\n    parser.add_argument(\"query\", help=\"The query string to search for\")\n    args = parser.parse_args()\n    \n    query = args.query\n    \n    print(\"Loading index...\")\n    try:\n        index = faiss.read_index(\"rag_index/embeddings/embeddings.faiss\")\n        with open(\"rag_index/embeddings/embeddings.pkl\", \"rb\") as f:\n            metadata = pickle.load(f)\n    except Exception as e:\n        print(f\"Error loading index: {e}\")\n        sys.exit(1)\n        \n    model = SentenceTransformer(\"all-MiniLM-L6-v2\")\n    q_emb = model.encode([query], show_progress_bar=False, convert_to_numpy=True)\n    \n    D, I = index.search(q_emb, 10)\n    \n    print(\"\\n--- Results ---\\n\")\n    for dist, idx in zip(D[0], I[0]):\n        if idx == -1: continue\n        path = metadata[\"paths\"][idx]\n        text = metadata[\"texts\"][idx]\n        \n        print(f\"File: {path}\")\n        print(f\"Distance: {dist:.4f}\")\n        print(\"Snippet:\")\n        print(\"-\" * 40)\n        print(text[:300] + \"...\" if len(text) > 300 else text)\n        print(\"-\" * 40 + \"\\n\")",
+      "metadata": {
+        "start_line": 8,
+        "lang": "python",
+        "desc": "Definition of main in rag_search.py"
+      },
+      "id": "rag_search.py:chunk0"
+    }
+  ]
+}

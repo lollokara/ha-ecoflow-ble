@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_ui_v2 module.",
+  "chunks": [
+    {
+      "content": "def extract_html():\n    with open('EcoflowESP32/src/WebAssets.h', 'r') as f:\n        content = f.read()\n\n    start = content.find('R\"rawliteral(') + len('R\"rawliteral(')\n    end = content.find(')rawliteral\";')\n    html = content[start:end]\n\n    # Mock for Cyberpunk/Offline test\n    mock_script = \"\"\"\n    <script>\n    window.fetch = async (url, options) => {\n        console.log('Mock Fetch:', url);\n        if (url.includes('/api/status')) {\n            return {\n                json: async () => ({\n                    esp_temp: 45.0,\n                    d3: { connected: true, sn: 'D3-ACTIVE', name: 'Delta 3', batt: 85, in: 100, out: 200, solar: 50, cell_temp: 25, ac_on: true, dc_on: false, usb_on: true, ac_out_pow: 150, dc_out_pow: 0, usb_out_pow: 50, cfg_ac_lim: 800, cfg_max: 100, cfg_min: 0 },\n                    // W2 is PAIRED but DISCONNECTED (Offline test)\n                    w2: { connected: false, paired: true, sn: 'W2-OFFLINE', name: 'Wave 2', batt: 0 },\n                    d3p: { connected: false },\n                    ac: { connected: false }\n                })\n            };\n        }\n        if (url.includes('/api/forget')) {\n            console.log('Forgot device');\n            return { ok: true };\n        }\n        return { ok: true, json: async () => ({}) };\n    };\n    </script>\n    \"\"\"\n\n    html = html.replace('</head>', mock_script + '</head>')\n\n    with open('temp_ui_cyber.html', 'w') as f:\n        f.write(html)",
+      "metadata": {
+        "start_line": 4,
+        "lang": "python",
+        "desc": "Definition of extract_html in Test Scripts/verify_ui_v2.py"
+      },
+      "id": "Test Scripts/verify_ui_v2.py:chunk0"
+    },
+    {
+      "content": "def verify_ui():\n    extract_html()\n\n    with sync_playwright() as p:\n        browser = p.chromium.launch(headless=True)\n        page = browser.new_page()\n        page.goto('file://' + os.getcwd() + '/temp_ui_cyber.html')\n        page.wait_for_timeout(2000) # Wait for animations\n\n        # 1. Check if Active Device is visible and styled\n        d3_card = page.locator('#card-d3')\n        if d3_card.is_visible():\n            print(\"Active D3 card visible\")\n            # We can't easily check backdrop-filter in headless, but we can check class presence\n            if 'offline' not in d3_card.get_attribute('class'):\n                print(\"Active D3 card is NOT offline (Correct)\")\n\n        # 2. Check if Offline Device is visible (Persistence test)\n        w2_card = page.locator('#card-w2')\n        if w2_card.is_visible():\n            print(\"Offline W2 card visible (Persistence works)\")\n            if 'offline' in w2_card.get_attribute('class'):\n                print(\"Offline W2 card has 'offline' class (Visuals Correct)\")\n\n        # 3. Check Forget Menu\n        # Click 3-dot on W2\n        w2_menu_btn = w2_card.locator('.card-menu-btn')\n        w2_menu_btn.click()\n        page.wait_for_timeout(500)\n\n        forget_opt = page.locator('#menu-w2 .menu-opt', has_text='Forget')\n        if forget_opt.is_visible():\n            print(\"Forget option visible for offline device\")\n            forget_opt.click()\n            # In real app this calls API. In mock we verify call?\n            # We just check UI update if mock handled it (mock deletes from knownDevices? No, mock is stateless mostly)\n            # But JS logic deletes card on success.\n            page.wait_for_timeout(500)\n            if not w2_card.is_visible():\n                print(\"Offline card removed after Forget (Logic Correct)\")\n            else:\n                # Our mock fetch returns OK, JS should remove it from DOM.\n                # knownDevices.delete is in the .then() block.\n                print(\"Offline card removal verification: Card still visible? \" + str(w2_card.is_visible()))\n\n        page.screenshot(path='screenshot_cyberpunk.png')\n        browser.close()",
+      "metadata": {
+        "start_line": 43,
+        "lang": "python",
+        "desc": "Definition of verify_ui in Test Scripts/verify_ui_v2.py"
+      },
+      "id": "Test Scripts/verify_ui_v2.py:chunk1"
+    }
+  ]
+}
