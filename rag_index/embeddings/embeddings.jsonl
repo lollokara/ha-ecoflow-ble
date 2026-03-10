@@ -788,6 +788,7 @@
 {"id": "EcoflowESP32/src/DeviceManager.h:chunk1", "path": "EcoflowESP32/src/DeviceManager.h", "text": "Code chunk from EcoflowESP32/src/DeviceManager.h lines 101-154\n    // Device instances\n    EcoflowES"}
 {"id": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h lines 1-100\n/**\n  ***************"}
 {"id": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h lines 101-148\n  */\n/**\n  * @}\n  *"}
+{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-66\n# \u2261 AGENTS ONBOARDING & GUIDELINES // ECOFLOW CYBER DECK\n\n**Wel"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h lines 1-100\n/**\n  **********"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h lines 101-158\n\n/** @defgroup"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/s5k5cag/s5k5cag.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/s5k5cag/s5k5cag.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/s5k5cag/s5k5cag.h lines 1-100\n/**\n  **************"}
@@ -875,5 +876,5 @@
 {"id": "docs/device_reference/Wave_2.md:chunk0", "path": "docs/device_reference/Wave_2.md", "text": "Code chunk from docs/device_reference/Wave_2.md lines 1-37\n# \u2261 DATA REFERENCE // WAVE 2\n\n> **DEVICE "}
 {"id": "EcoflowSTM32F4/lib/FatFs/ffsystem.c:chunk0", "path": "EcoflowSTM32F4/lib/FatFs/ffsystem.c", "text": "Code chunk from EcoflowSTM32F4/lib/FatFs/ffsystem.c lines 1-67\n#include \"ff.h\"\n#include <stdio.h>\n\n#"}
 {"id": "EcoflowSTM32F4/src/lv_conf.h:chunk0", "path": "EcoflowSTM32F4/src/lv_conf.h", "text": "Code chunk from EcoflowSTM32F4/src/lv_conf.h lines 1-54\n#ifndef LV_CONF_H\n#define LV_CONF_H\n\n#includ"}
-{"id": "rag_search.py:chunk0", "path": "rag_search.py", "text": "Definition of main in rag_search.py\ndef main():\n    parser = argparse.ArgumentParser(description=\"Se"}
 {"id": "EcoflowESP32/src/dc009_apl_comm.pb.c:chunk0", "path": "EcoflowESP32/src/dc009_apl_comm.pb.c", "text": "Code chunk from EcoflowESP32/src/dc009_apl_comm.pb.c lines 1-45\n/* Automatically generated nanopb co"}
+{"id": "EcoflowSTM32F4/include/README:chunk0", "path": "EcoflowSTM32F4/include/README", "text": "Code chunk from EcoflowSTM32F4/include/README lines 1-37\n\nThis directory is intended for project hea"}
