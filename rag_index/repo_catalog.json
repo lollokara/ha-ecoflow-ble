@@ -16,7 +16,7 @@
     },
     {
       "path": "generate_rag_index.py",
-      "size": 12283,
+      "size": 11951,
       "lang": "python",
       "summary": "Python file with 0 classes and 8 functions. Key components include classes and method definitions relevant to generate_rag_index module.",
       "modified": "2026-03-10"
@@ -30,16 +30,23 @@
     },
     {
       "path": "update_index.py",
-      "size": 1457,
+      "size": 1441,
       "lang": "python",
       "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to update_index module.",
       "modified": "2026-03-10"
     },
     {
       "path": "rag_search.py",
-      "size": 1280,
+      "size": 1248,
       "lang": "python",
       "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to rag_search module.",
+      "modified": "2026-03-10"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 8784,
+      "lang": "markdown",
+      "summary": "Markdown file with 67 lines. Provides configuration, documentation or supporting data for the repository.",
       "modified": "2026-03-10"
     },
     {
@@ -1654,11 +1661,11 @@
     }
   ],
   "stats": {
-    "total_files": 236,
+    "total_files": 237,
     "langs": {
       "python": 14,
       "unknown": 16,
-      "markdown": 16,
+      "markdown": 17,
       "cpp": 15,
       "c": 170,
       "json": 3,
@@ -1666,16 +1673,16 @@
       "css": 1
     },
     "top_dirs": [
-      "EcoflowSTM32F4/lib/bsp/Components/exc7200",
-      "EcoflowSTM32F4/lib/bsp/Components/stmpe1600",
-      "EcoflowESP32/src",
+      "EcoflowSTM32F4/lib/bsp/Components/s25fl512s",
       "Test Scripts",
-      "docs",
-      "proto",
-      "EcoflowSTM32F4/lib/bsp/Components/n25q512a",
-      "EcoflowSTM32F4/lib/bsp/Components/st7789h2",
-      "EcoflowSTM32F4/lib/bsp/Components/lsm303dlhc",
-      "EcoflowSTM32F4/lib/bsp/Components/s5k5cag"
+      "EcoflowSTM32F4/lib/bsp/Components/ov5640",
+      "EcoflowSTM32F4/lib/bsp/Components/wm8994",
+      "EcoflowSTM32F4",
+      "EcoflowSTM32F4_Bootloader",
+      "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152",
+      "EcoflowSTM32F4/lib/bsp/Components/lsm303agr",
+      "EcoflowSTM32F4/lib/bsp",
+      "EcoflowSTM32F4/lib/bsp/Components/ampire480272"
     ]
   }
 }
