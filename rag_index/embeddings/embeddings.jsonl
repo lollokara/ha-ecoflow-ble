@@ -680,6 +680,7 @@
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h lines 1-100\n/**\n  ****************"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h lines 101-200\n#define FT3X67_P2_MI"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h:chunk2", "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h lines 201-270\n  */\n\nvoid     ft3x6"}
+{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-67\n# Agent Instructions for Ecoflow Cyber Deck\n\nWelcome to the Eco"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h lines 1-100\n/**\n  ****************"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h lines 101-200\n/**\n  * @}\n  */\n\n/**"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h:chunk2", "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h lines 201-300\n  * @}\n  */\n\n/** @de"}
@@ -796,7 +797,6 @@
 {"id": "EcoflowSTM32F4/lib/FatFs/diskio.c:chunk1", "path": "EcoflowSTM32F4/lib/FatFs/diskio.c", "text": "Code chunk from EcoflowSTM32F4/lib/FatFs/diskio.c lines 101-144\n\tconst BYTE *buff,\t/* Data to be wri"}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c:chunk0", "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_log_manager.c lines 1-100\n#include \"ui_view_log_manage"}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c:chunk1", "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_log_manager.c lines 101-122\n    lv_obj_set_size(btn_fm"}
-{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-39\n# Agent Instructions for Ecoflow Cyber Deck\n\nWelcome to the Eco"}
 {"id": "EcoflowSTM32F4/include/FreeRTOSConfig.h:chunk0", "path": "EcoflowSTM32F4/include/FreeRTOSConfig.h", "text": "Code chunk from EcoflowSTM32F4/include/FreeRTOSConfig.h lines 1-100\n#ifndef FREERTOS_CONFIG_H\n#defin"}
 {"id": "EcoflowESP32/src/EcoflowData.h:chunk0", "path": "EcoflowESP32/src/EcoflowData.h", "text": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 1-100\n#ifndef ECOFLOW_DATA_H\n#define ECOFLOW_DA"}
 {"id": "EcoflowESP32/src/EcoflowData.h:chunk1", "path": "EcoflowESP32/src/EcoflowData.h", "text": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 101-155\n    float usbcOutputPower = 0;\n    floa"}

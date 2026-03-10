@@ -30,10 +30,38 @@ This repository uses a custom Retrieval-Augmented Generation (RAG) indexing syst
 - **State Structs:** `EcoflowDataParser` dump functions use comprehensive state structs defined in `EcoflowData.h` (e.g., `Delta3Data`), which expand to include every field from the protobuf definitions.
 - **Unconditional Logging:** Debug dump functions must log all field values unconditionally, ignoring `has_` flags, to ensure zero values are captured and data dumps are complete.
 
-### Other Important Implementation Details
-- **ESP32 WebServer:** `WebServer::handleStatus` requires a `DynamicJsonDocument` size of at least 16KB (16384 bytes) to prevent dropping fields.
-- **BLE Authentication & Connection:** During the `AUTHENTICATING` state, non-auth packets must be ignored rather than triggering an immediate failure. For Protocol V2 devices (e.g., Wave 2), a payload of `0x04` during authentication signifies success alongside `0x00`. To prevent immediate disconnection after auth, disable automatic ACKs (`shouldReply = false`) for incoming background telemetry and status packets.
-- **Inter-chip UART:** The ESP32 and STM32F4 inter-chip UART communication uses a baud rate of 460800.
+### ESP32 BLE & Communications
+- **Authentication Handshake:** During the `AUTHENTICATING` state in `EcoflowESP32::_handleAuthPacket`, non-auth packets (where cmdSet is not 0x35 and cmdId is not 0x86) **must be ignored** rather than triggering an immediate authentication failure. Devices like Wave 2 send status packets asynchronously before the auth response.
+- **Protocol V2 (Wave 2):** A payload of `0x04` during the `AUTHENTICATING` state signifies a successful authentication handshake and must be accepted alongside `0x00`. To prevent Wave 2 devices from immediately terminating the connection (reason 531) after auth, **automatic ACKs must be disabled** (`shouldReply = false`) for incoming background telemetry and status packets in `EcoflowESP32::_handlePacket`.
+- **BLE Notification Queue:** To prevent BLE packet loss and CRC mismatches from high-throughput devices (like the Delta Pro 3), `EcoflowESP32` uses a BLE notification queue size of 50. In `ble_task_entry`, BLE notifications must be drained using a `while (xQueueReceive(...))` loop to ensure all queued packets are processed per task iteration.
+- **Connection Hygiene:** To prevent auth failures and remote disconnections upon reconnection, `EcoflowESP32` must explicitly call `_rxBuffer.clear()` and completely drain `_ble_queue` in its `onConnect`, `onDisconnect`, and `disconnectAndForget` methods to ensure residual corrupted BLE data does not taint the new connection.
+- **Dynamic Scanning:** `DeviceManager::_manageScanning()` suppresses BLE scanning for the Wave 2 device if a connected Delta Pro 3 (D3P) has its AC output turned off.
+
+### ESP32 WebServer, Logging, & Peripherals
+- **Hardware Conflicts:** ESP32-S3 `Serial` (Debug UART) initializes on GPIO 1 (TX0) by default, which conflicts with the `LightSensor` configured on GPIO 1 (ADC1 CH0). `Serial.begin()` **must be disabled** in `main.cpp` to ensure stable light sensor readings and prevent backlight flashing. `LightSensor::begin` requires explicit calls to `analogReadResolution(12)` and `analogSetAttenuation(ADC_11db)`.
+- **Remote Logging:** Because standard serial is disabled, `RemoteLogger` redirects all `ESP_LOGx` output to the STM32 via `Stm32Serial` using `esp_log_set_vprintf`. The `remote_vprintf` buffer is sized to 512 bytes to prevent truncation. To prevent WDT timeouts, `RemoteLogger` uses `strstr` on the raw log buffer to explicitly filter out high-frequency logs containing "NimBLE".
+- **WebServer Log Downloads:**
+  - Route `/api/sd_logs/download` is renamed to `/api/download_log` to prevent routing conflicts with `/api/sd_logs`.
+  - Downloads use a **deferred response strategy**: the request is stored in `_pendingLogRequest` and initiated via `WebServer::update` (called from `main.cpp`) only after `Stm32Serial` has buffered data (>8KB). The `LogResponse` constructor **must not** call `Stm32Serial::startLogDownload` directly.
+  - `LogResponse` must set `_chunked = true` and `_sendContentLength = false` to enable Chunked Transfer Encoding.
+  - `LogResponse::_fillBuffer` uses a 3000ms timeout to handle UART latencies. It must explicitly check for `len == 0` and return 0 immediately to prevent blocking `AsyncTCP` connections.
+- **WebServer Status / List:** `WebServer::handleStatus` requires a `DynamicJsonDocument` size of at least 16KB (16384 bytes). `/api/sd_logs` requires `new AsyncJsonResponse(true, 32768)` to prevent JSON truncation when listing many files.
+
+### Inter-Chip UART Protocol (ESP32 <-> STM32)
+- **Baud Rate:** The ESP32 and STM32F4 UART communication runs at `460800`.
+- **System Beep:** Toggled via `SET_VAL_BEEP` (10) UART command, which sends a `ConfigWrite` protobuf message with `cfg_beep_en`.
+- **Data Freshness:** STM32F4 `uart_task.c` implements a 15-second data freshness timeout per device (`last_device_rx_time`). If exceeded, it requests a forced reconnection from the ESP32.
+- **Log Downloading (STM32 to ESP):**
+  - ESP32 `Stm32Serial::begin` sets the `Serial1` receive buffer to 16384 bytes (`setRxBufferSize`) to prevent FIFO overflows.
+  - ESP32 `Stm32Serial::update` must not enforce an `expected_len > 250` limit; larger packets fit in the 1024-byte `rx_buf` and are required for fast downloads.
+  - STM32F4 `LogManager_HandleListReq` applies a 2ms delay (`vTaskDelay(2)`) after *every* transmitted packet to prevent ESP buffer overflow.
+  - STM32F4 `LogManager_HandleDownloadReq` prevents 0-byte downloads by temporarily closing the active log file before opening it for reading to bypass FatFS file sharing restrictions. If `f_open` fails, it sends an immediate EOF packet.
+  - STM32F4 `LogManager` implements `LogManager_SeekDownload` to support random access reading during download retries (via `CMD_LOG_RESEND_REQ` 0x7B).
+
+### STM32F4 UI & System Watchdog
+- **Watchdog (IWDG):** STM32F4 `StartUARTTask` must include a call to `HAL_IWDG_Refresh(&hiwdg)` in its main loop. It must also be called inside the `rb_pop` data processing loop in `uart_task` and around FatFS formatting operations in `LogManager_Init`.
+- **UI Styling:** In `ui_lvgl.c` `UI_LVGL_Update`, Delta Pro 3 AC input card (`card_grid`) active styling tracks the `ac_plugged_in` state (via `last_ac_plugged_in`) rather than solely relying on `in_ac` wattage changes.
+- **UI Brightness Bug:** `UI_LVGL_Update` uses a static variable `last_target_brightness` to persist the last valid brightness level when the `DeviceStatus` pointer is NULL, preventing the display from flashing to 100% brightness during animations.
 
 ---
-**Failure to follow these rules will result in compilation failures, communication breakdowns between microcontrollers, memory leaks, or missing data.**
+**Failure to follow these instructions will result in Watchdog timeouts, Task execution faults, Memory Leaks, or broken inter-chip communications.**
