@@ -17,9 +17,9 @@ This repository uses a custom Retrieval-Augmented Generation (RAG) indexing syst
 
 ## 3. Critical Codebase Rules
 
-### Duplicated Protocol Headers
-- The `ecoflow_protocol.h` file is duplicated between `EcoflowSTM32F4/lib/EcoFlowComm/` and `EcoflowESP32/lib/EcoFlowComm/`.
-- **Any modifications must be mirrored exactly in both locations** to ensure struct layouts align correctly for UART transmission.
+### Shared Protocol Headers
+- The `EcoFlowComm` library (which includes `ecoflow_protocol.h` and `ecoflow_protocol.c`) is located in the top-level `shared_libs/` directory.
+- This library is shared between `EcoflowESP32` and `EcoflowSTM32F4` using the `lib_extra_dirs` setting in their respective `platformio.ini` files.
 
 ### STM32 LVGL UI Memory Management
 - In the EcoflowSTM32F4 LVGL implementation, repeatedly calling `lv_obj_add_style` on the same object without first explicitly removing the old style causes memory leaks (style nodes accumulate on the heap).
