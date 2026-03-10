@@ -9,6 +9,7 @@ The system operates on a Hub-and-Spoke model, consisting of three primary hardwa
 
 *   **ESP32-S3 Gateway (in `EcoflowESP32/`)**: The communications hub. It handles BLE connections, the complex ECDH+AES-128 cryptographic handshake, and translates proprietary protocols (Protobuf V3, Binary V2) into a simplified UART stream. Built in C++ using `NimBLE` and `nanopb`.
 *   **STM32F469I-Discovery UI (in `EcoflowSTM32F4/`)**: The visual master. It runs a FreeRTOS + LVGL 8.3 graphical interface, sending commands to the ESP32 and displaying telemetry. Built primarily in C using the STM32 HAL.
+*   **STM32F4 Bootloader (in `EcoflowSTM32F4_Bootloader/`)**: A dedicated bootloader required for STM32 OTA firmware updates.
 *   **RP2040 Thermal Controller (in `EcoflowRP2040/`)**: Manages the environmental cooling (fans/temps) for the deck itself. Built in C++ using the Arduino Core (`earlephilhower` core).
 
 ---
@@ -44,6 +45,10 @@ The firmware for the MCUs is built using PlatformIO. You must execute these comm
     ```bash
     pio run -d EcoflowESP32
     ```
+*   **Compile STM32 Bootloader (REQUIRED FOR OTA):**
+    ```bash
+    pio run -d EcoflowSTM32F4_Bootloader
+    ```
 *   **Compile STM32 Display:**
     ```bash
     pio run -d EcoflowSTM32F4
@@ -52,6 +57,18 @@ The firmware for the MCUs is built using PlatformIO. You must execute these comm
     ```bash
     pio run -d EcoflowRP2040
     ```
+
+**[>> CRITICAL: STM32 OTA FIRMWARE REQUIREMENT <<]**
+The OTA package for the STM32 includes the bootloader binary. Therefore, you **MUST** compile the bootloader (`EcoflowSTM32F4_Bootloader`) **BEFORE** compiling the main STM32 firmware (`EcoflowSTM32F4`). Failing to do so will result in an incomplete or broken OTA package.
+
+### Memory Map & Addresses
+The flash memory is divided to accommodate both the bootloader and the application. This is reflected in their respective linker scripts (`stm32f469ni_flash.ld`):
+*   **Bootloader (`EcoflowSTM32F4_Bootloader`)**:
+    *   `ORIGIN = 0x08000000`
+    *   `LENGTH = 32K`
+*   **Main Application (`EcoflowSTM32F4`)**:
+    *   `ORIGIN = 0x08008000` (Starts at a 32KB offset to leave Sectors 0 and 1 for the bootloader)
+    *   `LENGTH = 1024K - 32K`
 
 If you introduce new dependencies, ensure they are correctly added to the respective `platformio.ini` files.
 
