@@ -758,6 +758,7 @@
 {"id": "EcoflowSTM32F4/src/flash_ops.c:chunk1", "path": "EcoflowSTM32F4/src/flash_ops.c", "text": "Code chunk from EcoflowSTM32F4/src/flash_ops.c lines 101-185\n        first_sector = FLASH_SECTOR_2;\n"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h lines 1-100\n/**\n  **********"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h lines 101-193\n  */\n#define S"}
+{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-83\n# \u2261 AGENTS ONBOARDING & GUIDELINES // ECOFLOW CYBER DECK\n\n**Wel"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c lines 1-100\n/**\n  ****************"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c lines 101-200\n\n}\n\n/**\n  * @brief  "}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c:chunk2", "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c lines 201-236\n}\n\n/**\n  * @brief  C"}
@@ -875,5 +876,5 @@
 {"id": "docs/device_reference/Wave_2.md:chunk0", "path": "docs/device_reference/Wave_2.md", "text": "Code chunk from docs/device_reference/Wave_2.md lines 1-37\n# \u2261 DATA REFERENCE // WAVE 2\n\n> **DEVICE "}
 {"id": "EcoflowSTM32F4/lib/FatFs/ffsystem.c:chunk0", "path": "EcoflowSTM32F4/lib/FatFs/ffsystem.c", "text": "Code chunk from EcoflowSTM32F4/lib/FatFs/ffsystem.c lines 1-67\n#include \"ff.h\"\n#include <stdio.h>\n\n#"}
 {"id": "EcoflowSTM32F4/src/lv_conf.h:chunk0", "path": "EcoflowSTM32F4/src/lv_conf.h", "text": "Code chunk from EcoflowSTM32F4/src/lv_conf.h lines 1-54\n#ifndef LV_CONF_H\n#define LV_CONF_H\n\n#includ"}
-{"id": "rag_search.py:chunk0", "path": "rag_search.py", "text": "Definition of main in rag_search.py\ndef main():\n    parser = argparse.ArgumentParser(description=\"Se"}
 {"id": "EcoflowESP32/src/dc009_apl_comm.pb.c:chunk0", "path": "EcoflowESP32/src/dc009_apl_comm.pb.c", "text": "Code chunk from EcoflowESP32/src/dc009_apl_comm.pb.c lines 1-45\n/* Automatically generated nanopb co"}
+{"id": "EcoflowSTM32F4/include/README:chunk0", "path": "EcoflowSTM32F4/include/README", "text": "Code chunk from EcoflowSTM32F4/include/README lines 1-37\n\nThis directory is intended for project hea"}
