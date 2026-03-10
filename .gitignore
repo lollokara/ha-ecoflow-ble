@@ -5,6 +5,12 @@ __pycache__
 *.pid
 tts
 
+### RAG Index files ###
+rag_index/embeddings/
+rag_index/file_summaries/
+rag_index/repo_catalog.json
+rag_index/repo_hierarchy.json
+
 
 ### macOS ###
 # General
