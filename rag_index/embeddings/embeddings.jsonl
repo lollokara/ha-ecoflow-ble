@@ -796,6 +796,7 @@
 {"id": "EcoflowSTM32F4/lib/FatFs/diskio.c:chunk1", "path": "EcoflowSTM32F4/lib/FatFs/diskio.c", "text": "Code chunk from EcoflowSTM32F4/lib/FatFs/diskio.c lines 101-144\n\tconst BYTE *buff,\t/* Data to be wri"}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c:chunk0", "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_log_manager.c lines 1-100\n#include \"ui_view_log_manage"}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c:chunk1", "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_log_manager.c lines 101-122\n    lv_obj_set_size(btn_fm"}
+{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-39\n# Agent Instructions for Ecoflow Cyber Deck\n\nWelcome to the Eco"}
 {"id": "EcoflowSTM32F4/include/FreeRTOSConfig.h:chunk0", "path": "EcoflowSTM32F4/include/FreeRTOSConfig.h", "text": "Code chunk from EcoflowSTM32F4/include/FreeRTOSConfig.h lines 1-100\n#ifndef FREERTOS_CONFIG_H\n#defin"}
 {"id": "EcoflowESP32/src/EcoflowData.h:chunk0", "path": "EcoflowESP32/src/EcoflowData.h", "text": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 1-100\n#ifndef ECOFLOW_DATA_H\n#define ECOFLOW_DA"}
 {"id": "EcoflowESP32/src/EcoflowData.h:chunk1", "path": "EcoflowESP32/src/EcoflowData.h", "text": "Code chunk from EcoflowESP32/src/EcoflowData.h lines 101-155\n    float usbcOutputPower = 0;\n    floa"}
@@ -814,7 +815,6 @@
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h lines 101-125\n  */\n\n/**\n  * @}\n  "}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h:chunk0", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h lines 1-100\n/**\n  *******************"}
 {"id": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h:chunk1", "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h lines 101-114\n  * @}\n  */\n\n/**\n  * @}"}
-{"id": "AGENTS.md:chunk0", "path": "AGENTS.md", "text": "Code chunk from AGENTS.md lines 1-36\n# Agent Instructions for Ecoflow Cyber Deck\n\nWelcome to the Eco"}
 {"id": "docs/Device_STM32.md:chunk0", "path": "docs/Device_STM32.md", "text": "Code chunk from docs/Device_STM32.md lines 1-94\n# \u2261 STM32 INTERFACE // VISUAL CORE\n\n> **HARDWARE:** "}
 {"id": "EcoflowSTM32F4/src/ui/ui_view_settings.c:chunk0", "path": "EcoflowSTM32F4/src/ui/ui_view_settings.c", "text": "Code chunk from EcoflowSTM32F4/src/ui/ui_view_settings.c lines 1-96\n#include \"ui_core.h\"\n\n// --- Wid"}
 {"id": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md:chunk0", "path": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md", "text": "Code chunk from EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md lines 1-73\n# Contributor Covenant Code of "}

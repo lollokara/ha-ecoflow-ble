@@ -10,6 +10,9 @@ This repository uses a custom Retrieval-Augmented Generation (RAG) indexing syst
 ## 2. Microcontroller Architectures & Frameworks
 - **EcoflowESP32**: Uses the `h2zero/NimBLE-Arduino` library version `^2.0.0` (upgraded from 1.4.1). Note that `NimBLEAdvertisedDeviceCallbacks` is replaced by `NimBLEScanCallbacks`, `onDisconnect` accepts an `int reason`, scan results receive `const NimBLEAdvertisedDevice*`, and `NimBLEScan::start` takes `(duration, is_continue)`.
 - **EcoflowSTM32F4**: Built using PlatformIO targeting the `disco_f469ni` board.
+- **EcoflowSTM32F4_Bootloader**: The bootloader for the STM32F4 display.
+  - **Memory Layout:** The bootloader resides at `0x08000000` (length: 32KB). The main application (`EcoflowSTM32F4`) resides at `0x08008000` (length: 1024KB - 32KB).
+  - **Compilation Requisite:** When building OTA firmware for the STM32, the bootloader binary is embedded inside the update package. Therefore, **you must compile the bootloader first** (`cd EcoflowSTM32F4_Bootloader && pio run`) before compiling the main `EcoflowSTM32F4` project.
 - **EcoflowRP2040**: Uses the `earlephilhower` Arduino core for the Raspberry Pi Pico.
 
 ## 3. Critical Codebase Rules

@@ -44,9 +44,9 @@
     },
     {
       "path": "AGENTS.md",
-      "size": 3472,
+      "size": 3996,
       "lang": "markdown",
-      "summary": "Markdown file with 36 lines. Provides configuration, documentation or supporting data for the repository.",
+      "summary": "Markdown file with 39 lines. Provides configuration, documentation or supporting data for the repository.",
       "modified": "2026-03-10"
     },
     {
@@ -1673,16 +1673,16 @@
       "css": 1
     },
     "top_dirs": [
-      "EcoflowSTM32F4/lib/bsp/Components/stmpe1600",
-      "EcoflowSTM32F4",
-      "EcoflowSTM32F4/lib/FatFs",
-      "docs/device_reference",
-      "EcoflowSTM32F4/lib/bsp/Components/s25fl512s",
-      "EcoflowSTM32F4/lib/bsp/Components/lis3dsh",
-      "EcoflowSTM32F4/src",
-      "EcoflowSTM32F4/lib/bsp/Components/stmpe811",
-      "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy",
-      "EcoflowESP32/src/proto"
+      "EcoflowSTM32F4/lib/bsp/Components/n25q256a",
+      "EcoflowSTM32F4/lib/bsp/Components/lsm303agr",
+      "EcoflowSTM32F4/lib/bsp/Components/l3gd20",
+      "EcoflowSTM32F4/include",
+      "EcoflowRP2040",
+      "verification",
+      "EcoflowSTM32F4/lib/bsp/Components/ampire640480",
+      "EcoflowSTM32F4/lib/bsp/Components/ov5640",
+      "EcoflowSTM32F4/lib/bsp/Components/n25q512a",
+      "Test Scripts/tools"
     ]
   }
 }
