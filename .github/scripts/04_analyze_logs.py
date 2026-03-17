@@ -21,8 +21,7 @@ def main():
         print("Errore: Variabile d'ambiente AI_API_KEY mancante.")
         sys.exit(1)
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
-
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key={api_key}"
     # Tronchiamo i log se dovessero essere eccezionalmente lunghi, 
     # mantenendo la parte finale (dove di solito ci sono gli errori seriali e di linker)
     max_chars = 100000
