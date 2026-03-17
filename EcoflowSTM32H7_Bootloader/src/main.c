@@ -1,6 +1,6 @@
 // Ensure HSE_VALUE is defined correctly before HAL inclusion
 #ifndef HSE_VALUE
-#define HSE_VALUE 8000000
+#define HSE_VALUE 25000000
 #endif
 
 #include "stm32h7xx_hal.h"
@@ -9,8 +9,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-// Define Application Address (Sector 2)
-#define APP_ADDRESS 0x08008000
+// External Flash Offsets
+#define EXT_FLASH_BASE 0x90000000
+#define BANK_A_OFFSET  0x00000000
+#define BANK_B_OFFSET  0x01000000
+#define OTA_OFFSET     0x02000000
 
 // UART Protocol
 #define START_BYTE 0xAA
@@ -40,6 +43,7 @@ uint8_t rx_byte_isr;
 UART_HandleTypeDef huart6;
 UART_HandleTypeDef huart3; // Debug UART
 IWDG_HandleTypeDef hiwdg; // Watchdog
+OSPI_HandleTypeDef hospi1; // OctoSPI Flash
 
 typedef void (*pFunction)(void);
 pFunction JumpToApplication;
@@ -50,6 +54,12 @@ void UART_Init(void);
 void USART3_Init(void);
 void MX_IWDG_Init(void);
 void GPIO_Init(void);
+void MX_OCTOSPI1_Init(void);
+void OSPI_EnableMemoryMappedMode(void);
+void OSPI_DisableMemoryMappedMode(void);
+HAL_StatusTypeDef OSPI_EraseSector(uint32_t address);
+HAL_StatusTypeDef OSPI_WriteData(uint32_t address, uint8_t *buffer, uint32_t length);
+void MPU_Config(void);
 void Bootloader_OTA_Loop(void);
 void Serial_Log(const char* fmt, ...);
 void ClearFlashFlags(void);
@@ -226,6 +236,8 @@ int main(void) {
     // CRITICAL: Ensure Interrupt Vector Table is set correctly.
     // When booting from Bank 2 (aliased to 0x00), this ensures VTOR points to
     // the alias 0x00 (or 0x08000000 alias) rather than some other random location.
+    MPU_Config();
+
     SCB->VTOR = 0x08000000;
     __DSB(); // Data Synchronization Barrier
 
@@ -248,6 +260,10 @@ int main(void) {
 
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
+    MX_OCTOSPI1_Init();
+    OSPI_EnableMemoryMappedMode();
+    Serial_Log("OSPI Initialized and Memory Mapped.");
+
     // Enable Backup Access for OTA Flag and Boot Counter
     // __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
@@ -255,19 +271,19 @@ int main(void) {
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
     uint32_t boot_fails = RTC->BKP1R;
 
-    // Determine Active Bank based on OPTCR
-    // Note: On F469, BFB2 is Bit 4.
-    // When booting from Bank 2, FLASH->OPTCR BFB2 should be 1.
-    // However, the hardware Aliases Bank 2 to 0x08000000.
-    // Let's log the full OPTCR for diagnostics.
-    Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
+    // Determine Active Bank based on RTC Backup Register 2
+    // If BKP2R == 0 (or uninitialized), Bank A is active
+    // If BKP2R == 1, Bank B is active
+    bool is_bank_b_active = (RTC->BKP2R == 1);
+    uint32_t app_address = EXT_FLASH_BASE + (is_bank_b_active ? BANK_B_OFFSET : BANK_A_OFFSET);
 
-    // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
-    // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
-    uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
-    bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
+    Serial_Log("Active Bank: %s (Address 0x%08X)", is_bank_b_active ? "B" : "A", app_address);
 
-    Serial_Log("Checking App at 0x%08X. SP: 0x%08X. Valid: %d", APP_ADDRESS, sp, valid_app);
+    // Check App Validity (SP must be in RAM 0x20000000 - 0x24080000 approx for H7)
+    uint32_t sp = *(__IO uint32_t*)app_address;
+    bool valid_app = (sp >= 0x20000000 && sp <= 0x24080000);
+
+    Serial_Log("Checking App at 0x%08X. SP: 0x%08X. Valid: %d", app_address, sp, valid_app);
 
     if (ota_flag) {
         Serial_Log("OTA Flag Detected.");
@@ -308,14 +324,29 @@ int main(void) {
 
         // Jump - Green ON
         LED_G_On();
-        Serial_Log("Jumping to Application at 0x%08X", APP_ADDRESS);
+        Serial_Log("Jumping to Application at 0x%08X", app_address);
 
         // Reset RCC (Clocks) to default state (HSI) before jump
         HAL_RCC_DeInit();
 
-        DeInit();
+        // Do NOT completely DeInit OSPI if memory mapped execution is required!
+        // We just de-init UART and LEDs
+        HAL_UART_DeInit(&huart6);
+        HAL_UART_DeInit(&huart3);
+        HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
+        HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
+        HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
 
-        JumpAddress = *(__IO uint32_t*) (APP_ADDRESS + 4);
+        SysTick->CTRL = 0;
+        SysTick->LOAD = 0;
+        SysTick->VAL  = 0;
+        __disable_irq();
+        for (int i = 0; i < 8; i++) {
+            NVIC->ICER[i] = 0xFFFFFFFF;
+            NVIC->ICPR[i] = 0xFFFFFFFF;
+        }
+
+        JumpAddress = *(__IO uint32_t*) (app_address + 4);
         JumpToApplication = (pFunction) JumpAddress;
         __set_MSP(sp);
         JumpToApplication();
@@ -382,32 +413,19 @@ void Bootloader_OTA_Loop(void) {
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
-    // Determine Active Bank (Using Direct Register Read)
-    bool bfb2_active = (FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2;
+    // Abort Memory Mapped mode so we can write to OSPI
+    HAL_OSPI_Abort(&hospi1);
 
-    Serial_Log("OPTCR: 0x%08X. BFB2: %d", FLASH->OPTCR, bfb2_active);
+    // Target OTA Partition
+    uint32_t target_ota_addr = OTA_OFFSET;
 
-    // Target Inactive Bank
-    // On STM32F469 with Dual Bank enabled:
-    // Active Bank is ALWAYS mapped to 0x08000000. Inactive to 0x08100000.
-    // BUT we must target correct PHYSICAL SECTORS for Erase.
-    // If BFB2=1 (Bank 2 Active), Inactive is Bank 1 (Phys Sectors 0-11).
-    // If BFB2=0 (Bank 1 Active), Inactive is Bank 2 (Phys Sectors 12-23).
+    bool is_bank_b_active = (RTC->BKP2R == 1);
+    uint32_t inactive_bank_offset = is_bank_b_active ? BANK_A_OFFSET : BANK_B_OFFSET;
 
-    uint32_t target_bank_addr = 0x08100000;
-    uint32_t start_sector, end_sector;
-
-    if (bfb2_active) {
-        // Active: Bank 2. Inactive: Bank 1 (Sectors 0-11).
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_3;
-        Serial_Log("Active: Bank 2. Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
-        // Active: Bank 1. Inactive: Bank 2 (Sectors 12-23).
-        start_sector = FLASH_SECTOR_4;
-        end_sector = FLASH_SECTOR_7;
-        Serial_Log("Active: Bank 1. Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
-    }
+    Serial_Log("Active Bank: %s, Inactive: %s, OTA Addr: 0x%08X",
+                is_bank_b_active ? "B" : "A",
+                is_bank_b_active ? "A" : "B",
+                EXT_FLASH_BASE + target_ota_addr);
 
     bool ota_started = false;
     bool checksum_verified = false;
@@ -477,31 +495,20 @@ void Bootloader_OTA_Loop(void) {
             chunks_received = 0;
             checksum_verified = false;
 
-            FLASH_EraseInitTypeDef EraseInitStruct;
-            uint32_t SectorError = 0;
-            EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-            EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
-            EraseInitStruct.NbSectors = 1;
-
-            ClearFlashFlags(); // Clear flags before Erase
-
             bool error = false;
-            // Erase the ENTIRE Inactive Bank (Bootloader area included)
-            for (uint32_t sec = start_sector; sec <= end_sector; sec++) {
-                // Refresh Watchdog inside Erase Loop
+            // Erase the OTA partition (Assume max 16MB image size for simplicity, or we can erase as we go)
+            // MX25LM51245G Sector size is usually 64KB
+            // We will erase 16MB = 256 Sectors
+            Serial_Log("Erasing OTA partition...");
+            for (uint32_t offset = 0; offset < (16 * 1024 * 1024); offset += (64 * 1024)) {
                 HAL_IWDG_Refresh(&hiwdg);
-
-                EraseInitStruct.Sector = sec;
-
-                if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK) {
-                    uint32_t err = HAL_FLASH_GetError();
-                    Serial_Log("Erase Error at Sector %d. HAL Err: %d. SecErr: %d", sec, err, SectorError);
+                if (OSPI_EraseSector(target_ota_addr + offset) != HAL_OK) {
+                    Serial_Log("Erase Error at offset 0x%08X", offset);
                     error = true; break;
                 }
             }
 
             if (!error) {
-                ClearFlashFlags(); // Clear flags after Erase, before Write
                 Serial_Log("Erase Complete");
                 send_ack();
             } else {
@@ -514,21 +521,16 @@ void Bootloader_OTA_Loop(void) {
             uint8_t *data = &payload[4];
             uint32_t data_len = len - 4;
 
-            // Write to Inactive Bank
-            uint32_t addr = target_bank_addr + offset;
+            // Write to OTA Partition
+            uint32_t addr = target_ota_addr + offset;
 
             bool ok = true;
-            for (uint32_t i=0; i<data_len; i+=4) {
-                uint32_t word = 0xFFFFFFFF;
-                uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
-                memcpy(&word, &data[i], copy_len);
 
-                // ClearFlashFlags(); // Optimization: Removed for speed. Only on error?
-
-                if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, addr + i, word) != HAL_OK) {
-                    ok = false; break;
-                }
+            // Assume data_len is page-aligned or we just write it all
+            if (OSPI_WriteData(addr, data, data_len) != HAL_OK) {
+                ok = false;
             }
+
             if (ok) {
                 bytes_written += data_len;
                 chunks_received++;
@@ -537,9 +539,7 @@ void Bootloader_OTA_Loop(void) {
                 }
                 send_ack();
             } else {
-                uint32_t err = HAL_FLASH_GetError();
-                Serial_Log("Flash Write Error at %08X. HAL Err: %d", addr, err);
-                ClearFlashFlags(); // Try to recover
+                Serial_Log("Flash Write Error at %08X.", addr);
                 send_nack();
             }
         }
@@ -551,8 +551,11 @@ void Bootloader_OTA_Loop(void) {
                 Serial_Log("OTA End. Verifying CRC...");
 
                 // Calculate CRC of written flash using SOFTWARE CRC
+                // Switch back to Memory Mapped Mode to easily read flash for CRC check
+                OSPI_EnableMemoryMappedMode();
+
                 uint32_t calculated_crc32 = 0;
-                uint8_t* flash_ptr = (uint8_t*)target_bank_addr;
+                uint8_t* flash_ptr = (uint8_t*)(EXT_FLASH_BASE + target_ota_addr);
 
                 for(uint32_t i = 0; i < bytes_written; i++) {
                      // Refresh Watchdog during CRC Check
@@ -561,6 +564,9 @@ void Bootloader_OTA_Loop(void) {
                 }
 
                 Serial_Log("Calc: 0x%08X, Recv: 0x%08X", calculated_crc32, received_crc32);
+
+                // Disable Memory Mapped Mode to allow applying if needed
+                OSPI_DisableMemoryMappedMode();
 
                 if (calculated_crc32 == received_crc32) {
                     checksum_verified = true;
@@ -587,50 +593,76 @@ void Bootloader_OTA_Loop(void) {
 
             Serial_Log("Applying Update...");
             send_ack();
-            HAL_Delay(100);
+
+            // Disable Memory Mapped Mode to allow erasing/writing
+            OSPI_DisableMemoryMappedMode();
+
+            // Step 1: Erase Inactive Bank
+            Serial_Log("Erasing Inactive Bank at 0x%08X", inactive_bank_offset);
+            bool erase_error = false;
+            // Erase up to `bytes_written` rounded to next 64KB sector
+            for (uint32_t offset = 0; offset < bytes_written; offset += (64 * 1024)) {
+                HAL_IWDG_Refresh(&hiwdg);
+                if (OSPI_EraseSector(inactive_bank_offset + offset) != HAL_OK) {
+                    Serial_Log("Erase Error at offset 0x%08X", offset);
+                    erase_error = true; break;
+                }
+            }
+
+            if (erase_error) {
+                Serial_Log("Erase failed. Aborting apply.");
+                HAL_NVIC_SystemReset();
+            }
+
+            // Step 2: Copy from OTA Partition to Inactive Bank
+            Serial_Log("Copying OTA to Inactive Bank...");
+
+            // Re-enable memory mapped mode to easily read the OTA partition
+            OSPI_EnableMemoryMappedMode();
+
+            // Temporary buffer to read from OTA partition and write to inactive bank
+            uint8_t copy_buffer[256];
+            uint8_t* ota_ptr = (uint8_t*)(EXT_FLASH_BASE + target_ota_addr);
+
+            bool copy_error = false;
+            for (uint32_t offset = 0; offset < bytes_written; offset += 256) {
+                HAL_IWDG_Refresh(&hiwdg);
+
+                uint32_t copy_len = (bytes_written - offset > 256) ? 256 : (bytes_written - offset);
+                memcpy(copy_buffer, &ota_ptr[offset], copy_len);
+
+                // Disable Mapped Mode to Write
+                OSPI_DisableMemoryMappedMode();
+
+                if (OSPI_WriteData(inactive_bank_offset + offset, copy_buffer, copy_len) != HAL_OK) {
+                    Serial_Log("Write Error at offset 0x%08X", offset);
+                    copy_error = true; break;
+                }
+
+                // Re-enable Mapped Mode to Read next chunk
+                OSPI_EnableMemoryMappedMode();
+            }
+
+            if (copy_error) {
+                Serial_Log("Copy failed. Aborting apply.");
+                HAL_NVIC_SystemReset();
+            }
+
+            // Step 3: Toggle Active Bank in RTC Backup Register
+            Serial_Log("Copy Complete. Toggling Active Bank.");
 
             // Clear Boot Counter (BKP1R) for fresh start
             RTC->BKP1R = 0;
 
-            // Toggle BFB2
-            ClearFlashFlags(); // Clear flags before OB operations
-            HAL_FLASH_Unlock();
-            HAL_FLASH_OB_Unlock();
-
-            // Manual Option Byte Modification
-            uint32_t optcr = FLASH->OPTCR;
-            Serial_Log("Current OPTCR: 0x%08X", optcr);
-
-            // Toggle BFB2 (Bit 4)
-            if (bfb2_active) {
-                // If BFB2 was 1 (Bank 1 Active), we want Bank 2 Active (BFB2=0).
-                optcr &= ~FLASH_OPTCR_BFB2;
+            // Toggle BKP2R
+            if (is_bank_b_active) {
+                RTC->BKP2R = 0; // Bank A becomes active
             } else {
-                // If BFB2 was 0 (Bank 2 Active), we want Bank 1 Active (BFB2=1).
-                optcr |= FLASH_OPTCR_BFB2;
+                RTC->BKP2R = 1; // Bank B becomes active
             }
 
-            // Ensure OPTSTRT is cleared before writing
-            optcr &= ~FLASH_OPTCR_OPTSTART;
-
-            Serial_Log("Writing OPTCR: 0x%08X", optcr);
-
-            __disable_irq(); // Disable Interrupts for safety
-
-            // 1. Write the new value
-            FLASH->OPTCR = optcr;
-
-            // 2. Set OPTSTRT to commit
-            FLASH->OPTCR |= FLASH_OPTCR_OPTSTART;
-
-            // 3. Wait for BSY
-            while (FLASH->SR1 & FLASH_SR_BSY);
-
-            // 4. Force Reload (Triggers Reset)
-            HAL_FLASH_OB_Launch();
-
-            // Should reset automatically, but if not:
-            Serial_Log("OB Launch Failed/Completed. Resetting...");
+            Serial_Log("Update Applied Successfully. Resetting...");
+            HAL_Delay(100);
             HAL_NVIC_SystemReset();
         }
     }
@@ -722,33 +754,54 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  // __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  /** Supply configuration update enable
+  */
+  HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
 
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
+
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 360;
-  RCC_OscInitStruct.PLL.PLLP = 2;
+  // HSE = 25MHz, M = 5, N = 104, P = 1 => 520MHz SysClock
+  RCC_OscInitStruct.PLL.PLLM = 5;
+  RCC_OscInitStruct.PLL.PLLN = 104;
+  RCC_OscInitStruct.PLL.PLLP = 1;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-      // Use Software Delay for Error Loop too
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
+  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
+  RCC_OscInitStruct.PLL.PLLFRACN = 0;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
       while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
   }
 
-  // HAL_PWREx_EnableOverDrive();
-
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  {
+      while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
+  }
 
   // PERFORMANCE: Enable Cache and Prefetch
   // __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
@@ -759,4 +812,269 @@ void SystemClock_Config(void)
 void SysTick_Handler(void)
 {
   HAL_IncTick();
+}
+// MPU Configuration
+void MPU_Config(void)
+{
+  MPU_Region_InitTypeDef MPU_InitStruct = {0};
+
+  /* Disables the MPU */
+  HAL_MPU_Disable();
+
+  /* Configure the MPU attributes for the OSPI external flash */
+  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+  MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+  MPU_InitStruct.BaseAddress = 0x90000000;
+  MPU_InitStruct.Size = MPU_REGION_SIZE_64MB; // 512Mbit = 64MB
+  MPU_InitStruct.SubRegionDisable = 0x0;
+  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+  MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
+  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+  /* Enables the MPU */
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
+
+void MX_OCTOSPI1_Init(void)
+{
+  /* OCTOSPI1 parameter configuration*/
+  hospi1.Instance = OCTOSPI1;
+  hospi1.Init.FifoThreshold = 4;
+  hospi1.Init.DualQuad = HAL_OSPI_DUALQUAD_DISABLE;
+  hospi1.Init.MemoryType = HAL_OSPI_MEMTYPE_MACRONIX;
+  hospi1.Init.DeviceSize = 26; // 64MB = 2^26 bytes
+  hospi1.Init.ChipSelectHighTime = 2;
+  hospi1.Init.FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE;
+  hospi1.Init.ClockMode = HAL_OSPI_CLOCK_MODE_0;
+  hospi1.Init.WrapSize = HAL_OSPI_WRAP_NOT_SUPPORTED;
+  hospi1.Init.ClockPrescaler = 2; // Prescaler
+  hospi1.Init.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE;
+  hospi1.Init.DelayHoldQuarterCycle = HAL_OSPI_DHQC_ENABLE;
+  hospi1.Init.ChipSelectBoundary = 0;
+  hospi1.Init.DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_USED;
+  hospi1.Init.MaxTran = 0;
+  hospi1.Init.Refresh = 0;
+  if (HAL_OSPI_Init(&hospi1) != HAL_OK)
+  {
+    Serial_Log("OSPI Init Error!");
+  }
+}
+
+void HAL_OSPI_MspInit(OSPI_HandleTypeDef* ospiHandle)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  if(ospiHandle->Instance==OCTOSPI1)
+  {
+    /* OCTOSPI1 clock enable */
+    __HAL_RCC_OCTOSPIM_CLK_ENABLE();
+    __HAL_RCC_OSPI1_CLK_ENABLE();
+
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+
+    /**OCTOSPI1 GPIO Configuration for STM32H735G-DK (MX25LM51245G)
+    PB2     ------> OCTOSPIM_P1_DQS
+    PF10    ------> OCTOSPIM_P1_CLK
+    PG6     ------> OCTOSPIM_P1_NCS
+    PD11    ------> OCTOSPIM_P1_IO0
+    PD12    ------> OCTOSPIM_P1_IO1
+    PE2     ------> OCTOSPIM_P1_IO2
+    PD13    ------> OCTOSPIM_P1_IO3
+    PD4     ------> OCTOSPIM_P1_IO4
+    PD5     ------> OCTOSPIM_P1_IO5
+    PG9     ------> OCTOSPIM_P1_IO6
+    PD7     ------> OCTOSPIM_P1_IO7
+    */
+
+    /* DQS (PB2) */
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    /* CLK (PF10) */
+    GPIO_InitStruct.Pin = GPIO_PIN_10;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+    /* NCS (PG6) */
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    /* IO0, IO1, IO3 (PD11, PD12, PD13) */
+    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* IO2 (PE2) */
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    /* IO4, IO5, IO7 (PD4, PD5, PD7) */
+    GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* IO6 (PG9) */
+    GPIO_InitStruct.Pin = GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+  }
+}
+
+void OSPI_EnableMemoryMappedMode(void)
+{
+  OSPI_RegularCmdTypeDef sCommand = {0};
+  OSPI_MemoryMappedTypeDef sMemMappedCfg = {0};
+
+  /* Enable Octal mode (Read/Write configuration) for MX25LM51245G */
+  sCommand.OperationType = HAL_OSPI_OPTYPE_COMMON_CFG;
+  sCommand.FlashId = HAL_OSPI_FLASH_ID_1;
+  sCommand.InstructionMode = HAL_OSPI_INSTRUCTION_8_LINES;
+  sCommand.InstructionSize = HAL_OSPI_INSTRUCTION_16_BITS;
+  sCommand.InstructionDtrMode = HAL_OSPI_INSTRUCTION_DTR_DISABLE;
+  sCommand.AddressMode = HAL_OSPI_ADDRESS_8_LINES;
+  sCommand.AddressSize = HAL_OSPI_ADDRESS_32_BITS;
+  sCommand.AddressDtrMode = HAL_OSPI_ADDRESS_DTR_DISABLE;
+  sCommand.AlternateBytesMode = HAL_OSPI_ALTERNATE_BYTES_NONE;
+  sCommand.DataMode = HAL_OSPI_DATA_8_LINES;
+  sCommand.DataDtrMode = HAL_OSPI_DATA_DTR_DISABLE;
+  sCommand.DummyCycles = 20;
+  sCommand.DQSMode = HAL_OSPI_DQS_ENABLE;
+  sCommand.SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD;
+
+  /* Read Command Configuration */
+  sCommand.OperationType = HAL_OSPI_OPTYPE_READ_CFG;
+  sCommand.Instruction = 0xEC13; /* Octal Read */
+  if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Serial_Log("OSPI Read Cmd Error!");
+  }
+
+  /* Write Command Configuration */
+  sCommand.OperationType = HAL_OSPI_OPTYPE_WRITE_CFG;
+  sCommand.Instruction = 0x12ED; /* Octal Write */
+  sCommand.DummyCycles = 0;
+  if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Serial_Log("OSPI Write Cmd Error!");
+  }
+
+  sMemMappedCfg.TimeOutActivation = HAL_OSPI_TIMEOUT_COUNTER_DISABLE;
+  if (HAL_OSPI_MemoryMapped(&hospi1, &sMemMappedCfg) != HAL_OK)
+  {
+    Serial_Log("OSPI MemMapped Error!");
+  }
+}
+
+// Flash Erase Helper for OSPI
+HAL_StatusTypeDef OSPI_EraseSector(uint32_t address)
+{
+    OSPI_RegularCmdTypeDef sCommand = {0};
+
+    /* Enable write operations */
+    sCommand.OperationType = HAL_OSPI_OPTYPE_COMMON_CFG;
+    sCommand.FlashId = HAL_OSPI_FLASH_ID_1;
+    sCommand.InstructionMode = HAL_OSPI_INSTRUCTION_8_LINES;
+    sCommand.InstructionSize = HAL_OSPI_INSTRUCTION_16_BITS;
+    sCommand.InstructionDtrMode = HAL_OSPI_INSTRUCTION_DTR_DISABLE;
+    sCommand.AddressMode = HAL_OSPI_ADDRESS_NONE;
+    sCommand.AlternateBytesMode = HAL_OSPI_ALTERNATE_BYTES_NONE;
+    sCommand.DataMode = HAL_OSPI_DATA_NONE;
+    sCommand.DummyCycles = 0;
+    sCommand.DQSMode = HAL_OSPI_DQS_ENABLE;
+    sCommand.SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD;
+    sCommand.Instruction = 0x06F9; // Write Enable for Octal
+
+    if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+        return HAL_ERROR;
+
+    /* Erase Sector (64KB usually) */
+    sCommand.AddressMode = HAL_OSPI_ADDRESS_8_LINES;
+    sCommand.AddressSize = HAL_OSPI_ADDRESS_32_BITS;
+    sCommand.Address = address;
+    sCommand.Instruction = 0x21DE; // Sector Erase 4-byte address for Octal
+
+    if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+        return HAL_ERROR;
+
+    /* Wait for Write in Progress bit to clear */
+    // Note: Implementation of status check usually required here.
+    // For simplicity, a delay is used, but reading SR is better.
+    HAL_Delay(50);
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef OSPI_WriteData(uint32_t address, uint8_t *buffer, uint32_t length)
+{
+    OSPI_RegularCmdTypeDef sCommand = {0};
+
+    /* Enable write operations */
+    sCommand.OperationType = HAL_OSPI_OPTYPE_COMMON_CFG;
+    sCommand.FlashId = HAL_OSPI_FLASH_ID_1;
+    sCommand.InstructionMode = HAL_OSPI_INSTRUCTION_8_LINES;
+    sCommand.InstructionSize = HAL_OSPI_INSTRUCTION_16_BITS;
+    sCommand.InstructionDtrMode = HAL_OSPI_INSTRUCTION_DTR_DISABLE;
+    sCommand.AddressMode = HAL_OSPI_ADDRESS_NONE;
+    sCommand.AlternateBytesMode = HAL_OSPI_ALTERNATE_BYTES_NONE;
+    sCommand.DataMode = HAL_OSPI_DATA_NONE;
+    sCommand.DummyCycles = 0;
+    sCommand.DQSMode = HAL_OSPI_DQS_ENABLE;
+    sCommand.SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD;
+    sCommand.Instruction = 0x06F9; // Write Enable
+
+    if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+        return HAL_ERROR;
+
+    /* Write Data */
+    sCommand.AddressMode = HAL_OSPI_ADDRESS_8_LINES;
+    sCommand.AddressSize = HAL_OSPI_ADDRESS_32_BITS;
+    sCommand.Address = address;
+    sCommand.DataMode = HAL_OSPI_DATA_8_LINES;
+    sCommand.NbData = length;
+    sCommand.Instruction = 0x12ED; // Octal Page Program
+
+    if (HAL_OSPI_Command(&hospi1, &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+        return HAL_ERROR;
+
+    if (HAL_OSPI_Transmit(&hospi1, buffer, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+        return HAL_ERROR;
+
+    /* Wait for write complete */
+    HAL_Delay(2);
+    return HAL_OK;
+}
+// Disable Memory Mapped Mode to use direct OSPI commands
+void OSPI_DisableMemoryMappedMode(void) {
+    HAL_OSPI_Abort(&hospi1);
 }

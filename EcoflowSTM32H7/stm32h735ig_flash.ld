@@ -47,7 +47,8 @@ MEMORY
 {
   RAM (xrw)      : ORIGIN = 0x24000000, LENGTH = 320K
   CCMRAM (xrw)   : ORIGIN = 0x10000000, LENGTH = 64K
-  FLASH (rx)     : ORIGIN = 0x08008000, LENGTH = 1024K - 32K
+  /* External OctoSPI Flash mapped at 0x90000000, size 16MB per Bank A/B */
+  FLASH (rx)     : ORIGIN = 0x90000000, LENGTH = 16384K
 }
 
 /* Sections */
