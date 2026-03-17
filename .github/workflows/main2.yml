@@ -1,0 +1,120 @@
+name: PlatformIO AI Dev & Test Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: 'Descrivi la feature, il refactoring o la correzione da implementare'
+        required: true
+        type: string
+      capture_seconds:
+        description: 'Secondi di cattura del log seriale (es. 30, 60)'
+        required: false
+        default: '45'
+        type: string
+
+jobs:
+  embedded-ai-orchestration:
+    # Richiede che il runner sia installato sul PC fisico a cui è collegato l'ESP32 via USB
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installazione PlatformIO e dipendenze AI
+        run: |
+          python -m pip install --upgrade pip
+          # Installiamo pio e librerie per gli script custom in Python
+          pip install platformio requests pyserial
+
+      - name: 1. Scomposizione Intento in Task (AI)
+        id: ai_breakdown
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          INTENT: ${{ inputs.intent }}
+        run: |
+          # Script che invia l'INTENT al modello e genera tasks.json
+          python .github/scripts/01_breakdown_intent.py
+
+      - name: 2. Esecuzione Task con Jules
+        id: jules_exec
+        env:
+          JULES_API_TOKEN: ${{ secrets.JULES_API_TOKEN }}
+        run: |
+          # Jules legge tasks.json e modifica i file in /src, /include, o platformio.ini
+          python .github/scripts/02_run_jules.py
+
+      - name: 3. Compilazione Firmware (PlatformIO)
+        id: pio_build
+        run: |
+          # Compila il progetto. I log vengono salvati per l'analisi AI in caso di fallimento
+          pio run > build_logs.txt 2>&1
+
+      - name: 4. Caricamento Firmware su Dispositivo
+        id: pio_upload
+        run: |
+          # Esegue l'upload sul dispositivo fisico (es. /dev/ttyUSB0 o COM3)
+          pio run --target upload >> build_logs.txt 2>&1
+
+      - name: 5. Cattura Log Seriali (Test)
+        id: serial_capture
+        run: |
+          # Si connette al monitor seriale usando timeout per limitare l'osservazione
+          timeout ${{ inputs.capture_seconds }} pio device monitor > test_logs.txt 2>&1 || true
+
+      - name: 6. Preparazione Dati e Analisi AI
+        if: always()
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          # Uniamo log di compilazione e log seriali per un contesto completo
+          echo "=== LOG DI COMPILAZIONE ED UPLOAD ===" > full_context.txt
+          cat build_logs.txt >> full_context.txt
+          echo -e "\n=== LOG SERIALI DI RUNTIME ===" >> full_context.txt
+          cat test_logs.txt >> full_context.txt
+          
+          # Lo script invia 'full_context.txt' all'AI chiedendo l'analisi finale
+          python .github/scripts/04_analyze_logs.py full_context.txt > ai_feedback.md
+
+      - name: 7. Notifica Utente con Report su Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # Invio del report formattato su Telegram tramite le sue API REST
+          python -c "
+          import requests, os
+          try:
+              with open('ai_feedback.md', 'r') as f:
+                  text = f.read()
+              
+              bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+              chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+              
+              if bot_token and chat_id:
+                  # Telegram richiede che il testo non superi i 4096 caratteri. 
+                  # Tronchiamo per sicurezza se il report è troppo lungo.
+                  safe_text = text[:4000] + '\n...[Testo troncato]' if len(text) > 4000 else text
+                  message = f'*Esito PlatformIO AI Workflow*\n\n{safe_text}'
+                  
+                  url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+                  payload = {
+                      'chat_id': chat_id, 
+                      'text': message, 
+                      'parse_mode': 'Markdown'
+                  }
+                  
+                  response = requests.post(url, json=payload)
+                  if response.status_code != 200:
+                      print(f'Errore Telegram: {response.text}')
+                  else:
+                      print('Notifica Telegram inviata con successo!')
+          except Exception as e:
+              print(f'Errore durante l\'invio della notifica: {e}')
+          "
