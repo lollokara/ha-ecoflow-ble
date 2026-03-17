@@ -1,4 +1,4 @@
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "uart_task.h"
 #include "fan_task.h"
 

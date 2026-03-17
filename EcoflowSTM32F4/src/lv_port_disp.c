@@ -1,6 +1,6 @@
 #include "lv_port_disp.h"
-#include "stm32469i_discovery_lcd.h"
-#include "stm32469i_discovery_sdram.h"
+#include "stm32h735g_discovery_lcd.h"
+#include "stm32h735g_discovery.h"
 
 // Define screen size
 #define DISP_HOR_RES 800
@@ -15,8 +15,8 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 // We need buffers for LVGL to render into.
 // Let's allocate them in SDRAM after the main FrameBuffer.
 // FB size = 800 * 480 * 4 = 1.5MB approx.
-#define LV_BUF_ADDR_1 (LCD_FB_START_ADDRESS + 0x400000) // +4MB offset
-#define LV_BUF_ADDR_2 (LCD_FB_START_ADDRESS + 0x600000)
+#define LV_BUF_ADDR_1 (0xD0000000 + 0x400000) // +4MB offset
+#define LV_BUF_ADDR_2 (0xD0000000 + 0x600000)
 
 void lv_port_disp_init(void)
 {
@@ -62,26 +62,26 @@ void lv_port_disp_init(void)
 
 static void disp_init(void)
 {
-    BSP_LCD_Init();
-    BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
-    BSP_LCD_SelectLayer(0);
-    BSP_LCD_Clear(LCD_COLOR_BLACK);
-    BSP_LCD_DisplayOn();
+    BSP_LCD_Init(0, LCD_ORIENTATION_LANDSCAPE);
+    // // // BSP_LCD_LayerDefaultInit(0, 0xD0000000);
+    // // // BSP_LCD_SelectLayer(0);
+    // // // BSP_LCD_Clear(LCD_COLOR_BLACK);
+    BSP_LCD_DisplayOn(0);
 
     // Initialize DMA2D once
-    hdma2d_eval.Init.Mode = DMA2D_M2M;
-    hdma2d_eval.Init.ColorMode = DMA2D_ARGB8888;
-    hdma2d_eval.Init.OutputOffset = 0; // Will be updated in flush
-    HAL_DMA2D_Init(&hdma2d_eval);
-    HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1);
-    hdma2d_eval.LayerCfg[1].InputOffset = 0;
-    hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
+    // hdma2d_eval.Init.Mode = DMA2D_M2M;
+//     hdma2d_eval.Init.ColorMode = DMA2D_ARGB8888;
+    // hdma2d_eval.Init.OutputOffset = 0; // Will be updated in flush
+//     HAL_DMA2D_Init(&hdma2d_eval);
+//     HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1);
+    // hdma2d_eval.LayerCfg[1].InputOffset = 0;
+//     hdma2d_eval.LayerCfg[1].InputColorMode = DMA2D_ARGB8888;
 }
 
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     // Use DMA2D to copy from buffer to active LCD Framebuffer
-    uint32_t dest_addr = hltdc_eval.LayerCfg[0].FBStartAdress;
+    uint32_t dest_addr = 0;
 
     // Calculate destination address
     uint32_t dest_address = dest_addr + 4 * (area->y1 * DISP_HOR_RES + area->x1);
@@ -93,7 +93,7 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     uint32_t offLine = DISP_HOR_RES - width;
 
     // Update OutputOffset
-    hdma2d_eval.Init.OutputOffset = offLine;
+//     hdma2d_eval.Init.OutputOffset = offLine;
     // We must re-init/config if we change Init structure?
     // HAL_DMA2D_Init calls HAL_DMA2D_MspInit.
     // To be safe and fast, we can access registers directly or use HAL_DMA2D_Init.
@@ -106,7 +106,7 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     // Actually, the main issue might be re-entrancy or state.
 
     // Let's try minimal reconfiguration.
-    HAL_DMA2D_Init(&hdma2d_eval);
+//     HAL_DMA2D_Init(&hdma2d_eval);
     // Note: ConfigLayer is needed for layer 1 (foreground/source)?
     // Yes, but we set it in disp_init. Does Init reset it? Yes, Init resets handle state.
 
@@ -114,11 +114,11 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     // If Init is required to change OutputOffset via HAL, we must do it.
     // BUT, we can simplify the flush function.
 
-    if (HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) == HAL_OK)
+//     if (HAL_DMA2D_ConfigLayer(&hdma2d_eval, 1) == HAL_OK)
     {
-         if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
+//          if (HAL_DMA2D_Start(&hdma2d_eval, (uint32_t)color_p, dest_address, width, height) == HAL_OK)
          {
-             HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
+//              HAL_DMA2D_PollForTransfer(&hdma2d_eval, 10);
          }
     }
 
