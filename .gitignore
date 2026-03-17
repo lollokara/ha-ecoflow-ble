@@ -71,3 +71,5 @@ EcoflowRP2040/.vscode/launch.json
 **/.pio/
 *.bin
 EcoflowESP32/.vscode/extensions.json
+rag_index/file_summaries/*
+rag_index/*
