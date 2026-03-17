@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in mx25lm51245g.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    mx25lm51245g_conf.h\n  * @author  MCD Application Team\n  * @brief   MX25LM51245G OctoSPI memory configuration template file.\n  *          This file should be copied to the application folder and renamed\n  *          to mx25lm51245g_conf.h\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2017-2019 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef MX25LM51245G_CONF_H\n#define MX25LM51245G_CONF_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include \"stm32h7xx_hal.h\"\n\n/** @addtogroup BSP\n  * @{\n  */\n#define CONF_OSPI_ODS                MX25LM51245G_CR_ODS_24   /* MX25LM51245G Output Driver Strength */\n\n#define DUMMY_CYCLES_READ            8U\n#define DUMMY_CYCLES_READ_OCTAL      6U\n#define DUMMY_CYCLES_READ_OCTAL_DTR  6U\n#define DUMMY_CYCLES_REG_OCTAL       4U\n#define DUMMY_CYCLES_REG_OCTAL_DTR   5U\n\n/**\n  * @}\n  */\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* MX25LM51245G_CONF_H */",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/mx25lm51245g/mx25lm51245g_conf.h lines 1-51"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/mx25lm51245g/mx25lm51245g_conf.h:chunk0"
+    }
+  ]
+}

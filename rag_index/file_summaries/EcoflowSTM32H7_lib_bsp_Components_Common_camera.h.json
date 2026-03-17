@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    camera.h\n  * @author  MCD Application Team\n  * @brief   This header file contains the common defines and functions prototypes\n  *          for the camera driver.   \n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.\n  * All rights reserved.</center></h2>\n  *\n  * This software component is licensed by ST under BSD 3-Clause license,\n  * the \"License\"; You may not use this file except in compliance with the\n  * License. You may obtain a copy of the License at:\n  *                        opensource.org/licenses/BSD-3-Clause\n  *\n  ******************************************************************************\n  */ \n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef CAMERA_H\n#define CAMERA_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif \n\n/* Includes ------------------------------------------------------------------*/\n#include <stdint.h>\n\n/** @addtogroup BSP\n  * @{\n  */\n\n/** @addtogroup Components\n  * @{\n  */\n    \n/** @addtogroup CAMERA\n  * @{\n  */\n\n\n/** @defgroup CAMERA_Exported_Types\n  * @{\n  */ \n/**\n  * @}\n  */\n\n/** @defgroup CAMERA_Driver_structure  Camera Driver structure\n  * @{\n  */\ntypedef struct\n{\n  int32_t  (*Init              )(void*, uint32_t, uint32_t);\n  int32_t  (*DeInit            )(void*);    \n  int32_t  (*ReadID            )(void*, uint32_t*);\n  int32_t  (*GetCapabilities   )(void*, void*);  \n  int32_t  (*SetLightMode      )(void*, uint32_t);\n  int32_t  (*SetColorEffect    )(void*, uint32_t);\n  int32_t  (*SetBrightness     )(void*, int32_t);\n  int32_t  (*SetSaturation     )(void*, int32_t);\n  int32_t  (*SetContrast       )(void*, int32_t);\n  int32_t  (*SetHueDegree      )(void*, int32_t);\n  int32_t  (*MirrorFlipConfig  )(void*, uint32_t);\n  int32_t  (*ZoomConfig        )(void*, uint32_t);\n  int32_t  (*SetResolution     )(void*, uint32_t);  \n  int32_t  (*GetResolution     )(void*, uint32_t*);\n  int32_t  (*SetPixelFormat    )(void*, uint32_t);  \n  int32_t  (*GetPixelFormat    )(void*, uint32_t*);  \n  int32_t  (*NightModeConfig   )(void*, uint32_t);\n}CAMERA_Drv_t;\n\n/**\n  * @}\n  */\n\n/** @defgroup CAMERA_Exported_Constants\n  * @{\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n#ifdef __cplusplus",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/Common/camera.h lines 1-100"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/Common/camera.h:chunk0"
+    },
+    {
+      "content": "}\n#endif\n\n#endif /* CAMERA_H */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/Common/camera.h lines 101-106"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/Common/camera.h:chunk1"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    ff_gen_drv.h\n  * @author  MCD Application Team\n  * @brief   Header for ff_gen_drv.c module.\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2023 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the st_license.txt\n  * file in the root directory of this software component.\n  * If no st_license.txt file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef __FF_GEN_DRV_H\n#define __FF_GEN_DRV_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include \"diskio.h\"\n#include \"ff.h\"\n#include \"stdint.h\"\n\n\n/* Exported types ------------------------------------------------------------*/\n\n/**\n  * @brief  Disk IO Driver structure definition\n  */\ntypedef struct\n{\n  DSTATUS (*disk_initialize) (BYTE);                           /*!< Initialize Disk Drive*/\n  DSTATUS (*disk_status)     (BYTE);                           /*!< Get Disk Status*/\n  DRESULT (*disk_read)       (BYTE, BYTE*, DWORD, UINT);       /*!< Read Sector(s)*/\n  DRESULT (*disk_write)      (BYTE, const BYTE*, DWORD, UINT); /*!< Write Sector(s)*/\n  DRESULT (*disk_ioctl)      (BYTE, BYTE, void*);              /*!< I/O control operation*/\n}Diskio_drvTypeDef;\n\n/**\n  * @brief  Global Disk IO Drivers structure definition\n  */\ntypedef struct\n{\n  uint8_t                 is_initialized[FF_VOLUMES];\n  const Diskio_drvTypeDef *drv[FF_VOLUMES];\n  uint8_t                 lun[FF_VOLUMES];\n  volatile uint8_t        nbr;\n\n}Disk_drvTypeDef;\n\n/* Exported constants --------------------------------------------------------*/\n/* Exported macro ------------------------------------------------------------*/\n/* Exported functions ------------------------------------------------------- */\nuint8_t FATFS_LinkDriver(const Diskio_drvTypeDef *drv, char *path);\nuint8_t FATFS_UnLinkDriver(char *path);\nuint8_t FATFS_LinkDriverEx(const Diskio_drvTypeDef *drv, char *path, BYTE lun);\nuint8_t FATFS_UnLinkDriverEx(char *path, BYTE lun);\nuint8_t FATFS_GetAttachedDriversNbr(void);\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* __FF_GEN_DRV_H */",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/FatFs/ff_gen_drv.h lines 1-72"
+      },
+      "id": "EcoflowSTM32H7/lib/FatFs/ff_gen_drv.h:chunk0"
+    }
+  ]
+}

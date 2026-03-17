@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    stm32h735g_discovery_errno.h\n  * @author  MCD Application Team\n  * @brief   Error Code.\n  *\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2019 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef STM32H735G_DISCO_ERRNO_H\n#define STM32H735G_DISCO_ERRNO_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n/* Common Error codes */\n#define BSP_ERROR_NONE                    0\n#define BSP_ERROR_NO_INIT                -1\n#define BSP_ERROR_WRONG_PARAM            -2\n#define BSP_ERROR_BUSY                   -3\n#define BSP_ERROR_PERIPH_FAILURE         -4\n#define BSP_ERROR_COMPONENT_FAILURE      -5\n#define BSP_ERROR_UNKNOWN_FAILURE        -6\n#define BSP_ERROR_UNKNOWN_COMPONENT      -7\n#define BSP_ERROR_BUS_FAILURE            -8\n#define BSP_ERROR_CLOCK_FAILURE          -9\n#define BSP_ERROR_MSP_FAILURE            -10\n#define BSP_ERROR_FEATURE_NOT_SUPPORTED  -11\n\n/* BSP OSPI error codes */\n#define BSP_ERROR_OSPI_SUSPENDED          -20\n#define BSP_ERROR_OSPI_ASSIGN_FAILURE     -24\n#define BSP_ERROR_OSPI_SETUP_FAILURE      -25\n#define BSP_ERROR_OSPI_MMP_LOCK_FAILURE   -26\n#define BSP_ERROR_OSPI_MMP_UNLOCK_FAILURE -27\n\n/* BSP TS error code */\n#define BSP_ERROR_TS_TOUCH_NOT_DETECTED   -30\n\n/* BSP BUS error codes */\n#define BSP_ERROR_BUS_TRANSACTION_FAILURE    -100\n#define BSP_ERROR_BUS_ARBITRATION_LOSS       -101\n#define BSP_ERROR_BUS_ACKNOWLEDGE_FAILURE    -102\n#define BSP_ERROR_BUS_PROTOCOL_FAILURE       -103\n\n#define BSP_ERROR_BUS_MODE_FAULT             -104\n#define BSP_ERROR_BUS_FRAME_ERROR            -105\n#define BSP_ERROR_BUS_CRC_ERROR              -106\n#define BSP_ERROR_BUS_DMA_FAILURE            -107\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* STM32H735G_DISCO_ERRNO_H */",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/stm32h735g_discovery_errno.h lines 1-67"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/stm32h735g_discovery_errno.h:chunk0"
+    }
+  ]
+}

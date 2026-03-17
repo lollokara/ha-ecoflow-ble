@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#ifndef LV_CONF_H\n#define LV_CONF_H\n\n#include <stdint.h>\n#include \"FreeRTOS.h\"\n#include \"task.h\"\n\n/*====================\n   COLOR SETTINGS\n *====================*/\n#define LV_COLOR_DEPTH 32\n#define LV_COLOR_16_SWAP 0\n\n/*=========================\n   MEMORY SETTINGS\n *=========================*/\n#define LV_MEM_CUSTOM 0\n#define LV_MEM_SIZE (128 * 1024U)          /*[bytes]*/\n#define LV_MEM_ADR 0     /*0: use malloc, 1: use custom pointer*/\n\n/*====================\n   HAL SETTINGS\n *====================*/\n#define LV_TICK_CUSTOM 1\n#define LV_TICK_CUSTOM_INCLUDE \"FreeRTOS.h\"\n#define LV_TICK_CUSTOM_SYS_TIME_EXPR (xTaskGetTickCount())\n\n/*=======================\n * FEATURE CONFIGURATION\n *=======================*/\n#define LV_USE_GPU_STM32_DMA2D 1\n#define LV_GPU_DMA2D_CMSIS_INCLUDE \"stm32h7xx.h\"\n\n#define LV_USE_LOG 1\n#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN\n\n#define LV_USE_FONT_COMPRESSED 1\n#define LV_FONT_MONTSERRAT_12 1\n#define LV_FONT_MONTSERRAT_14 1\n#define LV_FONT_MONTSERRAT_16 1\n#define LV_FONT_MONTSERRAT_20 1\n#define LV_FONT_MONTSERRAT_24 1\n#define LV_FONT_MONTSERRAT_28 1\n#define LV_FONT_MONTSERRAT_32 1\n\n#define LV_USE_THEME_DEFAULT 1\n#define LV_THEME_DEFAULT_DARK 0\n\n/*==================\n * EXAMPLES\n *==================*/\n#define LV_BUILD_EXAMPLES 0\n\n#endif /*LV_CONF_H*/",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/src/lv_conf.h lines 1-54"
+      },
+      "id": "EcoflowSTM32H7/src/lv_conf.h:chunk0"
+    }
+  ]
+}

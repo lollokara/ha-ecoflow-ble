@@ -1,0 +1,23 @@
+{
+  "full_summary": "Markdown file with 104 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "---\npagetitle: Release Notes for FT5336 Component Driver\nlang: en\n---\n::: {.row}\n::: {.col-sm-12 .col-lg-4}\n\n::: {.card .fluid}\n::: {.sectione .dark}\n<center>\n# **Release Notes for FT5336 TS Component Driver**\nCopyright &copy; 2015 STMicroelectronics\\\n    \n[![ST logo](_htmresc/st_logo.png)](https://www.st.com){.logo}\n</center>\n:::\n:::\n\n# License\n\nThis software component is licensed by ST under BSD 3-Clause license, the \"License\"; You may not use this component except in \ncompliance with the License. You may obtain a copy of the License at:\n<center>\n[https://opensource.org/licenses/BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause)\n</center>\n\n# Purpose\n\nThis driver provides a set of Touch Screen functions offered by FT5336 component\n\n:::\n\n::: {.col-sm-12 .col-lg-8}\n# Update History\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section4\" checked aria-hidden=\"true\">\n<label for=\"collapse-section4\" aria-hidden=\"true\">__V2.0.1 / 30-October-2019__</label>\n<div>\t\t\t\n\n## Main Changes\n\n-\tUpdate st_logo.png inclusion path in Release notes.\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section3\" checked aria-hidden=\"true\">\n<label for=\"collapse-section3\" aria-hidden=\"true\">__V2.0.0 / 14-October-2019__</label>\n<div>\t\t\t\n\n## Main Changes\n\n-\tFirst Official Release of FT5336 Touch Screen Component Drivers in line with STM32Cube BSP drivers development guidelines (UM2298) \n-\tThe component drivers are composed of\n\t-\tcomponent core drivers files: ft5336.h/.c\n\t-\tcomponent register drivers files: ft5336_regs.h/.c\n\t-\tcomponent configuration file ft5336_conf_template.h file\n\n## Backward Compatibility\n\n-\tThis version breaks the compatibility with previous versions\n\n## Dependencies\n\nThis software release is compatible with:\n\n-\tBSP Common v6.0.1 or above\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section2\" checked aria-hidden=\"true\">\n<label for=\"collapse-section2\" aria-hidden=\"true\">__V1.0.1 / 07-April-2017__</label>\n<div>\t\t\t\n\n## Main Changes\n\n-\tUpdate comments to be used for PDSC generation\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section1\" checked aria-hidden=\"true\">\n<label for=\"collapse-section1\" aria-hidden=\"true\">__V1.0.0 / 25-June-2015__</label>\n<div>\t\t\t\n\n## Main Changes\n\n-\tFirst official release of **FT5336** TS driver \n\n</div>\n:::\n\n:::\n:::\n",
+      "metadata": {
+        "start_line": 1,
+        "lang": "markdown",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/ft5336/Release_Notes.md lines 1-100"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/ft5336/Release_Notes.md:chunk0"
+    },
+    {
+      "content": "<footer class=\"sticky\">\nFor complete documentation on <mark>STM32 Microcontrollers</mark> ,\nvisit: [[www.st.com](http://www.st.com/STM32)]{style=\"font-color: blue;\"}\n</footer>",
+      "metadata": {
+        "start_line": 101,
+        "lang": "markdown",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/ft5336/Release_Notes.md lines 101-104"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/ft5336/Release_Notes.md:chunk1"
+    }
+  ]
+}

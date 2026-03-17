@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in gt911.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    gt911_conf.h\n  * @author  MCD Application Team\n  * @brief   This file contains specific configuration for the\n  *          gt911.c that can be modified by user.\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2023 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef GT911_CONF_H\n#define GT911_CONF_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n/* Macros --------------------------------------------------------------------*/\n/* Exported types ------------------------------------------------------------*/\n/* Exported constants --------------------------------------------------------*/\n#define GT911_AUTO_CALIBRATION_ENABLED      0U\n#define GT911_MAX_X_LENGTH                  800U\n#define GT911_MAX_Y_LENGTH                  480U\n\n#ifdef __cplusplus\n}\n#endif\n#endif /* GT911_CONF_H */",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/gt911/gt911_conf_template.h lines 1-39"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/gt911/gt911_conf_template.h:chunk0"
+    }
+  ]
+}

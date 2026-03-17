@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft5336.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    ft5336_conf.h\n  * @author  MCD Application Team\n  * @brief   This file contains specific configuration for the\n  *          ft5336.c that can be modified by user.\n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.\n  * All rights reserved.</center></h2>\n  *\n  * This software component is licensed by ST under BSD 3-Clause license,\n  * the \"License\"; You may not use this file except in compliance with the\n  * License. You may obtain a copy of the License at:\n  *                        opensource.org/licenses/BSD-3-Clause\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef FT5336_CONF_H\n#define FT5336_CONF_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n/* Macros --------------------------------------------------------------------*/\n/* Exported types ------------------------------------------------------------*/\n/* Exported constants --------------------------------------------------------*/\n#define FT5336_AUTO_CALIBRATION_ENABLED      0U\n#define FT5336_MAX_X_LENGTH                  800U\n#define FT5336_MAX_Y_LENGTH                  480U\n  \n#ifdef __cplusplus\n}\n#endif\n#endif /* FT5336_CONF_H */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/ft5336/ft5336_conf.h lines 1-42"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/ft5336/ft5336_conf.h:chunk0"
+    }
+  ]
+}

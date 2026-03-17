@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in rk043fn48h.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    rk043fn48h.h\n  * @author  MCD Application Team\n  * @brief   This file contains all the constants parameters for the RK043FN48H-CT672B\n  *          LCD component.\n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.\n  * All rights reserved.</center></h2>\n  *\n  * This software component is licensed by ST under BSD 3-Clause license,\n  * the \"License\"; You may not use this file except in compliance with the\n  * License. You may obtain a copy of the License at:\n  *                        opensource.org/licenses/BSD-3-Clause\n  *\n  ******************************************************************************\n  */ \n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef __RK043FN48H_H\n#define __RK043FN48H_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif \n\n/* Includes ------------------------------------------------------------------*/  \n\n/** @addtogroup BSP\n  * @{\n  */ \n\n/** @addtogroup Components\n  * @{\n  */ \n  \n/** @addtogroup rk043fn48h\n  * @{\n  */\n\n/** @defgroup RK043FN48H_Exported_Types\n  * @{\n  */\n   \n/**\n  * @}\n  */ \n\n/** @defgroup RK043FN48H_Exported_Constants\n  * @{\n  */\n\n/** \n  * @brief  RK043FN48H Size  \n  */     \n#define  RK043FN48H_WIDTH    ((uint16_t)480)          /* LCD PIXEL WIDTH            */\n#define  RK043FN48H_HEIGHT   ((uint16_t)272)          /* LCD PIXEL HEIGHT           */\n\n/** \n  * @brief  RK043FN48H Timing  \n  */     \n#define  RK043FN48H_HSYNC            ((uint16_t)41)   /* Horizontal synchronization */\n#define  RK043FN48H_HBP              ((uint16_t)13)   /* Horizontal back porch      */\n#define  RK043FN48H_HFP              ((uint16_t)32)   /* Horizontal front porch     */\n#define  RK043FN48H_VSYNC            ((uint16_t)10)   /* Vertical synchronization   */\n#define  RK043FN48H_VBP              ((uint16_t)2)    /* Vertical back porch        */\n#define  RK043FN48H_VFP              ((uint16_t)2)    /* Vertical front porch       */\n\n/** \n  * @brief  RK043FN48H frequency divider  \n  */    \n#define  RK043FN48H_FREQUENCY_DIVIDER    5            /* LCD Frequency divider      */\n/**\n  * @}\n  */\n  \n/** @defgroup RK043FN48H_Exported_Functions\n  * @{\n  */\n\n/**\n  * @}\n  */    \n#ifdef __cplusplus\n}\n#endif\n\n#endif /* __RK043FN48H_H */\n/**\n  * @}\n  */ \n\n/**\n  * @}\n  */ \n\n/**\n  * @}",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/rk043fn48h.h lines 1-100"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/rk043fn48h.h:chunk0"
+    },
+    {
+      "content": "  */ \n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/rk043fn48h.h lines 101-103"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/rk043fn48h.h:chunk1"
+    }
+  ]
+}

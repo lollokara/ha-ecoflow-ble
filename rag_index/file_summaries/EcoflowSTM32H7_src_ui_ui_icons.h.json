@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+  "chunks": [
+    {
+      "content": "#ifndef UI_ICONS_H\n#define UI_ICONS_H\n\n#include \"lvgl.h\"\n\n// Font Declaration\nextern const lv_font_t ui_font_mdi;\n\n// MDI Icon Macros (UTF-8 Encoded via Universal Character Name)\n// Current mapping in ui_font_mdi.c (approximate hex values):\n// 985714 -> F0A72 (Solar)\n// 984741 -> F06A5 (Plug)\n// 983308 -> F010C (Car)\n// 990399 -> F1CBF (USB)\n// 984211 -> F0493 (Settings)\n// 983117 -> F004D (Back)\n// 983161 -> F0079 (Battery)\n// 987399 -> F1107 (AC)\n\n#define MDI_ICON_SOLAR      \"\\U000F0A72\" // \udb82\ude72\n#define MDI_ICON_PLUG       \"\\U000F06A5\" // \udb81\udea5\n#define MDI_ICON_CAR        \"\\U000F010C\" // \udb80\udd0c\n#define MDI_ICON_USB        \"\\U000F1CBF\" // \udb87\udcbf\n#define MDI_ICON_SETTINGS   \"\\U000F0493\" // \udb81\udc93\n#define MDI_ICON_BACK       \"\\U000F004D\" // \udb80\udc4d\n#define MDI_ICON_BATTERY    \"\\U000F0079\" // \udb80\udc79\n#define MDI_ICON_AC         \"\\U000F1107\" // \udb84\udd07\n\n// New Icons for Wave 2\n// Note: These will only render if the font is regenerated with these glyphs.\n#define MDI_ICON_FAN        \"\\U000F0210\" // \udb80\ude10\n#define MDI_ICON_THERMOMETER \"\\U000F050F\" // \udb81\udd0f\n#define MDI_ICON_FIRE       \"\\U000F18D6\" // \udb86\udcd6 (New Hot Icon)\n#define MDI_ICON_SNOWFLAKE  \"\\U000F1A71\" // \udb86\ude71 (New Cold Icon)\n#define MDI_ICON_LEAF       \"\\U000F030D\" // \udb80\udf0d\n#define MDI_ICON_MOON       \"\\U000F0594\" // \udb81\udd94\n#define MDI_ICON_POWER      \"\\U000F0425\" // \udb81\udc25\n\n// Alternator Charger Icons\n#define MDI_ICON_CHARGING_WIRELESS \"\\U000F0084\" // \udb80\udc84\n#define MDI_ICON_VAN_UTILITY       \"\\U000F05F1\" // \udb81\uddf1\n\n// Helper to set label to icon\nstatic inline void ui_set_icon(lv_obj_t * label, const char * icon_code) {\n    lv_obj_set_style_text_font(label, &ui_font_mdi, 0);\n    lv_label_set_text(label, icon_code);\n}\n\n#endif // UI_ICONS_H",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/src/ui/ui_icons.h lines 1-49"
+      },
+      "id": "EcoflowSTM32H7/src/ui/ui_icons.h:chunk0"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate_keydata_header module.",
+  "chunks": [
+    {
+      "content": "def generate_header(data_bytes, output_path):\n    with open(output_path, \"w\") as f:\n        f.write(\"#ifndef CREDENTIALS_H\\n\")\n        f.write(\"#define CREDENTIALS_H\\n\\n\")\n        f.write(\"#include <stdint.h>\\n\\n\")\n        f.write(\"static const char ECOFLOW_USER_ID[] = \\\"1921517708356313089\\\";\\n\")\n        f.write(\"static const char ECOFLOW_DEVICE_SN[] = \\\"P231ZEBAPH342310\\\";\\n\\n\")\n        f.write(\"const uint8_t ECOFLOW_KEYDATA[] = {\\n    \")\n        \n        for i, byte in enumerate(data_bytes):\n            f.write(f\"0x{byte:02x}, \")\n            if (i + 1) % 16 == 0:\n                f.write(\"\\n    \")\n        \n        f.write(\"\\n};\\n\\n\")\n        f.write(\"#endif // CREDENTIALS_H\\n\")",
+      "metadata": {
+        "start_line": 9,
+        "lang": "python",
+        "desc": "Definition of generate_header in Test Scripts/generate_keydata_header.py"
+      },
+      "id": "Test Scripts/generate_keydata_header.py:chunk0"
+    }
+  ]
+}

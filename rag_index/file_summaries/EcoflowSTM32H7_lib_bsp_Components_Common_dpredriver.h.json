@@ -1,0 +1,23 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    dpredriver.h\n  * @author  MCD Application Team\n  * @brief   This header file contains the functions prototypes for the  \n  *          DisplayPort Linear Redriver.\n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.\n  * All rights reserved.</center></h2>\n  *\n  * This software component is licensed by ST under BSD 3-Clause license,\n  * the \"License\"; You may not use this file except in compliance with the\n  * License. You may obtain a copy of the License at:\n  *                        opensource.org/licenses/BSD-3-Clause\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef __DPREDRIVER_H\n#define __DPREDRIVER_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include <stdint.h>\n\n/** @addtogroup BSP\n  * @{\n  */\n\n/** @addtogroup Components\n  * @{\n  */\n    \n/** @addtogroup DPREDRIVER\n  * @{\n  */\n\n/** @defgroup DPREDRIVER_Exported_Types\n  * @{\n  */ \n\n/** @defgroup DPREDRIVER_Channel_Identifier  Channel Identifier\n  * @{\n  */\n typedef enum {\n   CHANNEL_DP0 = 0,\n   CHANNEL_DP1,\n   CHANNEL_DP2,\n   CHANNEL_DP3,\n   CHANNEL_RX1,\n   CHANNEL_RX2,\n   CHANNEL_SSTX\n } DPREDRIVER_ChannelId_t;\n/**\n  * @}\n  */\n  \n /** @defgroup DPREDRIVER_Driver_structure  DisplayPort Linear Redriver Driver structure\n  * @{\n  */\ntypedef struct\n{\n  uint32_t  (*Init)(uint16_t);\n  void      (*DeInit)(uint16_t); \n  uint32_t  (*PowerOn)(uint16_t);\n  uint32_t  (*PowerOff)(uint16_t);\n  uint32_t  (*SetEQGain)(uint16_t, DPREDRIVER_ChannelId_t, uint8_t);\n  uint32_t  (*EnableChannel)(uint16_t, DPREDRIVER_ChannelId_t);\n  uint32_t  (*DisableChannel)(uint16_t, DPREDRIVER_ChannelId_t);\n}DPREDRIVER_Drv_t;\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n#ifdef __cplusplus\n}\n#endif",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/Common/dpredriver.h lines 1-100"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/Common/dpredriver.h:chunk0"
+    },
+    {
+      "content": "\n#endif /* __DPREDRIVER_H */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 101,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/Common/dpredriver.h lines 101-104"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/Common/dpredriver.h:chunk1"
+    }
+  ]
+}

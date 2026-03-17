@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to merge_firmware module.",
+  "chunks": [
+    {
+      "content": "def merge_firmware(source, target, env):\n    # Paths\n    bootloader_path = \"../EcoflowSTM32H7_Bootloader/.pio/build/disco_h735ig/firmware.bin\"\n\n    # Ensure we use the .bin file, not the .elf file\n    # SCons might pass the .elf as source[0], so we explicitly construct the bin path\n    app_path = os.path.join(env.subst(\"$BUILD_DIR\"), env.subst(\"${PROGNAME}.bin\"))\n\n    output_path = os.path.join(env.subst(\"$PROJECT_DIR\"), \"factory_firmware.bin\")\n\n    # Constants\n    BOOTLOADER_SIZE = 0x8000 # 32KB\n    CONFIG_SIZE = 0x0000     # 0KB\n    APP_OFFSET = 0x8000      # 32KB\n\n    print(f\"Merging firmware... \")\n    print(f\"App Path: {app_path}\")\n\n    if not os.path.exists(bootloader_path):\n        print(f\"Warning: Bootloader not found at {bootloader_path}. Skipping merge.\")\n        return\n\n    if not os.path.exists(app_path):\n        print(f\"Error: Application binary not found at {app_path}\")\n        return\n\n    try:\n        with open(bootloader_path, \"rb\") as f:\n            boot_bin = f.read()\n\n        with open(app_path, \"rb\") as f:\n            app_bin = f.read()\n\n        # Check Bootloader Size\n        boot_len = len(boot_bin)\n        print(f\"Bootloader Size: {boot_len} bytes\")\n        if boot_len > BOOTLOADER_SIZE:\n            raise Exception(f\"Error: Bootloader too large! Size: {boot_len} bytes, Max: {BOOTLOADER_SIZE} bytes.\")\n\n        padding1 = b'\\xFF' * (BOOTLOADER_SIZE - boot_len)\n\n        # Empty Config (16KB)\n        config_padding = b'\\xFF' * CONFIG_SIZE\n\n        # Verify App Binary isn't ELF (Check Magic)\n        if len(app_bin) > 4 and app_bin[0:4] == b'\\x7FELF':\n             raise Exception(f\"Error: Application binary appears to be an ELF file! Check your build settings.\")\n\n        # Merge\n        with open(output_path, \"wb\") as f:\n            f.write(boot_bin)\n            f.write(padding1)\n            f.write(config_padding)\n            f.write(app_bin)\n\n        print(f\"Factory firmware created at: {output_path}\")\n\n    except Exception as e:\n        print(f\"Error merging firmware: {e}\")\n        env.Exit(1)",
+      "metadata": {
+        "start_line": 5,
+        "lang": "python",
+        "desc": "Definition of merge_firmware in EcoflowSTM32H7/merge_firmware.py"
+      },
+      "id": "EcoflowSTM32H7/merge_firmware.py:chunk0"
+    }
+  ]
+}

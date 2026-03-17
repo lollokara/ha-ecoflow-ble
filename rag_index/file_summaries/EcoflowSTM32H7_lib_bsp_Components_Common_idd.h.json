@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    idd.h\n  * @author  MCD Application Team\n  * @brief   This file contains all the functions prototypes for the IDD driver.\n  ******************************************************************************\n  * @attention\n  *\n  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.\n  * All rights reserved.</center></h2>\n  *\n  * This software component is licensed by ST under BSD 3-Clause license,\n  * the \"License\"; You may not use this file except in compliance with the\n  * License. You may obtain a copy of the License at:\n  *                        opensource.org/licenses/BSD-3-Clause\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef IDD_H\n#define IDD_H\n\n#ifdef __cplusplus\n extern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include <stdint.h>\n\n/** @addtogroup BSP\n  * @{\n  */\n\n/** @addtogroup Components\n  * @{\n  */\n\n/** @addtogroup IDD\n  * @{\n  */\n\n/** @defgroup IDD_Exported_Types IDD Exported Types\n  * @{\n  */\n\n/** @defgroup IDD_Driver_structure  IDD Driver structure\n  * @{\n  */\ntypedef struct\n{\n  int32_t    (*Init             )(void*);\n  int32_t    (*DeInit           )(void*);\n  int32_t    (*ReadID           )(void*, uint32_t*);\n  int32_t    (*Reset            )(void*);\n  int32_t    (*LowPower         )(void*);\n  int32_t    (*WakeUp           )(void*);\n  int32_t    (*Start            )(void*);\n  int32_t    (*Config           )(void*, void*);\n  int32_t    (*GetValue         )(void*, uint32_t*);\n  int32_t    (*EnableIT         )(void*);\n  int32_t    (*DisableIT        )(void*); \n  int32_t    (*ITStatus         )(void*);   \n  int32_t    (*ClearIT          )(void*);\n  int32_t    (*ErrorEnableIT    )(void*);\n  int32_t    (*ErrorClearIT     )(void*);\n  int32_t    (*ErrorGetITStatus)(void*);\n  int32_t    (*ErrorDisableIT   )(void*);\n  int32_t    (*ErrorGetSrc      )(void*);\n  int32_t    (*ErrorGetCode     )(void*);\n}IDD_Drv_t;\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n/**\n  * @}\n  */\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* IDD_H */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/Common/idd.h lines 1-98"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/Common/idd.h:chunk0"
+    }
+  ]
+}

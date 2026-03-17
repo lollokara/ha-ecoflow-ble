@@ -71,3 +71,6 @@ EcoflowRP2040/.vscode/launch.json
 **/.pio/
 *.bin
 EcoflowESP32/.vscode/extensions.json
+*.py
+EcoflowSTM32H7/lib/bsp/Components/
+EcoflowSTM32H7/lib/bsp/stm32h735g*

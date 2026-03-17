@@ -1,0 +1,14 @@
+{
+  "full_summary": "Markdown file with 31 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "# Report potential product security vulnerabilities\n\nST places a high priority on security, and our Product Security Incident\nResponse Team (PSIRT) is committed to rapidly addressing potential security\nvulnerabilities affecting our products. PSIRT's long history and vast experience\nin security allows ST to perform clear analyses and provide appropriate guidance\non mitigations and solutions when applicable.\n\nIf you wish to report potential security vulnerabilities regarding our products,\n**please do not report them through public GitHub issues.** Instead, we\nencourage you to report them to our ST PSIRT following the process described at:\n**https://www.st.com/content/st_com/en/security/report-vulnerabilities.html**\n\n### IMPORTANT - READ CAREFULLY:\n\nSTMicroelectronics International N.V., on behalf of itself, its affiliates and\nsubsidiaries, (collectively \u201cST\u201d) takes all potential security vulnerability\nreports or other related communications (\u201cReport(s)\u201d) seriously. In order to\nreview Your Report (the terms \u201cYou\u201d and \u201cYours\u201d include your employer, and all\naffiliates, subsidiaries and related persons or entities) and take actions as\ndeemed appropriate, ST requires that we have the rights and Your permission to\ndo so.\n\nAs such, by submitting Your Report to ST, You agree that You have the right to\ndo so, and You grant to ST the rights to use the Report for purposes related to\nsecurity vulnerability analysis, testing, correction, patching, reporting and\nany other related purpose or function.\n\nBy submitting Your Report, You agree that ST\u2019s\n[Privacy Policy](https://www.st.com/content/st_com/en/common/privacy-portal.html)\napplies to all related communications.",
+      "metadata": {
+        "start_line": 1,
+        "lang": "markdown",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/ft5336/SECURITY.md lines 1-31"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/ft5336/SECURITY.md:chunk0"
+    }
+  ]
+}

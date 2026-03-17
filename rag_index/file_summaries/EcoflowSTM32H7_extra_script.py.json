@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to extra_script module.",
+  "chunks": [
+    {
+      "content": "def copy_firmware(source, target, env):\n    import shutil\n    import os\n\n    # Get the project directory\n    project_dir = env.subst(\"$PROJECT_DIR\")\n    \n    # Construct the path to the firmware.bin file\n    firmware_path = target[0].get_path()\n    firmware_filename = os.path.basename(firmware_path)\n\n    # Define the destination directory\n    bin_dir = os.path.join(project_dir, \"bin\")\n\n    # Create the bin directory if it doesn't exist\n    if not os.path.exists(bin_dir):\n        os.makedirs(bin_dir)\n        print(f\"Created directory: {bin_dir}\")\n\n    # Define the destination path\n    destination_path = os.path.join(bin_dir, firmware_filename)\n\n    # Copy the file\n    shutil.copy(firmware_path, destination_path)\n    print(f\"Copied {firmware_path} to {destination_path}\")",
+      "metadata": {
+        "start_line": 11,
+        "lang": "python",
+        "desc": "Definition of copy_firmware in EcoflowSTM32H7/extra_script.py"
+      },
+      "id": "EcoflowSTM32H7/extra_script.py:chunk0"
+    }
+  ]
+}

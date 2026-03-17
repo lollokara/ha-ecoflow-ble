@@ -1,0 +1,14 @@
+{
+  "full_summary": "Markdown file with 92 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "---\npagetitle: Release Notes for RK043FN48H-CT672B LCD Component Drivers\nlang: en\n---\n\n::: {.row}\n::: {.col-sm-12 .col-lg-4}\n\n::: {.card .fluid}\n::: {.sectione .dark}\n<center>\n# <small>Release Notes for</small> <mark>RK043FN48H-CT672B LCD Component Drivers</mark>\nCopyright &copy; 2015 STMicroelectronics\\\n    \n[![ST logo](_htmresc/st_logo.png)](https://www.st.com){.logo}\n</center>\n:::\n:::\n\n# License\n\nLicensed by ST under BSD 3-Clause license (the \\\"License\\\"). You may\nnot use this package except in compliance with the License. You may\nobtain a copy of the License at:\n\n[https://opensource.org/licenses/BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause)\n\n# Purpose\n\nThis directory contains the RK043FN48H-CT672B LCD component drivers.\n\n:::\n\n::: {.col-sm-12 .col-lg-8}\n# Update History\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section4\" checked aria-hidden=\"true\">\n<label for=\"collapse-section4\" aria-hidden=\"true\">V1.0.3 / 30-October-2019</label>\n<div>\t\t\t\n\n## Main Changes\n\n- Update st_logo.png inclusion path in Release notes.\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section3\" checked aria-hidden=\"true\">\n<label for=\"collapse-section3\" aria-hidden=\"true\">V1.0.2 / 03-April-2019</label>\n<div>\t\t\t\n\n## Main Changes\n\n- Update release notes format\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section2\" aria-hidden=\"true\">\n<label for=\"collapse-section2\" aria-hidden=\"true\">V1.0.1 / 31-August-2018</label>\n<div>\t\t\t\n\n## Main Changes\n\n- Reformat the BSD 3-Clause license declaration in the files header (replace license terms by a web reference to OSI website where those terms lie)\n\n</div>\n:::\n\n::: {.collapse}\n<input type=\"checkbox\" id=\"collapse-section1\" aria-hidden=\"true\">\n<label for=\"collapse-section1\" aria-hidden=\"true\">V1.0.0 / 25-June-2015</label>\n<div>\t\t\t\n\n## Main Changes\n\n- First official release\n\n\n</div>\n:::\n\n:::\n:::\n\n<footer class=\"sticky\">\nFor complete documentation on <mark>STM32 Microcontrollers</mark> ,\nvisit: [http://www.st.com/STM32](http://www.st.com/STM32)\n</footer>",
+      "metadata": {
+        "start_line": 1,
+        "lang": "markdown",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/Release_Notes.md lines 1-92"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/Components/rk043fn48h/Release_Notes.md:chunk0"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+  "chunks": [
+    {
+      "content": "/**\n  ******************************************************************************\n  * @file    stm32h735g_discovery_conf.h\n  * @author  MCD Application Team\n  * @brief   STM32H735G_DISCO board configuration file.\n  ******************************************************************************\n  * @attention\n  *\n  * Copyright (c) 2019 STMicroelectronics.\n  * All rights reserved.\n  *\n  * This software is licensed under terms that can be found in the LICENSE file\n  * in the root directory of this software component.\n  * If no LICENSE file comes with this software, it is provided AS-IS.\n  *\n  ******************************************************************************\n  */\n\n/* Define to prevent recursive inclusion -------------------------------------*/\n#ifndef STM32H735G_DK_CONF_H\n#define STM32H735G_DK_CONF_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n/* Includes ------------------------------------------------------------------*/\n#include \"stm32h7xx_hal.h\"\n\n/* COM define */\n#define USE_COM_LOG                         0U\n#define USE_BSP_COM_FEATURE                 0U\n\n/* I2C BUS timing define */\n#define I2C_VALID_TIMING_NBR                128U\n\n/* Audio codecs defines */\n#define USE_AUDIO_CODEC_WM8994              1U\n#define USE_BSP_PDM_LIB_FEATURE             1U\n\n/* Default Audio IN internal buffer size */\n#define DEFAULT_AUDIO_IN_BUFFER_SIZE        2048U\n#define USE_BSP_CPU_CACHE_MAINTENANCE       1U\n\n/* LCD defines */\n#define LCD_LAYER_0_ADDRESS                 0x70000000U\n#define LCD_LAYER_1_ADDRESS                 0x70200000U\n#define USE_DMA2D_TO_FILL_RGB_RECT          0U\n#define USE_LCD_CTRL_RK043FN48H             1U\n\n/* TS defines */\n#define USE_TS_GESTURE                      1U\n#define USE_TS_MULTI_TOUCH                  1U\n#define TS_TOUCH_NBR                        2U\n\n/* OSPI RAM interrupt priority */\n#define BSP_OSPI_RAM_IT_PRIORITY            0x07UL\n#define BSP_OSPI_RAM_DMA_IT_PRIORITY        0x07UL\n\n/* IRQ priorities */\n#define BSP_BUTTON_USER_IT_PRIORITY         15U\n#define BSP_AUDIO_OUT_IT_PRIORITY           14U\n#define BSP_AUDIO_IN_IT_PRIORITY            15U\n#define BSP_SD_IT_PRIORITY                  14U\n#define BSP_SD_RX_IT_PRIORITY               14U\n#define BSP_SD_TX_IT_PRIORITY               15U\n#define BSP_TS_IT_PRIORITY                  15U\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* STM32H735G_DK_CONF_H */",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/bsp/stm32h735g_discovery_conf_template.h lines 1-73"
+      },
+      "id": "EcoflowSTM32H7/lib/bsp/stm32h735g_discovery_conf_template.h:chunk0"
+    }
+  ]
+}

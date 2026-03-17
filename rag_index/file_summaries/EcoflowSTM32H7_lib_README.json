@@ -1,0 +1,14 @@
+{
+  "full_summary": "Unknown file with 46 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "\nThis directory is intended for project specific (private) libraries.\nPlatformIO will compile them to static libraries and link into the executable file.\n\nThe source code of each library should be placed in a separate directory\n(\"lib/your_library_name/[Code]\").\n\nFor example, see the structure of the following example libraries `Foo` and `Bar`:\n\n|--lib\n|  |\n|  |--Bar\n|  |  |--docs\n|  |  |--examples\n|  |  |--src\n|  |     |- Bar.c\n|  |     |- Bar.h\n|  |  |- library.json (optional. for custom build options, etc) https://docs.platformio.org/page/librarymanager/config.html\n|  |\n|  |--Foo\n|  |  |- Foo.c\n|  |  |- Foo.h\n|  |\n|  |- README --> THIS FILE\n|\n|- platformio.ini\n|--src\n   |- main.c\n\nExample contents of `src/main.c` using Foo and Bar:\n```\n#include <Foo.h>\n#include <Bar.h>\n\nint main (void)\n{\n  ...\n}\n\n```\n\nThe PlatformIO Library Dependency Finder will find automatically dependent\nlibraries by scanning project source files.\n\nMore information about PlatformIO Library Dependency Finder\n- https://docs.platformio.org/page/librarymanager/ldf.html",
+      "metadata": {
+        "start_line": 1,
+        "lang": "unknown",
+        "desc": "Code chunk from EcoflowSTM32H7/lib/README lines 1-46"
+      },
+      "id": "EcoflowSTM32H7/lib/README:chunk0"
+    }
+  ]
+}
