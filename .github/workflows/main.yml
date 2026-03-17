@@ -14,22 +14,17 @@ on:
 
 jobs:
   embedded-ai-orchestration:
-    # Richiede che il runner sia installato sul Mac fisico a cui è collegato l'ESP32 via USB
     runs-on: self-hosted
-
+    
     steps:
       - name: Checkout del codice
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Installazione PlatformIO e dipendenze AI
         run: |
-          python -m pip install --upgrade pip
-          pip install platformio requests pyserial
+          # Utilizza direttamente l'eseguibile python3.11 di sistema
+          python3.11 -m pip install --upgrade pip
+          python3.11 -m pip install platformio requests pyserial
 
       - name: 1. Scomposizione Intento in Task (AI)
         id: ai_breakdown
@@ -37,18 +32,19 @@ jobs:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           INTENT: ${{ inputs.intent }}
         run: |
-          python .github/scripts/01_breakdown_intent.py
+          python3.11 .github/scripts/01_breakdown_intent.py
 
       - name: 2. Esecuzione Task con Jules
         id: jules_exec
         env:
           JULES_API_TOKEN: ${{ secrets.JULES_API_TOKEN }}
         run: |
-          python .github/scripts/02_run_jules.py
+          python3.11 .github/scripts/02_run_jules.py
 
       - name: 3. Compilazione Firmware (PlatformIO)
         id: pio_build
         run: |
+          # pio viene installato tramite il pip di python3.11
           pio run > build_logs.txt 2>&1
 
       - name: 4. Caricamento Firmware su Dispositivo
@@ -66,12 +62,15 @@ jobs:
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
         run: |
+          # Creiamo i file vuoti se non esistono per prevenire il crash di 'cat'
+          touch build_logs.txt test_logs.txt
+          
           echo "=== LOG DI COMPILAZIONE ED UPLOAD ===" > full_context.txt
           cat build_logs.txt >> full_context.txt
           echo -e "\n=== LOG SERIALI DI RUNTIME ===" >> full_context.txt
           cat test_logs.txt >> full_context.txt
           
-          python .github/scripts/04_analyze_logs.py full_context.txt > ai_feedback.md
+          python3.11 .github/scripts/04_analyze_logs.py full_context.txt > ai_feedback.md
 
       - name: 7. Notifica Utente con Report su Telegram
         if: always()
@@ -79,11 +78,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -c "
+          python3.11 -c "
           import requests, os
           try:
-              with open('ai_feedback.md', 'r') as f:
-                  text = f.read()
+              # Controlliamo che il file Markdown esista davvero
+              if not os.path.exists('ai_feedback.md'):
+                  text = '🔴 Errore critico: Il workflow si è interrotto prima di poter eseguire l\'analisi. Controlla i log di GitHub Actions per i dettagli.'
+              else:
+                  with open('ai_feedback.md', 'r') as f:
+                      text = f.read()
               
               bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
               chat_id = os.environ.get('TELEGRAM_CHAT_ID')
