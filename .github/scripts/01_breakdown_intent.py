@@ -12,7 +12,7 @@ def main():
         sys.exit(1)
 
     # Utilizziamo l'endpoint REST standard. Puoi usare gemini-1.5-pro o modelli successivi
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
 
     prompt = f"""
     Sei un Senior Embedded Software Engineer. Il tuo compito è analizzare la seguente richiesta per un progetto PlatformIO (C++ per ESP32, repository: ha-ecoflow-ble) e dividerla in task sequenziali per un agente di coding AI subordinato (Jules).
