@@ -1,6 +1,6 @@
 // Ensure HSE_VALUE is defined correctly before HAL inclusion
 #ifndef HSE_VALUE
-#define HSE_VALUE 8000000
+#define HSE_VALUE 25000000
 #endif
 
 #include "stm32h7xx_hal.h"
@@ -771,9 +771,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  // HSE = 8MHz, M = 2, N = 130, P = 1 => 520MHz SysClock
-  RCC_OscInitStruct.PLL.PLLM = 2;
-  RCC_OscInitStruct.PLL.PLLN = 130;
+  // HSE = 25MHz, M = 5, N = 104, P = 1 => 520MHz SysClock
+  RCC_OscInitStruct.PLL.PLLM = 5;
+  RCC_OscInitStruct.PLL.PLLN = 104;
   RCC_OscInitStruct.PLL.PLLP = 1;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
