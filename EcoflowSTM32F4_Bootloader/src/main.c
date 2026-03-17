@@ -3,14 +3,14 @@
 #define HSE_VALUE 8000000
 #endif
 
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
 
 // Define Application Address (Sector 2)
-#define APP_ADDRESS 0x08008000
+#define APP_ADDRESS 0x08020000
 
 // UART Protocol
 #define START_BYTE 0xAA
@@ -45,7 +45,7 @@ typedef void (*pFunction)(void);
 pFunction JumpToApplication;
 uint32_t JumpAddress;
 
-void SystemClock_Config(void);
+
 void UART_Init(void);
 void USART3_Init(void);
 void MX_IWDG_Init(void);
@@ -175,9 +175,7 @@ void DeInit(void) {
     HAL_UART_DeInit(&huart3);
 
     // De-init LEDs
-    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_6);
-    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_4 | GPIO_PIN_5);
-    HAL_GPIO_DeInit(GPIOK, GPIO_PIN_3);
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_3 | GPIO_PIN_2);
 
     SysTick->CTRL = 0;
     SysTick->LOAD = 0;
@@ -191,21 +189,21 @@ void DeInit(void) {
 }
 
 // LED Helpers
-void LED_G_On() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET); }
-void LED_G_Off() { HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET); }
-void LED_G_Toggle() { HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6); }
+void LED_G_On() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET); }
+void LED_G_Off() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET); }
+void LED_G_Toggle() { HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_3); }
 
-void LED_O_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET); }
-void LED_O_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); }
-void LED_O_Toggle() { HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_4); }
+void LED_O_On() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET); }
+void LED_O_Off() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET); }
+void LED_O_Toggle() { HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2); }
 
-void LED_R_On() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET); }
-void LED_R_Off() { HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET); }
-void LED_R_Toggle() { HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_5); }
+void LED_R_On() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET); }
+void LED_R_Off() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET); }
+void LED_R_Toggle() { HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2); }
 
-void LED_B_On() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET); }
-void LED_B_Off() { HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_SET); }
-void LED_B_Toggle() { HAL_GPIO_TogglePin(GPIOK, GPIO_PIN_3); }
+void LED_B_On() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET); }
+void LED_B_Off() { HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET); }
+void LED_B_Toggle() { HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_3); }
 
 void All_LEDs_Off() {
     LED_G_Off(); LED_O_Off(); LED_R_Off(); LED_B_Off();
@@ -249,7 +247,6 @@ int main(void) {
     Serial_Log("Bootloader Started. CRC & Logging Active.");
 
     // Enable Backup Access for OTA Flag and Boot Counter
-    __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
 
     bool ota_flag = (RTC->BKP0R == 0xDEADBEEF);
@@ -263,7 +260,7 @@ int main(void) {
     Serial_Log("OPTCR: 0x%08X", FLASH->OPTCR);
 
     // Check App Validity (SP must be in RAM 0x20000000 - 0x20060000)
-    // When aliased, 0x08008000 points to the App offset in the CURRENT bank.
+    // When aliased, 0x08020000 points to the App offset in the CURRENT bank.
     uint32_t sp = *(__IO uint32_t*)APP_ADDRESS;
     bool valid_app = (sp >= 0x20000000 && sp <= 0x20060000);
 
@@ -361,7 +358,7 @@ void send_nack() {
 
 void ClearFlashFlags() {
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
-                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR | FLASH_FLAG_RDERR);
+                           FLASH_FLAG_PGSERR | FLASH_FLAG_INCERR | FLASH_FLAG_STRBERR);
 }
 
 // Bit 30: DB1M (0=Dual Bank, 1=Single Bank)
@@ -383,32 +380,10 @@ void Bootloader_OTA_Loop(void) {
     ClearFlashFlags(); // Clear flags on entry
     All_LEDs_Off();
 
-    // Determine Active Bank (Using Direct Register Read)
-    bool bfb2_active = (FLASH->OPTCR & FLASH_OPTCR_BFB2) == FLASH_OPTCR_BFB2;
-
-    Serial_Log("OPTCR: 0x%08X. BFB2: %d", FLASH->OPTCR, bfb2_active);
-
-    // Target Inactive Bank
-    // On STM32F469 with Dual Bank enabled:
-    // Active Bank is ALWAYS mapped to 0x08000000. Inactive to 0x08100000.
-    // BUT we must target correct PHYSICAL SECTORS for Erase.
-    // If BFB2=1 (Bank 2 Active), Inactive is Bank 1 (Phys Sectors 0-11).
-    // If BFB2=0 (Bank 1 Active), Inactive is Bank 2 (Phys Sectors 12-23).
-
-    uint32_t target_bank_addr = 0x08100000;
-    uint32_t start_sector, end_sector;
-
-    if (bfb2_active) {
-        // Active: Bank 2. Inactive: Bank 1 (Sectors 0-11).
-        start_sector = FLASH_SECTOR_0;
-        end_sector = FLASH_SECTOR_11;
-        Serial_Log("Active: Bank 2. Target: Bank 1 (Sectors 0-11) Addr: 0x%08X", target_bank_addr);
-    } else {
-        // Active: Bank 1. Inactive: Bank 2 (Sectors 12-23).
-        start_sector = FLASH_SECTOR_12;
-        end_sector = FLASH_SECTOR_23;
-        Serial_Log("Active: Bank 1. Target: Bank 2 (Sectors 12-23) Addr: 0x%08X", target_bank_addr);
-    }
+    uint32_t target_bank_addr = APP_ADDRESS;
+    uint32_t start_sector = FLASH_SECTOR_1;
+    uint32_t end_sector = FLASH_SECTOR_7;
+    Serial_Log("Target App Addr: 0x%08X (Sectors %d-%d)", target_bank_addr, start_sector, end_sector);
 
     bool ota_started = false;
     bool checksum_verified = false;
@@ -435,7 +410,7 @@ void Bootloader_OTA_Loop(void) {
         uint32_t timeout_val = ota_started ? 60000 : 30000;
         if (HAL_GetTick() - last_packet_time > timeout_val) {
              Serial_Log("OTA Timeout (%d ms). Resetting...", timeout_val);
-             HAL_NVIC_SystemReset();
+             NVIC_SystemReset();
         }
 
         uint8_t b;
@@ -519,14 +494,13 @@ void Bootloader_OTA_Loop(void) {
             uint32_t addr = target_bank_addr + offset;
 
             bool ok = true;
-            for (uint32_t i=0; i<data_len; i+=4) {
-                uint32_t word = 0xFFFFFFFF;
-                uint8_t copy_len = (data_len - i < 4) ? (data_len - i) : 4;
-                memcpy(&word, &data[i], copy_len);
+            for (uint32_t i=0; i<data_len; i+=32) {
+                uint8_t copy_len = (data_len - i < 32) ? (data_len - i) : 32;
+                uint8_t flash_word[32];
+                memset(flash_word, 0xFF, 32);
+                memcpy(flash_word, &data[i], copy_len);
 
-                // ClearFlashFlags(); // Optimization: Removed for speed. Only on error?
-
-                if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK) {
+                if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, addr + i, (uint32_t)flash_word) != HAL_OK) {
                     ok = false; break;
                 }
             }
@@ -593,46 +567,8 @@ void Bootloader_OTA_Loop(void) {
             // Clear Boot Counter (BKP1R) for fresh start
             RTC->BKP1R = 0;
 
-            // Toggle BFB2
-            ClearFlashFlags(); // Clear flags before OB operations
-            HAL_FLASH_Unlock();
-            HAL_FLASH_OB_Unlock();
-
-            // Manual Option Byte Modification
-            uint32_t optcr = FLASH->OPTCR;
-            Serial_Log("Current OPTCR: 0x%08X", optcr);
-
-            // Toggle BFB2 (Bit 4)
-            if (bfb2_active) {
-                // If BFB2 was 1 (Bank 1 Active), we want Bank 2 Active (BFB2=0).
-                optcr &= ~FLASH_OPTCR_BFB2;
-            } else {
-                // If BFB2 was 0 (Bank 2 Active), we want Bank 1 Active (BFB2=1).
-                optcr |= FLASH_OPTCR_BFB2;
-            }
-
-            // Ensure OPTSTRT is cleared before writing
-            optcr &= ~FLASH_OPTCR_OPTSTRT;
-
-            Serial_Log("Writing OPTCR: 0x%08X", optcr);
-
             __disable_irq(); // Disable Interrupts for safety
-
-            // 1. Write the new value
-            FLASH->OPTCR = optcr;
-
-            // 2. Set OPTSTRT to commit
-            FLASH->OPTCR |= FLASH_OPTCR_OPTSTRT;
-
-            // 3. Wait for BSY
-            while (FLASH->SR & FLASH_SR_BSY);
-
-            // 4. Force Reload (Triggers Reset)
-            HAL_FLASH_OB_Launch();
-
-            // Should reset automatically, but if not:
-            Serial_Log("OB Launch Failed/Completed. Resetting...");
-            HAL_NVIC_SystemReset();
+            NVIC_SystemReset();
         }
     }
 }
@@ -646,7 +582,7 @@ void UART_Init(void) {
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART6;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
     huart6.Instance = USART6;
@@ -662,16 +598,16 @@ void UART_Init(void) {
 
 void USART3_Init(void) {
     __HAL_RCC_USART3_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
 
-    // PB10 (TX), PB11 (RX)
+    // PD8 (TX), PD9 (RX)
     GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
+    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     huart3.Instance = USART3;
     huart3.Init.BaudRate = 115200; // Keep Debug logging at standard rate
@@ -685,7 +621,7 @@ void USART3_Init(void) {
 }
 
 void MX_IWDG_Init(void) {
-    hiwdg.Instance = IWDG;
+    hiwdg.Instance = IWDG1;
     hiwdg.Init.Prescaler = IWDG_PRESCALER_256; // 32kHz / 256 = 125Hz
     hiwdg.Init.Reload = 1250; // 10s
     if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
@@ -694,68 +630,73 @@ void MX_IWDG_Init(void) {
 }
 
 void GPIO_Init(void) {
-    __HAL_RCC_GPIOG_CLK_ENABLE();
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOK_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    // PG6 (Green)
-    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    // PC3 (Green), PC2 (Red)
+    GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_2;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
-
-    // PD4 (Orange), PD5 (Red)
-    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-    // PK3 (Blue)
-    GPIO_InitStruct.Pin = GPIO_PIN_3;
-    HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     All_LEDs_Off();
 }
 
+
+
+void SystemClock_Config(void);
+
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  HAL_StatusTypeDef ret = HAL_OK;
 
-  __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
+
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
+  RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 360;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+
+  RCC_OscInitStruct.PLL.PLLM = 5;
+  RCC_OscInitStruct.PLL.PLLN = 104;
+  RCC_OscInitStruct.PLL.PLLFRACN = 0;
+  RCC_OscInitStruct.PLL.PLLP = 1;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-      // Use Software Delay for Error Loop too
-      while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+
+  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
+  ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
+  if(ret != HAL_OK)
+  {
+    while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
   }
 
-  HAL_PWREx_EnableOverDrive();
+  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_D1PCLK1 | RCC_CLOCKTYPE_PCLK1 |                                  RCC_CLOCKTYPE_PCLK2  | RCC_CLOCKTYPE_D3PCLK1);
 
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-
-  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
-
-  // PERFORMANCE: Enable Cache and Prefetch
-  __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
-  __HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
-  __HAL_FLASH_DATA_CACHE_ENABLE();
+  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
+  ret = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3);
+  if(ret != HAL_OK)
+  {
+    while(1) { LED_R_On(); Software_Delay(200000); LED_R_Off(); Software_Delay(200000); }
+  }
 }
+
+
 
 void SysTick_Handler(void)
 {

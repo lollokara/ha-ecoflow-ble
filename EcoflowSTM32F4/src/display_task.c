@@ -1,7 +1,7 @@
 #include "display_task.h"
-#include "stm32469i_discovery_lcd.h"
-#include "stm32469i_discovery_ts.h"
-#include "stm32469i_discovery_sdram.h"
+#include "stm32h735g_discovery_lcd.h"
+#include "stm32h735g_discovery_ts.h"
+#include "stm32h735g_discovery.h"
 #include "ui/ui_lvgl.h"
 #include "ui/ui_view_debug.h"
 #include "ui/ui_view_connections.h"
@@ -15,10 +15,10 @@ extern IWDG_HandleTypeDef hiwdg;
 
 void StartDisplayTask(void * argument) {
     // Init Hardware
-    BSP_SDRAM_Init();
+    // // // BSP_SDRAM_Init();
 
     // Init Touch (Hardcoded size to avoid dependency on LCD init state)
-    BSP_TS_Init(800, 480);
+    TS_Init_t ts; ts.Width=480; ts.Height=272; ts.Orientation=0; ts.Accuracy=0; BSP_TS_Init(0, &ts);
 
     printf("Display Task Started\n");
 

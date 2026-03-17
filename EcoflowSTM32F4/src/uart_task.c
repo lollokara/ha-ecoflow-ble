@@ -1,7 +1,7 @@
 #include "uart_task.h"
 #include "ecoflow_protocol.h"
 #include "display_task.h"
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "ui/ui_lvgl.h" // For UI_UpdateConnectionStatus
 #include "log_manager.h"
 #include <string.h>
@@ -119,7 +119,7 @@ static void UART_Init(void) {
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF8_USART6;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART6;
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
     huart6.Instance = USART6;
@@ -157,7 +157,7 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
 
         // Enable Backup Access
         HAL_PWR_EnableBkUpAccess();
-        __HAL_RCC_BKPSRAM_CLK_ENABLE();
+        __HAL_RCC_BKPRAM_CLK_ENABLE();
 
         RTC->BKP0R = 0xDEADBEEF;
 

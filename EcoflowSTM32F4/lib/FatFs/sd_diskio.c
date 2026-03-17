@@ -1,5 +1,5 @@
 #include "sd_diskio.h"
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 #define SD_TIMEOUT 30000 // 30s timeout
 

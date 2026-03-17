@@ -4,7 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "fan_protocol.h"
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 // Initialize Task
 void StartFanTask(void *argument);

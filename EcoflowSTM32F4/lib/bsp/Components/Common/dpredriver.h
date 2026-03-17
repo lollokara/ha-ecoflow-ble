@@ -1,8 +1,9 @@
 /**
   ******************************************************************************
-  * @file    io.h
+  * @file    dpredriver.h
   * @author  MCD Application Team
-  * @brief   This file contains all the functions prototypes for the IO driver.
+  * @brief   This header file contains the functions prototypes for the
+  *          DisplayPort Linear Redriver.
   ******************************************************************************
   * @attention
   *
@@ -18,8 +19,8 @@
   */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef IO_H
-#define IO_H
+#ifndef __DPREDRIVER_H
+#define __DPREDRIVER_H
 
 #ifdef __cplusplus
  extern "C" {
@@ -36,31 +37,43 @@
   * @{
   */
 
-/** @addtogroup IO
+/** @addtogroup DPREDRIVER
   * @{
   */
 
-/** @defgroup IO_Exported_Types IO Exported Types
+/** @defgroup DPREDRIVER_Exported_Types
   * @{
   */
 
-/** @defgroup IO_Driver_structure  IO Driver structure
+/** @defgroup DPREDRIVER_Channel_Identifier  Channel Identifier
+  * @{
+  */
+ typedef enum {
+   CHANNEL_DP0 = 0,
+   CHANNEL_DP1,
+   CHANNEL_DP2,
+   CHANNEL_DP3,
+   CHANNEL_RX1,
+   CHANNEL_RX2,
+   CHANNEL_SSTX
+ } DPREDRIVER_ChannelId_t;
+/**
+  * @}
+  */
+
+ /** @defgroup DPREDRIVER_Driver_structure  DisplayPort Linear Redriver Driver structure
   * @{
   */
 typedef struct
 {
-  int32_t   (*Init      )(void*, void*);
-  int32_t   (*DeInit    )(void*);
-  int32_t   (*ReadID    )(void*, uint32_t*);
-  int32_t   (*Reset     )(void*);
-  int32_t   (*Start     )(void*, uint32_t);
-  int32_t   (*WritePin  )(void*, uint32_t, uint8_t);
-  int32_t   (*ReadPin   )(void*, uint32_t);
-  int32_t   (*EnableIT  )(void*);
-  int32_t   (*DisableIT )(void*);
-  int32_t   (*ITStatus  )(void*, uint32_t);
-  int32_t   (*ClearIT   )(void*, uint32_t);
-}IO_Drv_t;
+  uint32_t  (*Init)(uint16_t);
+  void      (*DeInit)(uint16_t);
+  uint32_t  (*PowerOn)(uint16_t);
+  uint32_t  (*PowerOff)(uint16_t);
+  uint32_t  (*SetEQGain)(uint16_t, DPREDRIVER_ChannelId_t, uint8_t);
+  uint32_t  (*EnableChannel)(uint16_t, DPREDRIVER_ChannelId_t);
+  uint32_t  (*DisableChannel)(uint16_t, DPREDRIVER_ChannelId_t);
+}DPREDRIVER_Drv_t;
 /**
   * @}
   */
@@ -68,6 +81,7 @@ typedef struct
 /**
   * @}
   */
+
 
 /**
   * @}
@@ -85,6 +99,6 @@ typedef struct
 }
 #endif
 
-#endif /* IO_H */
+#endif /* __DPREDRIVER_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

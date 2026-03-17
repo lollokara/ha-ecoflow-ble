@@ -4,7 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "ecoflow_protocol.h"
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 void StartUARTTask(void * argument);
 

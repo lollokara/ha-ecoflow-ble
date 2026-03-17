@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h> // For abs()
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 // External Backlight Control
 extern void SetBacklight(uint8_t percent);

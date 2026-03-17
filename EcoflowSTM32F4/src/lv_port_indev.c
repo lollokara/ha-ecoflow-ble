@@ -1,5 +1,5 @@
 #include "lv_port_indev.h"
-#include "stm32469i_discovery_ts.h"
+#include "stm32h735g_discovery_ts.h"
 #include <stdbool.h>
 #include "ui/ui_lvgl.h"
 
@@ -31,7 +31,7 @@ static void touchpad_init(void)
 {
     // BSP_TS_Init is called in StartDisplayTask
     // Configure Touch Interrupts
-    BSP_TS_ITConfig();
+    // // // BSP_TS_ITConfig();
 }
 
 // Calibration Values
@@ -48,24 +48,24 @@ static int32_t map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, i
 
 static void touchpad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
-    static TS_StateTypeDef  TS_State;
+    static TS_State_t  TS_State;
 
     // Check if interrupt triggered or pin is active (Low)
     if (touch_irq_triggered || HAL_GPIO_ReadPin(TS_INT_GPIO_PORT, TS_INT_PIN) == GPIO_PIN_RESET) {
         touch_irq_triggered = false;
-        BSP_TS_GetState(&TS_State);
+        BSP_TS_GetState(0, &TS_State);
     } else {
-        TS_State.touchDetected = 0;
+        TS_State.TouchDetected = 0;
     }
 
-    if(TS_State.touchDetected) {
+    if(TS_State.TouchDetected) {
         // Reset Idle Timer on any physical touch detection
         UI_ResetIdleTimer();
 
         data->state = LV_INDEV_STATE_PR;
 
-        int16_t x_raw = TS_State.touchX[0];
-        int16_t y_raw = TS_State.touchY[0];
+        int16_t x_raw = TS_State.TouchX;
+        int16_t y_raw = TS_State.TouchY;
 
         // Calibration
         int32_t x_cal = map(x_raw, 11, 799, 0, 800);

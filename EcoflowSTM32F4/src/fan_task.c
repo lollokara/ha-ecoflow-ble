@@ -1,5 +1,5 @@
 #include "fan_task.h"
-#include "stm32f4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include <string.h>
 #include <stdio.h>
 #include "semphr.h"
@@ -209,7 +209,7 @@ void StartFanTask(void *argument) {
 }
 
 // --- IRQ Handlers ---
-// UART4_IRQHandler is moved to stm32f4xx_it.c
+// UART4_IRQHandler is moved to stm32h7xx_it.c
 
 void Fan_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == UART4) {

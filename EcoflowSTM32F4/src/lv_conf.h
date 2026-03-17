@@ -29,7 +29,7 @@
  * FEATURE CONFIGURATION
  *=======================*/
 #define LV_USE_GPU_STM32_DMA2D 1
-#define LV_GPU_DMA2D_CMSIS_INCLUDE "stm32f4xx.h"
+#define LV_GPU_DMA2D_CMSIS_INCLUDE "stm32h7xx.h"
 
 #define LV_USE_LOG 1
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
