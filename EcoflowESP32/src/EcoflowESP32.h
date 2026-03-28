@@ -72,7 +72,7 @@ class EcoflowClientCallback : public NimBLEClientCallbacks {
 public:
     EcoflowClientCallback(class EcoflowESP32* instance);
     void onConnect(NimBLEClient* pClient) override;
-    void onDisconnect(NimBLEClient* pClient) override;
+    void onDisconnect(NimBLEClient* pClient, int reason) override;
 private:
     class EcoflowESP32* _instance;
 };

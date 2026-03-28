@@ -425,12 +425,12 @@ void DeviceManager::startScan(DeviceType type) {
 
     if (!pScan) {
         pScan = NimBLEDevice::getScan();
-        pScan->setAdvertisedDeviceCallbacks(new ManagerScanCallbacks(this), true);
+        pScan->setScanCallbacks(new ManagerScanCallbacks(this), true);
         pScan->setActiveScan(true);
         pScan->setInterval(100);
         pScan->setWindow(99);
     }
-    pScan->start(0, nullptr, false); // Non-blocking scan
+    pScan->start(0, false); // Non-blocking scan
 }
 
 void DeviceManager::stopScan() {
@@ -443,7 +443,7 @@ void DeviceManager::stopScan() {
     }
 }
 
-void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+void DeviceManager::ManagerScanCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     if (_parent->isScanning()) {
         _parent->onDeviceFound(advertisedDevice);
     }
@@ -453,7 +453,7 @@ void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* adver
  * @brief Callback function that is executed when a BLE device is found during a scan.
  * It checks if the found device matches a configured device and flags it for connection.
  */
-void DeviceManager::onDeviceFound(NimBLEAdvertisedDevice* device) {
+void DeviceManager::onDeviceFound(const NimBLEAdvertisedDevice* device) {
     if (_hasPendingConnection) return; // Already found a device, ignore others
 
     if (xSemaphoreTake(_scanMutex, 100 / portTICK_PERIOD_MS) == pdTRUE) {
