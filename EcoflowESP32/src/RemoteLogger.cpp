@@ -51,7 +51,8 @@ static int remote_vprintf(const char *fmt, va_list args) {
         }
     }
 
-    if (old_vprintf) return old_vprintf(fmt, args);
+    // Disable local UART echo to prevent interference with GPIO 1 (Light Sensor)
+    // if (old_vprintf) return old_vprintf(fmt, args);
     return len;
 }
 

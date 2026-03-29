@@ -341,6 +341,11 @@ void LogManager_HandleListReq(void) {
             xSemaphoreTake(LogMutex, portMAX_DELAY);
             f_closedir(&dir);
             xSemaphoreGive(LogMutex);
+        } else {
+             // Failed to re-open directory (should be rare)
+             // Send empty list to stop ESP32 from waiting
+             int len = pack_log_list_resp_message(buffer, 0, 0, 0, "");
+             UART_SendRaw(buffer, len);
         }
     }
 }
