@@ -44,7 +44,7 @@
     },
     {
       "path": "AGENTS.md",
-      "size": 8784,
+      "size": 8813,
       "lang": "markdown",
       "summary": "Markdown file with 67 lines. Provides configuration, documentation or supporting data for the repository.",
       "modified": "2026-03-10"
@@ -54,6 +54,27 @@
       "size": 17635,
       "lang": "python",
       "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to verify_ota_ui module.",
+      "modified": "2026-03-10"
+    },
+    {
+      "path": "shared_libs/EcoFlowComm/library.json",
+      "size": 303,
+      "lang": "json",
+      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-03-10"
+    },
+    {
+      "path": "shared_libs/EcoFlowComm/ecoflow_protocol.h",
+      "size": 13167,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
+      "modified": "2026-03-10"
+    },
+    {
+      "path": "shared_libs/EcoFlowComm/ecoflow_protocol.c",
+      "size": 15663,
+      "lang": "c",
+      "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
       "modified": "2026-03-10"
     },
     {
@@ -170,9 +191,9 @@
     },
     {
       "path": "EcoflowSTM32F4/platformio.ini",
-      "size": 448,
+      "size": 480,
       "lang": "unknown",
-      "summary": "Unknown file with 18 lines. Provides configuration, documentation or supporting data for the repository.",
+      "summary": "Unknown file with 19 lines. Provides configuration, documentation or supporting data for the repository.",
       "modified": "2026-03-10"
     },
     {
@@ -995,27 +1016,6 @@
       "modified": "2026-03-10"
     },
     {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/library.json",
-      "size": 303,
-      "lang": "json",
-      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-03-10"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.h",
-      "size": 13166,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-03-10"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.c",
-      "size": 15663,
-      "lang": "c",
-      "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-03-10"
-    },
-    {
       "path": "EcoflowSTM32F4/src/lv_port_disp.c",
       "size": 4867,
       "lang": "c",
@@ -1297,9 +1297,9 @@
     },
     {
       "path": "EcoflowESP32/platformio.ini",
-      "size": 724,
+      "size": 756,
       "lang": "unknown",
-      "summary": "Unknown file with 26 lines. Provides configuration, documentation or supporting data for the repository.",
+      "summary": "Unknown file with 27 lines. Provides configuration, documentation or supporting data for the repository.",
       "modified": "2026-03-10"
     },
     {
@@ -1314,27 +1314,6 @@
       "size": 64,
       "lang": "unknown",
       "summary": "Unknown file with 2 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-03-10"
-    },
-    {
-      "path": "EcoflowESP32/lib/EcoFlowComm/library.json",
-      "size": 303,
-      "lang": "json",
-      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-03-10"
-    },
-    {
-      "path": "EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.h",
-      "size": 13167,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-03-10"
-    },
-    {
-      "path": "EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.c",
-      "size": 15663,
-      "lang": "c",
-      "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
       "modified": "2026-03-10"
     },
     {
@@ -1661,28 +1640,28 @@
     }
   ],
   "stats": {
-    "total_files": 237,
+    "total_files": 234,
     "langs": {
       "python": 14,
       "unknown": 16,
       "markdown": 17,
+      "json": 2,
+      "c": 168,
       "cpp": 15,
-      "c": 170,
-      "json": 3,
       "html": 1,
       "css": 1
     },
     "top_dirs": [
-      "EcoflowSTM32F4/lib/bsp/Components/s25fl512s",
-      "Test Scripts",
-      "EcoflowSTM32F4/lib/bsp/Components/ov5640",
-      "EcoflowSTM32F4/lib/bsp/Components/wm8994",
+      "EcoflowSTM32F4/src/ui",
+      "EcoflowRP2040",
+      ".",
       "EcoflowSTM32F4",
-      "EcoflowSTM32F4_Bootloader",
-      "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152",
-      "EcoflowSTM32F4/lib/bsp/Components/lsm303agr",
+      "EcoflowSTM32F4/lib/bsp/Components/nt35510",
+      "EcoflowSTM32F4/lib/bsp/Components/s5k5cag",
+      "Test Scripts/tools",
       "EcoflowSTM32F4/lib/bsp",
-      "EcoflowSTM32F4/lib/bsp/Components/ampire480272"
+      "EcoflowSTM32F4/lib/bsp/Components/ov5640",
+      "EcoflowSTM32F4/lib/bsp/Components/l3gd20"
     ]
   }
 }

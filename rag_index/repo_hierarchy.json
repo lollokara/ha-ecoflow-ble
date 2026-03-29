@@ -19,6 +19,23 @@
       ],
       "subdirs": {}
     },
+    "shared_libs": {
+      "dir": "shared_libs",
+      "summary": "Directory shared_libs",
+      "files": [],
+      "subdirs": {
+        "EcoFlowComm": {
+          "dir": "EcoFlowComm",
+          "summary": "Directory EcoFlowComm",
+          "files": [
+            "library.json",
+            "ecoflow_protocol.h",
+            "ecoflow_protocol.c"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
     "docs": {
       "dir": "docs",
       "summary": "Directory docs",
@@ -518,16 +535,6 @@
                   "subdirs": {}
                 }
               }
-            },
-            "EcoFlowComm": {
-              "dir": "EcoFlowComm",
-              "summary": "Directory EcoFlowComm",
-              "files": [
-                "library.json",
-                "ecoflow_protocol.h",
-                "ecoflow_protocol.c"
-              ],
-              "subdirs": {}
             }
           }
         },
@@ -597,23 +604,6 @@
         "sdkconfig.defaults"
       ],
       "subdirs": {
-        "lib": {
-          "dir": "lib",
-          "summary": "Directory lib",
-          "files": [],
-          "subdirs": {
-            "EcoFlowComm": {
-              "dir": "EcoFlowComm",
-              "summary": "Directory EcoFlowComm",
-              "files": [
-                "library.json",
-                "ecoflow_protocol.h",
-                "ecoflow_protocol.c"
-              ],
-              "subdirs": {}
-            }
-          }
-        },
         "src": {
           "dir": "src",
           "summary": "Directory src",
