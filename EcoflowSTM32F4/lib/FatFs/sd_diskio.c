@@ -35,7 +35,10 @@ static DSTATUS SD_check_status(BYTE lun)
 
 static DSTATUS SD_initialize(BYTE lun)
 {
-  // We assume HAL_SD_Init is called in main.c
+  if (hsd.State == HAL_SD_STATE_RESET) {
+      // Re-init if needed, but usually done in main.c
+      // We assume main.c handles MSP and HAL_SD_Init
+  }
   return SD_check_status(lun);
 }
 
@@ -49,7 +52,10 @@ static DRESULT SD_read(BYTE lun, BYTE *buff, LBA_t sector, UINT count)
   DRESULT res = RES_ERROR;
   if (HAL_SD_ReadBlocks(&hsd, (uint8_t*)buff, sector, count, SD_TIMEOUT) == HAL_OK)
   {
-    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {}
+    uint32_t tickstart = HAL_GetTick();
+    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {
+        if ((HAL_GetTick() - tickstart) > SD_TIMEOUT) return RES_ERROR;
+    }
     res = RES_OK;
   }
   return res;
@@ -60,7 +66,10 @@ static DRESULT SD_write(BYTE lun, const BYTE *buff, LBA_t sector, UINT count)
   DRESULT res = RES_ERROR;
   if (HAL_SD_WriteBlocks(&hsd, (uint8_t*)buff, sector, count, SD_TIMEOUT) == HAL_OK)
   {
-    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {}
+    uint32_t tickstart = HAL_GetTick();
+    while (HAL_SD_GetCardState(&hsd) != HAL_SD_CARD_TRANSFER) {
+         if ((HAL_GetTick() - tickstart) > SD_TIMEOUT) return RES_ERROR;
+    }
     res = RES_OK;
   }
   return res;

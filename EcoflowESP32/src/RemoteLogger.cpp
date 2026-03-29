@@ -8,46 +8,24 @@
 static vprintf_like_t old_vprintf;
 
 static int remote_vprintf(const char *fmt, va_list args) {
-    char buf[256];
+    char buf[512]; // Increased buffer
     int len = vsnprintf(buf, sizeof(buf), fmt, args);
     if (len > 0) {
-        // ESP-IDF log format usually starts with color code or 'E'/'W'
-        // Simple check for Error/Warning markers
-        // Standard format: "E (123) TAG: Message"
-        // Note: colors might be present.
+        // Strip ANSI Color Codes if present (basic simplistic strip)
+        // Usually \033[0;31mE (123) ...
+        char* start = buf;
+        if (buf[0] == 0x1B) { // ESC
+             char* m = strchr(buf, 'm');
+             if (m) start = m + 1;
+        }
 
-        uint8_t level = ESP_LOG_INFO;
-        bool interesting = false;
+        // We want to capture EVERYTHING according to user request
+        // "even if that means to replace all esp_log calls to a custom function that reroutes the logs to both the ESP_Log and F4"
+        // But we should avoid sending Stm32Serial logs to avoid recursion loops if Stm32Serial logs about sending.
+        // Stm32Serial logs usually use TAG "Stm32Serial".
 
-        if (strstr(buf, "E (")) { level = ESP_LOG_ERROR; interesting = true; }
-        else if (strstr(buf, "W (")) { level = ESP_LOG_WARN; interesting = true; }
-
-        // Also capture our specific "Dump" tags regardless of level if they don't match E/W
-        // but `EcoflowDataParser` uses `ESP_LOGI`.
-        // So we should look for specific tags too.
-
-        bool isDump = strstr(buf, "EcoflowDataParser") != NULL;
-
-        if (interesting || isDump) {
-             // Extract Tag and Message
-             char* closeParen = strchr(buf, ')');
-             if (closeParen) {
-                 char* colon = strchr(closeParen, ':');
-                 if (colon) {
-                     char tag[32];
-                     int tagLen = colon - (closeParen + 2);
-                     if (tagLen > 31) tagLen = 31;
-                     if (tagLen > 0) {
-                         strncpy(tag, closeParen + 2, tagLen);
-                         tag[tagLen] = 0;
-
-                         // Avoid recursion
-                         if (strcmp(tag, "Stm32Serial") != 0) {
-                             Stm32Serial::getInstance().sendEspLog(level, tag, colon + 2);
-                         }
-                     }
-                 }
-             }
+        if (!strstr(start, "Stm32Serial")) {
+             Stm32Serial::getInstance().sendEspLog(start);
         }
     }
 

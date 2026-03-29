@@ -178,34 +178,34 @@ static void process_packet(uint8_t *packet, uint16_t total_len) {
             LogManager_HandleDeleteReq(name);
         }
     }
-    else if (cmd == CMD_LOG_MANAGER_OP) {
+    else if (cmd == CMD_LOG_OP) {
         uint8_t op;
         if (unpack_log_manager_op_message(packet, &op) == 0) {
             LogManager_HandleManagerOp(op);
         }
     }
-    else if (cmd == CMD_ESP_LOG_DATA) {
-        // [Level:1][TagLen:1][Tag][Msg]
-        // Manual unpack since implementation was custom
-        uint8_t payload_len = packet[2];
-        if (payload_len >= 2) {
-            uint8_t level = packet[3];
-            uint8_t tagLen = packet[4];
-            if (payload_len >= 2 + tagLen) {
-                char tag[32];
-                if (tagLen > 31) tagLen = 31;
-                memcpy(tag, &packet[5], tagLen);
-                tag[tagLen] = 0;
-
-                int msgLen = payload_len - (2 + tagLen);
-                if (msgLen > 0) {
-                    char msg[256];
-                    if (msgLen > 255) msgLen = 255;
-                    memcpy(msg, &packet[5+packet[4]], msgLen); // packet[4] is actual tagLen in packet
-                    msg[msgLen] = 0;
-                    LogManager_HandleEspLog(level, tag, msg);
-                }
-            }
+    else if (cmd == CMD_LOG_MSG) {
+        // ESP Log Message: Payload is direct string
+        char msg[256];
+        uint8_t len = packet[2]; // Payload Len
+        if (len > 0) {
+            if (len > 255) len = 255;
+            memcpy(msg, &packet[3], len);
+            msg[len] = 0;
+            LogManager_HandleEspLog(msg);
+        }
+    }
+    else if (cmd == CMD_DEBUG_DUMP_RESP) {
+        // Payload is direct string dump of a section
+        char msg[256];
+        uint8_t len = packet[2];
+        if (len > 0) {
+            if (len > 255) len = 255;
+            memcpy(msg, &packet[3], len);
+            msg[len] = 0;
+            // Write directly to file without timestamp/formatting as it is a block dump
+            // But we use LogManager_HandleEspLog which just writes raw string now
+            LogManager_HandleEspLog(msg);
         }
     }
     // ... Normal Commands ...

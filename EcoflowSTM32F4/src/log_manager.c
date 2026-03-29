@@ -62,9 +62,9 @@ void LogManager_ForceRotate(void) {
         LogOpen = true;
 
         // Header Section 1
-        LogManager_Write(0, "SYS", "--- Firmware Versions ---");
-        LogManager_Write(0, "SYS", "STM32 F4: v1.0.0"); // TODO: Get real version
-        LogManager_Write(0, "SYS", "ESP32: v1.0.0");     // TODO: Get real version
+        LogManager_Write(__FILE__, __FUNCTION__, "--- Firmware Versions ---");
+        LogManager_Write(__FILE__, __FUNCTION__, "STM32 F4: v1.0.0"); // TODO: Get real version
+        LogManager_Write(__FILE__, __FUNCTION__, "ESP32: v1.0.0");     // TODO: Get real version
 
         // Request Section 2 & 3
         uint8_t buf[32];
@@ -78,7 +78,7 @@ void LogManager_ForceRotate(void) {
     }
 }
 
-void LogManager_Write(uint8_t level, const char* tag, const char* message) {
+void LogManager_Write(const char* file, const char* func, const char* message, ...) {
     if (!LogOpen) return;
 
     // Check size
@@ -86,15 +86,30 @@ void LogManager_Write(uint8_t level, const char* tag, const char* message) {
         LogManager_ForceRotate();
     }
 
-    // Format: [Timestamp] [Tag] Message\n
+    // Format: [Timestamp] [File] Function() Message\n
+    // Note: message itself may contain formatting
+    char body[256];
+    va_list args;
+    va_start(args, message);
+    vsnprintf(body, sizeof(body), message, args);
+    va_end(args);
+
     char line[512];
     uint32_t time = xTaskGetTickCount();
-    // [millis] [Tag] Message
-    snprintf(line, sizeof(line), "[%lu] [%s] %s\n", time, tag, message);
+
+    // Extract filename from path if needed, but __FILE__ usually full path
+    // We just use it as is or basename. Let's keep it simple.
+    const char* filename = file;
+    const char* p = strrchr(file, '/');
+    if (p) filename = p + 1;
+    p = strrchr(filename, '\\');
+    if (p) filename = p + 1;
+
+    snprintf(line, sizeof(line), "[%lu] [%s] %s() %s\n", time, filename, func, body);
 
     UINT bw;
     f_write(&LogFile, line, strlen(line), &bw);
-    f_sync(&LogFile); // Sync frequently or rely on periodic sync? Sync is safer but slower.
+    f_sync(&LogFile);
 }
 
 void LogManager_Process(void) {
@@ -116,7 +131,7 @@ void LogManager_Process(void) {
                 // End of file
                 Downloading = false;
                 f_close(&DownloadFile);
-                // Send empty chunk
+                // Send empty chunk to signal EOF
                 uint8_t packet[32];
                 int len = pack_log_data_chunk_message(packet, DownloadOffset, NULL, 0);
                 UART_SendRaw(packet, len);
@@ -135,6 +150,7 @@ void LogManager_HandleListReq(void) {
     uint8_t buffer[256];
     uint8_t count = 0;
 
+    // First pass: count files
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
@@ -144,13 +160,14 @@ void LogManager_HandleListReq(void) {
         f_closedir(&dir);
     }
 
+    // Second pass: send details
     uint8_t idx = 0;
     if (f_opendir(&dir, "/") == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
              if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
                  int len = pack_log_list_resp_message(buffer, count, idx, fno.fsize, fno.fname);
                  UART_SendRaw(buffer, len);
-                 vTaskDelay(5); // Throttle
+                 vTaskDelay(5); // Throttle to prevent UART buffer overflow
                  idx++;
              }
         }
@@ -193,6 +210,10 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
             f_closedir(&dir);
         }
     } else if (op_code == LOG_OP_FORMAT_SD) {
+        if (LogOpen) {
+            f_close(&LogFile);
+            LogOpen = false;
+        }
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
         f_mkfs(SDPath, &opt, work, sizeof(work));
@@ -201,8 +222,14 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
     }
 }
 
-void LogManager_HandleEspLog(uint8_t level, const char* tag, const char* message) {
-    LogManager_Write(level, tag, message);
+void LogManager_HandleEspLog(const char* message) {
+    // ESP logs come as full strings via UART
+    if (!LogOpen) return;
+    if (f_size(&LogFile) > MAX_LOG_SIZE) LogManager_ForceRotate();
+
+    UINT bw;
+    f_write(&LogFile, message, strlen(message), &bw);
+    f_sync(&LogFile);
 }
 
 uint32_t LogManager_GetTotalSpace(void) {
@@ -210,7 +237,7 @@ uint32_t LogManager_GetTotalSpace(void) {
     DWORD fre_clust, tot_sect;
     if (f_getfree(SDPath, &fre_clust, &fs) == FR_OK) {
         tot_sect = (fs->n_fatent - 2) * fs->csize;
-        return tot_sect / 2;
+        return tot_sect / 2; // Sectors are 512b, so /2 = KB
     }
     return 0;
 }
@@ -220,7 +247,22 @@ uint32_t LogManager_GetFreeSpace(void) {
     DWORD fre_clust, fre_sect;
     if (f_getfree(SDPath, &fre_clust, &fs) == FR_OK) {
         fre_sect = fre_clust * fs->csize;
-        return fre_sect / 2;
+        return fre_sect / 2; // KB
     }
     return 0;
+}
+
+uint32_t LogManager_GetFileCount(void) {
+    DIR dir;
+    FILINFO fno;
+    uint32_t count = 0;
+    if (f_opendir(&dir, "/") == FR_OK) {
+        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+             if (strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) {
+                 count++;
+             }
+        }
+        f_closedir(&dir);
+    }
+    return count;
 }

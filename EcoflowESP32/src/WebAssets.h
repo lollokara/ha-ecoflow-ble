@@ -1037,26 +1037,35 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                 list.innerHTML = '<div style="text-align:center; color:#555;">No logs found</div>';
                 return;
             }
-            data.forEach(file => {
-                let name = file;
-                let display = file;
-                if (file.includes(' (')) {
-                    name = file.split(' (')[0];
-                }
+            data.forEach(item => {
+                const name = item.name;
+                const size = (item.size / 1024).toFixed(1) + ' KB';
 
                 const div = document.createElement('div');
                 div.className = 'ctrl-row';
                 div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
                 div.style.padding = '8px 0';
                 div.innerHTML = `
-                    <span style="font-family:monospace; font-size:0.9em;">${display}</span>
-                    <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-family:monospace; font-size:0.9em;">${name}</span>
+                        <span style="font-size:0.7em; color:var(--text-sub);">${size}</span>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <a href="${API}/sd_logs/download?name=${name}" target="_blank" class="btn" style="padding:4px 10px; font-size:0.8em; text-decoration:none; background:rgba(0,255,157,0.1); color:var(--neon-green); border:1px solid var(--neon-green);">Download</a>
+                        <button class="btn" onclick="deleteSdLog('${name}')" style="padding:4px 10px; font-size:0.8em; background:rgba(255,50,50,0.1); color:var(--neon-pink); border:1px solid var(--neon-pink);">X</button>
+                    </div>
                 `;
                 list.appendChild(div);
             });
         }).catch(e => {
             el('sd-log-list').innerHTML = '<div style="text-align:center; color:var(--neon-pink);">Error loading list</div>';
         });
+    }
+
+    function deleteSdLog(name) {
+        if(!confirm('Delete ' + name + '?')) return;
+        fetch(API + '/sd_logs?name=' + name, { method: 'DELETE' })
+        .then(() => fetchSdLogs());
     }
 
     setInterval(update, 1000);

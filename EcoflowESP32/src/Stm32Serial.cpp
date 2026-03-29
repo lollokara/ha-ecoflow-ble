@@ -13,6 +13,7 @@
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
 #include <vector>
+#include <algorithm> // Required for std::min
 
 // Hardware Serial pin definition
 #define RX_PIN 18
@@ -30,15 +31,6 @@ extern String ota_msg;
 // Variables for OTA
 static volatile bool otaAckReceived = false;
 static volatile bool otaNackReceived = false;
-
-// Log Globals
-static std::vector<String> _cachedLogList;
-static bool _logListReady = false;
-static SemaphoreHandle_t _logListMutex = NULL;
-
-static std::vector<uint8_t> _downloadBuffer;
-static bool _downloadComplete = false;
-static SemaphoreHandle_t _downloadMutex = NULL;
 
 // CRC32 Table
 static const uint32_t crc32_table[] = {
@@ -104,12 +96,20 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
     }
 }
 
-void Stm32Serial::sendEspLog(uint8_t level, const char* tag, const char* msg) {
+void Stm32Serial::sendEspLog(const char* msg) {
     if (_txMutex != NULL) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            uint8_t buf[256];
-            int len = pack_esp_log_message(buf, level, tag, msg);
-            Serial1.write(buf, len);
+            uint8_t buf[512];
+            size_t msgLen = strlen(msg);
+            if (msgLen > 255) msgLen = 255;
+
+            buf[0] = START_BYTE;
+            buf[1] = CMD_LOG_MSG;
+            buf[2] = (uint8_t)msgLen;
+            memcpy(&buf[3], msg, msgLen);
+            buf[3 + msgLen] = calculate_crc8(&buf[1], 2 + msgLen);
+
+            Serial1.write(buf, 4 + msgLen);
             xSemaphoreGive(_txMutex);
         }
     }
@@ -278,12 +278,12 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
     } else if (cmd == CMD_GET_FULL_CONFIG) {
-        sendEspLog(ESP_LOG_INFO, "CFG", "--- ESP32 Config ---");
+        sendEspLog("--- ESP32 Config ---");
         char buf[64];
         snprintf(buf, sizeof(buf), "MAC: %s", WiFi.macAddress().c_str());
-        sendEspLog(ESP_LOG_INFO, "CFG", buf);
+        sendEspLog(buf);
         snprintf(buf, sizeof(buf), "IP: %s", WiFi.localIP().toString().c_str());
-        sendEspLog(ESP_LOG_INFO, "CFG", buf);
+        sendEspLog(buf);
     } else if (cmd == CMD_GET_DEBUG_DUMP) {
         EcoflowDataParser::triggerDebugDump();
     } else if (cmd == CMD_LOG_LIST_RESP) {
@@ -295,7 +295,7 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             xSemaphoreTake(_logListMutex, portMAX_DELAY);
             if (idx == 0) _cachedLogList.clear();
             if (total > 0 && name[0]) {
-                _cachedLogList.push_back(String(name));
+                _cachedLogList.push_back({String(name), size});
             }
             if (idx == total - 1 || total == 0) {
                 _logListReady = true;
@@ -304,8 +304,11 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         }
     } else if (cmd == CMD_LOG_DATA_CHUNK) {
         if (len >= 9) {
+            uint32_t offset; // not used currently, we stream
             uint16_t dataLen;
+            memcpy(&offset, &rx_buf[3], 4);
             memcpy(&dataLen, &rx_buf[7], 2);
+
             if (!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
             xSemaphoreTake(_downloadMutex, portMAX_DELAY);
             if (dataLen > 0) {
@@ -481,15 +484,21 @@ void Stm32Serial::requestLogList() {
     sendData(buf, l);
 }
 
-std::vector<String> Stm32Serial::getLogList() {
+std::vector<LogFileEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
     while(!_logListReady && millis() - start < 5000) {
         vTaskDelay(10);
     }
     xSemaphoreTake(_logListMutex, portMAX_DELAY);
-    std::vector<String> copy = _cachedLogList;
+    std::vector<LogFileEntry> copy = _cachedLogList;
     xSemaphoreGive(_logListMutex);
     return copy;
+}
+
+void Stm32Serial::deleteLogFile(const String& filename) {
+    uint8_t buf[64];
+    int len = pack_log_delete_req_message(buf, filename.c_str());
+    sendData(buf, len);
 }
 
 void Stm32Serial::startLogDownload(const String& name) {
@@ -527,7 +536,7 @@ bool Stm32Serial::isLogDownloadComplete() {
 }
 
 void Stm32Serial::abortLogDownload() {
-    // Placeholder
+    // Placeholder - could send cancel command to STM32
 }
 
 static String otaFilename;
