@@ -877,23 +877,24 @@ void HAL_OSPI_MspInit(OSPI_HandleTypeDef* ospiHandle)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOE_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
 
-    /**OCTOSPI1 GPIO Configuration
+    /**OCTOSPI1 GPIO Configuration for STM32H735G-DK (MX25LM51245G)
     PB2     ------> OCTOSPIM_P1_DQS
-    PD11     ------> OCTOSPIM_P1_IO0
-    PD12     ------> OCTOSPIM_P1_IO1
+    PF10    ------> OCTOSPIM_P1_CLK
+    PG6     ------> OCTOSPIM_P1_NCS
+    PD11    ------> OCTOSPIM_P1_IO0
+    PD12    ------> OCTOSPIM_P1_IO1
     PE2     ------> OCTOSPIM_P1_IO2
-    PD13     ------> OCTOSPIM_P1_IO3
-    PC1     ------> OCTOSPIM_P1_IO4
-    PC2     ------> OCTOSPIM_P1_IO5
-    PC3     ------> OCTOSPIM_P1_IO6
-    PC0     ------> OCTOSPIM_P1_IO7
-    PB2     ------> OCTOSPIM_P1_CLK
-    PC11     ------> OCTOSPIM_P1_NCS
+    PD13    ------> OCTOSPIM_P1_IO3
+    PD4     ------> OCTOSPIM_P1_IO4
+    PD5     ------> OCTOSPIM_P1_IO5
+    PG9     ------> OCTOSPIM_P1_IO6
+    PD7     ------> OCTOSPIM_P1_IO7
     */
 
-    /* DQS */
+    /* DQS (PB2) */
     GPIO_InitStruct.Pin = GPIO_PIN_2;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -901,23 +902,23 @@ void HAL_OSPI_MspInit(OSPI_HandleTypeDef* ospiHandle)
     GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* CLK */
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    /* CLK (PF10) */
+    GPIO_InitStruct.Pin = GPIO_PIN_10;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
-    /* NCS */
-    GPIO_InitStruct.Pin = GPIO_PIN_11;
+    /* NCS (PG6) */
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-    /* IO0, IO1, IO3 */
+    /* IO0, IO1, IO3 (PD11, PD12, PD13) */
     GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -925,7 +926,7 @@ void HAL_OSPI_MspInit(OSPI_HandleTypeDef* ospiHandle)
     GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-    /* IO2 */
+    /* IO2 (PE2) */
     GPIO_InitStruct.Pin = GPIO_PIN_2;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -933,13 +934,21 @@ void HAL_OSPI_MspInit(OSPI_HandleTypeDef* ospiHandle)
     GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-    /* IO4, IO5, IO6, IO7 */
-    GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_0;
+    /* IO4, IO5, IO7 (PD4, PD5, PD7) */
+    GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF10_OCTOSPIM_P1;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* IO6 (PG9) */
+    GPIO_InitStruct.Pin = GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_OCTOSPIM_P1;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
   }
 }
 
