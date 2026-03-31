@@ -38,7 +38,7 @@ TIM_HandleTypeDef htim2;
 IWDG_HandleTypeDef hiwdg;
 SD_HandleTypeDef hsd;
 FATFS SDFatFs;
-char SDPath[4];
+char SDPath[4] = {0};
 
 QueueHandle_t displayQueue; // Global queue for UI events
 
