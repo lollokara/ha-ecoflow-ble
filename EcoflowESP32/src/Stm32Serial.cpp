@@ -9,6 +9,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include "EcoflowDataParser.h"
+#include "Logging.h"
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
@@ -278,12 +279,39 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
     } else if (cmd == CMD_GET_FULL_CONFIG) {
-        sendEspLog(ESP_LOG_INFO, "CFG", "--- ESP32 Config ---");
-        char buf[64];
-        snprintf(buf, sizeof(buf), "MAC: %s", WiFi.macAddress().c_str());
-        sendEspLog(ESP_LOG_INFO, "CFG", buf);
-        snprintf(buf, sizeof(buf), "IP: %s", WiFi.localIP().toString().c_str());
-        sendEspLog(ESP_LOG_INFO, "CFG", buf);
+        LOG_STM_I("SYS", "ESP32: v1.0.0"); // Section 1 Completion
+        LOG_STM_I("SYS", "--- Section 2: Configuration & Devices ---");
+
+        char buf[128];
+
+        // Config
+        Preferences prefs;
+        prefs.begin("ecoflow", true);
+        String ssid = prefs.getString("wifi_ssid", "");
+        prefs.end();
+
+        LOG_STM_I("SYS", "WiFi SSID: %s", ssid.c_str());
+        LOG_STM_I("SYS", "MAC: %s", WiFi.macAddress().c_str());
+        LOG_STM_I("SYS", "IP: %s", WiFi.localIP().toString().c_str());
+        LOG_STM_I("SYS", "Light Sens: Min=%d Max=%d", LightSensor::getInstance().getMin(), LightSensor::getInstance().getMax());
+
+        // Connected Devices
+        DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
+        for(int i=0; i<4; i++) {
+             DeviceSlot* s = DeviceManager::getInstance().getSlot(types[i]);
+             if(s) {
+                 LOG_STM_I("SYS", "Dev: %s (Type: %d)", s->name.c_str(), (int)s->type);
+                 if (s->serialNumber.length() > 0) {
+                     LOG_STM_I("SYS", "  SN: %s", s->serialNumber.c_str());
+                 }
+                 if (!s->macAddress.empty()) {
+                     LOG_STM_I("SYS", "  MAC: %02X:%02X:%02X:%02X:%02X:%02X",
+                        s->macAddress[0], s->macAddress[1], s->macAddress[2],
+                        s->macAddress[3], s->macAddress[4], s->macAddress[5]);
+                 }
+                 LOG_STM_I("SYS", "  Connected: %d", s->isConnected);
+             }
+        }
     } else if (cmd == CMD_GET_DEBUG_DUMP) {
         EcoflowDataParser::triggerDebugDump();
     } else if (cmd == CMD_LOG_LIST_RESP) {
@@ -483,7 +511,7 @@ void Stm32Serial::requestLogList() {
 
 std::vector<Stm32Serial::LogEntry> Stm32Serial::getLogList() {
     uint32_t start = millis();
-    while(!_logListReady && millis() - start < 5000) {
+    while(!_logListReady && millis() - start < 10000) {
         vTaskDelay(10);
     }
     xSemaphoreTake(_logListMutex, portMAX_DELAY);
