@@ -117,10 +117,14 @@ void WebServer::setupRoutes() {
     // SD Logs
     server.on("/api/sd_logs", HTTP_GET, [](AsyncWebServerRequest *request){
         Stm32Serial::getInstance().requestLogList();
-        std::vector<String> logs = Stm32Serial::getInstance().getLogList();
+        std::vector<Stm32Serial::LogEntry> logs = Stm32Serial::getInstance().getLogList();
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonArray root = response->getRoot();
-        for(const String& log : logs) root.add(log);
+        for(const auto& log : logs) {
+            JsonObject obj = root.createNestedObject();
+            obj["name"] = log.name;
+            obj["size"] = log.size;
+        }
         response->setLength();
         request->send(response);
     });
@@ -134,6 +138,16 @@ void WebServer::setupRoutes() {
         AsyncWebServerResponse *response = new LogResponse(name);
         response->addHeader("Content-Disposition", "attachment; filename=" + name);
         request->send(response);
+    });
+
+    server.on("/api/sd_logs/delete", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!request->hasParam("name", true)) { // POST param
+            request->send(400, "text/plain", "Missing name");
+            return;
+        }
+        String name = request->getParam("name", true)->value();
+        Stm32Serial::getInstance().deleteLog(name);
+        request->send(200, "text/plain", "OK");
     });
 
     server.on("/api/settings", HTTP_GET, handleSettings);

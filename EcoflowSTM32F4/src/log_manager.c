@@ -24,7 +24,29 @@ static uint32_t DownloadOffset = 0;
 static uint32_t DownloadSize = 0;
 
 void LogManager_Init(void) {
-    // Mount is done in main.c
+    // Mount Filesystem
+    FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+    if (res == FR_NO_FILESYSTEM) {
+        printf("No Filesystem. Formatting...\n");
+        BYTE work[FF_MAX_SS];
+        MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
+        FRESULT fmt_res = f_mkfs(SDPath, &opt, work, sizeof(work));
+        if (fmt_res == FR_OK) {
+            printf("Format Success. Remounting...\n");
+            FRESULT remount_res = f_mount(&SDFatFs, SDPath, 1);
+            if (remount_res != FR_OK) {
+                printf("Remount Failed: %d\n", remount_res);
+                return;
+            }
+        } else {
+            printf("Format Failed: %d\n", fmt_res);
+            return;
+        }
+    } else if (res != FR_OK) {
+        printf("FatFs Mount Failed: %d\n", res);
+        return;
+    }
+
     // Open current log
     if (f_open(&LogFile, LOG_FILENAME, FA_OPEN_ALWAYS | FA_WRITE | FA_READ) == FR_OK) {
         f_lseek(&LogFile, f_size(&LogFile)); // Append
@@ -213,6 +235,26 @@ uint32_t LogManager_GetTotalSpace(void) {
         return tot_sect / 2;
     }
     return 0;
+}
+
+void LogManager_GetStats(uint32_t* size, uint32_t* file_count) {
+    if (size) *size = LogOpen ? f_size(&LogFile) : 0;
+
+    if (file_count) {
+        *file_count = 0;
+        DIR dir;
+        FILINFO fno;
+        if (f_opendir(&dir, "/") == FR_OK) {
+            while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+                 if ((strstr(fno.fname, ".log") || strstr(fno.fname, ".txt")) &&
+                     strcmp(fno.fname, LOG_FILENAME) != 0) { // Exclude current.log from "other" count if desired?
+                     // Or just count all. User asked "how many other log files".
+                     (*file_count)++;
+                 }
+            }
+            f_closedir(&dir);
+        }
+    }
 }
 
 uint32_t LogManager_GetFreeSpace(void) {
