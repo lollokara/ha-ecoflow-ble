@@ -18,6 +18,7 @@ struct DeviceSlot {
     std::string name; // "D3" or "W2"
     DeviceType type;
     bool isConnected;
+    uint32_t lastScanTime = 0;
 };
 
 /**

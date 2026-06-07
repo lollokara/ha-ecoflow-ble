@@ -361,10 +361,8 @@ void SetBacklight(uint8_t percent) {
 int main(void) {
     // Relocate Vector Table to Application Address
     // Note: When booting from Bank 2 (BFB2 set), 0x08000000 is the alias for Bank 2.
-    // However, for Dual Bank boot stability, using the aliased 0x00000000 base
-    // plus offset ensures we point to the running bank correctly.
-    // Changed to 0x00008000 as requested for stability.
-    SCB->VTOR = 0x00008000;
+    // So 0x08008000 is the correct offset relative to the START of the current active bank.
+    SCB->VTOR = 0x08008000;
     __DSB();
 
     // Enable Interrupts (Bootloader disables them)

@@ -9,6 +9,7 @@
 #include "LightSensor.h"
 #include "EcoflowESP32.h"
 #include "EcoflowDataParser.h"
+#include "WebServer.h"
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <esp_rom_crc.h>
@@ -90,9 +91,43 @@ void Stm32Serial::begin() {
     if (_txMutex == NULL) {
         _txMutex = xSemaphoreCreateMutex();
     }
+    // Clean up any stale recovery/OTA files on boot
+    if (LittleFS.begin()) {
+        if (LittleFS.exists("/stm32_update.bin")) {
+            LittleFS.remove("/stm32_update.bin");
+            Serial.println("[Stm32Serial] Cleaned stale /stm32_update.bin from LittleFS.");
+        }
+    }
+}
+
+void Stm32Serial::resetRxBuffer() {
+    _rx_idx = 0;
+    _expected_len = 0;
+    _collecting = false;
+}
+
+void Stm32Serial::changeBaudRate(uint32_t baud) {
+    _switchingBaud = true;
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    if (_txMutex != NULL) {
+        xSemaphoreTake(_txMutex, portMAX_DELAY);
+    }
+
+    Serial1.end();
+    resetRxBuffer();
+    Serial1.setRxBufferSize(16384);
+    Serial1.begin(baud, SERIAL_8N1, RX_PIN, TX_PIN);
+
+    if (_txMutex != NULL) {
+        xSemaphoreGive(_txMutex);
+    }
+
+    _switchingBaud = false;
 }
 
 void Stm32Serial::sendData(const uint8_t* data, size_t len) {
+    if (_switchingBaud) return;
     if (_txMutex != NULL) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             Serial1.write(data, len);
@@ -106,6 +141,7 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
 }
 
 void Stm32Serial::sendEspLog(uint8_t level, const char* tag, const char* msg) {
+    if (_switchingBaud) return;
     if (_txMutex != NULL) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             uint8_t buf[256];
@@ -117,35 +153,35 @@ void Stm32Serial::sendEspLog(uint8_t level, const char* tag, const char* msg) {
 }
 
 void Stm32Serial::update() {
-    static uint8_t rx_buf[1024];
-    static uint16_t rx_idx = 0;
-    static uint8_t expected_len = 0;
-    static bool collecting = false;
+    if (_switchingBaud) return;
 
+    // bounded — freeze plan F6
+    int drained = 0;
     while (Serial1.available()) {
         uint8_t b = Serial1.read();
-        if (!collecting) {
+        if (++drained >= 1024) { taskYIELD(); break; }
+        if (!_collecting) {
             if (b == START_BYTE) {
-                collecting = true;
-                rx_idx = 0;
-                rx_buf[rx_idx++] = b;
+                _collecting = true;
+                _rx_idx = 0;
+                _rx_buf[_rx_idx++] = b;
             }
         } else {
-            rx_buf[rx_idx++] = b;
+            _rx_buf[_rx_idx++] = b;
 
-            if (rx_idx == 3) {
-                expected_len = rx_buf[2];
-                if (expected_len > 250) {
-                    collecting = false;
-                    rx_idx = 0;
+            if (_rx_idx == 3) {
+                _expected_len = _rx_buf[2];
+                if (_expected_len > 250) {
+                    _collecting = false;
+                    _rx_idx = 0;
                 }
-            } else if (rx_idx > 3) {
-                 if (rx_idx == (4 + expected_len)) {
-                    uint8_t received_crc = rx_buf[rx_idx - 1];
-                    uint8_t calculated_crc = calculate_crc8(&rx_buf[1], 2 + expected_len);
+            } else if (_rx_idx > 3) {
+                 if (_rx_idx == (4 + _expected_len)) {
+                    uint8_t received_crc = _rx_buf[_rx_idx - 1];
+                    uint8_t calculated_crc = calculate_crc8(&_rx_buf[1], 2 + _expected_len);
 
                     if (received_crc == calculated_crc) {
-                        processPacket(rx_buf, rx_idx);
+                        processPacket(_rx_buf, _rx_idx);
                     } else {
                         ESP_LOGE(TAG, "CRC Fail: Rx %02X != Calc %02X", received_crc, calculated_crc);
                         // If we are downloading, a CRC fail means we missed a chunk.
@@ -156,14 +192,14 @@ void Stm32Serial::update() {
                              sendLogResendReq(_expectedLogOffset);
                         }
                     }
-                    collecting = false;
-                    rx_idx = 0;
+                    _collecting = false;
+                    _rx_idx = 0;
                 }
             }
 
-            if (rx_idx >= sizeof(rx_buf)) {
-                collecting = false;
-                rx_idx = 0;
+            if (_rx_idx >= sizeof(_rx_buf)) {
+                _collecting = false;
+                _rx_idx = 0;
             }
         }
     }
@@ -261,8 +297,13 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         DebugInfo info = {0};
         if(WiFi.status() == WL_CONNECTED) {
             strncpy(info.ip, WiFi.localIP().toString().c_str(), 15);
+            info.wifi_connected = 1;
+        } else if ((WiFi.getMode() & WIFI_AP) != 0) {
+            strncpy(info.ip, WiFi.softAPIP().toString().c_str(), 15);
+            info.wifi_connected = 2;
         } else {
              strncpy(info.ip, "Disconnected", 15);
+             info.wifi_connected = 0;
         }
         DeviceType types[] = {DeviceType::DELTA_3, DeviceType::WAVE_2, DeviceType::DELTA_PRO_3, DeviceType::ALTERNATOR_CHARGER};
         for(int i=0; i<4; i++) {
@@ -285,6 +326,8 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
         if (unpack_forget_device_message(rx_buf, &type) == 0) {
             DeviceManager::getInstance().forget((DeviceType)type);
         }
+    } else if (cmd == CMD_ENABLE_HOTSPOT) {
+        WebServer::startHotspot();
     } else if (cmd == CMD_GET_FULL_CONFIG) {
         sendEspLog(ESP_LOG_INFO, "CFG", "--- ESP32 Config ---");
         char buf[128];
@@ -540,7 +583,11 @@ void Stm32Serial::deleteLog(const String& name) {
 
 void Stm32Serial::startLogDownload(const String& name) {
     if(!_downloadMutex) _downloadMutex = xSemaphoreCreateMutex();
-    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    // bounded — freeze plan F2
+    if (xSemaphoreTake(_downloadMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "startLogDownload: mutex timeout");
+        return;
+    }
     _downloadBuffer.clear();
     _downloadBuffer.reserve(4096);
     _downloadComplete = false;
@@ -561,7 +608,8 @@ void Stm32Serial::sendLogResendReq(uint32_t offset) {
 size_t Stm32Serial::readLogChunk(uint8_t* buffer, size_t maxLen) {
     size_t read = 0;
     if(!_downloadMutex) return 0;
-    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    // bounded — freeze plan F2
+    if (xSemaphoreTake(_downloadMutex, pdMS_TO_TICKS(50)) != pdTRUE) return 0;
     if (!_downloadBuffer.empty()) {
         read = std::min(maxLen, _downloadBuffer.size());
         memcpy(buffer, _downloadBuffer.data(), read);
@@ -573,7 +621,8 @@ size_t Stm32Serial::readLogChunk(uint8_t* buffer, size_t maxLen) {
 
 bool Stm32Serial::isLogDownloadComplete() {
     if(!_downloadMutex) return true;
-    xSemaphoreTake(_downloadMutex, portMAX_DELAY);
+    // bounded — freeze plan F2
+    if (xSemaphoreTake(_downloadMutex, pdMS_TO_TICKS(20)) != pdTRUE) return false;
     bool c = _downloadComplete && _downloadBuffer.empty();
     xSemaphoreGive(_downloadMutex);
     return c;
@@ -592,7 +641,6 @@ void Stm32Serial::abortLogDownload() {
 }
 
 static String otaFilename;
-
 void Stm32Serial::startOta(const String& filename) {
     if (_otaRunning) return;
     otaFilename = filename;
@@ -602,78 +650,106 @@ void Stm32Serial::startOta(const String& filename) {
 
 void Stm32Serial::otaTask(void* parameter) {
     Stm32Serial* self = (Stm32Serial*)parameter;
-
+    Serial.printf("[Stm32Serial] otaTask: Starting. Opening file: %s\n", otaFilename.c_str());
     File f = LittleFS.open(otaFilename, "r");
     if (!f) {
-        ESP_LOGE(TAG, "Failed to open firmware file");
+        Serial.printf("[Stm32Serial] otaTask: Failed to open firmware file in LittleFS: %s\n", otaFilename.c_str());
         ota_state = 4; ota_msg = "FS Error";
+        LittleFS.remove(otaFilename);
         self->_otaRunning = false;
         vTaskDelete(NULL);
         return;
     }
 
     uint32_t totalSize = f.size();
-    ESP_LOGI(TAG, "Starting OTA. Size: %d", totalSize);
+    Serial.printf("[Stm32Serial] otaTask: Binary size: %u bytes\n", totalSize);
 
-    ESP_LOGI(TAG, "Calculating Checksum...");
-    uint32_t crc = 0;
-    uint8_t buf[256];
-    size_t readLen;
-    while(f.available()) {
-        readLen = f.read(buf, sizeof(buf));
-        crc = calculate_crc32(crc, buf, readLen);
-    }
-    f.close();
-    ESP_LOGI(TAG, "CRC32: 0x%08X", crc);
-
-    f = LittleFS.open(otaFilename, "r");
+    // Start immediately at 921600 baud to catch the bootloader on boot
+    Serial.println("[Stm32Serial] otaTask: Switching UART to 921600 baud for bootloader...");
+    self->changeBaudRate(921600);
 
     bool startSuccess = false;
+    uint8_t buf[256];
     int len = pack_ota_start_message(buf, totalSize);
 
-    for(int attempt=0; attempt<3; attempt++) {
-        ESP_LOGI(TAG, "Sending OTA Start (Attempt %d)", attempt+1);
-        self->sendData(buf, len);
+    Serial.println("[Stm32Serial] otaTask: Commencing handshake loop (max 5 attempts)...");
+    for(int attempt=0; attempt<5; attempt++) {
+        if (attempt == 1) {
+            Serial.println("[Stm32Serial] otaTask: Attempt 1 (921600) failed/timed out. Switching UART to 460800 baud for main app...");
+            self->changeBaudRate(460800);
+        } else if (attempt == 2) {
+            Serial.println("[Stm32Serial] otaTask: Attempt 2 (460800) failed/timed out. Switching UART to 921600 baud for bootloader...");
+            self->changeBaudRate(921600);
+        }
 
         otaAckReceived = false;
         otaNackReceived = false;
+
+        Serial.printf("[Stm32Serial] otaTask: Sending OTA Start packet (Attempt %d/5)...\n", attempt+1);
+        self->sendData(buf, len);
+
         uint32_t startWait = millis();
-        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 30000)) {
-            vTaskDelay(100);
+        uint32_t timeout = (attempt == 1) ? 3000 : 25000; // 3s for main app (attempt 1), 25s for bootloader erase
+        
+        Serial.printf("[Stm32Serial] otaTask: Waiting for response (timeout: %u ms)...\n", timeout);
+        while(!otaAckReceived && !otaNackReceived && (millis() - startWait < timeout)) {
+            vTaskDelay(10);
         }
 
+        uint32_t elapsed = millis() - startWait;
         if (otaAckReceived) {
+            Serial.printf("[Stm32Serial] otaTask: Received OTA Start ACK on Attempt %d (negotiation took %u ms)\n", attempt+1, elapsed);
             startSuccess = true;
             break;
         }
 
         if (otaNackReceived) {
-            ESP_LOGE(TAG, "OTA Start NACK received");
-            vTaskDelay(1000);
+            Serial.printf("[Stm32Serial] otaTask: Received OTA Start NACK on Attempt %d (elapsed %u ms)\n", attempt+1, elapsed);
+            if (attempt == 1) {
+                Serial.println("[Stm32Serial] otaTask: NACK was expected from Main App. Waiting 2.5s for STM32 reboot and bootloader boot...");
+                vTaskDelay(2500); // Wait 2.5s for STM32 to reboot and enter the bootloader loop
+            } else {
+                Serial.println("[Stm32Serial] otaTask: Unexpected NACK from Bootloader. Retrying...");
+                vTaskDelay(500);
+            }
+        } else {
+            Serial.printf("[Stm32Serial] otaTask: OTA Start response timeout on Attempt %d (elapsed %u ms)\n", attempt+1, elapsed);
         }
     }
 
     if (!startSuccess) {
-        ESP_LOGE(TAG, "OTA Start Failed (Timeout/NACK)");
+        Serial.println("[Stm32Serial] otaTask: OTA Start negotiation failed completely (Timeout/NACK)");
         ota_state = 4; ota_msg = "Start Timeout";
         f.close();
+        LittleFS.remove(otaFilename);
+        
+        Serial.println("[Stm32Serial] otaTask: Restoring UART to 460800 baud...");
+        self->changeBaudRate(460800);
+
         self->_otaRunning = false;
         vTaskDelete(NULL);
         return;
     }
 
+    Serial.println("[Stm32Serial] otaTask: Flash Negotiation successful. Starting chunk stream...");
     uint32_t offset = 0;
     uint8_t chunk[200];
     int last_log_progress = -1;
     bool transferFailed = false;
+    uint32_t startTime = millis();
+    uint32_t crc = 0; // Calculated on the fly
 
     while (f.available()) {
         int bytesRead = f.read(chunk, sizeof(chunk));
+        crc = calculate_crc32(crc, chunk, bytesRead); // On the fly CRC
 
         len = pack_ota_chunk_message(buf, offset, chunk, bytesRead);
 
         bool chunkSuccess = false;
         for(int retries=0; retries<3; retries++) {
+            if (retries > 0) {
+                ESP_LOGW(TAG, "otaTask: Retrying chunk at offset %u (Retry %d/3)...", offset, retries);
+            }
             self->sendData(buf, len);
 
             otaAckReceived = false;
@@ -688,15 +764,15 @@ void Stm32Serial::otaTask(void* parameter) {
                 break;
             }
             if (otaNackReceived) {
-                 ESP_LOGW(TAG, "Chunk NACK at %d, retry %d", offset, retries);
+                 ESP_LOGE(TAG, "otaTask: Received chunk NACK at offset %u after %u ms (Retry %d)", offset, (uint32_t)(millis() - startWait), retries);
                  vTaskDelay(50);
             } else {
-                 ESP_LOGW(TAG, "Chunk Timeout at %d, retry %d", offset, retries);
+                 ESP_LOGE(TAG, "otaTask: Chunk timeout at offset %u after %u ms (Retry %d)", offset, (uint32_t)(millis() - startWait), retries);
             }
         }
 
         if (!chunkSuccess) {
-            ESP_LOGE(TAG, "OTA Chunk Failed at %d", offset);
+            ESP_LOGE(TAG, "otaTask: Chunk transfer failed at offset %u", offset);
             ota_state = 4; ota_msg = "Chunk Fail";
             transferFailed = true;
             break;
@@ -705,7 +781,13 @@ void Stm32Serial::otaTask(void* parameter) {
         offset += bytesRead;
         ota_progress = (offset * 100) / totalSize;
         if (ota_progress != last_log_progress && ota_progress % 10 == 0) {
-            ESP_LOGI(TAG, "OTA Progress: %d%% (%d/%d)", ota_progress, offset, totalSize);
+            uint32_t currentElapsed = millis() - startTime;
+            float kbps = 0;
+            if (currentElapsed > 0) {
+                kbps = (float)offset / (float)currentElapsed;
+            }
+            ESP_LOGI(TAG, "otaTask: OTA Progress: %d%% (%u/%u bytes) | Speed: %.2f KB/s | Time: %u s",
+                     ota_progress, offset, totalSize, kbps, currentElapsed / 1000);
             last_log_progress = ota_progress;
         }
     }
@@ -713,36 +795,69 @@ void Stm32Serial::otaTask(void* parameter) {
     f.close();
 
     if (!transferFailed && offset == totalSize) {
-        ESP_LOGI(TAG, "OTA Upload Complete. Sending End (CRC: 0x%08X)...", crc);
+        uint32_t totalElapsed = millis() - startTime;
+        ESP_LOGI(TAG, "otaTask: Firmware stream complete in %u ms (average speed: %.2f KB/s). Final CRC32: 0x%08X", totalElapsed, (float)totalSize / (float)totalElapsed, crc);
+        ESP_LOGI(TAG, "otaTask: Sending OTA End packet (verification CRC: 0x%08X)...", crc);
         len = pack_ota_end_message(buf, crc);
 
         bool endSuccess = false;
         for(int retries=0; retries<3; retries++) {
+            if (retries > 0) {
+                ESP_LOGW(TAG, "otaTask: Retrying End packet (Retry %d/3)...", retries);
+            }
             self->sendData(buf, len);
 
             otaAckReceived = false;
             otaNackReceived = false;
-             uint32_t startWait = millis();
+            uint32_t startWait = millis();
+            ESP_LOGI(TAG, "otaTask: Waiting for CRC verification response (timeout: 5000 ms)...");
             while(!otaAckReceived && !otaNackReceived && (millis() - startWait < 5000)) {
                 vTaskDelay(50);
             }
-            if (otaAckReceived) { endSuccess = true; break; }
-            if (otaNackReceived) { ESP_LOGE(TAG, "OTA End NACK (Checksum Mismatch?)"); break; }
+            
+            uint32_t elapsed = millis() - startWait;
+            if (otaAckReceived) {
+                ESP_LOGI(TAG, "otaTask: Received End ACK in %u ms. Verification successful!", elapsed);
+                endSuccess = true; 
+                break; 
+            }
+            if (otaNackReceived) { 
+                ESP_LOGE(TAG, "otaTask: Received End NACK in %u ms (Checksum Mismatch on STM32!)", elapsed);
+                break; 
+            }
+            ESP_LOGW(TAG, "otaTask: End response timeout in %u ms", elapsed);
         }
 
         if (endSuccess) {
             vTaskDelay(500);
-            ESP_LOGI(TAG, "Sending Apply...");
+            ESP_LOGI(TAG, "otaTask: Deleting temporary update binary from LittleFS...");
+            LittleFS.remove(otaFilename);
+            ESP_LOGI(TAG, "otaTask: OTA Success! Delaying 10s for Web UI confirmation...");
+            ota_state = 3;
+            ota_msg = "Update Complete! Rebooting in 10 seconds...";
+            
+            vTaskDelay(pdMS_TO_TICKS(10000));
+
+            ESP_LOGI(TAG, "otaTask: Sending Apply/Reboot command to STM32...");
             len = pack_ota_apply_message(buf);
             self->sendData(buf, len);
             ota_state = 3; ota_msg = "STM32 Rebooting...";
+            ESP_LOGI(TAG, "otaTask: Reboot command sent successfully.");
         } else {
+             ESP_LOGE(TAG, "otaTask: End Verification failed.");
              ota_state = 4; ota_msg = "Checksum Fail";
+             LittleFS.remove(otaFilename);
         }
     } else {
+        ESP_LOGE(TAG, "otaTask: Transfer was incomplete or failed. Written size: %u/%u bytes", offset, totalSize);
         if (ota_state != 4) { ota_state = 4; ota_msg = "Incomplete"; }
+        LittleFS.remove(otaFilename);
     }
 
+    ESP_LOGI(TAG, "otaTask: Restoring UART to 460800 baud...");
+    self->changeBaudRate(460800);
+
     self->_otaRunning = false;
+    ESP_LOGI(TAG, "otaTask: Task exit.");
     vTaskDelete(NULL);
 }

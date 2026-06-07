@@ -446,7 +446,10 @@ void LogManager_HandleManagerOp(uint8_t op_code) {
 
         BYTE work[FF_MAX_SS];
         MKFS_PARM opt = {FM_FAT32, 0, 0, 0, 0};
+        extern IWDG_HandleTypeDef hiwdg;
+        HAL_IWDG_Refresh(&hiwdg); // IWDG — AGENTS.md mandate (plan F8)
         FRESULT res = f_mkfs(SDPath, &opt, work, sizeof(work));
+        HAL_IWDG_Refresh(&hiwdg); // IWDG — AGENTS.md mandate (plan F8)
 
         if (res == FR_OK) {
              xSemaphoreGive(LogMutex);

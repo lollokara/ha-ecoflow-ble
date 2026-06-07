@@ -41,6 +41,7 @@ private:
     std::vector<LogMessage> _logs;
     const size_t _maxLogs = 50; // Limit buffer size to save RAM
     mutable SemaphoreHandle_t _mutex;
+    uint32_t _droppedLogs = 0;
 };
 
 #endif // LOG_BUFFER_H

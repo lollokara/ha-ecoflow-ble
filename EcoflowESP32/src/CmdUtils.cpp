@@ -3,6 +3,7 @@
 #include <esp_idf_version.h>
 #include <WiFi.h>
 #include "LogBuffer.h"
+#include "WebServer.h"
 
 #if CONFIG_IDF_TARGET_ESP32S3
 // Check IDF version for correct header
@@ -198,6 +199,7 @@ void CmdUtils::printHelp() {
     cmd_println("  con_forget <d3/w2/d3p/ac>       (Forget)");
     cmd_println("  wifi_set <ssid> <pass>          (Set WiFi credentials)");
     cmd_println("  wifi_ip                         (Get current IP)");
+    cmd_println("  wifi_ap                         (Enable temporary hotspot)");
 
     cmd_println("\n[Wave 2] (get_ or w2_set_)");
     cmd_println("  get_temp / w2_set_temp <val>");
@@ -283,6 +285,12 @@ void CmdUtils::handleConCommand(String cmd, String args) {
         } else {
             cmd_println("WiFi not connected.");
         }
+        return;
+    }
+
+    if (cmd.equalsIgnoreCase("wifi_ap")) {
+        cmd_println("Enabling hotspot...");
+        WebServer::startHotspot();
         return;
     }
 

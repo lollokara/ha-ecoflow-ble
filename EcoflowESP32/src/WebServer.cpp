@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "AsyncJson.h"
 #include <esp_log.h>
+#include <esp_heap_caps.h>
 #include <LittleFS.h>
 #include "Stm32Serial.h"
 
@@ -12,6 +13,8 @@ AsyncWebServer WebServer::server(80);
 AsyncWebServerRequest* WebServer::_pendingLogRequest = nullptr;
 uint32_t WebServer::_pendingLogRequestTime = 0;
 SemaphoreHandle_t WebServer::_requestMutex = NULL;
+DynamicJsonDocument* WebServer::_statusDoc = nullptr; // pre-alloc — freeze plan F7
+bool WebServer::_serverStarted = false;
 
 // Custom Response Class for SD Log Streaming
 class LogResponse : public AsyncAbstractResponse {
@@ -29,19 +32,11 @@ public:
         Stm32Serial::getInstance().abortLogDownload();
     }
     bool _sourceValid() const { return true; }
+    // non-blocking — freeze plan F3
     virtual size_t _fillBuffer(uint8_t *data, size_t len){
-        size_t read = 0;
-        uint32_t start = millis();
-        // Wait for data or completion, with timeout to prevent blocking Async task too long
-        while (read == 0 && !Stm32Serial::getInstance().isLogDownloadComplete()) {
-            read = Stm32Serial::getInstance().readLogChunk(data, len);
-            if (read == 0) {
-                // If we run dry, wait briefly. 500ms is safe for AsyncTCP (rx timeout is usually >3s).
-                if (millis() - start > 500) break;
-                vTaskDelay(5);
-            }
-        }
-        return read;
+        if (Stm32Serial::getInstance().isLogDownloadComplete()) return 0;
+        size_t read = Stm32Serial::getInstance().readLogChunk(data, len);
+        return read; // 0 → AsyncTCP polls next tick; no busy-wait
     }
 };
 
@@ -88,6 +83,7 @@ static float get_esp_temp() {
 
 void WebServer::begin() {
     if (!_requestMutex) _requestMutex = xSemaphoreCreateMutex();
+    if (!_statusDoc) _statusDoc = new DynamicJsonDocument(16384); // pre-alloc — freeze plan F7
 
     Preferences prefs;
     prefs.begin("ecoflow", true);
@@ -106,6 +102,7 @@ void WebServer::begin() {
 
     setupRoutes();
     server.begin();
+    _serverStarted = true;
 }
 
 void WebServer::update() {
@@ -153,6 +150,7 @@ void WebServer::setupRoutes() {
 
     // SD Logs
     server.on("/api/sd_logs", HTTP_GET, [](AsyncWebServerRequest *request){
+        log_d("free heap: %u, largest block: %u", ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)); // heap-log — freeze plan F7
         Stm32Serial::getInstance().requestLogList();
         std::vector<Stm32Serial::LogEntry> logs = Stm32Serial::getInstance().getLogList();
         // Increase buffer size to 32KB to accommodate large file lists and prevent "Error loading list"
@@ -227,8 +225,10 @@ void WebServer::setupRoutes() {
 }
 
 void WebServer::handleStatus(AsyncWebServerRequest *request) {
-    // Increased buffer size to 16KB to prevent truncation of "light_adc" or device data
-    DynamicJsonDocument doc(16384);
+    log_d("free heap: %u, largest block: %u", ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)); // heap-log — freeze plan F7
+    // pre-alloc — freeze plan F7
+    _statusDoc->clear();
+    auto& doc = *_statusDoc;
     doc["esp_temp"] = get_esp_temp();
     doc["light_adc"] = LightSensor::getInstance().getRaw();
 
@@ -544,5 +544,21 @@ void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filenam
 
         // Trigger OTA Task
         Stm32Serial::getInstance().startOta("/stm32_update.bin");
+    }
+}
+
+void WebServer::startHotspot() {
+    ESP_LOGI(TAG, "Starting Hotspot...");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+    // Use the SSID and password as specified
+    WiFi.softAP("EcoFlow-CyberDeck", "12345678");
+    ESP_LOGI(TAG, "Hotspot started: EcoFlow-CyberDeck (pass: 12345678)");
+    ESP_LOGI(TAG, "AP IP address: %s", WiFi.softAPIP().toString().c_str());
+
+    if (!_serverStarted) {
+        setupRoutes();
+        server.begin();
+        _serverStarted = true;
     }
 }

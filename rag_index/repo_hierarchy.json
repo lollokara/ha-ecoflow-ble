@@ -3,70 +3,21 @@
   "summary": "Root directory",
   "files": [
     "gen_logger.py",
-    "d3p_logger.inc",
-    "generate_rag_index.py",
-    "README.md",
     "update_index.py",
+    "d3p_logger.inc",
+    "README.md",
     "rag_search.py",
-    "AGENTS.md"
+    "AGENTS.md",
+    "generate_rag_index.py"
   ],
   "subdirs": {
-    "verification": {
-      "dir": "verification",
-      "summary": "Directory verification",
-      "files": [
-        "verify_ota_ui.py"
-      ],
-      "subdirs": {}
-    },
-    "docs": {
-      "dir": "docs",
-      "summary": "Directory docs",
-      "files": [
-        "Home.md",
-        "Device_RP2040.md",
-        "Protocol.md",
-        "Device_STM32.md",
-        "Device_ESP32.md"
-      ],
-      "subdirs": {
-        "device_reference": {
-          "dir": "device_reference",
-          "summary": "Directory device_reference",
-          "files": [
-            "Delta_Pro_3.md",
-            "Alternator_Charger.md",
-            "Wave_2.md",
-            "Delta_3.md"
-          ],
-          "subdirs": {}
-        }
-      }
-    },
-    "EcoflowRP2040": {
-      "dir": "EcoflowRP2040",
-      "summary": "Directory EcoflowRP2040",
-      "files": [
-        "platformio.ini"
-      ],
-      "subdirs": {
-        "src": {
-          "dir": "src",
-          "summary": "Directory src",
-          "files": [
-            "main.cpp"
-          ],
-          "subdirs": {}
-        }
-      }
-    },
     "EcoflowSTM32F4_Bootloader": {
       "dir": "EcoflowSTM32F4_Bootloader",
       "summary": "Directory EcoflowSTM32F4_Bootloader",
       "files": [
+        "extra_script.py",
         "platformio.ini",
-        "stm32f469ni_flash.ld",
-        "extra_script.py"
+        "stm32f469ni_flash.ld"
       ],
       "subdirs": {
         "src": {
@@ -87,32 +38,152 @@
       ],
       "subdirs": {}
     },
+    "EcoflowESP32": {
+      "dir": "EcoflowESP32",
+      "summary": "Directory EcoflowESP32",
+      "files": [
+        "platformio.ini",
+        "README.md",
+        "sdkconfig.defaults",
+        "library.properties"
+      ],
+      "subdirs": {
+        "lib": {
+          "dir": "lib",
+          "summary": "Directory lib",
+          "files": [],
+          "subdirs": {
+            "EcoFlowComm": {
+              "dir": "EcoFlowComm",
+              "summary": "Directory EcoFlowComm",
+              "files": [
+                "ecoflow_protocol.h",
+                "library.json",
+                "ecoflow_protocol.c"
+              ],
+              "subdirs": {}
+            }
+          }
+        },
+        "src": {
+          "dir": "src",
+          "summary": "Directory src",
+          "files": [
+            "dc009_apl_comm.pb.c",
+            "CmdUtils.h",
+            "Stm32Serial.h",
+            "DeviceManager.cpp",
+            "EcoflowESP32.h",
+            "EcoflowProtocol.cpp",
+            "EcoflowProtocol.h",
+            "pb_utils.h",
+            "WebServer.h",
+            "types.h",
+            "EcoflowDataParser.cpp",
+            "LogBuffer.h",
+            "WebServer.cpp",
+            "Logging.h",
+            "Display.cpp",
+            "DeviceManager.h",
+            "EcoflowDataParser.h",
+            "Display.h",
+            "platform-specific.inc",
+            "EcoflowESP32.cpp",
+            "dc009_apl_comm.pb.h",
+            "keydata.cpp",
+            "Stm32Serial.cpp",
+            "WebAssets.h",
+            "LightSensor.h",
+            "EcoflowCrypto.h",
+            "keydata.h",
+            "EcoflowData.h",
+            "Font.h",
+            "mr521.pb.c",
+            "CmdUtils.cpp",
+            "RemoteLogger.cpp",
+            "EcoflowCrypto.cpp",
+            "RemoteLogger.h",
+            "LogBuffer.cpp",
+            "LightSensor.cpp",
+            "main.cpp",
+            "pd335_sys.pb.c"
+          ],
+          "subdirs": {
+            "proto": {
+              "dir": "proto",
+              "summary": "Directory proto",
+              "files": [
+                "dc009_apl_comm.proto",
+                "mr521.proto"
+              ],
+              "subdirs": {}
+            }
+          }
+        }
+      }
+    },
+    "Test Scripts": {
+      "dir": "Test Scripts",
+      "summary": "Directory Test Scripts",
+      "files": [
+        "generate_keydata_header.py",
+        "verify_optimistic.py",
+        "verify_layout_v3.py",
+        "verify_power_logic.py",
+        "verify_ui_v2.py"
+      ],
+      "subdirs": {
+        "tools": {
+          "dir": "tools",
+          "summary": "Directory tools",
+          "files": [
+            "generate_mdi_font.py"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
+    "docs": {
+      "dir": "docs",
+      "summary": "Directory docs",
+      "files": [
+        "Device_STM32.md",
+        "Device_RP2040.md",
+        "Home.md",
+        "Device_ESP32.md",
+        "Protocol.md"
+      ],
+      "subdirs": {
+        "device_reference": {
+          "dir": "device_reference",
+          "summary": "Directory device_reference",
+          "files": [
+            "Delta_Pro_3.md",
+            "Delta_3.md",
+            "Wave_2.md",
+            "Alternator_Charger.md"
+          ],
+          "subdirs": {}
+        }
+      }
+    },
     "EcoflowSTM32F4": {
       "dir": "EcoflowSTM32F4",
       "summary": "Directory EcoflowSTM32F4",
       "files": [
-        "platformio.ini",
+        "extra_script.py",
         "merge_firmware.py",
-        "stm32f469ni_flash.ld",
-        "extra_script.py"
+        "platformio.ini",
+        "stm32f469ni_flash.ld"
       ],
       "subdirs": {
-        "include": {
-          "dir": "include",
-          "summary": "Directory include",
-          "files": [
-            "README",
-            "FreeRTOSConfig.h"
-          ],
-          "subdirs": {}
-        },
         "Inc": {
           "dir": "Inc",
           "summary": "Directory Inc",
           "files": [
+            "log_manager.h",
             "display_task.h",
-            "uart_task.h",
-            "log_manager.h"
+            "uart_task.h"
           ],
           "subdirs": {}
         },
@@ -124,6 +195,15 @@
           ],
           "subdirs": {}
         },
+        "include": {
+          "dir": "include",
+          "summary": "Directory include",
+          "files": [
+            "README",
+            "FreeRTOSConfig.h"
+          ],
+          "subdirs": {}
+        },
         "lib": {
           "dir": "lib",
           "summary": "Directory lib",
@@ -131,32 +211,19 @@
             "README"
           ],
           "subdirs": {
-            "Fonts": {
-              "dir": "Fonts",
-              "summary": "Directory Fonts",
-              "files": [
-                "font24.c",
-                "font12.c",
-                "font20.c",
-                "font8.c",
-                "fonts.h",
-                "font16.c"
-              ],
-              "subdirs": {}
-            },
             "FatFs": {
               "dir": "FatFs",
               "summary": "Directory FatFs",
               "files": [
-                "diskio.c",
-                "ff_gen_drv.c",
-                "ff_gen_drv.h",
-                "sd_diskio.h",
-                "ffsystem.c",
-                "ff.h",
                 "sd_diskio.c",
                 "diskio.h",
-                "ffconf.h"
+                "ff_gen_drv.c",
+                "sd_diskio.h",
+                "ff.h",
+                "ffconf.h",
+                "diskio.c",
+                "ffsystem.c",
+                "ff_gen_drv.h"
               ],
               "subdirs": {}
             },
@@ -164,212 +231,42 @@
               "dir": "bsp",
               "summary": "Directory bsp",
               "files": [
-                "stm32469i_discovery.c",
-                "library.json",
-                "stm32469i_discovery_lcd.h",
-                "README.md",
-                "stm32469i_discovery_sdram.c",
-                "stm32469i_discovery.h",
-                "Release_Notes.html",
-                "CONTRIBUTING.md",
-                "LICENSE.md",
-                "stm32469i_discovery_lcd.c",
-                "stm32469i_discovery_ts.c",
-                "stm32469i_discovery_sdram.h",
                 "CODE_OF_CONDUCT.md",
+                "LICENSE.md",
+                "Release_Notes.html",
+                "stm32469i_discovery.h",
+                "stm32469i_discovery_lcd.h",
+                "stm32469i_discovery_sdram.h",
+                "stm32469i_discovery_ts.c",
+                "README.md",
+                "library.json",
+                "stm32469i_discovery.c",
+                "CONTRIBUTING.md",
+                "stm32469i_discovery_lcd.c",
+                "stm32469i_discovery_sdram.c",
                 "SECURITY.md",
                 "stm32469i_discovery_ts.h"
               ],
               "subdirs": {
+                "_htmresc": {
+                  "dir": "_htmresc",
+                  "summary": "Directory _htmresc",
+                  "files": [
+                    "mini-st_2020.css"
+                  ],
+                  "subdirs": {}
+                },
                 "Components": {
                   "dir": "Components",
                   "summary": "Directory Components",
                   "files": [],
                   "subdirs": {
-                    "ft3x67": {
-                      "dir": "ft3x67",
-                      "summary": "Directory ft3x67",
+                    "lsm303dlhc": {
+                      "dir": "lsm303dlhc",
+                      "summary": "Directory lsm303dlhc",
                       "files": [
-                        "ft3x67.c",
-                        "ft3x67.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "n25q256a": {
-                      "dir": "n25q256a",
-                      "summary": "Directory n25q256a",
-                      "files": [
-                        "n25q256a.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ili9325": {
-                      "dir": "ili9325",
-                      "summary": "Directory ili9325",
-                      "files": [
-                        "ili9325.h",
-                        "ili9325.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "Common": {
-                      "dir": "Common",
-                      "summary": "Directory Common",
-                      "files": [
-                        "ts.h",
-                        "audio.h",
-                        "accelero.h",
-                        "camera.h",
-                        "tsensor.h",
-                        "magneto.h",
-                        "gyro.h",
-                        "epd.h",
-                        "io.h",
-                        "lcd.h",
-                        "idd.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ov2640": {
-                      "dir": "ov2640",
-                      "summary": "Directory ov2640",
-                      "files": [
-                        "ov2640.c",
-                        "ov2640.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ov5640": {
-                      "dir": "ov5640",
-                      "summary": "Directory ov5640",
-                      "files": [
-                        "ov5640.c",
-                        "ov5640.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "mfxstm32l152": {
-                      "dir": "mfxstm32l152",
-                      "summary": "Directory mfxstm32l152",
-                      "files": [
-                        "mfxstm32l152.c",
-                        "mfxstm32l152.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "st7735": {
-                      "dir": "st7735",
-                      "summary": "Directory st7735",
-                      "files": [
-                        "st7735.c",
-                        "st7735.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "lis302dl": {
-                      "dir": "lis302dl",
-                      "summary": "Directory lis302dl",
-                      "files": [
-                        "lis302dl.h",
-                        "lis302dl.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "stmpe811": {
-                      "dir": "stmpe811",
-                      "summary": "Directory stmpe811",
-                      "files": [
-                        "stmpe811.c",
-                        "stmpe811.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "i3g4250d": {
-                      "dir": "i3g4250d",
-                      "summary": "Directory i3g4250d",
-                      "files": [
-                        "i3g4250d.c",
-                        "i3g4250d.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "wm8994": {
-                      "dir": "wm8994",
-                      "summary": "Directory wm8994",
-                      "files": [
-                        "wm8994.h",
-                        "wm8994.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ft6x06": {
-                      "dir": "ft6x06",
-                      "summary": "Directory ft6x06",
-                      "files": [
-                        "ft6x06.h",
-                        "ft6x06.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "exc7200": {
-                      "dir": "exc7200",
-                      "summary": "Directory exc7200",
-                      "files": [
-                        "exc7200.h",
-                        "exc7200.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ampire640480": {
-                      "dir": "ampire640480",
-                      "summary": "Directory ampire640480",
-                      "files": [
-                        "ampire640480.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "lan8742": {
-                      "dir": "lan8742",
-                      "summary": "Directory lan8742",
-                      "files": [
-                        "lan8742.c",
-                        "lan8742.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "cs43l22": {
-                      "dir": "cs43l22",
-                      "summary": "Directory cs43l22",
-                      "files": [
-                        "cs43l22.h",
-                        "cs43l22.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "nt35510": {
-                      "dir": "nt35510",
-                      "summary": "Directory nt35510",
-                      "files": [
-                        "nt35510.c",
-                        "nt35510.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ts3510": {
-                      "dir": "ts3510",
-                      "summary": "Directory ts3510",
-                      "files": [
-                        "ts3510.h",
-                        "ts3510.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "lis3dsh": {
-                      "dir": "lis3dsh",
-                      "summary": "Directory lis3dsh",
-                      "files": [
-                        "lis3dsh.h",
-                        "lis3dsh.c"
+                        "lsm303dlhc.c",
+                        "lsm303dlhc.h"
                       ],
                       "subdirs": {}
                     },
@@ -382,11 +279,83 @@
                       ],
                       "subdirs": {}
                     },
+                    "lan8742": {
+                      "dir": "lan8742",
+                      "summary": "Directory lan8742",
+                      "files": [
+                        "lan8742.c",
+                        "lan8742.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lsm303agr": {
+                      "dir": "lsm303agr",
+                      "summary": "Directory lsm303agr",
+                      "files": [
+                        "lsm303agr.h",
+                        "lsm303agr.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "mfxstm32l152": {
+                      "dir": "mfxstm32l152",
+                      "summary": "Directory mfxstm32l152",
+                      "files": [
+                        "mfxstm32l152.h",
+                        "mfxstm32l152.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lis302dl": {
+                      "dir": "lis302dl",
+                      "summary": "Directory lis302dl",
+                      "files": [
+                        "lis302dl.c",
+                        "lis302dl.h"
+                      ],
+                      "subdirs": {}
+                    },
                     "n25q512a": {
                       "dir": "n25q512a",
                       "summary": "Directory n25q512a",
                       "files": [
                         "n25q512a.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ts3510": {
+                      "dir": "ts3510",
+                      "summary": "Directory ts3510",
+                      "files": [
+                        "ts3510.c",
+                        "ts3510.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "exc7200": {
+                      "dir": "exc7200",
+                      "summary": "Directory exc7200",
+                      "files": [
+                        "exc7200.c",
+                        "exc7200.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "cs43l22": {
+                      "dir": "cs43l22",
+                      "summary": "Directory cs43l22",
+                      "files": [
+                        "cs43l22.h",
+                        "cs43l22.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ov2640": {
+                      "dir": "ov2640",
+                      "summary": "Directory ov2640",
+                      "files": [
+                        "ov2640.h",
+                        "ov2640.c"
                       ],
                       "subdirs": {}
                     },
@@ -399,38 +368,20 @@
                       ],
                       "subdirs": {}
                     },
-                    "lsm303dlhc": {
-                      "dir": "lsm303dlhc",
-                      "summary": "Directory lsm303dlhc",
-                      "files": [
-                        "lsm303dlhc.h",
-                        "lsm303dlhc.c"
-                      ],
-                      "subdirs": {}
-                    },
-                    "ili9341": {
-                      "dir": "ili9341",
-                      "summary": "Directory ili9341",
-                      "files": [
-                        "ili9341.c",
-                        "ili9341.h"
-                      ],
-                      "subdirs": {}
-                    },
-                    "otm8009a": {
-                      "dir": "otm8009a",
-                      "summary": "Directory otm8009a",
-                      "files": [
-                        "otm8009a.h",
-                        "otm8009a.c"
-                      ],
-                      "subdirs": {}
-                    },
                     "s25fl512s": {
                       "dir": "s25fl512s",
                       "summary": "Directory s25fl512s",
                       "files": [
                         "s25fl512s.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ft6x06": {
+                      "dir": "ft6x06",
+                      "summary": "Directory ft6x06",
+                      "files": [
+                        "ft6x06.h",
+                        "ft6x06.c"
                       ],
                       "subdirs": {}
                     },
@@ -450,15 +401,6 @@
                       ],
                       "subdirs": {}
                     },
-                    "stmpe1600": {
-                      "dir": "stmpe1600",
-                      "summary": "Directory stmpe1600",
-                      "files": [
-                        "stmpe1600.c",
-                        "stmpe1600.h"
-                      ],
-                      "subdirs": {}
-                    },
                     "dp83848": {
                       "dir": "dp83848",
                       "summary": "Directory dp83848",
@@ -468,11 +410,144 @@
                       ],
                       "subdirs": {}
                     },
+                    "st7735": {
+                      "dir": "st7735",
+                      "summary": "Directory st7735",
+                      "files": [
+                        "st7735.c",
+                        "st7735.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "otm8009a": {
+                      "dir": "otm8009a",
+                      "summary": "Directory otm8009a",
+                      "files": [
+                        "otm8009a.c",
+                        "otm8009a.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "Common": {
+                      "dir": "Common",
+                      "summary": "Directory Common",
+                      "files": [
+                        "camera.h",
+                        "lcd.h",
+                        "accelero.h",
+                        "audio.h",
+                        "magneto.h",
+                        "gyro.h",
+                        "idd.h",
+                        "io.h",
+                        "ts.h",
+                        "tsensor.h",
+                        "epd.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "stmpe811": {
+                      "dir": "stmpe811",
+                      "summary": "Directory stmpe811",
+                      "files": [
+                        "stmpe811.h",
+                        "stmpe811.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "wm8994": {
+                      "dir": "wm8994",
+                      "summary": "Directory wm8994",
+                      "files": [
+                        "wm8994.h",
+                        "wm8994.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "i3g4250d": {
+                      "dir": "i3g4250d",
+                      "summary": "Directory i3g4250d",
+                      "files": [
+                        "i3g4250d.c",
+                        "i3g4250d.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "lis3dsh": {
+                      "dir": "lis3dsh",
+                      "summary": "Directory lis3dsh",
+                      "files": [
+                        "lis3dsh.h",
+                        "lis3dsh.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "n25q256a": {
+                      "dir": "n25q256a",
+                      "summary": "Directory n25q256a",
+                      "files": [
+                        "n25q256a.h"
+                      ],
+                      "subdirs": {}
+                    },
                     "s5k5cag": {
                       "dir": "s5k5cag",
                       "summary": "Directory s5k5cag",
                       "files": [
                         "s5k5cag.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "stmpe1600": {
+                      "dir": "stmpe1600",
+                      "summary": "Directory stmpe1600",
+                      "files": [
+                        "stmpe1600.c",
+                        "stmpe1600.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ili9341": {
+                      "dir": "ili9341",
+                      "summary": "Directory ili9341",
+                      "files": [
+                        "ili9341.c",
+                        "ili9341.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ft3x67": {
+                      "dir": "ft3x67",
+                      "summary": "Directory ft3x67",
+                      "files": [
+                        "ft3x67.c",
+                        "ft3x67.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ov5640": {
+                      "dir": "ov5640",
+                      "summary": "Directory ov5640",
+                      "files": [
+                        "ov5640.h",
+                        "ov5640.c"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ampire640480": {
+                      "dir": "ampire640480",
+                      "summary": "Directory ampire640480",
+                      "files": [
+                        "ampire640480.h"
+                      ],
+                      "subdirs": {}
+                    },
+                    "ili9325": {
+                      "dir": "ili9325",
+                      "summary": "Directory ili9325",
+                      "files": [
+                        "ili9325.h",
+                        "ili9325.c"
                       ],
                       "subdirs": {}
                     },
@@ -485,35 +560,27 @@
                       ],
                       "subdirs": {}
                     },
-                    "lsm303agr": {
-                      "dir": "lsm303agr",
-                      "summary": "Directory lsm303agr",
+                    "nt35510": {
+                      "dir": "nt35510",
+                      "summary": "Directory nt35510",
                       "files": [
-                        "lsm303agr.c",
-                        "lsm303agr.h"
+                        "nt35510.c",
+                        "nt35510.h"
                       ],
                       "subdirs": {}
                     }
                   }
                 },
-                "_htmresc": {
-                  "dir": "_htmresc",
-                  "summary": "Directory _htmresc",
-                  "files": [
-                    "mini-st_2020.css"
-                  ],
-                  "subdirs": {}
-                },
                 "Fonts": {
                   "dir": "Fonts",
                   "summary": "Directory Fonts",
                   "files": [
+                    "fonts.h",
+                    "font20.c",
                     "font24.c",
                     "font12.c",
-                    "font20.c",
-                    "font8.c",
-                    "fonts.h",
-                    "font16.c"
+                    "font16.c",
+                    "font8.c"
                   ],
                   "subdirs": {}
                 }
@@ -523,9 +590,22 @@
               "dir": "EcoFlowComm",
               "summary": "Directory EcoFlowComm",
               "files": [
-                "library.json",
                 "ecoflow_protocol.h",
+                "library.json",
                 "ecoflow_protocol.c"
+              ],
+              "subdirs": {}
+            },
+            "Fonts": {
+              "dir": "Fonts",
+              "summary": "Directory Fonts",
+              "files": [
+                "fonts.h",
+                "font20.c",
+                "font24.c",
+                "font12.c",
+                "font16.c",
+                "font8.c"
               ],
               "subdirs": {}
             }
@@ -535,51 +615,51 @@
           "dir": "src",
           "summary": "Directory src",
           "files": [
-            "lv_port_disp.c",
-            "lv_port_disp.h",
-            "display_task.c",
             "flash_ops.c",
-            "retarget.c",
-            "lv_conf.h",
-            "main.c",
-            "stm32f4xx_it.c",
-            "display_task.h",
-            "stm32f4xx_it.h",
-            "fan_task.h",
-            "log_manager.c",
-            "flash_ops.h",
+            "lv_port_disp.c",
             "fan_task.c",
-            "lv_port_indev.h",
-            "fan_protocol.h",
-            "lv_port_indev.c",
-            "uart_task.h",
             "log_manager.h",
+            "lv_port_indev.c",
+            "stm32f4xx_it.h",
             "uart_task.c",
-            "uart_callback.c"
+            "display_task.h",
+            "lv_port_disp.h",
+            "flash_ops.h",
+            "fan_protocol.h",
+            "main.c",
+            "log_manager.c",
+            "fan_task.h",
+            "uart_callback.c",
+            "stm32f4xx_it.c",
+            "lv_port_indev.h",
+            "lv_conf.h",
+            "retarget.c",
+            "display_task.c",
+            "uart_task.h"
           ],
           "subdirs": {
             "ui": {
               "dir": "ui",
               "summary": "Directory ui",
               "files": [
+                "ui_view_fan.c",
+                "ui_view_log_manager.c",
                 "ui_lvgl.h",
+                "ui_view_debug.h",
                 "ui_view_wave2.h",
-                "ui_view_debug.c",
-                "ui_view_fan.h",
-                "ui_core.h",
+                "ui_font_mdi.c",
                 "ui_view_connections.h",
                 "ui_utils.h",
-                "ui_font_mdi.c",
-                "ui_primitives.c",
-                "ui_view_wave2.c",
-                "ui_icons.h",
-                "ui_view_fan.c",
-                "ui_lvgl.c",
-                "ui_view_connections.c",
+                "ui_view_fan.h",
                 "ui_view_log_manager.h",
+                "ui_core.h",
                 "ui_view_settings.c",
-                "ui_view_debug.h",
-                "ui_view_log_manager.c"
+                "ui_lvgl.c",
+                "ui_view_debug.c",
+                "ui_icons.h",
+                "ui_view_connections.c",
+                "ui_primitives.c",
+                "ui_view_wave2.c"
               ],
               "subdirs": {}
             }
@@ -587,106 +667,26 @@
         }
       }
     },
-    "EcoflowESP32": {
-      "dir": "EcoflowESP32",
-      "summary": "Directory EcoflowESP32",
+    "verification": {
+      "dir": "verification",
+      "summary": "Directory verification",
       "files": [
-        "README.md",
-        "platformio.ini",
-        "library.properties",
-        "sdkconfig.defaults"
+        "verify_ota_ui.py"
+      ],
+      "subdirs": {}
+    },
+    "EcoflowRP2040": {
+      "dir": "EcoflowRP2040",
+      "summary": "Directory EcoflowRP2040",
+      "files": [
+        "platformio.ini"
       ],
       "subdirs": {
-        "lib": {
-          "dir": "lib",
-          "summary": "Directory lib",
-          "files": [],
-          "subdirs": {
-            "EcoFlowComm": {
-              "dir": "EcoFlowComm",
-              "summary": "Directory EcoFlowComm",
-              "files": [
-                "library.json",
-                "ecoflow_protocol.h",
-                "ecoflow_protocol.c"
-              ],
-              "subdirs": {}
-            }
-          }
-        },
         "src": {
           "dir": "src",
           "summary": "Directory src",
           "files": [
-            "Display.cpp",
-            "types.h",
-            "EcoflowESP32.cpp",
-            "EcoflowDataParser.cpp",
-            "main.cpp",
-            "platform-specific.inc",
-            "LightSensor.cpp",
-            "pb_utils.h",
-            "EcoflowData.h",
-            "mr521.pb.c",
-            "EcoflowProtocol.h",
-            "LogBuffer.cpp",
-            "CmdUtils.h",
-            "RemoteLogger.cpp",
-            "Stm32Serial.h",
-            "dc009_apl_comm.pb.h",
-            "CmdUtils.cpp",
-            "LightSensor.h",
-            "DeviceManager.h",
-            "Font.h",
-            "EcoflowCrypto.cpp",
-            "Display.h",
-            "Logging.h",
-            "EcoflowProtocol.cpp",
-            "WebServer.cpp",
-            "EcoflowDataParser.h",
-            "dc009_apl_comm.pb.c",
-            "DeviceManager.cpp",
-            "EcoflowESP32.h",
-            "Stm32Serial.cpp",
-            "keydata.cpp",
-            "RemoteLogger.h",
-            "WebServer.h",
-            "pd335_sys.pb.c",
-            "LogBuffer.h",
-            "EcoflowCrypto.h",
-            "WebAssets.h",
-            "keydata.h"
-          ],
-          "subdirs": {
-            "proto": {
-              "dir": "proto",
-              "summary": "Directory proto",
-              "files": [
-                "mr521.proto",
-                "dc009_apl_comm.proto"
-              ],
-              "subdirs": {}
-            }
-          }
-        }
-      }
-    },
-    "Test Scripts": {
-      "dir": "Test Scripts",
-      "summary": "Directory Test Scripts",
-      "files": [
-        "verify_ui_v2.py",
-        "verify_layout_v3.py",
-        "verify_power_logic.py",
-        "generate_keydata_header.py",
-        "verify_optimistic.py"
-      ],
-      "subdirs": {
-        "tools": {
-          "dir": "tools",
-          "summary": "Directory tools",
-          "files": [
-            "generate_mdi_font.py"
+            "main.cpp"
           ],
           "subdirs": {}
         }

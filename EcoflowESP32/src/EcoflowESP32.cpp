@@ -13,6 +13,7 @@
 #include "EcoflowDataParser.h"
 #include <NimBLEDevice.h>
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "pd335_sys.pb.h"
 #include "mr521.pb.h"
 #include "dc009_apl_comm.pb.h"

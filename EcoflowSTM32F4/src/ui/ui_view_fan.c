@@ -119,6 +119,8 @@ static void create_slider_row(lv_obj_t * parent, const char * label, int min, in
     lv_slider_set_range(*slider_out, min, max);
     lv_obj_set_width(*slider_out, lv_pct(100));
     lv_obj_align(*slider_out, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_pad_all(*slider_out, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(*slider_out, 16);
     lv_obj_add_event_cb(*slider_out, event_slider_change, LV_EVENT_VALUE_CHANGED, NULL);
 }
 

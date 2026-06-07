@@ -118,7 +118,18 @@ void LogBuffer::setTagLevel(const String& tag, esp_log_level_t level) {
 void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* message, va_list args) {
     if (!_enabled) return;
 
-    xSemaphoreTake(_mutex, portMAX_DELAY);
+    // bounded — freeze plan F1
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+        _droppedLogs++;
+        static uint32_t last_warn_ms = 0;
+        uint32_t now = millis();
+        if (now - last_warn_ms >= 60000) {
+            last_warn_ms = now;
+            ESP_LOGW("LogBuffer", "LogBuffer dropped %u entries", _droppedLogs);
+            _droppedLogs = 0;
+        }
+        return;
+    }
 
     if (_logs.size() >= _maxLogs) {
         _logs.erase(_logs.begin()); // Remove oldest

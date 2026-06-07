@@ -49,21 +49,25 @@ DeviceManager::DeviceManager() {
     slotD3.name = "D3";
     slotD3.type = DeviceType::DELTA_3;
     slotD3.isConnected = false;
+    slotD3.lastScanTime = 0;
 
     slotW2.instance = &w2;
     slotW2.name = "W2";
     slotW2.type = DeviceType::WAVE_2;
     slotW2.isConnected = false;
+    slotW2.lastScanTime = 0;
 
     slotD3P.instance = &d3p;
     slotD3P.name = "D3P";
     slotD3P.type = DeviceType::DELTA_PRO_3;
     slotD3P.isConnected = false;
+    slotD3P.lastScanTime = 0;
 
     slotAC.instance = &ac;
     slotAC.name = "CHG";
     slotAC.type = DeviceType::ALTERNATOR_CHARGER;
     slotAC.isConnected = false;
+    slotAC.lastScanTime = 0;
 
     _scanMutex = xSemaphoreCreateMutex();
 }
@@ -293,10 +297,14 @@ void DeviceManager::_manageScanning() {
         }
     } else if (!isAnyConnecting()) {
         // If not scanning and no device is connecting, check if we need to start a scan
-        bool d3NeedsConnect = !slotD3.isConnected && !slotD3.macAddress.empty() && !d3.isConnecting();
-        bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting();
-        bool d3pNeedsConnect = !slotD3P.isConnected && !slotD3P.macAddress.empty() && !d3p.isConnecting();
-        bool acNeedsConnect = !slotAC.isConnected && !slotAC.macAddress.empty() && !ac.isConnecting();
+        bool d3NeedsConnect = !slotD3.isConnected && !slotD3.macAddress.empty() && !d3.isConnecting() && (slotD3.lastScanTime == 0 || millis() - slotD3.lastScanTime > 60000);
+        bool w2NeedsConnect = !slotW2.isConnected && !slotW2.macAddress.empty() && !w2.isConnecting() && (slotW2.lastScanTime == 0 || millis() - slotW2.lastScanTime > 60000);
+        bool d3pNeedsConnect = !slotD3P.isConnected && !slotD3P.macAddress.empty() && !d3p.isConnecting() && (slotD3P.lastScanTime == 0 || millis() - slotD3P.lastScanTime > 60000);
+        bool acNeedsConnect = !slotAC.isConnected && !slotAC.macAddress.empty() && !ac.isConnecting() && (slotAC.lastScanTime == 0 || millis() - slotAC.lastScanTime > 60000);
+
+        if (slotD3P.isConnected && !d3p.isAcOn()) {
+            w2NeedsConnect = false;
+        }
 
         if (d3NeedsConnect) startScan(DeviceType::DELTA_3);
         else if (w2NeedsConnect) startScan(DeviceType::WAVE_2);
@@ -423,6 +431,14 @@ void DeviceManager::startScan(DeviceType type) {
     _scanStartTime = millis();
     _hasPendingConnection = false;
 
+    DeviceSlot* slot = getSlot(type);
+    if (slot) {
+        slot->lastScanTime = millis();
+        if (slot->lastScanTime == 0) {
+            slot->lastScanTime = 1;
+        }
+    }
+
     if (!pScan) {
         pScan = NimBLEDevice::getScan();
         pScan->setAdvertisedDeviceCallbacks(new ManagerScanCallbacks(this), true);
@@ -434,13 +450,16 @@ void DeviceManager::startScan(DeviceType type) {
 }
 
 void DeviceManager::stopScan() {
-    if (xSemaphoreTake(_scanMutex, portMAX_DELAY) == pdTRUE) {
-        if (pScan && pScan->isScanning()) {
-            pScan->stop();
-        }
-        _isScanning = false;
-        xSemaphoreGive(_scanMutex);
+    // bounded — freeze plan F4
+    if (xSemaphoreTake(_scanMutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+        ESP_LOGW("DeviceManager", "stopScan: mutex busy, skipping");
+        return;
     }
+    if (pScan && pScan->isScanning()) {
+        pScan->stop();
+    }
+    _isScanning = false;
+    xSemaphoreGive(_scanMutex);
 }
 
 void DeviceManager::ManagerScanCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {

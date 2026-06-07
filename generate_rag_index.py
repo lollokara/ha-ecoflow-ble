@@ -7,10 +7,14 @@ import pickle
 import datetime
 from pathlib import Path
 
-import pandas as pd
-import numpy as np
-import faiss
-from sentence_transformers import SentenceTransformer
+try:
+    import pandas as pd
+    import numpy as np
+    import faiss
+    from sentence_transformers import SentenceTransformer
+    HAS_RAG_DEPS = True
+except ImportError:
+    HAS_RAG_DEPS = False
 
 OUTPUT_DIR = Path("rag_index")
 REPO_PATH = Path(".")
@@ -258,6 +262,10 @@ def generate_hierarchy(files_data):
         f.write("- **Python Scripts**: Root directory contains utility scripts like `gen_logger.py` and `rag_search.py`.\n")
 
 def generate_embeddings(chunks):
+    if not HAS_RAG_DEPS:
+        print("Warning: faiss or sentence_transformers is not installed. Skipping embeddings index generation.")
+        return
+
     print("Step 4: Embeddings Index...")
     embeddings_dir = OUTPUT_DIR / "embeddings"
     embeddings_dir.mkdir(exist_ok=True)

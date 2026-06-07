@@ -38,6 +38,10 @@ static void event_back_to_debug(lv_event_t * e) {
     UI_CreateDebugView();
 }
 
+static void event_enable_hotspot(lv_event_t * e) {
+    UART_SendEnableHotspot();
+}
+
 static void event_connect_device(lv_event_t * e) {
     uint8_t type = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
     UART_SendConnectDevice(type);
@@ -177,6 +181,15 @@ void UI_CreateConnectionsView(void) {
     lv_obj_t * lbl_back = lv_label_create(btn_back);
     lv_label_set_text(lbl_back, "Back");
     lv_obj_center(lbl_back);
+
+    lv_obj_t * btn_hotspot = lv_btn_create(header);
+    lv_obj_set_size(btn_hotspot, 160, 40);
+    lv_obj_align_to(btn_hotspot, btn_back, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    lv_obj_set_style_bg_color(btn_hotspot, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_add_event_cb(btn_hotspot, event_enable_hotspot, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * lbl_hotspot = lv_label_create(btn_hotspot);
+    lv_label_set_text(lbl_hotspot, "Enable Hotspot");
+    lv_obj_center(lbl_hotspot);
 
     // Content Grid
     lv_obj_t * grid = lv_obj_create(scr_connections);

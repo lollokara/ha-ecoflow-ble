@@ -90,7 +90,8 @@ private:
     /**
      * @brief Private constructor for Singleton pattern.
      */
-    Stm32Serial() {}
+    Stm32Serial() : _otaRunning(false), _expectedLogOffset(0), _txMutex(NULL),
+                    _switchingBaud(false), _rx_idx(0), _expected_len(0), _collecting(false) {}
 
     /**
      * @brief Processes a fully received and validated packet.
@@ -101,9 +102,18 @@ private:
 
     static void otaTask(void* parameter);
 
+    void resetRxBuffer();
+    void changeBaudRate(uint32_t baud);
+
     bool _otaRunning = false;
     uint32_t _expectedLogOffset = 0;
     SemaphoreHandle_t _txMutex = NULL;
+
+    volatile bool _switchingBaud;
+    uint8_t _rx_buf[1024];
+    uint16_t _rx_idx;
+    uint8_t _expected_len;
+    bool _collecting;
 };
 
 #endif

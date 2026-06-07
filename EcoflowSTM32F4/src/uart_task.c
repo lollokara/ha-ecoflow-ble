@@ -33,7 +33,8 @@ typedef enum {
     MSG_POWER_OFF,
     MSG_GET_DEBUG_INFO,
     MSG_CONNECT_DEVICE,
-    MSG_FORGET_DEVICE
+    MSG_FORGET_DEVICE,
+    MSG_ENABLE_HOTSPOT
 } TxMsgType;
 
 typedef struct {
@@ -297,6 +298,9 @@ void UART_SendConnectDevice(uint8_t type) {
 void UART_SendForgetDevice(uint8_t type) {
     if (uartTxQueue) { TxMessage tx; tx.type = MSG_FORGET_DEVICE; tx.data.device_type = type; xQueueSend(uartTxQueue, &tx, 0); }
 }
+void UART_SendEnableHotspot(void) {
+    if (uartTxQueue) { TxMessage tx; tx.type = MSG_ENABLE_HOTSPOT; xQueueSend(uartTxQueue, &tx, 0); }
+}
 void UART_GetKnownDevices(DeviceList *list) { memcpy(list, &knownDevices, sizeof(DeviceList)); }
 
 
@@ -386,6 +390,7 @@ void StartUARTTask(void * argument) {
             else if (tx.type == MSG_GET_DEBUG_INFO) len = pack_get_debug_info_message(buf);
             else if (tx.type == MSG_CONNECT_DEVICE) len = pack_connect_device_message(buf, tx.data.device_type);
             else if (tx.type == MSG_FORGET_DEVICE) len = pack_forget_device_message(buf, tx.data.device_type);
+            else if (tx.type == MSG_ENABLE_HOTSPOT) len = pack_simple_cmd_message(buf, CMD_ENABLE_HOTSPOT);
 
             if (len > 0) UART_SendRaw(buf, len);
         }

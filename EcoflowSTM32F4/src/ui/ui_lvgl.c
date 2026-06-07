@@ -681,6 +681,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_lim_in, lim_input_w, LV_ANIM_OFF);
     lv_obj_set_width(slider_lim_in, 600);
     lv_obj_align(slider_lim_in, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_lim_in, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_lim_in, 16);
     lv_obj_add_event_cb(slider_lim_in, event_slider_input, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_lim_in, event_slider_input, LV_EVENT_RELEASED, NULL); // Catch release to send cmd
     lv_obj_add_event_cb(slider_lim_in, event_calib_touch, LV_EVENT_CLICKED, NULL); // Catch touch
@@ -708,6 +710,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_lim_out, lim_discharge_p, LV_ANIM_OFF);
     lv_obj_set_width(slider_lim_out, 600);
     lv_obj_align(slider_lim_out, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_lim_out, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_lim_out, 16);
     lv_obj_add_event_cb(slider_lim_out, event_slider_discharge, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_lim_out, event_slider_discharge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_lim_out, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -735,6 +739,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_lim_chg, lim_charge_p, LV_ANIM_OFF);
     lv_obj_set_width(slider_lim_chg, 600);
     lv_obj_align(slider_lim_chg, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_lim_chg, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_lim_chg, 16);
     lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_lim_chg, event_slider_charge, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_lim_chg, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -769,6 +775,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_alt_start_v, alt_start_v, LV_ANIM_OFF);
     lv_obj_set_width(slider_alt_start_v, 600);
     lv_obj_align(slider_alt_start_v, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_alt_start_v, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_alt_start_v, 16);
     lv_obj_add_event_cb(slider_alt_start_v, event_slider_alt_start_v, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_alt_start_v, event_slider_alt_start_v, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_alt_start_v, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -796,6 +804,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_alt_rev_curr, alt_rev_curr, LV_ANIM_OFF);
     lv_obj_set_width(slider_alt_rev_curr, 600);
     lv_obj_align(slider_alt_rev_curr, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_alt_rev_curr, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_alt_rev_curr, 16);
     lv_obj_add_event_cb(slider_alt_rev_curr, event_slider_alt_rev_curr, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_alt_rev_curr, event_slider_alt_rev_curr, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_alt_rev_curr, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -823,6 +833,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_alt_chg_curr, alt_chg_curr, LV_ANIM_OFF);
     lv_obj_set_width(slider_alt_chg_curr, 600);
     lv_obj_align(slider_alt_chg_curr, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_alt_chg_curr, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_alt_chg_curr, 16);
     lv_obj_add_event_cb(slider_alt_chg_curr, event_slider_alt_chg_curr, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_alt_chg_curr, event_slider_alt_chg_curr, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_alt_chg_curr, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -850,6 +862,8 @@ static void create_settings(void) {
     lv_slider_set_value(slider_alt_pow, alt_pow_limit, LV_ANIM_OFF);
     lv_obj_set_width(slider_alt_pow, 600);
     lv_obj_align(slider_alt_pow, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_set_style_pad_all(slider_alt_pow, 12, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider_alt_pow, 16);
     lv_obj_add_event_cb(slider_alt_pow, event_slider_alt_pow, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(slider_alt_pow, event_slider_alt_pow, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(slider_alt_pow, event_calib_touch, LV_EVENT_CLICKED, NULL);
@@ -1408,6 +1422,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                  static bool first_w2_disc = true;
                  if (last_w2_connected || first_w2_disc) { // Only add red style when actually disconnecting or on init
                      lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
+                     lv_obj_remove_style(btn_wave2, NULL, LV_PART_MAIN); // style leak fix — freeze plan F9
                      lv_obj_add_style(btn_wave2, &style_btn_red, 0);
                      first_w2_disc = false;
                  }

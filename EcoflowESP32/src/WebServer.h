@@ -14,12 +14,15 @@ class WebServer {
 public:
     static void begin();
     static void update();
+    static void startHotspot();
 
 private:
     static AsyncWebServer server;
     static AsyncWebServerRequest* _pendingLogRequest;
     static uint32_t _pendingLogRequestTime;
     static SemaphoreHandle_t _requestMutex;
+    static DynamicJsonDocument* _statusDoc; // pre-alloc — freeze plan F7
+    static bool _serverStarted;
 
     static void setupRoutes();
     static void handleStatus(AsyncWebServerRequest *request);

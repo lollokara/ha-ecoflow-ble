@@ -68,6 +68,7 @@ extern "C" {
 #define CMD_GET_DEBUG_INFO 0x60      ///< Request Debug Info
 #define CMD_CONNECT_DEVICE 0x62      ///< Request to connect to a device type
 #define CMD_FORGET_DEVICE 0x63       ///< Request to forget a device
+#define CMD_ENABLE_HOTSPOT 0x64      ///< Request to enable hotspot
 
 #define CMD_OTA_ACK  0x06            ///< OTA Acknowledge
 #define CMD_OTA_NACK 0x15            ///< OTA Negative Acknowledge

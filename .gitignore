@@ -71,3 +71,5 @@ EcoflowRP2040/.vscode/launch.json
 **/.pio/
 *.bin
 EcoflowESP32/.vscode/extensions.json
+/.omc/state
+/.omc
