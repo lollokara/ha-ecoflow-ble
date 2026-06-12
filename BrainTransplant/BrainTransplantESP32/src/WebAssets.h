@@ -1,0 +1,366 @@
+#ifndef WEB_ASSETS_H
+#define WEB_ASSETS_H
+
+#include <Arduino.h>
+
+const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainTransplant</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --glass-bg: rgba(20, 20, 25, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff9d;
+            --text-main: #e0e0e0;
+            --text-sub: #909090;
+        }
+        body {
+            background: var(--bg-dark); color: var(--text-main);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; padding: 20px; padding-bottom: 100px; overflow-x: hidden;
+        }
+        #canvas-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.8; pointer-events: none; }
+        h1, h2, h3 { margin: 0; font-weight: 300; letter-spacing: 1px; }
+
+        .container { max-width: 850px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; position: relative; z-index: 1; }
+
+        /* Glassmorphism Card */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out forwards;
+        }
+
+        .card::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
+            transform: skewX(-25deg); transition: 0.5s; pointer-events: none;
+        }
+        .card:hover::before { left: 150%; transition: 0.7s; }
+        .card:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 243, 255, 0.1); }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer; user-select: none; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 10px; display: inline-block; box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: all 0.3s; }
+        .status-dot.on { background: var(--neon-green); box-shadow: 0 0 12px var(--neon-green); }
+
+        /* Controls */
+        .ctrl-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.9em; flex-wrap: wrap; gap: 10px; }
+
+        /* Buttons */
+        .btn {
+            border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #fff;
+            transition: all 0.2s; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); box-shadow: 0 0 10px rgba(255,255,255,0.2); }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: linear-gradient(45deg, rgba(0, 243, 255, 0.2), rgba(0, 255, 157, 0.2)); border-color: var(--neon-cyan); color: var(--neon-cyan); }
+        .btn-primary:hover { background: linear-gradient(45deg, rgba(0, 243, 255, 0.4), rgba(0, 255, 157, 0.4)); box-shadow: 0 0 15px var(--neon-cyan); color: #fff; }
+
+        /* Inputs */
+        input[type="file"] {
+            background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; border-radius: 8px; color: #fff;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 10px;
+        }
+        .progress-bar {
+            height: 100%; width: 0%; background: var(--neon-cyan); transition: width 0.3s;
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        /* Logs */
+        #console { font-family: 'Fira Code', monospace; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 10px; border-radius: 8px; height: 300px; overflow-y: auto; font-size: 0.8em; margin-top: 15px; }
+        .log-line { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 3px 0; word-break: break-all; }
+        .log-I { color: #fff; } .log-W { color: #ffd700; } .log-E { color: #ff5252; } .log-D { color: #aaa; }
+
+        .hidden { display: none !important; }
+
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .3s; border-radius: 34px; border: 1px solid #444; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #888; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: rgba(0, 255, 157, 0.2); border-color: var(--neon-green); }
+        input:checked + .slider:before { transform: translateX(20px); background-color: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+
+    </style>
+</head>
+<body>
+    <canvas id="canvas-bg"></canvas>
+    <div class="container">
+        <!-- Main Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
+            <div style="display:flex; align-items:center; gap:10px">
+                <div style="font-size: 2em;">🧠</div>
+                <h2 style="background: linear-gradient(to right, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BrainTransplant</h2>
+            </div>
+            <div style="font-size:0.85em; color:var(--text-sub)">ESP32 & STM32 Firmware Loader</div>
+        </div>
+
+        <!-- Firmware Update Card -->
+        <div class="card">
+            <div class="header">
+                <h3>💾 Firmware Operations</h3>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                <!-- ESP32 Section -->
+                <div style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px;">
+                    <h4 style="margin-bottom: 10px; color: var(--neon-pink);">ESP32 (Host)</h4>
+                    <p style="font-size: 0.8em; color: #aaa; margin-bottom: 15px;">Update the BrainTransplant host firmware.</p>
+                    <div class="ctrl-row">
+                        <input type="file" id="file-esp32" accept=".bin">
+                        <button class="btn btn-primary" onclick="uploadFirmware('esp32')">Flash ESP32</button>
+                    </div>
+                </div>
+
+                <!-- STM32 Section -->
+                <div style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px;">
+                    <h4 style="margin-bottom: 10px; color: var(--neon-cyan);">STM32 (Target)</h4>
+                    <p style="font-size: 0.8em; color: #aaa; margin-bottom: 15px;">Flash firmware to the connected STM32F4 device via UART.</p>
+                    <div class="ctrl-row">
+                        <input type="file" id="file-stm32" accept=".bin">
+                        <button class="btn btn-primary" onclick="uploadFirmware('stm32')">Flash STM32</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ota-container" class="hidden" style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: var(--neon-green);">
+                    <span id="ota-msg">Starting...</span>
+                    <span id="ota-pct">0%</span>
+                </div>
+                <div class="progress-container">
+                    <div id="ota-bar" class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Card -->
+        <div class="card">
+            <div class="header" onclick="toggleLogs()">
+                <h3>📋 System Logs</h3>
+                <div style="display:flex; gap: 10px; align-items: center;">
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="log-enable" onchange="setLogConfig()"><span class="slider"></span></label>
+                    <button class="btn" id="log-toggle-btn" style="font-size:0.8em; padding: 5px 10px;">Toggle</button>
+                </div>
+            </div>
+            <div id="log-section">
+                <div class="ctrl-row">
+                     <select id="log-level" onchange="setLogConfig()">
+                        <option value="5">Verbose</option>
+                        <option value="4">Debug</option>
+                        <option value="3" selected>Info</option>
+                        <option value="2">Warn</option>
+                        <option value="1">Error</option>
+                    </select>
+                    <button class="btn" style="background: #333; padding: 5px 10px;" onclick="clearLogs()">Clear</button>
+                </div>
+                <div id="console"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const API = '/api';
+    let logPollInterval = null;
+    let lastLogCount = 0;
+    let isOtaRunning = false;
+
+    function el(id) { return document.getElementById(id); }
+
+    // --- Firmware Update ---
+    function uploadFirmware(type) {
+        const fileInput = el('file-' + type);
+        if (!fileInput.files.length) { alert('Please select a file'); return; }
+        const file = fileInput.files[0];
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        el('ota-container').classList.remove('hidden');
+        updateOtaStatus('Uploading ' + type + '...', 0);
+        isOtaRunning = true;
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API + '/update/' + type, true);
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                updateOtaStatus('Uploading...', percent);
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                updateOtaStatus('Upload complete. Flashing started...', 100);
+                // Start polling status
+                pollOtaStatus();
+            } else {
+                updateOtaStatus('Upload failed: ' + xhr.responseText, 0);
+                isOtaRunning = false;
+            }
+        };
+
+        xhr.onerror = function() {
+             updateOtaStatus('Network Error', 0);
+             isOtaRunning = false;
+        };
+
+        xhr.send(fd);
+    }
+
+    function updateOtaStatus(msg, pct) {
+        el('ota-msg').innerText = msg;
+        el('ota-pct').innerText = pct + '%';
+        el('ota-bar').style.width = pct + '%';
+    }
+
+    function pollOtaStatus() {
+        if(!isOtaRunning) return;
+        const interval = setInterval(() => {
+            fetch(API + '/update/status').then(r=>r.json()).then(s => {
+                updateOtaStatus(s.msg, s.progress);
+                if(s.state === 0 && s.progress === 0) {
+                     // Idle/Done? We need a better done signal really, but state 0 usually means idle.
+                     // If msg contains success/fail we stop.
+                     if(s.msg.toLowerCase().includes('success') || s.msg.toLowerCase().includes('fail') || s.msg.toLowerCase().includes('idle')) {
+                         clearInterval(interval);
+                         isOtaRunning = false;
+                     }
+                }
+            }).catch(e => {
+                clearInterval(interval);
+                isOtaRunning = false;
+            });
+        }, 1000);
+    }
+
+    // --- Logs ---
+    function toggleLogs() {
+        const sec = el('log-section');
+        sec.classList.toggle('hidden');
+        if (!sec.classList.contains('hidden')) startLogPoll(); else stopLogPoll();
+    }
+
+    function startLogPoll() {
+        if (logPollInterval) return;
+        // lastLogCount = 0; // Don't reset count, stick to stream
+        logPollInterval = setInterval(() => {
+            fetch(API + '/logs?index=' + lastLogCount).then(r => r.json()).then(logs => {
+                const c = el('console');
+                logs.forEach(l => {
+                    const d = new Date(l.ts);
+                    const time = d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
+                    const line = document.createElement('div');
+                    line.className = 'log-line log-' + (['?','E','W','I','D','V'][l.lvl] || 'I');
+                    line.innerText = `[${time}] ${l.tag}: ${l.msg}`;
+                    c.appendChild(line);
+                });
+                lastLogCount += logs.length;
+                if(logs.length > 0) c.scrollTop = c.scrollHeight;
+            }).catch(()=>{});
+        }, 1000);
+    }
+
+    function stopLogPoll() { clearInterval(logPollInterval); logPollInterval = null; }
+
+    function setLogConfig() {
+        const enabled = el('log-enable').checked;
+        const level = parseInt(el('log-level').value);
+        fetch(API + '/log_config', {
+             method: 'POST',
+             headers:{'Content-Type':'application/json'},
+             body:JSON.stringify({enable: enabled, level, tag: "Global"})
+        });
+    }
+
+    function clearLogs() { el('console').innerHTML = ''; }
+
+    // Auto-start logs if visible
+    if(!el('log-section').classList.contains('hidden')) startLogPoll();
+
+    // --- Cyberpunk Particles ---
+    const canvas = document.getElementById('canvas-bg');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let w, h;
+
+    function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        initParticles();
+    }
+
+    function initParticles() {
+        particles = [];
+        const cnt = Math.floor(w * h / 20000);
+        for(let i=0; i<cnt; i++) {
+            particles.push({
+                x: Math.random()*w, y: Math.random()*h,
+                vx: (Math.random()-0.5)*0.8, vy: (Math.random()-0.5)*0.8,
+                size: Math.random() * 2 + 1,
+                color: Math.random() > 0.5 ? 'rgba(0, 243, 255, ' : 'rgba(0, 255, 157, '
+            });
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0,0,w,h);
+
+        for(let i=0; i<particles.length; i++) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            if(p.x < 0 || p.x > w) p.vx *= -1;
+            if(p.y < 0 || p.y > h) p.vy *= -1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fillStyle = p.color + '0.5)';
+            ctx.fill();
+
+            for(let j=i+1; j<particles.length; j++) {
+                let p2 = particles[j];
+                let dx = p.x - p2.x, dy = p.y - p2.y;
+                let dist = dx*dx + dy*dy;
+                if(dist < 10000) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = p.color + (1 - dist/10000)*0.2 + ')';
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    draw();
+</script>
+</body>
+</html>
+)rawliteral";
+
+#endif // WEB_ASSETS_H
