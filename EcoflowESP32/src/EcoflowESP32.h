@@ -225,6 +225,7 @@ private:
 
     // --- Authentication Flow ---
     void _startAuthentication();
+    void _startBladeAuthentication();
     void _handleAuthPacket(Packet* pkt);
     void _sendConfigPacket(const pd335_sys_ConfigWrite& config);
     uint8_t _getDeviceDest();
