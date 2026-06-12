@@ -42,6 +42,7 @@ struct Delta3Data {
     bool acOn = false;
     bool dcOn = false;
     bool usbOn = false;
+    bool beepEnable = false;
 };
 
 struct Wave2Data {
@@ -122,6 +123,7 @@ struct DeltaPro3Data {
     float soh = 0;
     uint32_t dischargeRemainingTime = 0;
     uint32_t chargeRemainingTime = 0;
+    bool beepEnable = false;
 };
 
 struct AlternatorChargerData {

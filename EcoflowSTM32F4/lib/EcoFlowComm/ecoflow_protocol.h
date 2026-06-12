@@ -98,6 +98,7 @@ extern "C" {
 #define SET_VAL_ALT_REV_LIMIT 7
 #define SET_VAL_ALT_CHG_LIMIT 8
 #define SET_VAL_ALT_ENABLE 9
+#define SET_VAL_BEEP 10
 
 // Device Types (matching types.h)
 #define DEV_TYPE_DELTA_3 1
@@ -142,6 +143,7 @@ typedef struct {
     float solarInputPower;
     int32_t acChargingSpeed;
     int32_t maxAcChargingPower;
+    bool beepEnable;
     bool acOn;
     bool dcOn;
     bool usbOn;
@@ -228,6 +230,7 @@ typedef struct {
     float soh;
     uint32_t dischargeRemainingTime;
     uint32_t chargeRemainingTime;
+    bool beepEnable;
 } DeltaPro3DataStruct;
 
 /**

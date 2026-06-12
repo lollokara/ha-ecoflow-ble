@@ -1,0 +1,3 @@
+Oh! `int32_t beepEnable;` is only under `Wave2DataStruct`!
+Let's see if my `sed` commands hit `EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.h`.
+No, I only ran `sed` on `EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.h`.

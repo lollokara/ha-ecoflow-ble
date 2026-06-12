@@ -480,6 +480,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                     if (d3_msg.has_pow_get_typec1) d3.usbcOutputPower = -std::abs(d3_msg.pow_get_typec1);
                     if (d3_msg.has_pow_get_typec2) d3.usbc2OutputPower = -std::abs(d3_msg.pow_get_typec2);
                     if (d3_msg.has_pow_get_qcusb1) d3.usbaOutputPower = -std::abs(d3_msg.pow_get_qcusb1);
+                    if (d3_msg.has_en_beep) d3.beepEnable = d3_msg.en_beep;
                     if (d3_msg.has_pow_get_qcusb2) d3.usba2OutputPower = -std::abs(d3_msg.pow_get_qcusb2);
 
                     if (d3_msg.has_plug_in_info_ac_charger_flag) d3.pluggedInAc = d3_msg.plug_in_info_ac_charger_flag;
@@ -583,6 +584,7 @@ void parsePacket(const Packet& pkt, EcoflowData& data, DeviceType type) {
                      if (mr521_msg.has_bms_batt_soh) d3p.soh = mr521_msg.bms_batt_soh;
                      if (mr521_msg.has_bms_dsg_rem_time) d3p.dischargeRemainingTime = mr521_msg.bms_dsg_rem_time;
                      if (mr521_msg.has_bms_chg_rem_time) d3p.chargeRemainingTime = mr521_msg.bms_chg_rem_time;
+                     if (mr521_msg.has_en_beep) d3p.beepEnable = mr521_msg.en_beep;
 
                      static uint32_t lastDumpId = 0;
                      if (currentDumpId > lastDumpId) {
