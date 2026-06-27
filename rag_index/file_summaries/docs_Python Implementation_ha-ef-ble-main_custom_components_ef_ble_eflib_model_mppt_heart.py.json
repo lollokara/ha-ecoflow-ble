@@ -1,0 +1,32 @@
+{
+  "full_summary": "Python file with 3 classes and 0 functions. Key components include classes and method definitions relevant to mppt_heart module.",
+  "chunks": [
+    {
+      "content": "class BaseMpptHeart(RawData):\n    fault_code: Annotated[int, \"I\", \"faultCode\"]\n    sw_ver: Annotated[str, \"4s\", \"swVer\"]\n    in_vol: Annotated[int, \"I\", \"inVol\"]\n    in_amp: Annotated[int, \"I\", \"inAmp\"]\n    in_watts: Annotated[int, \"H\", \"inWatts\"]\n    out_val: Annotated[int, \"I\", \"outVal\"]\n    out_amp: Annotated[int, \"I\", \"outAmp\"]\n    out_watts: Annotated[int, \"H\", \"outWatts\"]\n    mppt_temp: Annotated[int, \"h\", \"mpptTemp\"]\n    xt60_chg_type: Annotated[int, \"B\", \"xt60ChgType\"]\n    cfg_chg_type: Annotated[int, \"B\", \"cfgChgType\"]\n    chg_type: Annotated[int, \"B\", \"chgType\"]\n    chg_state: Annotated[int, \"B\", \"chgState\"]\n    dcdc_12v_vol: Annotated[int, \"I\", \"dcdc12VVol\"]\n    dcdc_12v_amp: Annotated[int, \"I\", \"dcdc12VAmp\"]\n    dcdc_12v_watts: Annotated[int, \"H\", \"dcdc12VWatts\"]\n    car_out_vol: Annotated[int, \"I\", \"carOutVol\"]\n    car_out_amp: Annotated[int, \"I\", \"carOutAmp\"]\n    car_out_watts: Annotated[int, \"H\", \"carOutWatts\"]\n    car_temp: Annotated[int, \"h\", \"carTemp\"]\n    car_state: Annotated[int, \"B\", \"carState\"]\n    dc24v_temp: Annotated[int, \"h\", \"dc24vTemp\"]\n    dc24v_state: Annotated[int, \"B\", \"dc24vState\"]\n    chg_pause_flag: Annotated[int, \"B\", \"chgPauseFlag\"]\n    cfg_dc_chg_current: Annotated[int, \"I\", \"cfgDcChgCurrent\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of BaseMpptHeart in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py:chunk0"
+    },
+    {
+      "content": "class Mr330MpptHeart(BaseMpptHeart):\n    beep_state: Annotated[int, \"B\", \"beepState\"]\n    cfg_ac_enabled: Annotated[int, \"B\", \"cfgAcEnabled\"]\n    cfg_ac_xboost: Annotated[int, \"B\", \"cfgAcXboost\"]\n    cfg_ac_out_voltage: Annotated[int, \"I\", \"cfgAcOutVoltage\"]\n    cfg_ac_out_freq: Annotated[int, \"B\", \"cfgAcOutFreq\"]\n    cfg_chg_watts: Annotated[int, \"H\", \"cfgChgWatts\"]\n    ac_standby_mins: Annotated[int, \"H\", \"acStandbyMins\"]\n    discharge_type: Annotated[int, \"B\", \"dischargeType\"]\n    car_standby_mins: Annotated[int, \"H\", \"carStandbyMins\"]\n    power_standby_mins: Annotated[int, \"H\", \"powerStandbyMins\"]\n    screen_standby_mins: Annotated[int, \"H\", \"screenStandbyMins\"]\n    pay_flag: Annotated[int, \"H\", \"payFlag\"]\n    reserved: Annotated[bytes, \"8s\", \"res\"]",
+      "metadata": {
+        "start_line": 34,
+        "lang": "python",
+        "desc": "Definition of Mr330MpptHeart in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py:chunk1"
+    },
+    {
+      "content": "class Mr350MpptHeart(BaseMpptHeart):\n    pv2_in_vol: Annotated[int, \"I\", \"pv2InVol\"]\n    pv2_in_amp: Annotated[int, \"I\", \"pv2InAmp\"]\n    pv2_in_watts: Annotated[int, \"H\", \"pv2InWatts\"]\n    pv2_mppt_temp: Annotated[int, \"H\", \"pv2MpptTemp\"]\n    pv2_xt60_chg_type: Annotated[int, \"B\", \"pv2Xt60ChgType\"]\n    pv2_cfg_chg_type: Annotated[int, \"B\", \"pv2CfgChgType\"]\n    pv2_chg_type: Annotated[int, \"B\", \"pv2ChgType\"]\n    pv2_chg_state: Annotated[int, \"B\", \"pv2ChgState\"]\n    pv2_chg_pause_flag: Annotated[int, \"B\", \"pv2ChgPauseGlag\"]\n    car_standby_mins: Annotated[int, \"H\", \"carStandbyMins\"]\n    res: Annotated[bytes, \"8s\", \"res\"]\n    padding: Annotated[bytes, \"s\", \"padding\"]",
+      "metadata": {
+        "start_line": 50,
+        "lang": "python",
+        "desc": "Definition of Mr350MpptHeart in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py:chunk2"
+    }
+  ]
+}

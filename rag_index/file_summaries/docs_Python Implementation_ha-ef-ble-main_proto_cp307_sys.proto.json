@@ -1,0 +1,23 @@
+{
+  "full_summary": "Unknown file with 105 lines. Provides configuration, documentation or supporting data for the repository.",
+  "chunks": [
+    {
+      "content": "syntax = \"proto3\";\n\npackage cp307_sys;\n\n\nenum Cmd_Set {\n  NONE = 0;\n  BASIC = 1;\n  EMS = 2;\n  IOT = 53;\n  EV = 209;\n  OCPP = 224;\n  EDEV = 241;\n  EEBUS = 242;\n  GENERAL = 254;\n}\n\nmessage EnergyFlowHistory {\n  optional uint32 time_stamp = 1;\n  optional float evcharging_power = 2;\n  optional float meter_power = 3;\n  optional uint32 order_id = 4;\n  optional float from_grid_power = 5;\n  optional float from_pv_power = 6;\n  optional float from_bp_power = 7;\n}\n\nmessage EnergyStatistics {\n  optional uint32 time_stamp = 1;\n  optional uint32 watth_type = 2;\n  repeated uint32 watth = 3;\n  optional uint32 order_id = 4;\n  repeated uint32 charging_time = 5;\n}\n\nmessage TimerTask {\n  optional uint32 is_cfg = 1;\n  optional uint32 task_index = 2;\n  optional bool is_enable = 3;\n  optional bool is_effect = 4;\n  optional uint32 type = 5;\n  optional uint32 param = 6;\n  optional uint32 time_mode = 7;\n  optional uint32 time_param = 8;\n  repeated uint32 time_table = 9;\n  repeated uint32 current_table = 10;\n  optional bool delay_start = 11;\n}\n\nmessage FaultHistroy {\n  optional fixed32 fault_time = 1;\n  optional fixed32 recover_time = 2;\n  optional uint32 fault_code = 3;\n  optional float fault_value = 4;\n}\n\nmessage MeterValueItem {\n  optional uint32 alive = 1;\n  optional uint32 active_energy = 2;\n  optional uint32 reactive_energy = 3;\n  optional float active_power = 4;\n  optional float reactive_power = 5;\n  optional uint32 frequency = 6;\n  optional float volt_l1 = 7;\n  optional float volt_l2 = 8;\n  optional float volt_l3 = 9;\n  optional float curr_l1 = 10;\n  optional float curr_l2 = 11;\n  optional float curr_l3 = 12;\n  optional float pf_t = 13;\n  optional float pf_l1 = 14;\n  optional float pf_l2 = 15;\n  optional float pf_l3 = 16;\n}\n\nmessage CardWhiteListItem {\n  optional uint32 is_enable = 1;\n  optional string physical_card_id = 2;\n  optional string card_id = 3;\n  optional fixed32 life_time = 4;\n  optional string card_name = 5;\n  optional uint32 card_type = 6;\n}\n\nmessage SmartModeParameter {\n  optional uint32 time_to_use_car = 1;\n  optional uint32 target_type = 2;\n  optional uint32 charge_target = 3;\n  optional uint32 distance_target = 4;\n  optional uint32 keep_effective = 5;\n}\n\nmessage SolarModeParameter {\n  optional uint32 keep_charging_en = 1;\n  optional uint32 keep_charging_current = 2;\n}\n\nmessage POLinkageParameter {\n  optional bool bind_state = 1;\n  optional bool online_state = 2;",
+      "metadata": {
+        "start_line": 1,
+        "lang": "unknown",
+        "desc": "Code chunk from docs/Python Implementation/ha-ef-ble-main/proto/cp307_sys.proto lines 1-100"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/proto/cp307_sys.proto:chunk0"
+    },
+    {
+      "content": "  optional string po_sn = 3;\n  optional uint32 work_mode = 4;\n  optional uint32 ctrl_mode = 5;\n  optional uint32 master_product_type = 6;\n}",
+      "metadata": {
+        "start_line": 101,
+        "lang": "unknown",
+        "desc": "Code chunk from docs/Python Implementation/ha-ef-ble-main/proto/cp307_sys.proto lines 101-105"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/proto/cp307_sys.proto:chunk1"
+    }
+  ]
+}

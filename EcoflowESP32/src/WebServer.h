@@ -23,6 +23,8 @@ private:
     static SemaphoreHandle_t _requestMutex;
     static DynamicJsonDocument* _statusDoc; // pre-alloc — freeze plan F7
     static bool _serverStarted;
+    static uint32_t _staConnectStart;   // when the STA connect attempt began
+    static bool _staFallbackPending;    // waiting to fall back to AP if STA fails
 
     static void setupRoutes();
     static void handleStatus(AsyncWebServerRequest *request);

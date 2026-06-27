@@ -1,0 +1,41 @@
+{
+  "full_summary": "Python file with 4 classes and 9 functions. Key components include classes and method definitions relevant to entity module.",
+  "chunks": [
+    {
+      "content": "class EcoflowEntity(Entity):\n    _attr_has_entity_name = True\n\n    def __init__(self, device: DeviceBase):\n        self._device = device\n        self._update_callbacks: list[tuple[str, Callable[[Any], None]]] = []\n\n    @property\n    def device_info(self):\n        \"\"\"Return information to link this entity with the correct device\"\"\"\n        return DeviceInfo(\n            identifiers={\n                (DOMAIN, self._device.address),\n            },\n            connections={\n                (CONNECTION_BLUETOOTH, self._device.address),\n            },\n            name=self._device.name,\n            manufacturer=MANUFACTURER,\n            model=self._device.device,\n            serial_number=self._device.serial_number,\n        )\n\n    @property\n    def available(self) -> bool:\n        \"\"\"Return True if device is connected\"\"\"\n        return self._device.is_connected\n\n    class SkipWrite:\n        \"\"\"Sentinel value for skipping write in update callback\"\"\"\n\n    def _register_update_callback(\n        self,\n        entity_attr: str,\n        prop_name: str | None,\n        get_state: Callable[[Any], SkipWrite | Any] = lambda x: x,\n        default_state: Any = None,\n    ):\n        if prop_name is None or not hasattr(self._device, prop_name):\n            return\n\n        @callback\n        def state_updated(state: Any):\n            if (state := get_state(state)) is EcoflowEntity.SkipWrite:\n                return\n\n            setattr(self, entity_attr, state)\n            self.async_write_ha_state()\n\n        device_state = getattr(self._device, prop_name, None)\n        if device_state is None and default_state is not None:\n            setattr(self, entity_attr, default_state)\n        elif (initial := get_state(device_state)) is not EcoflowEntity.SkipWrite:\n            setattr(self, entity_attr, initial)\n\n        self._update_callbacks.append((prop_name, state_updated))\n\n    async def async_added_to_hass(self) -> None:\n        for prop, state_callback in self._update_callbacks:\n            self._device.register_state_update_callback(state_callback, prop)\n        await super().async_added_to_hass()\n\n    async def async_will_remove_from_hass(self) -> None:\n        for prop, state_callback in self._update_callbacks:\n            self._device.remove_state_update_callback(state_callback, prop)\n        await super().async_will_remove_from_hass()",
+      "metadata": {
+        "start_line": 15,
+        "lang": "python",
+        "desc": "Definition of EcoflowEntity in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py:chunk0"
+    },
+    {
+      "content": "class EcoflowBatteryAddonEntity(EcoflowEntity):\n    def __init__(\n        self,\n        device: DeviceBase,\n        battery_index: int,\n    ) -> None:\n        super().__init__(device)\n        self._battery_index = battery_index\n        self._sn_prop = f\"battery_{battery_index}_sn\"\n\n    @property\n    def device_info(self) -> DeviceInfo:\n        battery_sn = getattr(self._device, self._sn_prop, None)\n        battery_model = battery_name_from_device(self._device, self._battery_index)\n\n        return DeviceInfo(\n            identifiers={\n                (DOMAIN, f\"{self._device.address}_battery_{self._battery_index}\"),\n            },\n            name=f\"{self._device.name} Extra Battery {self._battery_index}\",\n            manufacturer=MANUFACTURER,\n            model=battery_model,\n            serial_number=battery_sn,\n            via_device=(DOMAIN, self._device.address),\n        )\n\n    async def async_added_to_hass(self) -> None:\n        await super().async_added_to_hass()\n        self._device.register_state_update_callback(\n            self._refresh_device_registry, self._sn_prop\n        )\n\n    async def async_will_remove_from_hass(self) -> None:\n        self._device.remove_state_update_callback(\n            self._refresh_device_registry, self._sn_prop\n        )\n        await super().async_will_remove_from_hass()\n\n    @callback\n    def _refresh_device_registry(self, battery_sn: str | None) -> None:\n        \"\"\"Push a late-arriving battery serial number into the device registry\"\"\"\n        if not battery_sn:\n            return\n\n        registry = dr.async_get(self.hass)\n        identifier = (DOMAIN, f\"{self._device.address}_battery_{self._battery_index}\")\n        device_entry = registry.async_get_device(identifiers={identifier})\n        if device_entry is None:\n            return\n\n        battery_model = battery_name_from_device(self._device, self._battery_index)\n        if (\n            device_entry.serial_number == battery_sn\n            and device_entry.model == battery_model\n        ):\n            return\n\n        registry.async_update_device(\n            device_entry.id, serial_number=battery_sn, model=battery_model\n        )",
+      "metadata": {
+        "start_line": 83,
+        "lang": "python",
+        "desc": "Definition of EcoflowBatteryAddonEntity in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py:chunk1"
+    },
+    {
+      "content": "class IndexableDescription(Protocol):\n    \"\"\"Entity description that supports indexed expansion via `{n}` in keys\"\"\"\n\n    key: str\n    indexed_range: range | None\n    translation_placeholders: Mapping[str, str] | None",
+      "metadata": {
+        "start_line": 146,
+        "lang": "python",
+        "desc": "Definition of IndexableDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py:chunk2"
+    },
+    {
+      "content": "def resolve_entity_description_keys[D: EntityDescription](\n    descriptions: dict[str, D],\n) -> dict[str, D]:\n    \"\"\"\n    Fill in description keys from dict key, and expand indexed ({n}) descriptions.\n\n    Descriptions with {n} in their key that are instances of indexed_type with\n    indexed_range set are expanded across the range. {n} in translation_placeholder\n    values is also replaced, supporting format specs like {n:02d}.\n    \"\"\"\n    result: dict[str, D] = {}\n    for k, v in descriptions.items():\n        if not (\n            \"{n}\" in k\n            and isinstance(v, IndexableDescription)\n            and v.indexed_range is not None\n        ):\n            result[k] = dataclasses.replace(v, key=k) if not v.key else v\n            continue\n\n        for i in v.indexed_range:\n            actual_key = k.replace(\"{n}\", str(i))\n            placeholders = v.translation_placeholders\n            if placeholders:\n                placeholders = {pk: pv.format(n=i) for pk, pv in placeholders.items()}\n            result[actual_key] = dataclasses.replace(\n                v,\n                key=actual_key,\n                indexed_range=None,\n                translation_placeholders=placeholders,\n            )\n\n    return result",
+      "metadata": {
+        "start_line": 154,
+        "lang": "python",
+        "desc": "Definition of resolve_entity_description_keys in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py:chunk3"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "full_summary": "Python file with 0 classes and 12 functions. Key components include classes and method definitions relevant to transforms module.",
+  "chunks": [
+    {
+      "content": "def out_power(x: float) -> float:\n    \"\"\"Negate and round output power, returning 0 for zero values\"\"\"\n    return -round(x, 2) if x != 0 else 0.0",
+      "metadata": {
+        "start_line": 4,
+        "lang": "python",
+        "desc": "Definition of out_power in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk0"
+    },
+    {
+      "content": "def flow_is_on(x: int) -> bool:\n    \"\"\"Return True when the flow info bitmask indicates an active port\"\"\"\n    # Same check as in the app; values other than 0 (off) or 2 (on) are unknown\n    return (int(x) & 0b11) in [0b10, 0b11]",
+      "metadata": {
+        "start_line": 9,
+        "lang": "python",
+        "desc": "Definition of flow_is_on in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk1"
+    },
+    {
+      "content": "def pround(precision: int = 2):\n    \"\"\"Return a transform that rounds a float to the given precision\"\"\"\n\n    def _round(val: float | None) -> float | None:\n        return None if val is None else round(val, precision)\n\n    return _round",
+      "metadata": {
+        "start_line": 15,
+        "lang": "python",
+        "desc": "Definition of pround in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk2"
+    },
+    {
+      "content": "def pmultiply(x: int) -> Callable[[float | None], float | None]:\n    \"\"\"Return a transform that multiplies a float by x, preserving None\"\"\"\n\n    def _multiply(value: float | None) -> float | None:\n        return None if value is None else value * x\n\n    return _multiply",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of pmultiply in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk3"
+    },
+    {
+      "content": "def pdiv(\n    divisor: float, precision: int | None = None\n) -> Callable[[float | None], float | None]:\n    \"\"\"Return a transform that divides a float by divisor, optionally rounding\"\"\"\n\n    def _divide(value: float | None) -> float | None:\n        if value is None:\n            return None\n        result = value / divisor\n        return round(result, precision) if precision is not None else result\n\n    return _divide",
+      "metadata": {
+        "start_line": 33,
+        "lang": "python",
+        "desc": "Definition of pdiv in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk4"
+    },
+    {
+      "content": "def prop_has_bit_on(bit_position: int) -> Callable[[int | None], bool]:\n    \"\"\"Return a transform that checks whether a specific bit is set\"\"\"\n\n    def transform(value: int | None) -> bool:\n        if value is None:\n            return False\n        return bool((value >> bit_position) & 1)\n\n    return transform",
+      "metadata": {
+        "start_line": 47,
+        "lang": "python",
+        "desc": "Definition of prop_has_bit_on in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk5"
+    },
+    {
+      "content": "def prop_has_bit_off(bit_position: int) -> Callable[[int | None], bool]:\n    \"\"\"Return a transform that checks whether a specific bit is cleared\"\"\"\n\n    def transform(value: int | None) -> bool:\n        if value is None:\n            return False\n        return not bool((value >> bit_position) & 1)\n\n    return transform",
+      "metadata": {
+        "start_line": 58,
+        "lang": "python",
+        "desc": "Definition of prop_has_bit_off in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py:chunk6"
+    }
+  ]
+}

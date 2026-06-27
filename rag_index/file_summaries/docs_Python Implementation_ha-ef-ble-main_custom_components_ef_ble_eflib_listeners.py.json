@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 3 classes and 9 functions. Key components include classes and method definitions relevant to listeners module.",
+  "chunks": [
+    {
+      "content": "class ListenerRegistry:\n    \"\"\"Registry for listeners\"\"\"\n\n    def __init_subclass__(cls) -> None:\n        for name in get_annotations(cls):\n            setattr(cls, name, field(default_factory=ListenerGroup))\n\n        dataclass(cls)\n\n    @classmethod\n    def create(cls):\n        return cls._Descriptor[cls](cls)\n\n    @dataclass\n    class _Descriptor[T]:\n        orig_cls: type\n\n        def __set_name__(self, owner, name: str):\n            self.private_name = (\n                f\"_{name}\" if not hasattr(owner, f\"_{name}\") else f\"__{name}\"\n            )\n\n        @overload\n        def __get__(self, instance: None, owner: type) -> T: ...\n\n        @overload\n        def __get__(self, instance: Any, owner: type) -> T: ...\n\n        def __get__(self, instance: Any, owner: type) -> Self | T:\n            if instance is None:\n                return self\n\n            cls = getattr(instance, self.private_name, None)\n            if cls is None:\n                cls = self.orig_cls()\n                setattr(instance, self.private_name, cls)\n            return cls",
+      "metadata": {
+        "start_line": 8,
+        "lang": "python",
+        "desc": "Definition of ListenerRegistry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/listeners.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/listeners.py:chunk0"
+    },
+    {
+      "content": "class ListenerGroup[T: Callable](list[T]):\n    \"\"\"Collection of listeners that can be called as a single listener\"\"\"\n\n    def add(self, object: T) -> Callable[[], None]:\n        self.append(object)\n\n        def _unlisten():\n            self.remove(object)\n\n        return _unlisten\n\n    if TYPE_CHECKING:\n        # NOTE(gnox): ideally, this would be handled with ParamSpecs and in the runtime\n        # __call__ method, but this does not work with listeners defined with 3.12 type\n        # aliases so this is a workaround\n        __call__: T\n    else:\n\n        def __call__(self, *args, **kwargs):\n            for listener in self:\n                listener(*args, **kwargs)",
+      "metadata": {
+        "start_line": 47,
+        "lang": "python",
+        "desc": "Definition of ListenerGroup in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/listeners.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/listeners.py:chunk1"
+    }
+  ]
+}

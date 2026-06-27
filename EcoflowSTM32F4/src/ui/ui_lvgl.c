@@ -1422,7 +1422,7 @@ void UI_LVGL_Update(DeviceStatus* dev) {
                  static bool first_w2_disc = true;
                  if (last_w2_connected || first_w2_disc) { // Only add red style when actually disconnecting or on init
                      lv_obj_clear_state(btn_wave2, LV_STATE_CHECKED);
-                     lv_obj_remove_style(btn_wave2, NULL, LV_PART_MAIN); // style leak fix — freeze plan F9
+                     lv_obj_remove_style(btn_wave2, &style_btn_red, 0); // targeted removal — prevents leak without wiping position/size local styles
                      lv_obj_add_style(btn_wave2, &style_btn_red, 0);
                      first_w2_disc = false;
                  }

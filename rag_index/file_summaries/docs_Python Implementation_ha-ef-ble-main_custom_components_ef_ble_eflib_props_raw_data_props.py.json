@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 8 functions. Key components include classes and method definitions relevant to raw_data_props module.",
+  "chunks": [
+    {
+      "content": "class _Listeners(ListenerRegistry):\n    on_message_processed: ListenerGroup[MessageProcessedListener]",
+      "metadata": {
+        "start_line": 17,
+        "lang": "python",
+        "desc": "Definition of _Listeners in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_props.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_props.py:chunk0"
+    },
+    {
+      "content": "class RawDataProps(UpdatableProps, abc.ABC):\n    _raw_listeners = _Listeners.create()\n\n    def update_from_data(self, data: RawData, reset: bool = False):\n        if reset:\n            self.reset_updated()\n\n        for base in type(data).get_bases():\n            for field in self._datatype_to_field[base]:\n                setattr(self, field.public_name, data)\n\n    @overload\n    def update_from_bytes[T: RawData](\n        self,\n        data: type[T],\n        payload: bytes,\n        as_list: Literal[False] = False,\n        reset: bool = False,\n    ) -> T: ...\n\n    @overload\n    def update_from_bytes[T: RawData](\n        self, data: type[T], payload: bytes, as_list: Literal[True], reset: bool = False\n    ) -> list[T]: ...\n\n    def on_message_processed(self, listener: MessageProcessedListener):\n        return self._raw_listeners.on_message_processed.add(listener)\n\n    def update_from_bytes[T: RawData](\n        self, data: type[T], payload: bytes, as_list: bool = False, reset: bool = False\n    ) -> T | list[T]:\n        msgs = (\n            data.list_from_bytes(data=payload)\n            if as_list\n            else [data.from_bytes(data=payload)]\n        )\n\n        for msg in msgs:\n            self.update_from_data(msg, reset=reset)\n            self._log_message(msg)\n            self._raw_listeners.on_message_processed(msg)\n\n        return msgs if as_list else msgs[0]\n\n    @cached_property\n    def _log_message(self) -> Callable[[RawData], None]:\n        if not isinstance(self, devicebase.DeviceBase):\n            return lambda _: None\n\n        def _log_msg(msg: RawData):\n            return self._logger.log_filtered(\n                LogOptions.DESERIALIZED_MESSAGES,\n                \"Message from %s, type: %s\\n%s\",\n                self.device,\n                msg.__class__.__name__,\n                str(msg),\n            )\n\n        return _log_msg\n\n    @cached_property\n    def _datatype_to_field(self) -> dict[type[RawData], list[RawDataField]]:\n        field_map = defaultdict(list)\n        for field in self._fields:\n            if not isinstance(field, RawDataField):\n                continue\n\n            field_map[field.data_attr.message_type].append(field)\n        return field_map",
+      "metadata": {
+        "start_line": 21,
+        "lang": "python",
+        "desc": "Definition of RawDataProps in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_props.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_props.py:chunk1"
+    }
+  ]
+}

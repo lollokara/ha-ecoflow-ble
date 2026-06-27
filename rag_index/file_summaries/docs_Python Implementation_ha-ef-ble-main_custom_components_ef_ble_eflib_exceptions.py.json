@@ -1,0 +1,104 @@
+{
+  "full_summary": "Python file with 20 classes and 4 functions. Key components include classes and method definitions relevant to exceptions module.",
+  "chunks": [
+    {
+      "content": "class PacketParseError(Exception):\n    \"\"\"Error during parsing Packet\"\"\"",
+      "metadata": {
+        "start_line": 1,
+        "lang": "python",
+        "desc": "Definition of PacketParseError in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk0"
+    },
+    {
+      "content": "class EncPacketParseError(Exception):\n    \"\"\"Error during parsing EncPacket\"\"\"",
+      "metadata": {
+        "start_line": 5,
+        "lang": "python",
+        "desc": "Definition of EncPacketParseError in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk1"
+    },
+    {
+      "content": "class PacketReceiveError(Exception):\n    \"\"\"Error during receiving packet\"\"\"",
+      "metadata": {
+        "start_line": 9,
+        "lang": "python",
+        "desc": "Definition of PacketReceiveError in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk2"
+    },
+    {
+      "content": "class FailedToAuthenticate(Exception):\n    \"\"\"Failed to connect\"\"\"",
+      "metadata": {
+        "start_line": 13,
+        "lang": "python",
+        "desc": "Definition of FailedToAuthenticate in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk3"
+    },
+    {
+      "content": "class ConnectionTimeout(TimeoutError):\n    \"\"\"Connection timeout reached\"\"\"",
+      "metadata": {
+        "start_line": 17,
+        "lang": "python",
+        "desc": "Definition of ConnectionTimeout in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk4"
+    },
+    {
+      "content": "class MaxConnectionAttemptsReached(Exception):\n    \"\"\"Device could not complete initial connection after maximum attempts\"\"\"\n\n    def __init__(\n        self, last_error: Exception | type[Exception] | None = None, attempts: int = 8\n    ):\n        super().__init__()\n        self.last_error = last_error\n        self.attempts = attempts",
+      "metadata": {
+        "start_line": 21,
+        "lang": "python",
+        "desc": "Definition of MaxConnectionAttemptsReached in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk5"
+    },
+    {
+      "content": "class MaxReconnectAttemptsReached(Exception):\n    \"\"\"Device could not reconnect after maximum attempts\"\"\"\n\n    def __init__(self, last_error: Exception | type[Exception], attempts: int = 2):\n        super().__init__(\n            f\"Could not connect to device after {attempts} unsuccessful attempts\"\n        )\n        self.last_error = last_error\n        self.attempts = attempts",
+      "metadata": {
+        "start_line": 32,
+        "lang": "python",
+        "desc": "Definition of MaxReconnectAttemptsReached in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk6"
+    },
+    {
+      "content": "class BaseAuthException(Exception):\n    pass",
+      "metadata": {
+        "start_line": 43,
+        "lang": "python",
+        "desc": "Definition of BaseAuthException in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk7"
+    },
+    {
+      "content": "class AuthFailedError(BaseAuthException):\n    pass",
+      "metadata": {
+        "start_line": 47,
+        "lang": "python",
+        "desc": "Definition of AuthFailedError in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk8"
+    },
+    {
+      "content": "class AuthErrors:\n    BaseException = BaseAuthException\n\n    class KeyInfoReqFailed(BaseAuthException):\n        pass\n\n    class NeedRefreshToken(BaseAuthException):\n        pass\n\n    class DeviceInternalError(BaseAuthException):\n        pass\n\n    class DeviceAlreadyBound(BaseAuthException):\n        pass\n\n    class NeedBindInstallFirst(BaseAuthException):\n        pass\n\n    class AppSendDataError(BaseAuthException):\n        pass\n\n    class WrongKey(BaseAuthException):\n        pass\n\n    class MaximumDevicesError(BaseAuthException):\n        pass\n\n    class UnknownError(BaseAuthException):\n        pass\n\n    _PAYLOAD_TO_ERROR = {\n        b\"\\x00\": None,\n        b\"\\x01\": NeedRefreshToken,\n        b\"\\x02\": DeviceInternalError,\n        b\"\\x03\": DeviceAlreadyBound,\n        b\"\\x04\": NeedBindInstallFirst,\n        b\"\\x05\": AppSendDataError,\n        b\"\\x06\": WrongKey,\n        b\"\\x07\": MaximumDevicesError,\n    }\n\n    @classmethod\n    def from_payload(cls, payload: bytes) -> type[Exception] | None:\n        return cls._PAYLOAD_TO_ERROR.get(payload, AuthErrors.UnknownError)",
+      "metadata": {
+        "start_line": 51,
+        "lang": "python",
+        "desc": "Definition of AuthErrors in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk9"
+    },
+    {
+      "content": "class UnsupportedBluetoothProtocol(Exception):\n    def __init__(self, characteristic_type: str, available_characteristics: list[str]):\n        characteristics = \"\\n    \".join(available_characteristics)\n        super().__init__(\n            f\"Device is using unsupported protocol for {characteristic_type}.\\n\"\n            f\"Available characteristics:\\n    {characteristics}\"\n        )",
+      "metadata": {
+        "start_line": 97,
+        "lang": "python",
+        "desc": "Definition of UnsupportedBluetoothProtocol in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py:chunk10"
+    }
+  ]
+}

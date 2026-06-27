@@ -1,0 +1,50 @@
+{
+  "full_summary": "Python file with 4 classes and 4 functions. Key components include classes and method definitions relevant to encryption module.",
+  "chunks": [
+    {
+      "content": "class EncryptionStrategy(ABC):\n    \"\"\"Strategy for session-level AES-CBC encryption/decryption\"\"\"\n\n    session_key: bytes\n    iv: bytes\n\n    @abstractmethod\n    async def encrypt(self, plaintext: bytes) -> bytes: ...\n\n    @abstractmethod\n    async def decrypt(self, ciphertext: bytes) -> bytes: ...",
+      "metadata": {
+        "start_line": 16,
+        "lang": "python",
+        "desc": "Definition of EncryptionStrategy in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py:chunk0"
+    },
+    {
+      "content": "class Type7Encryption(EncryptionStrategy):\n    async def encrypt(self, plaintext: bytes) -> bytes:\n        cipher = AES.new(self.session_key, AES.MODE_CBC, self.iv)\n        return cipher.encrypt(plaintext=pad(plaintext, AES.block_size))\n\n    async def decrypt(self, ciphertext: bytes) -> bytes:\n        # native firmware decrypts only full AES blocks and discards any trailing bytes\n        # that don't fill a complete block\n        aligned = len(ciphertext) - len(ciphertext) % AES.block_size\n        if aligned == 0:\n            return ciphertext\n        cipher = AES.new(self.session_key, AES.MODE_CBC, self.iv)\n        decrypted = cipher.decrypt(ciphertext[:aligned])\n        try:\n            return unpad(decrypted, AES.block_size)\n        except ValueError:\n            return decrypted",
+      "metadata": {
+        "start_line": 29,
+        "lang": "python",
+        "desc": "Definition of Type7Encryption in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py:chunk1"
+    },
+    {
+      "content": "class Type1Encryption(EncryptionStrategy):\n    async def encrypt(self, plaintext: bytes) -> bytes:\n        padded_len = (len(plaintext) + 15) // 16 * 16\n        padded = plaintext + b\"\\x00\" * (padded_len - len(plaintext))\n        cipher = AES.new(self.session_key, AES.MODE_CBC, self.iv)\n        return cipher.encrypt(padded)\n\n    async def decrypt(self, ciphertext: bytes) -> bytes:\n        cipher = AES.new(self.session_key, AES.MODE_CBC, self.iv)\n        return cipher.decrypt(ciphertext)",
+      "metadata": {
+        "start_line": 48,
+        "lang": "python",
+        "desc": "Definition of Type1Encryption in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py:chunk2"
+    },
+    {
+      "content": "def _counter_nonce(base: bytes, counter: int) -> bytes:\n    n = bytearray(base)\n    cb = counter.to_bytes(12)\n    return bytes(a ^ b for a, b in zip(n, cb, strict=True))",
+      "metadata": {
+        "start_line": 60,
+        "lang": "python",
+        "desc": "Definition of _counter_nonce in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py:chunk3"
+    },
+    {
+      "content": "class Session:\n    @staticmethod\n    @functools.cache\n    def _developer_pubkey():\n        # NOTE(gnox): used for encrypting sensitive diagnostics data - only integration\n        # developers have access to the private key\n        return ECC.import_key(\n            \"-----BEGIN PUBLIC KEY-----\\n\"\n            \"MCowBQYDK2VuAyEAjyDKgWi1v2IO417ZsQC3VIa5U6bs8TzQQGxzlvCKWkM=\\n\"\n            \"-----END PUBLIC KEY-----\"\n        )\n\n    def __init__(self) -> None:\n        eph_priv = ECC.generate(curve=\"curve25519\")\n        eph_der = eph_priv.public_key().export_key(format=\"DER\")\n\n        shared = key_agreement(\n            static_priv=eph_priv,\n            static_pub=Session._developer_pubkey(),\n            kdf=lambda z: z,\n        )\n        self._aes_key = cast(\n            \"bytes\",\n            HKDF(shared, 32, b\"\", SHA256, context=b\"ecies-curve25519-aes256gcm\"),\n        )\n        self._base_nonce = get_random_bytes(12)\n        self._counter = 0\n\n        self.header = len(eph_der).to_bytes(2) + eph_der + self._base_nonce\n\n    def encrypt(self, plaintext: bytes) -> bytes:\n        counter = self._counter\n        self._counter += 1\n        nonce = _counter_nonce(self._base_nonce, counter)\n        cipher = AES.new(self._aes_key, AES.MODE_GCM, nonce=nonce)\n        ciphertext, tag = cipher.encrypt_and_digest(plaintext)\n        return counter.to_bytes(2) + ciphertext + tag",
+      "metadata": {
+        "start_line": 66,
+        "lang": "python",
+        "desc": "Definition of Session in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py:chunk4"
+    }
+  ]
+}

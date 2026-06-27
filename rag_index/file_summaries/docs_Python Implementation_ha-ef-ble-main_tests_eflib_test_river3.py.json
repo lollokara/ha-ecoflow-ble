@@ -1,0 +1,104 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_river3 module.",
+  "chunks": [
+    {
+      "content": "def packet_sequence():\n    \"\"\"\n    Raw packet sequence captured from a River 3 UPS device\n\n    All packets are DisplayPropertyUpload (src=0x02, cmd_set=0xFE, cmd_id=0x15)\n    containing battery, power, and system status information\n    \"\"\"\n    return [\n        \"aa132c01292c7537e009014502210101fe157d75687575213750757521374d74353e3875757575207575757528757575751075757575fd74d57ee5747fed7475c57475cd747abd7475d87775757575d87675757575c0760c324c37a57175987175757575ed7c74d57c75807c757575b5ed7974ed7847d57875af7875ed7b9374e07a7575e337e87a7575bd37b57af511857aaa688d7a8668e56555ed6554d5656cdd656cc0657575e337c8657575bd379565aa689d65866885652f8d657fed6474bd6475a564759d6475856475ed6375dd6375c56375cd6347b86375757575f0620c324cb7b86f757575758f69257f737d776580847e7f777d767f717d7165557f777d707f717d7365707f777d727f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f757f753e0a\",\n        \"aa135f00b32c7e37e009014502210101fe158e7f7ee67b7ede7b7ed67b7ece7b7ec67b7ebc7b7eb67b7eae7b7ea47b7e9e767e94765d747d76a07a747d76a07a747d76a07a747d76a67d747d76ef7d747e747e747e747e747ed6737ec6737ebe707efc657eee657ede657ece657ec6657e22b0\",\n        \"aa136500c82c8a37e009014502210101fe15e28afa8af28a0a8b8a02888a62888a7a888a72888862898a7a898a7a8e8a728e8a4a83944283945a868b0287b87a8426882a9c8c4a9c8a5a9c8a529c8b6a9c8a629c8a7a9c8a729c8832908a4a908a5a908a52908a6a908a72908a00918a12918a5a963b881f06\",\n        \"aa132c01292c9237e009014502210101fe159a928f9292f2d0b79292f2d0aa93d2d9df92929292c792929292cf92929292f7929292921a9332990293980a93922293922a939d5a93923f90929292923f919292929227913897bdd04296927f96929292920a9b93329b92679b929292520a9e930a9fa0329f92489f920a9c7493079d929204d00f9d92925ad0529d12f6629d4d8f6a9d618f0282b20a82b332828b3a828b2782929204d02f8292925ad072824d8f7a82618f6282c86a82980a83935a83924283927a83926283920a84923a84922284922a84a05f849292929217853897bd505f8892929292688ec298949a908267639998909a9198969a9682b298909a9798969a94829798909a959892989298929892989298929892989298929892989298929892989298929892989298929892989298929892989298928c2e\",\n        \"aa135f00b32c9b37e009014502210101fe156b9a9b039e9b3b9e9b339e9b2b9e9b239e9b599e9b539e9b4b9e9b419e9b7b939b7193b8919893459f919893459f919893459f91989343989198930a98919b919b919b919b919b33969b23969b5b959b19809b0b809b3b809b2b809b23809bbdb3\",\n    ]",
+      "metadata": {
+        "start_line": 8,
+        "lang": "python",
+        "desc": "Definition of packet_sequence in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk0"
+    },
+    {
+      "content": "def device(mocker: MockerFixture):\n    ble_dev = mocker.Mock()\n    ble_dev.address = \"AA:BB:CC:DD:EE:FF\"\n    adv_data = mocker.MagicMock()\n    device = Device(ble_dev, adv_data, \"R655TEST1234\")\n    device._conn = mocker.AsyncMock()\n    return device",
+      "metadata": {
+        "start_line": 25,
+        "lang": "python",
+        "desc": "Definition of device in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk1"
+    },
+    {
+      "content": "async def test_river3_parses_all_packets_successfully(device, packet_sequence):\n    for i, hex_packet in enumerate(packet_sequence):\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n\n        assert packet is not None, f\"Packet {i} failed to parse\"\n        assert packet.src == 0x02, f\"Packet {i} has unexpected src: {packet.src:#04x}\"\n        assert packet.cmd_set == 0xFE, (\n            f\"Packet {i} has unexpected cmd_set: {packet.cmd_set:#04x}\"\n        )\n        assert packet.cmd_id == 0x15, (\n            f\"Packet {i} has unexpected cmd_id: {packet.cmd_id:#04x}\"\n        )",
+      "metadata": {
+        "start_line": 34,
+        "lang": "python",
+        "desc": "Definition of test_river3_parses_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk2"
+    },
+    {
+      "content": "async def test_river3_processes_all_packets_successfully(device, packet_sequence):\n    for i, hex_packet in enumerate(packet_sequence):\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        processed = await device.data_parse(packet)\n        assert processed is True, f\"Packet {i} was not processed\"",
+      "metadata": {
+        "start_line": 48,
+        "lang": "python",
+        "desc": "Definition of test_river3_processes_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk3"
+    },
+    {
+      "content": "async def test_river3_updates_battery_level(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    assert Device.battery_level.public_name in device.updated_fields\n    battery_level = device.get_value(Device.battery_level)\n    assert battery_level is not None\n    assert isinstance(battery_level, (int, float))\n    assert 0 <= battery_level <= 100, f\"Battery level {battery_level} out of range\"",
+      "metadata": {
+        "start_line": 55,
+        "lang": "python",
+        "desc": "Definition of test_river3_updates_battery_level in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk4"
+    },
+    {
+      "content": "async def test_river3_updates_power_fields(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    power_field_names = [\n        Device.ac_input_power,\n        Device.ac_output_power,\n        Device.input_power,\n        Device.output_power,\n        Device.dc_input_power,\n    ]\n\n    for field_name in power_field_names:\n        value = device.get_value(field_name)\n        assert isinstance(value, (int, float)), (\n            f\"Power field {field_name} has wrong type: {type(value)}\"\n        )",
+      "metadata": {
+        "start_line": 66,
+        "lang": "python",
+        "desc": "Definition of test_river3_updates_power_fields in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk5"
+    },
+    {
+      "content": "async def test_river3_handles_zero_values_correctly(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    # Check that zero power values are handled correctly\n    if Device.ac_output_power.public_name in device.updated_fields:\n        ac_output = device.ac_output_power\n        assert isinstance(ac_output, (int, float))",
+      "metadata": {
+        "start_line": 85,
+        "lang": "python",
+        "desc": "Definition of test_river3_handles_zero_values_correctly in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk6"
+    },
+    {
+      "content": "async def test_river3_field_types_are_consistent(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    numeric_fields = [\n        Device.battery_level,\n        Device.ac_input_power,\n        Device.ac_output_power,\n        Device.input_power,\n        Device.output_power,\n        Device.dc_input_power,\n        Device.dc12v_output_power,\n        Device.usbc_output_power,\n        Device.usba_output_power,\n        Device.battery_input_power,\n        Device.battery_output_power,\n        Device.cell_temperature,\n    ]\n\n    for field_name in numeric_fields:\n        value = device.get_value(field_name)\n        if value is not None:\n            assert isinstance(value, (int, float)), (\n                f\"Field {field_name} has wrong type: {type(value)}\"\n            )\n\n    boolean_fields = [\n        Device.plugged_in_ac,\n        Device.energy_backup,\n        Device.dc_12v_port,\n        Device.ac_ports,\n    ]\n\n    for field_name in boolean_fields:\n        value = device.get_value(field_name)\n        assert isinstance(value, (bool, int)), (\n            f\"Field {field_name} has wrong type: {type(value)}\"\n        )\n        if isinstance(value, int):\n            assert value in (0, 1), f\"Boolean field {field_name} has invalid int value\"",
+      "metadata": {
+        "start_line": 96,
+        "lang": "python",
+        "desc": "Definition of test_river3_field_types_are_consistent in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk7"
+    },
+    {
+      "content": "async def test_river3_battery_soc_values_are_valid(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    if Device.battery_level.public_name in device.updated_fields:\n        battery_level = device.battery_level\n        assert battery_level is not None\n        assert 0 <= battery_level <= 100, (\n            f\"Battery level {battery_level} is out of valid range (0-100%)\"\n        )",
+      "metadata": {
+        "start_line": 139,
+        "lang": "python",
+        "desc": "Definition of test_river3_battery_soc_values_are_valid in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk8"
+    },
+    {
+      "content": "async def test_river3_energy_calculations(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    # Test that calculated energy fields are computed correctly\n    if device.ac_input_energy is not None and device.dc_input_energy is not None:\n        assert device.input_energy is not None, (\n            \"Input energy should be calculated from AC and DC input\"\n        )\n        assert device.input_energy == (\n            device.ac_input_energy + device.dc_input_energy\n        ), \"Input energy calculation is incorrect\"\n\n    if (\n        device.ac_output_energy is not None\n        and device.usba_output_energy is not None\n        and device.usbc_output_energy is not None\n        and device.dc12v_output_energy is not None\n    ):\n        assert device.output_energy is not None, (\n            \"Output energy should be calculated from all output sources\"\n        )\n        expected_output = (\n            device.ac_output_energy\n            + device.usba_output_energy\n            + device.usbc_output_energy\n            + device.dc12v_output_energy\n        )\n        assert device.output_energy == expected_output, (\n            \"Output energy calculation is incorrect\"\n        )",
+      "metadata": {
+        "start_line": 152,
+        "lang": "python",
+        "desc": "Definition of test_river3_energy_calculations in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk9"
+    },
+    {
+      "content": "async def test_river3_exact_values_from_known_packets(device, packet_sequence):\n    \"\"\"Test that known packet data produces exact expected values\"\"\"\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    expected = {\n        Device.battery_level: 75.0,\n        Device.ac_input_power: 43.76,\n        Device.ac_output_power: 43.76,\n        Device.input_power: 56.0,\n        Device.output_power: 56.0,\n        Device.dc_input_power: 0.0,\n        Device.dc12v_output_power: 0.0,\n        Device.usbc_output_power: 0,\n        Device.usba_output_power: 0,\n        Device.battery_input_power: 0,\n        Device.battery_output_power: 2.0,\n        Device.cell_temperature: 33,\n        Device.plugged_in_ac: True,\n        Device.energy_backup: True,\n        Device.dc_12v_port: False,\n        Device.ac_ports: True,\n        Device.ac_input_energy: 5,\n        Device.ac_output_energy: 194805,\n        Device.dc_input_energy: 0,\n        Device.usbc_output_energy: 32,\n        Device.usba_output_energy: 0,\n        Device.dc12v_output_energy: 0,\n        Device.input_energy: 5,\n        Device.output_energy: 194837,\n        Device.remaining_time_charging: 3827,\n        Device.remaining_time_discharging: 3807,\n    }\n\n    for field_name, expected_value in expected.items():\n        actual_value = device.get_value(field_name)\n        assert actual_value == expected_value, (\n            f\"{field_name}: expected {expected_value}, got {actual_value}\"\n        )",
+      "metadata": {
+        "start_line": 186,
+        "lang": "python",
+        "desc": "Definition of test_river3_exact_values_from_known_packets in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py:chunk10"
+    }
+  ]
+}

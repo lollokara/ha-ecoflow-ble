@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to keydata module.",
+  "chunks": [
+    {
+      "content": "def get8bytes(pos: int):\n    return _data[pos : pos + 8]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of get8bytes in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/keydata.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/keydata.py:chunk0"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 3 functions. Key components include classes and method definitions relevant to powerpulse_ev module.",
+  "chunks": [
+    {
+      "content": "class AcPlugState(IntFieldValue):\n    UNKNOWN = -1\n    UNPLUGGED = 1\n    PLUGGED_IN = 2\n    CHARGING = 3\n    PAUSED = 4\n    CHARGE_COMPLETE = 6\n    STANDBY = 7\n    UPDATING = 8",
+      "metadata": {
+        "start_line": 17,
+        "lang": "python",
+        "desc": "Definition of AcPlugState in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerpulse_ev.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerpulse_ev.py:chunk0"
+    },
+    {
+      "content": "class Device(DeviceBase, ProtobufProps):\n    \"\"\"PowerPulse\"\"\"\n\n    SN_PREFIX = (\n        b\"C101\",  # PowerPulse 9.6 kW DIY\n        b\"C102\",  # PowerPulse 11.5 kW\n        b\"C103\",  # PowerPulse 9.6 kW\n        b\"C371\",  # PowerPulse 7 kW\n        b\"C372\",  # PowerPulse 22 kW\n        b\"C373\",  # PowerPulse 22 kW Pro\n        b\"C374\",  # PowerPulse 22 kW Meter\n        b\"C375\",  # PowerPulse 11 kW\n        b\"C376\",  # PowerPulse 11 kW Meter\n    )\n    NAME_PREFIX = \"EF-C10\"\n\n    ac_plug_state = pb_field(pb.system_state, AcPlugState.from_value)\n    output_power = pb_field(pb.charge_power, pround(1))\n    ac_output_voltage = pb_field(pb.mid_meter.volt_l1, pround(1))\n    ac_output_current = pb_field(pb.mid_meter.curr_l1, pround(2))\n    total_energy = pb_field(pb.energy_value)\n\n    def __init__(\n        self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str\n    ) -> None:\n        super().__init__(ble_dev, adv_data, sn)\n        self._time_commands = TimeCommands(self)\n\n    @classmethod\n    def check(cls, sn: bytes) -> bool:\n        return sn[:4] in cls.SN_PREFIX\n\n    @property\n    def device(self) -> str:\n        match self._sn[:4]:\n            case \"C102\":\n                model = \"11.5 kW\"\n            case \"C103\":\n                model = \"9.6 kW\"\n            case \"C371\":\n                model = \"7 kW\"\n            case \"C372\":\n                model = \"22 kW\"\n            case \"C373\":\n                model = \"22 kW Pro\"\n            case \"C374\":\n                model = \"22 kW Meter\"\n            case \"C375\":\n                model = \"11 kW\"\n            case \"C376\":\n                model = \"11 kW Meter\"\n            case _:\n                model = \"9.6 kW DIY\"\n        return f\"PowerPulse EV Charger ({model})\"\n\n    async def packet_parse(self, data: bytes):\n        return Packet.from_bytes(data, xor_payload=True)\n\n    async def data_parse(self, packet: Packet) -> bool:\n        processed = False\n        self.reset_updated()\n\n        match packet.src, packet.cmd_set, packet.cmd_id:\n            case (0x02, 0x02, 0x21):\n                self.update_from_bytes(cp307_iot_pb2.HeartBeat, packet.payload)\n                processed = True\n            case (0x35, 0x01, Packet.NET_BLE_COMMAND_CMD_SET_RET_TIME):\n                if len(packet.payload) == 0:\n                    self._time_commands.async_send_all()\n                processed = True\n\n        for field_name in self.updated_fields:\n            self.update_callback(field_name)\n            self.update_state(field_name, getattr(self, field_name))\n\n        return processed",
+      "metadata": {
+        "start_line": 28,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerpulse_ev.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerpulse_ev.py:chunk1"
+    }
+  ]
+}

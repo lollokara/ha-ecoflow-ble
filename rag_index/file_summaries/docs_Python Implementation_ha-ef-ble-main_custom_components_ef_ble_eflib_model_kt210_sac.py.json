@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to kt210_sac module.",
+  "chunks": [
+    {
+      "content": "class KT210SAC(RawData):\n    mode: Annotated[int, \"B\", \"mode\"]\n    sub_mode: Annotated[int, \"B\", \"subMode\"]\n    set_temp: Annotated[int, \"B\", \"setTemp\"]\n    fan_value: Annotated[int, \"B\", \"fanValue\"]\n    env_temp: Annotated[float, \"f\", \"envTemp\"]\n    temp_sys: Annotated[int, \"B\", \"tempSys\"]\n    display_idle_time: Annotated[int, \"H\", \"displayIdleTime\"]\n    display_idle_mode: Annotated[int, \"B\", \"displayIdleMode\"]\n    time_en: Annotated[int, \"B\", \"timeEn\"]\n    time_set_val: Annotated[int, \"H\", \"timeSetVal\"]\n    time_remain_val: Annotated[int, \"H\", \"timeRemainVal\"]\n    beep_enable: Annotated[int, \"B\", \"beepEnable\"]\n    err_code: Annotated[int, \"I\", \"errCode\"]\n    name: Annotated[bytes, \"32s\", \"name\"]\n    ref_en: Annotated[int, \"B\", \"refEn\"]\n    bms_pid: Annotated[int, \"H\", \"bmsPid\"]\n    wte_fth_en: Annotated[int, \"B\", \"wteFthEn\"]\n    temp_display: Annotated[int, \"B\", \"tempDisplay\"]\n    power_mode: Annotated[int, \"B\", \"powerMode\"]\n    power_src: Annotated[int, \"B\", \"powerSrc\"]\n    psdr_pwr_watt: Annotated[int, \"H\", \"psdrPwrWatt\"]\n    bat_pwr_watt: Annotated[int, \"H\", \"batPwrWatt\"]\n    mptt_pwr_watt: Annotated[int, \"H\", \"mpttPwrWatt\"]\n    bat_dsg_remain_time: Annotated[int, \"I\", \"batDsgRemainTime\"]\n    bat_chg_remain_time: Annotated[int, \"I\", \"batChgRemainTime\"]\n    bat_soc: Annotated[int, \"B\", \"batSoc\"]\n    bat_chg_status: Annotated[int, \"B\", \"batChgStatus\"]\n    outlet_temp: Annotated[float, \"f\", \"outLetTemp\"]\n    mppt_work: Annotated[int, \"B\", \"mpptWork\"]\n    bms_err: Annotated[int, \"B\", \"bmsErr\"]\n    rgb_state: Annotated[int, \"B\", \"rgbState\"]\n    water_value: Annotated[int, \"B\", \"waterValue\"]\n    bms_bound_flag: Annotated[int, \"B\", \"bmsBoundFlag\"]\n    bms_undervoltage: Annotated[int, \"B\", \"bmsUndervoltage\"]\n    ver: Annotated[int, \"B\", \"ver\"]\n    resv_u8: Annotated[bytes, \"20s\", \"resvU8\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of KT210SAC in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kt210_sac.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kt210_sac.py:chunk0"
+    }
+  ]
+}

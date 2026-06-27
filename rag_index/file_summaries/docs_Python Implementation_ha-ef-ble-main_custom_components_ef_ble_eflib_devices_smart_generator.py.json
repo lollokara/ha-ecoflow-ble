@@ -1,0 +1,77 @@
+{
+  "full_summary": "Python file with 8 classes and 2 functions. Key components include classes and method definitions relevant to smart_generator module.",
+  "chunks": [
+    {
+      "content": "class FuelType(IntFieldValue):\n    UNKNOWN = -1\n\n    LNG = 1\n    LPG = 2\n    GASOLINE = 3  # original name: OIL",
+      "metadata": {
+        "start_line": 14,
+        "lang": "python",
+        "desc": "Definition of FuelType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk0"
+    },
+    {
+      "content": "class EngineOpen(IntFieldValue):\n    UNKNOWN = -1\n\n    CLOSED = 0\n    OPENED = 1\n    CLOSING = 2",
+      "metadata": {
+        "start_line": 22,
+        "lang": "python",
+        "desc": "Definition of EngineOpen in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk1"
+    },
+    {
+      "content": "class SubBatteryState(IntFieldValue):\n    UNKNOWN = -1\n\n    IDLE = 0\n    NO_INPUT = 1\n    DISCHARGING = 2\n    CHARGING = 3\n    NORMAL_FULL = 4\n    NORMAL_LOW_PRESSURE = 5",
+      "metadata": {
+        "start_line": 30,
+        "lang": "python",
+        "desc": "Definition of SubBatteryState in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk2"
+    },
+    {
+      "content": "class PerformanceMode(IntFieldValue):\n    UNKNOWN = -1\n\n    ECO = 0\n    PERFORMANCE = 1\n    AUTO = 2",
+      "metadata": {
+        "start_line": 41,
+        "lang": "python",
+        "desc": "Definition of PerformanceMode in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk3"
+    },
+    {
+      "content": "class LiquefiedGasType(IntFieldValue):\n    UNKNOWN = -1\n\n    LNG = 0\n    LPG = 1",
+      "metadata": {
+        "start_line": 49,
+        "lang": "python",
+        "desc": "Definition of LiquefiedGasType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk4"
+    },
+    {
+      "content": "class LiquefiedGasUnit(IntFieldValue):\n    UNKNOWN = -1\n\n    LB = 0\n    KG = 1",
+      "metadata": {
+        "start_line": 56,
+        "lang": "python",
+        "desc": "Definition of LiquefiedGasUnit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk5"
+    },
+    {
+      "content": "class AbnormalState(IntFieldValue):\n    UNKNOWN = -1\n\n    NO = 0\n    GASOLINE_LOW = 1  # original name: OIL_LOW",
+      "metadata": {
+        "start_line": 69,
+        "lang": "python",
+        "desc": "Definition of AbnormalState in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk6"
+    },
+    {
+      "content": "class Device(DeviceBase, ProtobufProps):\n    \"\"\"Smart Generator 3000 (Dual Fuel)\"\"\"\n\n    SN_PREFIX = (b\"G371\",)\n    NAME_PREFIX = \"EF-GE\"\n\n    output_power = pb_field(pb.pow_out_sum_w)\n    ac_output_power = pb_field(pb.pow_get_ac)\n\n    engine_on = pb_field(\n        pb.generator_engine_open,\n        lambda x: EngineOpen.from_value(x) in [EngineOpen.OPENED, EngineOpen.CLOSING],\n    )\n    engine_state = pb_field(pb.generator_engine_open, EngineOpen.from_value)\n    performance_mode = pb_field(pb.generator_perf_mode, PerformanceMode.from_value)\n\n    self_start = pb_field(pb.cms_oil_self_start)\n\n    fuel_type = pb_field(pb.generator_fuels_type, FuelType.from_value)\n    liquefied_gas_unit = pb_field(\n        pb.fuels_liquefied_gas_uint, LiquefiedGasUnit.from_value\n    )\n    liquefied_gas_value = pb_field(pb.fuels_liquefied_gas_val)\n    liquefied_gas_consumption = pb_field(pb.fuels_liquefied_gas_consume_per_hour)\n    lpg_level_monitoring = pb_field(pb.generator_lpg_monitor_en)\n\n    generator_abnormal_state = pb_field(\n        pb.generator_abnormal_state,\n        lambda x: AbnormalState.from_value(x & 1),\n    )\n\n    sub_battery_power = pb_field(pb.pow_get_dc)\n    sub_battery_soc = pb_field(pb.generator_sub_battery_soc)\n    sub_battery_state = pb_field(\n        pb.generator_sub_battery_state, SubBatteryState.from_value\n    )\n\n    ac_port = pb_field(pb.ac_out_open)\n\n    def __init__(\n        self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str\n    ) -> None:\n        super().__init__(ble_dev, adv_data, sn)\n        self._time_commands = TimeCommands(self)\n\n    @classmethod\n    def check(cls, sn):\n        return sn.startswith(cls.SN_PREFIX)\n\n    async def packet_parse(self, data: bytes):\n        return Packet.from_bytes(data, xor_payload=True)\n\n    async def data_parse(self, packet: Packet):\n        processed = False\n        self.reset_updated()\n\n        if packet.src == 0x08 and packet.cmd_set == 0xFE and packet.cmd_id == 0x15:\n            self.update_from_bytes(ge305_sys_pb2.DisplayPropertyUpload, packet.payload)\n            processed = True\n        elif (\n            packet.src == 0x35\n            and packet.cmd_set == 0x01\n            and packet.cmd_id == Packet.NET_BLE_COMMAND_CMD_SET_RET_TIME\n        ):\n            if len(packet.payload) == 0:\n                self._time_commands.async_send_all()\n            processed = True\n\n        for field_name in self.updated_fields:\n            self.update_callback(field_name)\n            self.update_state(field_name, getattr(self, field_name))\n\n        return processed\n\n    async def _send_config_packet(self, message: ge305_sys_pb2.ConfigWrite):\n        payload = message.SerializeToString()\n        packet = Packet(0x20, 0x08, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)\n        await self._conn.sendPacket(packet)\n\n    async def enable_ac_port(self, enabled: bool):\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_ac_out_open=enabled)\n        )\n\n    async def enable_self_start(self, enabled: bool):\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_generator_self_on=enabled)\n        )\n\n    async def enable_engine_on(self, enabled: bool):\n        value = EngineOpen.OPENED if enabled else EngineOpen.CLOSED\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_generator_engine_open=value.value)\n        )\n\n    async def enable_lpg_level_monitoring(self, enabled: bool):\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(\n                cfg_generator_lpg_monitor_en=enabled,\n                cfg_fuels_liquefied_gas_uint=self.liquefied_gas_unit,\n                cfg_fuels_liquefied_gas_val=self.liquefied_gas_value,\n            )\n        )\n\n    async def set_liquefied_gas_unit(self, value: LiquefiedGasUnit):\n        gas_value = None\n        if self.liquefied_gas_value is not None:\n            if (\n                self.liquefied_gas_unit is LiquefiedGasUnit.KG\n                and value is LiquefiedGasUnit.LB\n            ):\n                gas_value = round(self.liquefied_gas_value * 2.2, 1)\n            elif (\n                self.liquefied_gas_unit is LiquefiedGasUnit.LB\n                and value is LiquefiedGasUnit.KG\n            ):\n                gas_value = round(self.liquefied_gas_value / 2.2, 1)\n\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(\n                cfg_fuels_liquefied_gas_uint=value.value,\n                cfg_fuels_liquefied_gas_val=gas_value,\n            )\n        )\n\n    async def set_liquefied_gas_value(self, value: float):\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(\n                cfg_fuels_liquefied_gas_val=value,\n                cfg_fuels_liquefied_gas_uint=self.liquefied_gas_unit,\n            )\n        )\n        return True\n\n    async def set_engine_open(self, engine_open: EngineOpen):\n        if engine_open is EngineOpen.CLOSING:\n            return\n\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_generator_engine_open=engine_open.value)\n        )\n\n    async def set_performance_mode(self, performance_mode: PerformanceMode):\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_generator_perf_mode=performance_mode.value)\n        )",
+      "metadata": {
+        "start_line": 76,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py:chunk7"
+    }
+  ]
+}

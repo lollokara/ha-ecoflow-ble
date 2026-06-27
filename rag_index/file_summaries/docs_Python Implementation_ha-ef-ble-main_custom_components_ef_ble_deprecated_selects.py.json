@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to selects module.",
+  "chunks": [
+    {
+      "content": "class EcoflowSelectEntityDescription[T: DeviceBase](SelectEntityDescription):\n    set_state: Callable[[T, str], Awaitable] | None = None\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of EcoflowSelectEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/selects.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/selects.py:chunk0"
+    }
+  ]
+}

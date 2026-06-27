@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to smart_meter module.",
+  "chunks": [
+    {
+      "content": "class GridState(IntFieldValue):\n    NOT_VALID = 0\n    GRID_IN = 1\n    GRID_OFFLINE = 2\n    FEED_GRID = 3",
+      "metadata": {
+        "start_line": 17,
+        "lang": "python",
+        "desc": "Definition of GridState in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_meter.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_meter.py:chunk0"
+    },
+    {
+      "content": "class Device(DeviceBase, ProtobufProps):\n    SN_PREFIX = (b\"BK21\",)\n    NAME_PREFIX = \"EF-WN2\"\n\n    @classmethod\n    def check(cls, sn: bytes):\n        return sn[:4] in cls.SN_PREFIX\n\n    grid_power = pb_field(pb.pow_get_sys_grid)\n    grid_state = pb_field(pb.grid_connection_sta, GridState.from_value)\n    grid_energy = pb_field(pb.grid_connection_data_record.today_active)\n\n    l1_active = pb_field(pb.grid_connection_flag_L1)\n    l1_power = pb_field(pb.grid_connection_power_L1, pround(2))\n    l1_current = pb_field(pb.grid_connection_amp_L1, pround(2))\n    l1_voltage = pb_field(pb.grid_connection_vol_L1, pround(2))\n    l1_grid_energy = pb_field(pb.grid_connection_data_record.today_active_L1)\n\n    l2_active = pb_field(pb.grid_connection_flag_L2)\n    l2_power = pb_field(pb.grid_connection_power_L2, pround(2))\n    l2_current = pb_field(pb.grid_connection_amp_L2, pround(2))\n    l2_voltage = pb_field(pb.grid_connection_vol_L2, pround(2))\n    l2_grid_energy = pb_field(pb.grid_connection_data_record.today_active_L2)\n\n    l3_active = pb_field(pb.grid_connection_flag_L3)\n    l3_power = pb_field(pb.grid_connection_power_L3, pround(2))\n    l3_current = pb_field(pb.grid_connection_amp_L3, pround(2))\n    l3_voltage = pb_field(pb.grid_connection_vol_L3, pround(2))\n    l3_grid_energy = pb_field(pb.grid_connection_data_record.today_active_L3)\n\n    async def packet_parse(self, data: bytes):\n        return Packet.from_bytes(data, xor_payload=True)\n\n    async def data_parse(self, packet: Packet):\n        processed = False\n        self.reset_updated()\n\n        match packet.src, packet.cmd_set, packet.cmd_id:\n            case (0x02, 0xFE, 0x15):\n                self.update_from_bytes(\n                    bk622_common_pb2.DisplayPropertyUpload, packet.payload\n                )\n                processed = True\n\n        if not self.l1_active:\n            self.l1_power = self.l1_current = self.l1_voltage = 0\n        if not self.l2_active:\n            self.l2_power = self.l2_current = self.l2_voltage = 0\n        if not self.l3_active:\n            self.l3_power = self.l3_current = self.l3_voltage = 0\n\n        for field_name in self.updated_fields:\n            self.update_callback(field_name)\n            self.update_state(field_name, getattr(self, field_name))\n\n        return processed\n\n    async def _send_config_packet(self, message: bk622_common_pb2.ConfigWrite):\n        payload = message.SerializeToString()\n        message.cfg_utc_time = round(time.time())\n        packet = Packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)\n        await self._conn.sendPacket(packet)",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_meter.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_meter.py:chunk1"
+    }
+  ]
+}

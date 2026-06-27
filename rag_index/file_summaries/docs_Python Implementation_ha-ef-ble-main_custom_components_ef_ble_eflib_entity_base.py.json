@@ -1,0 +1,32 @@
+{
+  "full_summary": "Python file with 2 classes and 5 functions. Key components include classes and method definitions relevant to base module.",
+  "chunks": [
+    {
+      "content": "class EntityType:\n    field: \"updatable_props.Field\" = dataclasses.field(hash=False)\n\n    enabled: bool = dataclasses.field(default=True, kw_only=True)\n    availability: \"updatable_props.Field | str | None\" = dataclasses.field(\n        default=None, kw_only=True\n    )\n    translation_key: str | None = dataclasses.field(default=None, kw_only=True)\n    translation_placeholders: dict[str, str] | None = dataclasses.field(\n        default=None, kw_only=True\n    )\n\n    @property\n    def _field(self) -> \"updatable_props.Field\":\n        return self.field  # pyright: ignore[reportAttributeAccessIssue]\n\n    @property\n    def availability_prop(self):\n        availability: updatable_props.Field | str = self.availability  # pyright: ignore[reportAttributeAccessIssue]\n        if isinstance(availability, updatable_props.Field):\n            return availability.public_name\n        return availability\n\n    @property\n    def key(self):\n        return self._field.public_name\n\n    def __init_subclass__(cls) -> None:\n        dataclasses.dataclass(cls)",
+      "metadata": {
+        "start_line": 10,
+        "lang": "python",
+        "desc": "Definition of EntityType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py:chunk0"
+    },
+    {
+      "content": "class DynamicValue[F, T]:\n    field: \"updatable_props.Field[F]\"\n    transform: Callable[[F], T] | None = None",
+      "metadata": {
+        "start_line": 45,
+        "lang": "python",
+        "desc": "Definition of DynamicValue in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py:chunk1"
+    },
+    {
+      "content": "def dynamic[F, T](\n    field: \"updatable_props.Field[F]\", transform: Callable[[F], T] | None = None\n) -> T:\n    return DynamicValue(field, transform)  # pyright: ignore[reportReturnType]",
+      "metadata": {
+        "start_line": 50,
+        "lang": "python",
+        "desc": "Definition of dynamic in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py:chunk2"
+    }
+  ]
+}

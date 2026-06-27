@@ -1,0 +1,302 @@
+{
+  "full_summary": "Python file with 4 classes and 34 functions. Key components include classes and method definitions relevant to sensor module.",
+  "chunks": [
+    {
+      "content": "class EcoflowSensorEntityDescription[Device: DeviceBase](SensorEntityDescription):\n    state_attribute_fields: list[str] = field(default_factory=list)\n    native_unit_of_measurement_field: str | Callable[[Device], str] | None = None\n    indexed_range: range | None = None",
+      "metadata": {
+        "start_line": 54,
+        "lang": "python",
+        "desc": "Definition of EcoflowSensorEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk0"
+    },
+    {
+      "content": "class _SensorKwargs(TypedDict, total=False):\n    translation_key: str\n    translation_placeholders: dict[str, str]\n    indexed_range: range\n    entity_category: EntityCategory\n    state_attribute_fields: list[str]",
+      "metadata": {
+        "start_line": 60,
+        "lang": "python",
+        "desc": "Definition of _SensorKwargs in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk1"
+    },
+    {
+      "content": "def battery(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=PERCENTAGE,\n        device_class=SensorDeviceClass.BATTERY,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 68,
+        "lang": "python",
+        "desc": "Definition of battery in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk2"
+    },
+    {
+      "content": "def power(\n    key: str = \"\",\n    *,\n    enabled: bool = True,\n    precision: int | None = None,\n    state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfPower.WATT,\n        device_class=SensorDeviceClass.POWER,\n        state_class=state_class,\n        suggested_display_precision=precision,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 81,
+        "lang": "python",
+        "desc": "Definition of power in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk3"
+    },
+    {
+      "content": "def power_factor(\n    key: str = \"\",\n    *,\n    enabled: bool = False,\n    precision: int | None = 0,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=PERCENTAGE,\n        device_class=SensorDeviceClass.POWER_FACTOR,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_category=EntityCategory.DIAGNOSTIC,\n        suggested_display_precision=precision,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 100,
+        "lang": "python",
+        "desc": "Definition of power_factor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk4"
+    },
+    {
+      "content": "def energy(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,\n        device_class=SensorDeviceClass.ENERGY,\n        state_class=SensorStateClass.TOTAL_INCREASING,\n        suggested_display_precision=3,\n        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 119,
+        "lang": "python",
+        "desc": "Definition of energy in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk5"
+    },
+    {
+      "content": "def energy_storage(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,\n        device_class=SensorDeviceClass.ENERGY_STORAGE,\n        state_class=SensorStateClass.MEASUREMENT,\n        suggested_display_precision=0,\n        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 134,
+        "lang": "python",
+        "desc": "Definition of energy_storage in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk6"
+    },
+    {
+      "content": "def voltage(\n    key: str = \"\",\n    *,\n    enabled: bool = True,\n    precision: int | None = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfElectricPotential.VOLT,\n        device_class=SensorDeviceClass.VOLTAGE,\n        state_class=SensorStateClass.MEASUREMENT,\n        suggested_display_precision=precision,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 149,
+        "lang": "python",
+        "desc": "Definition of voltage in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk7"
+    },
+    {
+      "content": "def current(\n    key: str = \"\",\n    *,\n    enabled: bool = True,\n    precision: int | None = None,\n    state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,\n        device_class=SensorDeviceClass.CURRENT,\n        state_class=state_class,\n        suggested_display_precision=precision,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 167,
+        "lang": "python",
+        "desc": "Definition of current in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk8"
+    },
+    {
+      "content": "def signal_strength(\n    key: str = \"\", enabled: bool = False, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,\n        device_class=SensorDeviceClass.SIGNAL_STRENGTH,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_category=EntityCategory.DIAGNOSTIC,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 186,
+        "lang": "python",
+        "desc": "Definition of signal_strength in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk9"
+    },
+    {
+      "content": "def temperature(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfTemperature.CELSIUS,\n        device_class=SensorDeviceClass.TEMPERATURE,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 200,
+        "lang": "python",
+        "desc": "Definition of temperature in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk10"
+    },
+    {
+      "content": "def _wave_unit(dev: wave3.Device):\n    match dev:\n        case wave3.Device:\n            return (\n                UnitOfTemperature.FAHRENHEIT\n                if dev.temp_unit is wave3.TemperatureUnit.FAHRENHEIT\n                else UnitOfTemperature.CELSIUS\n            )\n    return UnitOfTemperature.CELSIUS",
+      "metadata": {
+        "start_line": 213,
+        "lang": "python",
+        "desc": "Definition of _wave_unit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk11"
+    },
+    {
+      "content": "def wave_temperature(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        device_class=SensorDeviceClass.TEMPERATURE,\n        state_class=SensorStateClass.MEASUREMENT,\n        native_unit_of_measurement_field=_wave_unit,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 224,
+        "lang": "python",
+        "desc": "Definition of wave_temperature in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk12"
+    },
+    {
+      "content": "def duration(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfTime.MINUTES,\n        device_class=SensorDeviceClass.DURATION,\n        state_class=SensorStateClass.MEASUREMENT,\n        suggested_unit_of_measurement=UnitOfTime.HOURS,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 237,
+        "lang": "python",
+        "desc": "Definition of duration in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk13"
+    },
+    {
+      "content": "def frequency(\n    key: str = \"\",\n    *,\n    enabled: bool = True,\n    precision: int | None = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=UnitOfFrequency.HERTZ,\n        device_class=SensorDeviceClass.FREQUENCY,\n        state_class=SensorStateClass.MEASUREMENT,\n        suggested_display_precision=precision,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 251,
+        "lang": "python",
+        "desc": "Definition of frequency in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk14"
+    },
+    {
+      "content": "def _liquefied_gas_unit(dev: DeviceBase) -> str:\n    unit = getattr(dev, \"liquefied_gas_unit\", None)\n    if (\n        unit is not None\n        and getattr(unit, \"value\", -1) == smart_generator.LiquefiedGasUnit.LB.value\n    ):\n        return UnitOfMass.POUNDS\n    return UnitOfMass.KILOGRAMS",
+      "metadata": {
+        "start_line": 269,
+        "lang": "python",
+        "desc": "Definition of _liquefied_gas_unit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk15"
+    },
+    {
+      "content": "def weight(\n    key: str = \"\",\n    enabled: bool = True,\n    unit: str | None = UnitOfMass.KILOGRAMS,\n    unit_field: \"str | Callable[[DeviceBase], str] | None\" = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        device_class=SensorDeviceClass.WEIGHT,\n        state_class=SensorStateClass.MEASUREMENT,\n        native_unit_of_measurement=None if unit_field is not None else unit,\n        native_unit_of_measurement_field=unit_field,\n        suggested_display_precision=2,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 279,
+        "lang": "python",
+        "desc": "Definition of weight in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk16"
+    },
+    {
+      "content": "def humidity(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=PERCENTAGE,\n        device_class=SensorDeviceClass.HUMIDITY,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 298,
+        "lang": "python",
+        "desc": "Definition of humidity in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk17"
+    },
+    {
+      "content": "def percentage(\n    key: str = \"\", enabled: bool = True, **kwargs: Unpack[_SensorKwargs]\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        native_unit_of_measurement=PERCENTAGE,\n        state_class=SensorStateClass.MEASUREMENT,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 311,
+        "lang": "python",
+        "desc": "Definition of percentage in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk18"
+    },
+    {
+      "content": "def enum(\n    key: str = \"\",\n    enabled: bool = True,\n    options: list[str] | type[IntFieldValue] | None = None,\n    name: str | None = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    if type(options) is EnumType and issubclass(options, IntFieldValue):\n        options = options.options()\n\n    return EcoflowSensorEntityDescription(\n        key=key,\n        name=name,\n        device_class=SensorDeviceClass.ENUM,\n        options=options,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 323,
+        "lang": "python",
+        "desc": "Definition of enum in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk19"
+    },
+    {
+      "content": "def raw(\n    key: str = \"\",\n    enabled: bool = True,\n    state_class: SensorStateClass | None = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return EcoflowSensorEntityDescription(\n        key=key,\n        state_class=state_class,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 343,
+        "lang": "python",
+        "desc": "Definition of raw in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk20"
+    },
+    {
+      "content": "def port_power(\n    name: str,\n    *,\n    enabled: bool = True,\n    precision: int | None = None,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return power(\n        enabled=enabled,\n        precision=precision,\n        translation_key=\"port_power\",\n        translation_placeholders={\"name\": name},\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 357,
+        "lang": "python",
+        "desc": "Definition of port_power in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk21"
+    },
+    {
+      "content": "def port_voltage(\n    name: str,\n    *,\n    enabled: bool = False,\n    precision: int | None = 2,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return voltage(\n        enabled=enabled,\n        precision=precision,\n        translation_key=\"port_voltage\",\n        translation_placeholders={\"name\": name},\n        entity_category=EntityCategory.DIAGNOSTIC,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 373,
+        "lang": "python",
+        "desc": "Definition of port_voltage in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk22"
+    },
+    {
+      "content": "def port_current(\n    name: str,\n    *,\n    enabled: bool = False,\n    precision: int | None = 2,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return current(\n        enabled=enabled,\n        precision=precision,\n        translation_key=\"port_current\",\n        translation_placeholders={\"name\": name},\n        entity_category=EntityCategory.DIAGNOSTIC,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 390,
+        "lang": "python",
+        "desc": "Definition of port_current in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk23"
+    },
+    {
+      "content": "def port_temperature(\n    name: str,\n    *,\n    enabled: bool = False,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return temperature(\n        enabled=enabled,\n        translation_key=\"port_temperature\",\n        translation_placeholders={\"name\": name},\n        entity_category=EntityCategory.DIAGNOSTIC,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 407,
+        "lang": "python",
+        "desc": "Definition of port_temperature in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk24"
+    },
+    {
+      "content": "def port_power_factor(\n    name: str,\n    *,\n    enabled: bool = False,\n    precision: int | None = 0,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return power_factor(\n        enabled=enabled,\n        precision=precision,\n        translation_key=\"port_power_factor\",\n        translation_placeholders={\"name\": name},\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 422,
+        "lang": "python",
+        "desc": "Definition of port_power_factor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk25"
+    },
+    {
+      "content": "def port_error_code(\n    name: str,\n    *,\n    enabled: bool = False,\n    **kwargs: Unpack[_SensorKwargs],\n) -> EcoflowSensorEntityDescription:\n    return raw(\n        enabled=enabled,\n        translation_key=\"port_error_code\",\n        translation_placeholders={\"name\": name},\n        entity_category=EntityCategory.DIAGNOSTIC,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 438,
+        "lang": "python",
+        "desc": "Definition of port_error_code in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk26"
+    },
+    {
+      "content": "def shp2_channel(\n    fn: Callable[..., EcoflowSensorEntityDescription],\n    translation_key: str | None = None,\n    translation_placeholders: dict[str, str] | None = None,\n    **kwargs,\n) -> EcoflowSensorEntityDescription:\n    return fn(\n        translation_key=translation_key,\n        translation_placeholders=translation_placeholders or {\"channel\": \"{n}\"},\n        indexed_range=_shp2_channel_range,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 457,
+        "lang": "python",
+        "desc": "Definition of shp2_channel in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk27"
+    },
+    {
+      "content": "def shp2_circuit(\n    fn: Callable[..., EcoflowSensorEntityDescription],\n    translation_key: str | None = None,\n    translation_placeholders: dict[str, str] | None = None,\n    **kwargs,\n) -> EcoflowSensorEntityDescription:\n    return fn(\n        translation_key=translation_key,\n        translation_placeholders=translation_placeholders or {\"index\": \"{n:02d}\"},\n        indexed_range=_shp2_circuit_range,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 471,
+        "lang": "python",
+        "desc": "Definition of shp2_circuit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk28"
+    },
+    {
+      "content": "async def async_setup_entry(\n    hass: HomeAssistant,\n    config_entry: DeviceConfigEntry,\n    async_add_entities: AddConfigEntryEntitiesCallback,\n) -> None:\n    \"\"\"Add sensors for passed config_entry in HA.\"\"\"\n    device = config_entry.runtime_data\n\n    new_sensors = [\n        EcoflowSensor(device, sensor)\n        for sensor in SENSOR_TYPES\n        if hasattr(device, sensor)\n    ]\n\n    if new_sensors:\n        async_add_entities(new_sensors)\n\n    if battery_entities := _get_extra_battery_entities(\n        hass=hass, device=device, conf=config_entry.data.get(CONF_EXTRA_BATTERY)\n    ):\n        async_add_entities(battery_entities)",
+      "metadata": {
+        "start_line": 880,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk29"
+    },
+    {
+      "content": "def _get_extra_battery_entities(\n    hass: HomeAssistant, device: DeviceBase, conf: list[str] | None\n):\n    available_indices = [\n        i for i in range(1, 6) if hasattr(device, f\"battery_{i}_battery_level\")\n    ]\n\n    if not available_indices:\n        return []\n\n    if conf is not None:\n        enabled_indices = {int(i) for i in conf}\n    else:\n        enabled_indices = {\n            i\n            for i in available_indices\n            if getattr(device, f\"battery_{i}_enabled\", False)\n        }\n\n    registry = dr.async_get(hass)\n    for battery_index in available_indices:\n        if battery_index not in enabled_indices:\n            identifier = (DOMAIN, f\"{device.address}_battery_{battery_index}\")\n            if dev_entry := registry.async_get_device(identifiers={identifier}):\n                registry.async_remove_device(dev_entry.id)\n\n    battery_entities: list[EcoflowBatteryAddonSensor] = []\n    for battery_index in enabled_indices:\n        if battery_index not in available_indices:\n            continue\n\n        for template_key, desc in _BATTERY_ADDON_SENSORS.items():\n            attr_name = template_key.replace(\"{n}\", str(battery_index))\n            if not hasattr(device, attr_name):\n                continue\n\n            battery_entities.append(\n                EcoflowBatteryAddonSensor(\n                    device=device,\n                    sensor=attr_name,\n                    description=replace(desc, key=attr_name),\n                    battery_index=battery_index,\n                )\n            )\n\n    return battery_entities",
+      "metadata": {
+        "start_line": 903,
+        "lang": "python",
+        "desc": "Definition of _get_extra_battery_entities in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk30"
+    },
+    {
+      "content": "class EcoflowSensor(EcoflowEntity, SensorEntity):\n    \"\"\"Base representation of a sensor.\"\"\"\n\n    def __init__(self, device: DeviceBase, sensor: str):\n        \"\"\"Initialize the sensor.\"\"\"\n        super().__init__(device)\n\n        self._sensor = sensor\n        self._attr_unique_id = f\"ef_{device.serial_number}_{sensor}\"\n\n        if sensor in SENSOR_TYPES:\n            self.entity_description = SENSOR_TYPES[sensor]\n            if self.entity_description.translation_key is None:\n                self._attr_translation_key = self.entity_description.key\n\n        self._attribute_fields = (\n            self.entity_description.state_attribute_fields\n            if isinstance(self.entity_description, EcoflowSensorEntityDescription)\n            else []\n        )\n\n    @property\n    def native_value(self):\n        \"\"\"Return the value of the sensor.\"\"\"\n        value = getattr(self._device, self._sensor, None)\n        if isinstance(value, Enum):\n            return value.name.lower()\n        return value\n\n    @property\n    def native_unit_of_measurement(self) -> str | None:\n        \"\"\"Return the unit of measurement.\"\"\"\n        if isinstance(self.entity_description, EcoflowSensorEntityDescription):\n            unit = self.entity_description.native_unit_of_measurement_field\n            match unit:\n                case str():\n                    return getattr(self._device, unit)\n                case Callable():\n                    return unit(self._device)\n        return self.entity_description.native_unit_of_measurement\n\n    @property\n    def extra_state_attributes(self) -> dict[str, Any]:\n        if not self._attribute_fields:\n            return {}\n\n        return {\n            field_name: getattr(self._device, field_name)\n            for field_name in self._attribute_fields\n            if hasattr(self._device, field_name)\n        }\n\n    async def async_added_to_hass(self):\n        \"\"\"Run when this Entity has been added to HA.\"\"\"\n        await super().async_added_to_hass()\n        self._device.register_callback(self.async_write_ha_state, self._sensor)\n\n    async def async_will_remove_from_hass(self):\n        \"\"\"Entity being removed from hass.\"\"\"\n        await super().async_will_remove_from_hass()\n        self._device.remove_callback(self.async_write_ha_state, self._sensor)",
+      "metadata": {
+        "start_line": 951,
+        "lang": "python",
+        "desc": "Definition of EcoflowSensor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk31"
+    },
+    {
+      "content": "class EcoflowBatteryAddonSensor(EcoflowBatteryAddonEntity, SensorEntity):\n    def __init__(\n        self,\n        device: DeviceBase,\n        sensor: str,\n        description: SensorEntityDescription,\n        battery_index: int,\n    ) -> None:\n        super().__init__(device=device, battery_index=battery_index)\n        self._sensor = sensor\n        self._attr_unique_id = f\"ef_{device.serial_number}_{description.key}\"\n        self._attr_native_value = getattr(device, sensor, None)\n        self.entity_description = description\n        if self.entity_description.translation_key is None:\n            self._attr_translation_key = self.entity_description.key\n\n    @property\n    def native_value(self):\n        return getattr(self._device, self._sensor, None)\n\n    async def async_added_to_hass(self):\n        await super().async_added_to_hass()\n        self._device.register_callback(self.async_write_ha_state, self._sensor)\n\n    async def async_will_remove_from_hass(self):\n        await super().async_will_remove_from_hass()\n        self._device.remove_callback(self.async_write_ha_state, self._sensor)",
+      "metadata": {
+        "start_line": 1014,
+        "lang": "python",
+        "desc": "Definition of EcoflowBatteryAddonSensor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py:chunk32"
+    }
+  ]
+}

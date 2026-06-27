@@ -15,6 +15,8 @@ uint32_t WebServer::_pendingLogRequestTime = 0;
 SemaphoreHandle_t WebServer::_requestMutex = NULL;
 DynamicJsonDocument* WebServer::_statusDoc = nullptr; // pre-alloc — freeze plan F7
 bool WebServer::_serverStarted = false;
+uint32_t WebServer::_staConnectStart = 0;
+bool WebServer::_staFallbackPending = false;
 
 // Custom Response Class for SD Log Streaming
 class LogResponse : public AsyncAbstractResponse {
@@ -95,17 +97,35 @@ void WebServer::begin() {
         WiFi.mode(WIFI_STA);
         WiFi.begin(ssid.c_str(), pass.c_str());
         ESP_LOGI(TAG, "Connecting to WiFi: %s", ssid.c_str());
+        // If the station fails to connect, fall back to a persistent hotspot.
+        _staConnectStart = millis();
+        _staFallbackPending = true;
     } else {
-        ESP_LOGW(TAG, "No WiFi credentials saved. Web UI disabled.");
-        return;
+        ESP_LOGW(TAG, "No WiFi credentials saved. Starting persistent hotspot.");
+        startHotspot(); // brings up AP + routes + server
     }
 
-    setupRoutes();
-    server.begin();
-    _serverStarted = true;
+    if (!_serverStarted) {
+        setupRoutes();
+        server.begin();
+        _serverStarted = true;
+    }
 }
 
 void WebServer::update() {
+    // If a station connection was requested but never succeeds, fall back to a
+    // persistent hotspot so the web UI is always reachable when there is no WiFi.
+    if (_staFallbackPending) {
+        if (WiFi.status() == WL_CONNECTED) {
+            _staFallbackPending = false;
+            ESP_LOGI(TAG, "WiFi connected: %s", WiFi.localIP().toString().c_str());
+        } else if (millis() - _staConnectStart > 15000) {
+            _staFallbackPending = false;
+            ESP_LOGW(TAG, "WiFi connect failed; starting persistent hotspot.");
+            startHotspot();
+        }
+    }
+
     if (xSemaphoreTake(_requestMutex, 0) == pdTRUE) {
         if (_pendingLogRequest) {
             // Check if download is ready (buffer > 8KB or Complete)
@@ -145,6 +165,12 @@ void WebServer::setupRoutes() {
     server.on("/api/history", HTTP_GET, handleHistory);
 
     server.on("/api/logs", HTTP_GET, handleLogs);
+    server.on("/api/log_config", HTTP_GET, [](AsyncWebServerRequest *r){
+        StaticJsonDocument<128> d;
+        d["enable"] = LogBuffer::getInstance().isLoggingEnabled();
+        String j; serializeJson(d, j);
+        r->send(200, "application/json", j);
+    });
     server.on("/api/log_config", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleLogConfig);
     server.on("/api/raw_command", HTTP_POST, [](AsyncWebServerRequest *r){}, NULL, handleRawCommand);
 
@@ -281,7 +307,7 @@ void WebServer::handleStatus(AsyncWebServerRequest *request) {
                 obj["sub_mode"] = (int)data.subMode;
                 obj["fan"] = (int)data.fanValue;
                 obj["pwr"] = (data.powerMode == 1);
-                obj["drain"] = (data.wteFthEn != 0);
+                obj["drain"] = (data.wteFthEn <= 1);
                 obj["light"] = (data.rgbState != 0);
                 obj["beep"] = (data.beepEnable != 0);
                 obj["pwr_bat"] = (int)data.batPwrWatt;
@@ -436,12 +462,13 @@ void WebServer::handleForget(AsyncWebServerRequest *request, uint8_t *data, size
 }
 
 void WebServer::handleLogs(AsyncWebServerRequest *request) {
-    size_t index = 0;
-    if (request->hasParam("index")) index = request->getParam("index")->value().toInt();
+    uint32_t sinceSeq = 0;
+    if (request->hasParam("index")) sinceSeq = (uint32_t)request->getParam("index")->value().toInt();
     DynamicJsonDocument doc(8192); JsonArray arr = doc.to<JsonArray>();
-    std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(index);
+    std::vector<LogMessage> logs = LogBuffer::getInstance().getLogs(sinceSeq);
     for (const auto& log : logs) {
         JsonObject obj = arr.createNestedObject();
+        obj["seq"] = log.seq;
         obj["ts"] = log.timestamp;
         obj["lvl"] = (int)log.level;
         obj["tag"] = log.tag.isEmpty() ? "?" : log.tag;
@@ -526,10 +553,12 @@ static File stm32File;
 void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
         ESP_LOGI(TAG, "STM32 Update Start: %s", filename.c_str());
+        LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "STM32 upload starting: %s", filename.c_str());
         LittleFS.begin();
         stm32File = LittleFS.open("/stm32_update.bin", "w");
         if (!stm32File) {
             ESP_LOGE(TAG, "Failed to open file for writing");
+            LogBuffer::getInstance().push(ESP_LOG_ERROR, "OTA", "Failed to open /stm32_update.bin for writing");
             ota_state = 4; ota_msg = "FS Error";
             return;
         }
@@ -540,6 +569,8 @@ void WebServer::handleUpdateStm32(AsyncWebServerRequest *request, String filenam
     if (final) {
         if (stm32File) stm32File.close();
         ESP_LOGI(TAG, "STM32 Upload Complete. Triggering Flash...");
+        LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA",
+            "STM32 upload complete (%u bytes). Starting flash task...", (unsigned)(index + len));
         ota_state = 2; ota_msg = "Flashing STM32...";
 
         // Trigger OTA Task

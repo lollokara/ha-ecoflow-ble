@@ -1,0 +1,68 @@
+{
+  "full_summary": "Python file with 7 classes and 5 functions. Key components include classes and method definitions relevant to wave3 module.",
+  "chunks": [
+    {
+      "content": "class OperatingMode(IntFieldValue):\n    UNKNOWN = -1\n\n    NULL = 0\n    COOLING = 1\n    HEATING = 2\n    VENTING = 3\n    DEHUMIDIFYING = 4\n    THERMOSTATIC = 5",
+      "metadata": {
+        "start_line": 19,
+        "lang": "python",
+        "desc": "Definition of OperatingMode in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk0"
+    },
+    {
+      "content": "class TemperatureUnit(IntFieldValue):\n    UNKNOWN = -1\n\n    NONE = 0\n    CELSIUS = 1\n    FAHRENHEIT = 2\n\n    @classmethod\n    def from_mode(cls, mode: ac517_apl_comm_pb2.USER_TEMP_UNIT_TYPE):\n        try:\n            return cls(mode)\n        except ValueError:\n            _LOGGER.debug(\"Encountered invalid value %s for %s\", mode, cls.__name__)\n            return TemperatureUnit.UNKNOWN\n\n    def as_pb_enum(self):\n        return {\n            TemperatureUnit.NONE: ac517_apl_comm_pb2.USER_TEMP_UNIT_NONE,\n            TemperatureUnit.CELSIUS: ac517_apl_comm_pb2.USER_TEMP_UNIT_C,\n            TemperatureUnit.FAHRENHEIT: ac517_apl_comm_pb2.USER_TEMP_UNIT_F,\n        }[self]",
+      "metadata": {
+        "start_line": 30,
+        "lang": "python",
+        "desc": "Definition of TemperatureUnit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk1"
+    },
+    {
+      "content": "class FanSpeed(IntFieldValue):\n    UNKNOWN = -1\n\n    LOW = 20\n    MEDIUM_LOW = 40\n    MEDIUM = 60\n    MEDIUM_HIGH = 80\n    HIGH = 100",
+      "metadata": {
+        "start_line": 53,
+        "lang": "python",
+        "desc": "Definition of FanSpeed in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk2"
+    },
+    {
+      "content": "class SubMode(IntFieldValue):\n    UNKNOWN = -1\n\n    NONE = 0\n    NORMAL = 1\n    MAX = 2\n    SLEEP = 3\n    ECO = 4",
+      "metadata": {
+        "start_line": 63,
+        "lang": "python",
+        "desc": "Definition of SubMode in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk3"
+    },
+    {
+      "content": "class TemperatureDisplayType(IntFieldValue):\n    UNKNOWN = -1\n\n    AMBIENT = 0\n    SUPPLY_AIR = 1",
+      "metadata": {
+        "start_line": 73,
+        "lang": "python",
+        "desc": "Definition of TemperatureDisplayType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk4"
+    },
+    {
+      "content": "class SleepState(IntFieldValue):\n    UNKNOWN = -1\n\n    ON = 0\n    STANDBY = 1",
+      "metadata": {
+        "start_line": 80,
+        "lang": "python",
+        "desc": "Definition of SleepState in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk5"
+    },
+    {
+      "content": "class Device(DeviceBase, ProtobufProps):\n    \"\"\"Wave 3\"\"\"\n\n    SN_PREFIX = (b\"AC71\",)\n    NAME_PREFIX = \"EF-AC\"\n\n    battery_level = pb_field(pb_disp.cms_batt_soc, pround(2))\n    ambient_temperature = pb_field(pb_disp.temp_ambient, pround(2))\n    ambient_humidity = pb_field(pb_disp.humi_ambient, pround(2))\n    operating_mode = pb_field(pb_disp.wave_operating_mode, OperatingMode.from_value)\n    condensate_water_level = pb_field(pb_disp.condensate_water_level)\n    cell_temperature = pb_field(pb_disp.bms_max_cell_temp)\n\n    pcs_fan_level = pb_field(pb_disp.pcs_fan_level)\n    in_drainage = pb_field(pb_disp.in_drainage)\n    drainage_mode = pb_field(pb_disp.drainage_mode)\n\n    input_power = pb_field(pb_disp.pow_in_sum_w, pround(1))\n    output_power = pb_field(pb_disp.pow_out_sum_w, pround(1))\n    ac_input_power = pb_field(pb_disp.pow_get_ac, pround(1))\n    battery_power = pb_field(pb_disp.pow_get_bms, pround(1))\n\n    temp_indoor_supply_air = pb_field(pb_disp.temp_indoor_supply_air, pround(1))\n    temp_unit = pb_field(pb_disp.user_temp_unit, TemperatureUnit.from_mode)\n\n    en_pet_care = pb_field(pb_disp.en_pet_care)\n    pet_care_warning = pb_field(pb_disp.pet_care_warning)\n\n    battery_charge_limit_min = pb_field(pb_disp.cms_min_dsg_soc)\n    battery_charge_limit_max = pb_field(pb_disp.cms_max_chg_soc)\n    sleep_state = pb_field(pb_disp.dev_sleep_state, SleepState.from_value)\n    power = pb_field(pb_disp.dev_sleep_state, lambda x: x == SleepState.ON)\n\n    _wave_mode_info = pb_field(pb_disp.wave_mode_info)\n    target_temperature_climate = pb_field(pb_mode.temp_set, pround(1))\n    fan_speed_climate = pb_field(pb_mode.airflow_speed, FanSpeed.from_value)\n    operating_submode = pb_field(pb_mode.submode, SubMode.from_value)\n\n    target_humidity_climate = pb_field(pb_mode.humi_set, pround(0))\n    target_temp_thermostatic_upper = pb_field(\n        pb_mode.temp_thermostatic_upper_limit, pround(1)\n    )\n    target_temp_thermostatic_lower = pb_field(\n        pb_mode.temp_thermostatic_lower_limit, pround(1)\n    )\n\n    @computed_field\n    def is_submode_available(self) -> bool:\n        return self.operating_mode in (OperatingMode.COOLING, OperatingMode.HEATING)\n\n    @classmethod\n    def check(cls, sn):\n        return sn[:4] in cls.SN_PREFIX\n\n    async def packet_parse(self, data: bytes):\n        return Packet.from_bytes(data, xor_payload=True)\n\n    async def data_parse(self, packet: Packet):\n        processed = False\n        self.reset_updated()\n\n        if packet.src == 0x42 and packet.cmd_set == 0xFE and packet.cmd_id == 0x15:\n            self.update_from_bytes(\n                ac517_apl_comm_pb2.DisplayPropertyUpload, packet.payload\n            )\n            processed = True\n\n        if packet.src == 0x42 and packet.cmd_set == 0xFE and packet.cmd_id == 0x16:\n            self.update_from_bytes(\n                ac517_apl_comm_pb2.RuntimePropertyUpload, packet.payload\n            )\n            processed = True\n\n        if (mode_item := self._current_mode_item) is not None:\n            self.target_temperature_climate = mode_item\n            self.fan_speed_climate = mode_item\n            self.operating_submode = mode_item\n            self.target_humidity_climate = mode_item\n            self.target_temp_thermostatic_upper = mode_item\n            self.target_temp_thermostatic_lower = mode_item\n\n        self._notify_updated()\n        return processed\n\n    async def _send_config_packet(self, message: ac517_apl_comm_pb2.ConfigWrite):\n        payload = message.SerializeToString()\n        packet = Packet(0x20, 0x42, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)\n        await self._conn.sendPacket(packet)\n\n    async def set_battery_charge_limit_min(self, limit: int):\n        if (\n            self.battery_charge_limit_max is not None\n            and limit > self.battery_charge_limit_max\n        ):\n            return False\n\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_min_dsg_soc=limit)\n        )\n        return True\n\n    async def set_battery_charge_limit_max(self, limit: int):\n        if (\n            self.battery_charge_limit_min is not None\n            and limit < self.battery_charge_limit_min\n        ):\n            return False\n\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_max_chg_soc=limit)\n        )\n        return True\n\n    _climate = controls.climate(\n        operating_mode,\n        translation_key=\"climate\",\n        hvac_modes={\n            HvacMode.COOL: OperatingMode.COOLING,\n            HvacMode.HEAT: OperatingMode.HEATING,\n            HvacMode.FAN_ONLY: OperatingMode.VENTING,\n            HvacMode.DRY: OperatingMode.DEHUMIDIFYING,\n            HvacMode.HEAT_COOL: OperatingMode.THERMOSTATIC,\n        },\n        fan_modes={\n            \"low\": FanSpeed.LOW,\n            \"medium_low\": FanSpeed.MEDIUM_LOW,\n            \"medium\": FanSpeed.MEDIUM,\n            \"medium_high\": FanSpeed.MEDIUM_HIGH,\n            \"high\": FanSpeed.HIGH,\n        },\n        current_temperature_field=ambient_temperature,\n    )\n\n    @_climate.power(power)\n    async def enable_power(self, enabled: bool):\n        cfg = ac517_apl_comm_pb2.ConfigWrite()\n        if enabled:\n            cfg.cfg_power_on = True\n        else:\n            cfg.cfg_power_off = True\n        await self._send_config_packet(cfg)\n\n    @_climate.mode()\n    async def set_operating_mode(self, mode: OperatingMode):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_wave_operating_mode=mode.value)\n        )\n\n    @_climate.target_temp(\n        target_temperature_climate,\n        modes={HvacMode.COOL, HvacMode.HEAT},\n        step=0.5,\n        min=16,\n        max=30,\n    )\n    async def set_target_temperature(self, temperature: float):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_temp_set=temperature)\n        )\n\n    @_climate.target_temp_range(\n        target_temp_thermostatic_lower,\n        target_temp_thermostatic_upper,\n        modes={HvacMode.HEAT_COOL},\n        step=0.5,\n        min=16,\n        max=30,\n    )\n    async def set_target_temperature_range(self, low: float, high: float):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(\n                cfg_temp_thermostatic_lower_limit=low,\n                cfg_temp_thermostatic_upper_limit=high,\n            )\n        )\n\n    @_climate.humidity(\n        target_humidity_climate,\n        min=40,\n        max=80,\n        modes={HvacMode.DRY},\n    )\n    async def set_target_humidity(self, humidity: int):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_humi_set=float(humidity))\n        )\n\n    @_climate.fan(\n        fan_speed_climate,\n        modes={HvacMode.COOL, HvacMode.HEAT, HvacMode.FAN_ONLY, HvacMode.DRY},\n    )\n    async def set_fan_speed(self, speed: FanSpeed):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_airflow_speed=speed.value)\n        )\n\n    @controls.switch(en_pet_care)\n    async def enable_en_pet_care(self, enabled: bool):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_en_pet_care=enabled)\n        )\n\n    @controls.select(\n        operating_submode, options=SubMode, availability=is_submode_available\n    )\n    async def set_operating_submode(self, submode: SubMode):\n        await self._send_config_packet(\n            ac517_apl_comm_pb2.ConfigWrite(cfg_wave_operating_submode=submode.value)\n        )\n\n    @property\n    def _current_mode_item(self):\n        if (\n            self._wave_mode_info is None\n            or self.operating_mode is None\n            or self.operating_mode == OperatingMode.NULL\n        ):\n            return None\n\n        items = self._wave_mode_info.list_info\n        if not items:\n            return None\n\n        # The list may contain 5 entries (modes 1-5) or 6 (modes 0-5 with NULL\n        # placeholder at index 0)\n        idx = self.operating_mode if len(items) > 5 else self.operating_mode - 1\n        if 0 <= idx < len(items):\n            return items[idx]\n\n        self._logger.debug(\n            \"mode_index %d out of range (list length %d, mode %s)\",\n            idx,\n            len(items),\n            self.operating_mode,\n        )\n        return None",
+      "metadata": {
+        "start_line": 87,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py:chunk6"
+    }
+  ]
+}

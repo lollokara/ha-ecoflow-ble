@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to kit_info module.",
+  "chunks": [
+    {
+      "content": "class KitBaseInfo(RawData):\n    avai_flag: Annotated[int, \"B\", \"avaiFlag\"]\n    sn: Annotated[bytes, \"16s\", \"sn\"]\n    product_type: Annotated[int, \"H\", \"productType\"]\n    product_detail: Annotated[int, \"H\", \"productDetail\"]\n    procedure_state: Annotated[int, \"B\", \"procedureState\"]\n    app_version: Annotated[int, \"I\", \"appVersion\"]\n    loader_version: Annotated[int, \"I\", \"loaderVersion\"]\n    cur_real_power: Annotated[int, \"I\", \"curRealPower\"]\n    f32_soc: Annotated[int, \"f\", \"f32Soc\"]\n    soc: Annotated[int, \"B\", \"soc\"]",
+      "metadata": {
+        "start_line": 7,
+        "lang": "python",
+        "desc": "Definition of KitBaseInfo in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kit_info.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kit_info.py:chunk0"
+    },
+    {
+      "content": "class AllKitDetailData(RawData):\n    protocol_version: Annotated[int, \"B\", \"protocolVersion\"]\n    available_data_len: Annotated[int, \"H\", \"availableDataLen\"]\n    support_kit_max_num: Annotated[int, \"H\", \"supportKitMaxNum\"]\n\n    kit_base_info: list[KitBaseInfo] = field(default_factory=list)\n\n    @classmethod\n    def from_bytes(cls, data: bytes) -> Self:\n        parsed = super().from_bytes(data)\n\n        offset = parsed.SIZE\n\n        for _ in range(parsed.support_kit_max_num):\n            base_info = KitBaseInfo.from_bytes(data[offset:])\n            parsed.kit_base_info.append(base_info)\n            offset += base_info.SIZE\n        return parsed",
+      "metadata": {
+        "start_line": 20,
+        "lang": "python",
+        "desc": "Definition of AllKitDetailData in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kit_info.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kit_info.py:chunk1"
+    }
+  ]
+}

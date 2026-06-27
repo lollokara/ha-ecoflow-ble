@@ -1,1688 +1,2773 @@
 {
   "files": [
     {
-      "path": "gen_logger.py",
-      "size": 1658,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to gen_logger module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "update_index.py",
-      "size": 1441,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to update_index module.",
-      "modified": "2026-06-07"
+      "path": "AGENTS.md",
+      "size": 8847,
+      "lang": "markdown",
+      "summary": "Markdown file with 67 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
     },
     {
       "path": "d3p_logger.inc",
-      "size": 31038,
+      "size": 31316,
       "lang": "unknown",
       "summary": "Unknown file with 278 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "README.md",
-      "size": 3828,
-      "lang": "markdown",
-      "summary": "Markdown file with 97 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "rag_search.py",
-      "size": 1248,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to rag_search module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "AGENTS.md",
-      "size": 8780,
-      "lang": "markdown",
-      "summary": "Markdown file with 67 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "generate_rag_index.py",
-      "size": 12195,
+      "size": 12507,
       "lang": "python",
       "summary": "Python file with 0 classes and 8 functions. Key components include classes and method definitions relevant to generate_rag_index module.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowSTM32F4_Bootloader/extra_script.py",
-      "size": 107,
+      "path": "gen_logger.py",
+      "size": 1710,
       "lang": "python",
-      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to extra_script module.",
-      "modified": "2026-06-07"
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to gen_logger module.",
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowSTM32F4_Bootloader/platformio.ini",
-      "size": 239,
-      "lang": "unknown",
-      "summary": "Unknown file with 10 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "path": "rag_search.py",
+      "size": 1291,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to rag_search module.",
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowSTM32F4_Bootloader/stm32f469ni_flash.ld",
-      "size": 4698,
-      "lang": "unknown",
-      "summary": "Unknown file with 177 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4_Bootloader/src/main.c",
-      "size": 26983,
-      "lang": "c",
-      "summary": "C/C++ file with ~40 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "proto/pd335_sys.proto",
-      "size": 19394,
-      "lang": "unknown",
-      "summary": "Unknown file with 549 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/platformio.ini",
-      "size": 806,
-      "lang": "unknown",
-      "summary": "Unknown file with 30 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/README.md",
-      "size": 3308,
+      "path": "README.md",
+      "size": 3925,
       "lang": "markdown",
-      "summary": "Markdown file with 89 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "summary": "Markdown file with 97 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/sdkconfig.defaults",
-      "size": 238,
+      "path": "update_index.py",
+      "size": 1476,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to update_index module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Device_ESP32.md",
+      "size": 3147,
+      "lang": "markdown",
+      "summary": "Markdown file with 99 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Device_RP2040.md",
+      "size": 2608,
+      "lang": "markdown",
+      "summary": "Markdown file with 87 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Device_STM32.md",
+      "size": 3510,
+      "lang": "markdown",
+      "summary": "Markdown file with 94 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Home.md",
+      "size": 2568,
+      "lang": "markdown",
+      "summary": "Markdown file with 62 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Protocol.md",
+      "size": 5745,
+      "lang": "markdown",
+      "summary": "Markdown file with 156 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/device_reference/Alternator_Charger.md",
+      "size": 1537,
+      "lang": "markdown",
+      "summary": "Markdown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/device_reference/Delta_3.md",
+      "size": 1588,
+      "lang": "markdown",
+      "summary": "Markdown file with 38 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/device_reference/Delta_Pro_3.md",
+      "size": 1110,
+      "lang": "markdown",
+      "summary": "Markdown file with 33 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/device_reference/Wave_2.md",
+      "size": 1399,
+      "lang": "markdown",
+      "summary": "Markdown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/CONTRIBUTING.md",
+      "size": 14399,
+      "lang": "markdown",
+      "summary": "Markdown file with 314 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/hacs.json",
+      "size": 84,
+      "lang": "json",
+      "summary": "Json file with 5 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/LICENSE",
+      "size": 10764,
       "lang": "unknown",
-      "summary": "Unknown file with 7 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "summary": "Unknown file with 190 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/pyproject.toml",
+      "size": 9935,
+      "lang": "unknown",
+      "summary": "Unknown file with 242 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/README.md",
+      "size": 48338,
+      "lang": "markdown",
+      "summary": "Markdown file with 827 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py",
+      "size": 8782,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 13 functions. Key components include classes and method definitions relevant to binary_sensor module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py",
+      "size": 2294,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 2 functions. Key components include classes and method definitions relevant to button module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/climate.py",
+      "size": 21021,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 35 functions. Key components include classes and method definitions relevant to climate module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/config_flow.py",
+      "size": 28668,
+      "lang": "python",
+      "summary": "Python file with 5 classes and 26 functions. Key components include classes and method definitions relevant to config_flow module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/const.py",
+      "size": 1071,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to const module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py",
+      "size": 4381,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 15 functions. Key components include classes and method definitions relevant to description_builder module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/diagnostics.py",
+      "size": 903,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to diagnostics module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/entity.py",
+      "size": 6492,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 9 functions. Key components include classes and method definitions relevant to entity module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/icons.json",
+      "size": 11739,
+      "lang": "json",
+      "summary": "Json file with 453 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/manifest.json",
+      "size": 6424,
+      "lang": "json",
+      "summary": "Json file with 213 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py",
+      "size": 9020,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 12 functions. Key components include classes and method definitions relevant to number module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/select.py",
+      "size": 5302,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 8 functions. Key components include classes and method definitions relevant to select module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/sensor.py",
+      "size": 35225,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 34 functions. Key components include classes and method definitions relevant to sensor module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py",
+      "size": 6167,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 8 functions. Key components include classes and method definitions relevant to switch module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py",
+      "size": 11590,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 4 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/numbers.py",
+      "size": 13282,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to numbers module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/selects.py",
+      "size": 5636,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to selects module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/switches.py",
+      "size": 5449,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to switches module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/__init__.py",
+      "size": 0,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/commands.py",
+      "size": 3465,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to commands module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/connection.py",
+      "size": 43759,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 42 functions. Key components include classes and method definitions relevant to connection module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/crc.py",
+      "size": 398,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to crc module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devicebase.py",
+      "size": 18086,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 46 functions. Key components include classes and method definitions relevant to devicebase module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/device_mappings.py",
+      "size": 8066,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to device_mappings module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encpacket.py",
+      "size": 1450,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 2 functions. Key components include classes and method definitions relevant to encpacket module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encryption.py",
+      "size": 3527,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 4 functions. Key components include classes and method definitions relevant to encryption module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/exceptions.py",
+      "size": 2658,
+      "lang": "python",
+      "summary": "Python file with 20 classes and 4 functions. Key components include classes and method definitions relevant to exceptions module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/frame_assembler.py",
+      "size": 9669,
+      "lang": "python",
+      "summary": "Python file with 5 classes and 9 functions. Key components include classes and method definitions relevant to frame_assembler module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/keydata.py",
+      "size": 88961,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to keydata module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/listeners.py",
+      "size": 1971,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 9 functions. Key components include classes and method definitions relevant to listeners module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py",
+      "size": 19531,
+      "lang": "python",
+      "summary": "Python file with 9 classes and 59 functions. Key components include classes and method definitions relevant to logging_util module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py",
+      "size": 3621,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 4 functions. Key components include classes and method definitions relevant to login module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/packet.py",
+      "size": 13120,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 14 functions. Key components include classes and method definitions relevant to packet module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/__init__.py",
+      "size": 2703,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 8 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/alternator_charger.py",
+      "size": 6540,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 5 functions. Key components include classes and method definitions relevant to alternator_charger module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta2.py",
+      "size": 3305,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 4 functions. Key components include classes and method definitions relevant to delta2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta2_max.py",
+      "size": 2787,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 4 functions. Key components include classes and method definitions relevant to delta2_max module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta2_plus.py",
+      "size": 249,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta2_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3.py",
+      "size": 529,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to delta3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_air.py",
+      "size": 625,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 2 functions. Key components include classes and method definitions relevant to delta3_air module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_classic.py",
+      "size": 3560,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta3_classic module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_max.py",
+      "size": 222,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta3_max module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_max_plus.py",
+      "size": 1046,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to delta3_max_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_plus.py",
+      "size": 1276,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta3_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra.py",
+      "size": 224,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta3_ultra module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra_plus.py",
+      "size": 2137,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 2 functions. Key components include classes and method definitions relevant to delta3_ultra_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta_pro.py",
+      "size": 11582,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 6 functions. Key components include classes and method definitions relevant to delta_pro module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta_pro_3.py",
+      "size": 8336,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 6 functions. Key components include classes and method definitions relevant to delta_pro_3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu.py",
+      "size": 25108,
+      "lang": "python",
+      "summary": "Python file with 7 classes and 5 functions. Key components include classes and method definitions relevant to dpu module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py",
+      "size": 7067,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 6 functions. Key components include classes and method definitions relevant to dpu_x module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerpulse_ev.py",
+      "size": 3200,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 3 functions. Key components include classes and method definitions relevant to powerpulse_ev module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/powerstream.py",
+      "size": 6128,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 2 functions. Key components include classes and method definitions relevant to powerstream module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/river2.py",
+      "size": 8757,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 4 functions. Key components include classes and method definitions relevant to river2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/river2_max.py",
+      "size": 179,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to river2_max module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/river2_pro.py",
+      "size": 157,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to river2_pro module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/river3.py",
+      "size": 9343,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 8 functions. Key components include classes and method definitions relevant to river3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/river3_plus.py",
+      "size": 1245,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to river3_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/shp2.py",
+      "size": 17258,
+      "lang": "python",
+      "summary": "Python file with 9 classes and 8 functions. Key components include classes and method definitions relevant to shp2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator.py",
+      "size": 6551,
+      "lang": "python",
+      "summary": "Python file with 8 classes and 2 functions. Key components include classes and method definitions relevant to smart_generator module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator_4k.py",
+      "size": 1330,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to smart_generator_4k module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_meter.py",
+      "size": 3035,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to smart_meter module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_ac.py",
+      "size": 15865,
+      "lang": "python",
+      "summary": "Python file with 6 classes and 24 functions. Key components include classes and method definitions relevant to stream_ac module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_ac_pro.py",
+      "size": 793,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to stream_ac_pro module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_max.py",
+      "size": 760,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to stream_max module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_microinverter.py",
+      "size": 3068,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to stream_microinverter module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_pro.py",
+      "size": 604,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to stream_pro module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/stream_ultra.py",
+      "size": 516,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to stream_ultra module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/unsupported.py",
+      "size": 2988,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 7 functions. Key components include classes and method definitions relevant to unsupported module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave2.py",
+      "size": 5958,
+      "lang": "python",
+      "summary": "Python file with 7 classes and 3 functions. Key components include classes and method definitions relevant to wave2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/wave3.py",
+      "size": 10122,
+      "lang": "python",
+      "summary": "Python file with 7 classes and 5 functions. Key components include classes and method definitions relevant to wave3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/_delta2_base.py",
+      "size": 8029,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 7 functions. Key components include classes and method definitions relevant to _delta2_base module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/_delta3_base.py",
+      "size": 7033,
+      "lang": "python",
+      "summary": "Python file with 4 classes and 8 functions. Key components include classes and method definitions relevant to _delta3_base module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/__init__.py",
+      "size": 498,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/base.py",
+      "size": 1637,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 5 functions. Key components include classes and method definitions relevant to base module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py",
+      "size": 14768,
+      "lang": "python",
+      "summary": "Python file with 14 classes and 24 functions. Key components include classes and method definitions relevant to controls module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/units.py",
+      "size": 214,
+      "lang": "python",
+      "summary": "Python file with 5 classes and 0 functions. Key components include classes and method definitions relevant to units module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/__init__.py",
+      "size": 105,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/base.py",
+      "size": 5817,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 7 functions. Key components include classes and method definitions relevant to base module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_bms_heartbeat_pack.py",
+      "size": 1411,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to direct_bms_heartbeat_pack module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_ems_heartbeat_pack.py",
+      "size": 1318,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to direct_ems_heartbeat_pack module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py",
+      "size": 4732,
+      "lang": "python",
+      "summary": "Python file with 6 classes and 0 functions. Key components include classes and method definitions relevant to direct_inv_heartbeat_pack module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_mppt_heartbeat_pack.py",
+      "size": 3325,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 0 functions. Key components include classes and method definitions relevant to direct_mppt_heartbeat_pack module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_pd_heartbeat_pack.py",
+      "size": 2808,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to direct_pd_heartbeat_pack module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kit_info.py",
+      "size": 1273,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to kit_info module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/kt210_sac.py",
+      "size": 1876,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to kt210_sac module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/mppt_heart.py",
+      "size": 2750,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 0 functions. Key components include classes and method definitions relevant to mppt_heart module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py",
+      "size": 6368,
+      "lang": "python",
+      "summary": "Python file with 6 classes and 0 functions. Key components include classes and method definitions relevant to pd_heart module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/__init__.py",
+      "size": 1254,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/ac517_apl_comm_pb2.py",
+      "size": 34515,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to ac517_apl_comm_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/bk622_common_pb2.py",
+      "size": 13097,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to bk622_common_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/bk_series_pb2.py",
+      "size": 71495,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to bk_series_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/cp307_iot_pb2.py",
+      "size": 34186,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to cp307_iot_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/cp307_sys_pb2.py",
+      "size": 6980,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to cp307_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/dc009_apl_comm_pb2.py",
+      "size": 17091,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to dc009_apl_comm_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/ge305_sys_pb2.py",
+      "size": 25837,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to ge305_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/mr521_pb2.py",
+      "size": 52946,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to mr521_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/pd100_pb2.py",
+      "size": 55621,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to pd100_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/pd303_pb2.py",
+      "size": 39015,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to pd303_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/pd335_bms_bp_pb2.py",
+      "size": 13319,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to pd335_bms_bp_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/pd335_sys_pb2.py",
+      "size": 49299,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to pd335_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/pr705_pb2.py",
+      "size": 82281,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to pr705_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/utc_sys_pb2.py",
+      "size": 2214,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to utc_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/wn511_sys_pb2.py",
+      "size": 44519,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to wn511_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/yj751_sys_pb2.py",
+      "size": 48191,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to yj751_sys_pb2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/pb/__init__.py",
+      "size": 158,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/enums.py",
+      "size": 918,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 5 functions. Key components include classes and method definitions relevant to enums module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py",
+      "size": 11529,
+      "lang": "python",
+      "summary": "Python file with 7 classes and 28 functions. Key components include classes and method definitions relevant to protobuf_field module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_props.py",
+      "size": 5002,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 10 functions. Key components include classes and method definitions relevant to protobuf_props module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py",
+      "size": 2520,
+      "lang": "python",
+      "summary": "Python file with 3 classes and 12 functions. Key components include classes and method definitions relevant to raw_data_field module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_props.py",
+      "size": 2770,
+      "lang": "python",
+      "summary": "Python file with 2 classes and 8 functions. Key components include classes and method definitions relevant to raw_data_props module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py",
+      "size": 4328,
+      "lang": "python",
+      "summary": "Python file with 5 classes and 12 functions. Key components include classes and method definitions relevant to repeated_protobuf_field module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/resv_info_parser.py",
+      "size": 1166,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 6 functions. Key components include classes and method definitions relevant to resv_info_parser module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/transforms.py",
+      "size": 1988,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 12 functions. Key components include classes and method definitions relevant to transforms module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/updatable_props.py",
+      "size": 13689,
+      "lang": "python",
+      "summary": "Python file with 6 classes and 48 functions. Key components include classes and method definitions relevant to updatable_props module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/utils.py",
+      "size": 334,
+      "lang": "python",
+      "summary": "Python file with 1 classes and 2 functions. Key components include classes and method definitions relevant to utils module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/__init__.py",
+      "size": 857,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/translations/en.json",
+      "size": 38557,
+      "lang": "json",
+      "summary": "Json file with 1136 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/translations/uk.json",
+      "size": 56350,
+      "lang": "json",
+      "summary": "Json file with 1128 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/translations/zh-Hans.json",
+      "size": 35900,
+      "lang": "json",
+      "summary": "Json file with 1115 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/ac517_apl_comm.proto",
+      "size": 14801,
+      "lang": "unknown",
+      "summary": "Unknown file with 421 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/bk622_common.proto",
+      "size": 5219,
+      "lang": "unknown",
+      "summary": "Unknown file with 154 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/bk_series.proto",
+      "size": 31358,
+      "lang": "unknown",
+      "summary": "Unknown file with 862 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/cp307_iot.proto",
+      "size": 14489,
+      "lang": "unknown",
+      "summary": "Unknown file with 495 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/cp307_sys.proto",
+      "size": 2543,
+      "lang": "unknown",
+      "summary": "Unknown file with 105 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/dc009_apl_comm.proto",
+      "size": 7328,
+      "lang": "unknown",
+      "summary": "Unknown file with 191 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/ge305_sys.proto",
+      "size": 11641,
+      "lang": "unknown",
+      "summary": "Unknown file with 322 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/generate.py",
+      "size": 1055,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/mr521.proto",
+      "size": 38699,
+      "lang": "unknown",
+      "summary": "Unknown file with 997 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/pd100.proto",
+      "size": 23730,
+      "lang": "unknown",
+      "summary": "Unknown file with 660 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/pd303.proto",
+      "size": 25378,
+      "lang": "unknown",
+      "summary": "Unknown file with 790 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/pd335_bms_bp.proto",
+      "size": 5548,
+      "lang": "unknown",
+      "summary": "Unknown file with 172 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/pd335_sys.proto",
+      "size": 20880,
+      "lang": "unknown",
+      "summary": "Unknown file with 578 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/pr705.proto",
+      "size": 36273,
+      "lang": "unknown",
+      "summary": "Unknown file with 932 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/utc_sys.proto",
+      "size": 686,
+      "lang": "unknown",
+      "summary": "Unknown file with 41 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/wn511_sys.proto",
+      "size": 19323,
+      "lang": "unknown",
+      "summary": "Unknown file with 553 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/proto/yj751_sys.proto",
+      "size": 20560,
+      "lang": "unknown",
+      "summary": "Unknown file with 790 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/__init__.py",
+      "size": 0,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/conftest.py",
+      "size": 639,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to conftest module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_delta2_max.py",
+      "size": 9079,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_delta2_max module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_delta2_plus.py",
+      "size": 11013,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_delta2_plus module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_delta_pro.py",
+      "size": 8580,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_delta_pro module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py",
+      "size": 7404,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_dpu module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu_x.py",
+      "size": 6937,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_dpu_x module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_powerpulse_ev.py",
+      "size": 4914,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_powerpulse_ev module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_powerstream.py",
+      "size": 8232,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_powerstream module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_river3.py",
+      "size": 9881,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_river3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_shp2.py",
+      "size": 14951,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 4 functions. Key components include classes and method definitions relevant to test_shp2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py",
+      "size": 6675,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_wave3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/__init__.py",
+      "size": 0,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "docs/Python Implementation/ha-ef-ble-main/tests/ha/__init__.py",
+      "size": 0,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to __init__ module.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/library.properties",
-      "size": 296,
+      "size": 306,
       "lang": "unknown",
       "summary": "Unknown file with 10 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.h",
-      "size": 13235,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-06-07"
+      "path": "EcoflowESP32/platformio.ini",
+      "size": 1105,
+      "lang": "unknown",
+      "summary": "Unknown file with 34 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/lib/EcoFlowComm/library.json",
-      "size": 303,
-      "lang": "json",
-      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "path": "EcoflowESP32/README.md",
+      "size": 3397,
+      "lang": "markdown",
+      "summary": "Markdown file with 89 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/sdkconfig.defaults",
+      "size": 245,
+      "lang": "unknown",
+      "summary": "Unknown file with 7 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.c",
-      "size": 15663,
+      "size": 16196,
       "lang": "c",
       "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/src/dc009_apl_comm.pb.c",
-      "size": 1270,
+      "path": "EcoflowESP32/lib/EcoFlowComm/ecoflow_protocol.h",
+      "size": 13686,
       "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/lib/EcoFlowComm/library.json",
+      "size": 316,
+      "lang": "json",
+      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/CmdUtils.cpp",
+      "size": 23547,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/CmdUtils.h",
-      "size": 946,
+      "size": 980,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/src/Stm32Serial.h",
-      "size": 3178,
+      "path": "EcoflowESP32/src/dc009_apl_comm.pb.c",
+      "size": 1315,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/dc009_apl_comm.pb.h",
+      "size": 44141,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/DeviceManager.cpp",
-      "size": 20064,
+      "size": 20604,
       "lang": "cpp",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowESP32.h",
-      "size": 7939,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowProtocol.cpp",
-      "size": 11652,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowProtocol.h",
-      "size": 2187,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/pb_utils.h",
-      "size": 270,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/WebServer.h",
-      "size": 2136,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/types.h",
-      "size": 608,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowDataParser.cpp",
-      "size": 43533,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/LogBuffer.h",
-      "size": 1115,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/WebServer.cpp",
-      "size": 24650,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~2 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/Logging.h",
-      "size": 2344,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/Display.cpp",
-      "size": 39404,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~31 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/DeviceManager.h",
-      "size": 4447,
+      "size": 4602,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/src/EcoflowDataParser.h",
-      "size": 599,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "path": "EcoflowESP32/src/Display.cpp",
+      "size": 40428,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~31 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/Display.h",
-      "size": 558,
+      "size": 581,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowCrypto.cpp",
+      "size": 6125,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowCrypto.h",
+      "size": 3864,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowData.h",
+      "size": 4050,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowDataParser.cpp",
+      "size": 44226,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowDataParser.h",
+      "size": 625,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowESP32.cpp",
+      "size": 47378,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowESP32.h",
+      "size": 8574,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowProtocol.cpp",
+      "size": 11988,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/EcoflowProtocol.h",
+      "size": 2253,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/Font.h",
+      "size": 2986,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/keydata.cpp",
+      "size": 6517,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/keydata.h",
+      "size": 130,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/LightSensor.cpp",
+      "size": 2243,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/LightSensor.h",
+      "size": 786,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/LogBuffer.cpp",
+      "size": 7283,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~2 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/LogBuffer.h",
+      "size": 2406,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/Logging.h",
+      "size": 2399,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/main.cpp",
+      "size": 5395,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/mr521.pb.c",
+      "size": 3479,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/pb_utils.h",
+      "size": 280,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/pd335_sys.pb.c",
+      "size": 2682,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/platform-specific.inc",
       "size": 0,
       "lang": "unknown",
       "summary": "Unknown file with 0 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowESP32.cpp",
-      "size": 37360,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/dc009_apl_comm.pb.h",
-      "size": 43402,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/keydata.cpp",
-      "size": 6449,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/Stm32Serial.cpp",
-      "size": 35963,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/WebAssets.h",
-      "size": 60184,
-      "lang": "c",
-      "summary": "C/C++ file with ~37 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/LightSensor.h",
-      "size": 746,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowCrypto.h",
-      "size": 3760,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/keydata.h",
-      "size": 122,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowData.h",
-      "size": 3895,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/Font.h",
-      "size": 2908,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/mr521.pb.c",
-      "size": 3332,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/CmdUtils.cpp",
-      "size": 22698,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/RemoteLogger.cpp",
-      "size": 2028,
+      "size": 1082,
       "lang": "cpp",
-      "summary": "C/C++ file with ~2 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/EcoflowCrypto.cpp",
-      "size": 5967,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/RemoteLogger.h",
-      "size": 87,
+      "size": 340,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/src/LogBuffer.cpp",
-      "size": 6432,
+      "path": "EcoflowESP32/src/Stm32Serial.cpp",
+      "size": 39548,
+      "lang": "cpp",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/Stm32Serial.h",
+      "size": 3297,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/types.h",
+      "size": 647,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/WebAssets.h",
+      "size": 61671,
+      "lang": "c",
+      "summary": "C/C++ file with ~37 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowESP32/src/WebServer.cpp",
+      "size": 26866,
       "lang": "cpp",
       "summary": "C/C++ file with ~2 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
-      "path": "EcoflowESP32/src/LightSensor.cpp",
-      "size": 2170,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/main.cpp",
-      "size": 3992,
-      "lang": "cpp",
-      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowESP32/src/pd335_sys.pb.c",
-      "size": 2577,
+      "path": "EcoflowESP32/src/WebServer.h",
+      "size": 2345,
       "lang": "c",
       "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/proto/dc009_apl_comm.proto",
-      "size": 7328,
+      "size": 7519,
       "lang": "unknown",
       "summary": "Unknown file with 191 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowESP32/src/proto/mr521.proto",
-      "size": 38699,
+      "size": 39696,
       "lang": "unknown",
       "summary": "Unknown file with 997 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/generate_keydata_header.py",
-      "size": 1047,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate_keydata_header module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/verify_optimistic.py",
-      "size": 3368,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_optimistic module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/verify_layout_v3.py",
-      "size": 3394,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_layout_v3 module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/verify_power_logic.py",
-      "size": 3355,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_power_logic module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/verify_ui_v2.py",
-      "size": 3713,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_ui_v2 module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "Test Scripts/tools/generate_mdi_font.py",
-      "size": 2077,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate_mdi_font module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/Device_STM32.md",
-      "size": 3416,
-      "lang": "markdown",
-      "summary": "Markdown file with 94 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/Device_RP2040.md",
-      "size": 2521,
-      "lang": "markdown",
-      "summary": "Markdown file with 87 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/Home.md",
-      "size": 2506,
-      "lang": "markdown",
-      "summary": "Markdown file with 62 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/Device_ESP32.md",
-      "size": 3048,
-      "lang": "markdown",
-      "summary": "Markdown file with 99 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/Protocol.md",
-      "size": 5589,
-      "lang": "markdown",
-      "summary": "Markdown file with 156 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/device_reference/Delta_Pro_3.md",
-      "size": 1077,
-      "lang": "markdown",
-      "summary": "Markdown file with 33 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/device_reference/Delta_3.md",
-      "size": 1550,
-      "lang": "markdown",
-      "summary": "Markdown file with 38 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/device_reference/Wave_2.md",
-      "size": 1362,
-      "lang": "markdown",
-      "summary": "Markdown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "docs/device_reference/Alternator_Charger.md",
-      "size": 1500,
-      "lang": "markdown",
-      "summary": "Markdown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/extra_script.py",
-      "size": 1062,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to extra_script module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/merge_firmware.py",
-      "size": 2140,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to merge_firmware module.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/platformio.ini",
-      "size": 448,
-      "lang": "unknown",
-      "summary": "Unknown file with 18 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/stm32f469ni_flash.ld",
-      "size": 4852,
-      "lang": "unknown",
-      "summary": "Unknown file with 179 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/Inc/log_manager.h",
-      "size": 989,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/Inc/display_task.h",
-      "size": 787,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/Inc/uart_task.h",
-      "size": 756,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/test/README",
-      "size": 518,
-      "lang": "unknown",
-      "summary": "Unknown file with 11 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/include/README",
-      "size": 1264,
-      "lang": "unknown",
-      "summary": "Unknown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/include/FreeRTOSConfig.h",
-      "size": 3917,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in include.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/README",
-      "size": 1054,
-      "lang": "unknown",
-      "summary": "Unknown file with 46 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/sd_diskio.c",
-      "size": 2320,
-      "lang": "c",
-      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/diskio.h",
-      "size": 2633,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/ff_gen_drv.c",
-      "size": 3649,
-      "lang": "c",
-      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/sd_diskio.h",
-      "size": 210,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/ff.h",
-      "size": 16022,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/ffconf.h",
-      "size": 11810,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/diskio.c",
-      "size": 4104,
-      "lang": "c",
-      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/ffsystem.c",
-      "size": 1353,
-      "lang": "c",
-      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/FatFs/ff_gen_drv.h",
-      "size": 2456,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md",
-      "size": 3402,
-      "lang": "markdown",
-      "summary": "Markdown file with 73 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/LICENSE.md",
-      "size": 1485,
-      "lang": "markdown",
-      "summary": "Markdown file with 27 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Release_Notes.html",
-      "size": 7146,
-      "lang": "html",
-      "summary": "Html file with 205 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery.h",
-      "size": 10803,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_lcd.h",
-      "size": 11450,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h",
-      "size": 4398,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_ts.c",
-      "size": 14202,
-      "lang": "c",
-      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/README.md",
-      "size": 2835,
-      "lang": "markdown",
-      "summary": "Markdown file with 41 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/library.json",
-      "size": 117,
-      "lang": "json",
-      "summary": "Json file with 10 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery.c",
-      "size": 27481,
-      "lang": "c",
-      "summary": "C/C++ file with ~39 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/CONTRIBUTING.md",
-      "size": 2744,
-      "lang": "markdown",
-      "summary": "Markdown file with 38 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_lcd.c",
-      "size": 56077,
-      "lang": "c",
-      "summary": "C/C++ file with ~60 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.c",
-      "size": 16561,
-      "lang": "c",
-      "summary": "C/C++ file with ~11 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/SECURITY.md",
-      "size": 1697,
-      "lang": "markdown",
-      "summary": "Markdown file with 31 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_ts.h",
-      "size": 5811,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/_htmresc/mini-st_2020.css",
-      "size": 57898,
-      "lang": "css",
-      "summary": "Css file with 1711 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303dlhc/lsm303dlhc.c",
-      "size": 14650,
-      "lang": "c",
-      "summary": "C/C++ file with ~19 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303dlhc.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303dlhc/lsm303dlhc.h",
-      "size": 19480,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303dlhc.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.c",
-      "size": 8014,
-      "lang": "c",
-      "summary": "C/C++ file with ~14 functions. Handles low level operations or hardware interfaces typical for embedded systems in l3gd20.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h",
-      "size": 8759,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in l3gd20.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lan8742/lan8742.c",
-      "size": 16412,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in lan8742.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lan8742/lan8742.h",
-      "size": 15255,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lan8742.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303agr/lsm303agr.h",
-      "size": 20941,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303agr.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303agr/lsm303agr.c",
-      "size": 16081,
-      "lang": "c",
-      "summary": "C/C++ file with ~21 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303agr.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152/mfxstm32l152.h",
-      "size": 24504,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in mfxstm32l152.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152/mfxstm32l152.c",
-      "size": 56127,
-      "lang": "c",
-      "summary": "C/C++ file with ~55 functions. Handles low level operations or hardware interfaces typical for embedded systems in mfxstm32l152.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lis302dl/lis302dl.c",
-      "size": 9761,
-      "lang": "c",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis302dl.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lis302dl/lis302dl.h",
-      "size": 26941,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis302dl.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q512a/n25q512a.h",
-      "size": 8568,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q512a.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c",
-      "size": 5377,
-      "lang": "c",
-      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in ts3510.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.h",
-      "size": 2906,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ts3510.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c",
-      "size": 4973,
-      "lang": "c",
-      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in exc7200.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.h",
-      "size": 2765,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in exc7200.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/cs43l22/cs43l22.h",
-      "size": 6612,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in cs43l22.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/cs43l22/cs43l22.c",
-      "size": 13395,
-      "lang": "c",
-      "summary": "C/C++ file with ~13 functions. Handles low level operations or hardware interfaces typical for embedded systems in cs43l22.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ov2640/ov2640.h",
-      "size": 7264,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov2640.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ov2640/ov2640.c",
-      "size": 27950,
-      "lang": "c",
-      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov2640.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/st7789h2/st7789h2.h",
-      "size": 5100,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7789h2.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/st7789h2/st7789h2.c",
-      "size": 18036,
-      "lang": "c",
-      "summary": "C/C++ file with ~20 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7789h2.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/s25fl512s/s25fl512s.h",
-      "size": 9790,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in s25fl512s.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ft6x06/ft6x06.h",
-      "size": 13898,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft6x06.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ft6x06/ft6x06.c",
-      "size": 14694,
-      "lang": "c",
-      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft6x06.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ampire480272/ampire480272.h",
-      "size": 2362,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ampire480272.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q128a/n25q128a.h",
-      "size": 6982,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q128a.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/dp83848/dp83848.h",
-      "size": 14685,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in dp83848.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/dp83848/dp83848.c",
-      "size": 16414,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in dp83848.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/st7735/st7735.c",
-      "size": 11781,
-      "lang": "c",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7735.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/st7735/st7735.h",
-      "size": 7206,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7735.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/otm8009a/otm8009a.c",
-      "size": 18535,
-      "lang": "c",
-      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in otm8009a.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/otm8009a/otm8009a.h",
-      "size": 8509,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in otm8009a.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/camera.h",
-      "size": 5244,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h",
-      "size": 3507,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/accelero.h",
-      "size": 4530,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/audio.h",
-      "size": 3554,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h",
-      "size": 3529,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/gyro.h",
-      "size": 4490,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/idd.h",
-      "size": 6453,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/io.h",
-      "size": 5284,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/ts.h",
-      "size": 3183,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/tsensor.h",
-      "size": 3600,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/epd.h",
-      "size": 3267,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe811/stmpe811.h",
-      "size": 9391,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe811.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe811/stmpe811.c",
-      "size": 28501,
-      "lang": "c",
-      "summary": "C/C++ file with ~34 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe811.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/wm8994/wm8994.h",
-      "size": 17088,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in wm8994.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/wm8994/wm8994.c",
-      "size": 37909,
-      "lang": "c",
-      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in wm8994.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/i3g4250d/i3g4250d.c",
-      "size": 8524,
-      "lang": "c",
-      "summary": "C/C++ file with ~14 functions. Handles low level operations or hardware interfaces typical for embedded systems in i3g4250d.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/i3g4250d/i3g4250d.h",
-      "size": 9250,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in i3g4250d.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lis3dsh/lis3dsh.h",
-      "size": 48275,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis3dsh.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/lis3dsh/lis3dsh.c",
-      "size": 11065,
-      "lang": "c",
-      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis3dsh.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q256a/n25q256a.h",
-      "size": 8565,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q256a.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/s5k5cag/s5k5cag.h",
-      "size": 4107,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in s5k5cag.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.c",
-      "size": 16752,
-      "lang": "c",
-      "summary": "C/C++ file with ~19 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe1600.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h",
-      "size": 5442,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe1600.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9341/ili9341.c",
-      "size": 6760,
-      "lang": "c",
-      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9341.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9341/ili9341.h",
-      "size": 8957,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9341.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.c",
-      "size": 12638,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft3x67.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h",
-      "size": 8873,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft3x67.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ov5640/ov5640.h",
-      "size": 8304,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov5640.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ov5640/ov5640.c",
-      "size": 29794,
-      "lang": "c",
-      "summary": "C/C++ file with ~13 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov5640.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ampire640480/ampire640480.h",
-      "size": 2389,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ampire640480.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9325/ili9325.h",
-      "size": 6752,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9325.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9325/ili9325.c",
-      "size": 13984,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9325.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.c",
-      "size": 19042,
-      "lang": "c",
-      "summary": "C/C++ file with ~18 functions. Handles low level operations or hardware interfaces typical for embedded systems in ls016b8uy.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h",
-      "size": 4197,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ls016b8uy.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/nt35510/nt35510.c",
-      "size": 10117,
-      "lang": "c",
-      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in nt35510.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Components/nt35510/nt35510.h",
-      "size": 11453,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in nt35510.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/fonts.h",
-      "size": 1790,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font20.c",
-      "size": 46293,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font24.c",
-      "size": 69959,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font12.c",
-      "size": 19748,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font16.c",
-      "size": 36036,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c",
-      "size": 14307,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.h",
-      "size": 13234,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/library.json",
-      "size": 303,
-      "lang": "json",
-      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.c",
-      "size": 15663,
-      "lang": "c",
-      "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/fonts.h",
-      "size": 1790,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/font20.c",
-      "size": 46293,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/font24.c",
-      "size": 69959,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/font12.c",
-      "size": 19748,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/font16.c",
-      "size": 36036,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/lib/Fonts/font8.c",
-      "size": 14307,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/flash_ops.c",
-      "size": 5481,
-      "lang": "c",
-      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/lv_port_disp.c",
-      "size": 4867,
-      "lang": "c",
-      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/fan_task.c",
-      "size": 6331,
-      "lang": "c",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/log_manager.h",
-      "size": 989,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/lv_port_indev.c",
-      "size": 2301,
-      "lang": "c",
-      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/stm32f4xx_it.h",
-      "size": 563,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/uart_task.c",
-      "size": 16211,
-      "lang": "c",
-      "summary": "C/C++ file with ~28 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/display_task.h",
-      "size": 787,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/lv_port_disp.h",
-      "size": 207,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/flash_ops.h",
-      "size": 380,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/fan_protocol.h",
-      "size": 834,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/main.c",
-      "size": 15103,
-      "lang": "c",
-      "summary": "C/C++ file with ~20 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/log_manager.c",
-      "size": 15831,
-      "lang": "c",
-      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/fan_task.h",
-      "size": 513,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/uart_callback.c",
-      "size": 365,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/stm32f4xx_it.c",
-      "size": 4522,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/lv_port_indev.h",
-      "size": 211,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/lv_conf.h",
-      "size": 1285,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/retarget.c",
-      "size": 200,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/display_task.c",
-      "size": 1984,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/uart_task.h",
-      "size": 791,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_fan.c",
-      "size": 7799,
-      "lang": "c",
-      "summary": "C/C++ file with ~8 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c",
-      "size": 4082,
-      "lang": "c",
-      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_lvgl.h",
-      "size": 575,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_debug.h",
-      "size": 180,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_wave2.h",
-      "size": 244,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_font_mdi.c",
-      "size": 32398,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_connections.h",
-      "size": 211,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_utils.h",
-      "size": 878,
-      "lang": "c",
-      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_fan.h",
-      "size": 99,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.h",
-      "size": 199,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_core.h",
-      "size": 2530,
-      "lang": "c",
-      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_settings.c",
-      "size": 3405,
-      "lang": "c",
-      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_lvgl.c",
-      "size": 74794,
-      "lang": "c",
-      "summary": "C/C++ file with ~40 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_debug.c",
-      "size": 18054,
-      "lang": "c",
-      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_icons.h",
-      "size": 1693,
-      "lang": "c",
-      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_connections.c",
-      "size": 8515,
-      "lang": "c",
-      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_primitives.c",
-      "size": 8080,
-      "lang": "c",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "EcoflowSTM32F4/src/ui/ui_view_wave2.c",
-      "size": 15665,
-      "lang": "c",
-      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
-      "modified": "2026-06-07"
-    },
-    {
-      "path": "verification/verify_ota_ui.py",
-      "size": 17635,
-      "lang": "python",
-      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to verify_ota_ui module.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowRP2040/platformio.ini",
-      "size": 269,
+      "size": 278,
       "lang": "unknown",
       "summary": "Unknown file with 9 lines. Provides configuration, documentation or supporting data for the repository.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
     },
     {
       "path": "EcoflowRP2040/src/main.cpp",
-      "size": 7888,
+      "size": 8153,
       "lang": "cpp",
       "summary": "C/C++ file with ~11 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
-      "modified": "2026-06-07"
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/extra_script.py",
+      "size": 1100,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to extra_script module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/merge_firmware.py",
+      "size": 2206,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to merge_firmware module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/platformio.ini",
+      "size": 466,
+      "lang": "unknown",
+      "summary": "Unknown file with 18 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/stm32f469ni_flash.ld",
+      "size": 5031,
+      "lang": "unknown",
+      "summary": "Unknown file with 179 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/Inc/display_task.h",
+      "size": 821,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/Inc/log_manager.h",
+      "size": 1023,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/Inc/uart_task.h",
+      "size": 784,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Inc.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/include/FreeRTOSConfig.h",
+      "size": 4017,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in include.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/include/README",
+      "size": 1301,
+      "lang": "unknown",
+      "summary": "Unknown file with 37 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/README",
+      "size": 1100,
+      "lang": "unknown",
+      "summary": "Unknown file with 46 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/CODE_OF_CONDUCT.md",
+      "size": 3475,
+      "lang": "markdown",
+      "summary": "Markdown file with 73 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/CONTRIBUTING.md",
+      "size": 2782,
+      "lang": "markdown",
+      "summary": "Markdown file with 38 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/library.json",
+      "size": 127,
+      "lang": "json",
+      "summary": "Json file with 10 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/LICENSE.md",
+      "size": 1512,
+      "lang": "markdown",
+      "summary": "Markdown file with 27 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/README.md",
+      "size": 2876,
+      "lang": "markdown",
+      "summary": "Markdown file with 41 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Release_Notes.html",
+      "size": 7351,
+      "lang": "html",
+      "summary": "Html file with 205 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/SECURITY.md",
+      "size": 1728,
+      "lang": "markdown",
+      "summary": "Markdown file with 31 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery.c",
+      "size": 28424,
+      "lang": "c",
+      "summary": "C/C++ file with ~39 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery.h",
+      "size": 11168,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_lcd.c",
+      "size": 57903,
+      "lang": "c",
+      "summary": "C/C++ file with ~60 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_lcd.h",
+      "size": 11858,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.c",
+      "size": 17069,
+      "lang": "c",
+      "summary": "C/C++ file with ~11 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_sdram.h",
+      "size": 4546,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_ts.c",
+      "size": 14663,
+      "lang": "c",
+      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/stm32469i_discovery_ts.h",
+      "size": 6003,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in bsp.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ampire480272/ampire480272.h",
+      "size": 2462,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ampire480272.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ampire640480/ampire640480.h",
+      "size": 2489,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ampire640480.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/accelero.h",
+      "size": 4673,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/audio.h",
+      "size": 3676,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/camera.h",
+      "size": 5385,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/epd.h",
+      "size": 3382,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/gyro.h",
+      "size": 4635,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/idd.h",
+      "size": 6621,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/io.h",
+      "size": 5434,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/lcd.h",
+      "size": 3621,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/magneto.h",
+      "size": 3654,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/ts.h",
+      "size": 3290,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/Common/tsensor.h",
+      "size": 3718,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Common.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/cs43l22/cs43l22.c",
+      "size": 13869,
+      "lang": "c",
+      "summary": "C/C++ file with ~13 functions. Handles low level operations or hardware interfaces typical for embedded systems in cs43l22.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/cs43l22/cs43l22.h",
+      "size": 6819,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in cs43l22.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/dp83848/dp83848.c",
+      "size": 17027,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in dp83848.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/dp83848/dp83848.h",
+      "size": 15119,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in dp83848.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.c",
+      "size": 5195,
+      "lang": "c",
+      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in exc7200.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/exc7200/exc7200.h",
+      "size": 2882,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in exc7200.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.c",
+      "size": 13077,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft3x67.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ft3x67/ft3x67.h",
+      "size": 9143,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft3x67.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ft6x06/ft6x06.c",
+      "size": 15187,
+      "lang": "c",
+      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft6x06.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ft6x06/ft6x06.h",
+      "size": 14350,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ft6x06.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/i3g4250d/i3g4250d.c",
+      "size": 8920,
+      "lang": "c",
+      "summary": "C/C++ file with ~14 functions. Handles low level operations or hardware interfaces typical for embedded systems in i3g4250d.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/i3g4250d/i3g4250d.h",
+      "size": 9552,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in i3g4250d.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9325/ili9325.c",
+      "size": 14483,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9325.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9325/ili9325.h",
+      "size": 6989,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9325.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9341/ili9341.c",
+      "size": 7087,
+      "lang": "c",
+      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9341.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ili9341/ili9341.h",
+      "size": 9187,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ili9341.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.c",
+      "size": 8409,
+      "lang": "c",
+      "summary": "C/C++ file with ~14 functions. Handles low level operations or hardware interfaces typical for embedded systems in l3gd20.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/l3gd20/l3gd20.h",
+      "size": 9062,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in l3gd20.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lan8742/lan8742.c",
+      "size": 17025,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in lan8742.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lan8742/lan8742.h",
+      "size": 15701,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lan8742.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lis302dl/lis302dl.c",
+      "size": 10165,
+      "lang": "c",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis302dl.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lis302dl/lis302dl.h",
+      "size": 27642,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis302dl.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lis3dsh/lis3dsh.c",
+      "size": 11477,
+      "lang": "c",
+      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis3dsh.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lis3dsh/lis3dsh.h",
+      "size": 49511,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lis3dsh.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.c",
+      "size": 19682,
+      "lang": "c",
+      "summary": "C/C++ file with ~18 functions. Handles low level operations or hardware interfaces typical for embedded systems in ls016b8uy.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ls016b8uy/ls016b8uy.h",
+      "size": 4355,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ls016b8uy.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303agr/lsm303agr.c",
+      "size": 16690,
+      "lang": "c",
+      "summary": "C/C++ file with ~21 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303agr.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303agr/lsm303agr.h",
+      "size": 21443,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303agr.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303dlhc/lsm303dlhc.c",
+      "size": 15207,
+      "lang": "c",
+      "summary": "C/C++ file with ~19 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303dlhc.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/lsm303dlhc/lsm303dlhc.h",
+      "size": 19957,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in lsm303dlhc.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152/mfxstm32l152.c",
+      "size": 57711,
+      "lang": "c",
+      "summary": "C/C++ file with ~55 functions. Handles low level operations or hardware interfaces typical for embedded systems in mfxstm32l152.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152/mfxstm32l152.h",
+      "size": 25152,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in mfxstm32l152.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q128a/n25q128a.h",
+      "size": 7180,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q128a.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q256a/n25q256a.h",
+      "size": 8805,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q256a.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/n25q512a/n25q512a.h",
+      "size": 8808,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in n25q512a.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/nt35510/nt35510.c",
+      "size": 10377,
+      "lang": "c",
+      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in nt35510.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/nt35510/nt35510.h",
+      "size": 11701,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in nt35510.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/otm8009a/otm8009a.c",
+      "size": 18991,
+      "lang": "c",
+      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in otm8009a.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/otm8009a/otm8009a.h",
+      "size": 8718,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in otm8009a.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ov2640/ov2640.c",
+      "size": 29282,
+      "lang": "c",
+      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov2640.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ov2640/ov2640.h",
+      "size": 7471,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov2640.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ov5640/ov5640.c",
+      "size": 31097,
+      "lang": "c",
+      "summary": "C/C++ file with ~13 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov5640.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ov5640/ov5640.h",
+      "size": 8506,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ov5640.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/s25fl512s/s25fl512s.h",
+      "size": 10032,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in s25fl512s.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/s5k5cag/s5k5cag.h",
+      "size": 4234,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in s5k5cag.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/st7735/st7735.c",
+      "size": 12230,
+      "lang": "c",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7735.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/st7735/st7735.h",
+      "size": 7399,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7735.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/st7789h2/st7789h2.c",
+      "size": 18740,
+      "lang": "c",
+      "summary": "C/C++ file with ~20 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7789h2.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/st7789h2/st7789h2.h",
+      "size": 5269,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in st7789h2.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.c",
+      "size": 17336,
+      "lang": "c",
+      "summary": "C/C++ file with ~19 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe1600.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe1600/stmpe1600.h",
+      "size": 5635,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe1600.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe811/stmpe811.c",
+      "size": 29457,
+      "lang": "c",
+      "summary": "C/C++ file with ~34 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe811.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/stmpe811/stmpe811.h",
+      "size": 9661,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in stmpe811.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.c",
+      "size": 5613,
+      "lang": "c",
+      "summary": "C/C++ file with ~10 functions. Handles low level operations or hardware interfaces typical for embedded systems in ts3510.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/ts3510/ts3510.h",
+      "size": 3027,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ts3510.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/wm8994/wm8994.c",
+      "size": 39084,
+      "lang": "c",
+      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in wm8994.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Components/wm8994/wm8994.h",
+      "size": 17569,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in wm8994.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font12.c",
+      "size": 21175,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font16.c",
+      "size": 37843,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font20.c",
+      "size": 48479,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font24.c",
+      "size": 72539,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/font8.c",
+      "size": 15354,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/Fonts/fonts.h",
+      "size": 1903,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/bsp/_htmresc/mini-st_2020.css",
+      "size": 59608,
+      "lang": "css",
+      "summary": "Css file with 1711 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.c",
+      "size": 16196,
+      "lang": "c",
+      "summary": "C/C++ file with ~44 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/EcoFlowComm/ecoflow_protocol.h",
+      "size": 13684,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in EcoFlowComm.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/EcoFlowComm/library.json",
+      "size": 316,
+      "lang": "json",
+      "summary": "Json file with 13 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/diskio.c",
+      "size": 4248,
+      "lang": "c",
+      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/diskio.h",
+      "size": 2712,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/ff.h",
+      "size": 16451,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/ffconf.h",
+      "size": 12106,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/ffsystem.c",
+      "size": 1420,
+      "lang": "c",
+      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/ff_gen_drv.c",
+      "size": 3769,
+      "lang": "c",
+      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/ff_gen_drv.h",
+      "size": 2528,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/sd_diskio.c",
+      "size": 2424,
+      "lang": "c",
+      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/FatFs/sd_diskio.h",
+      "size": 226,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in FatFs.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/font12.c",
+      "size": 21175,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/font16.c",
+      "size": 37843,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/font20.c",
+      "size": 48479,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/font24.c",
+      "size": 72539,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/font8.c",
+      "size": 15354,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/lib/Fonts/fonts.h",
+      "size": 1903,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in Fonts.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/display_task.c",
+      "size": 2048,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/display_task.h",
+      "size": 821,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/fan_protocol.h",
+      "size": 876,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/fan_task.c",
+      "size": 6550,
+      "lang": "c",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/fan_task.h",
+      "size": 534,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/flash_ops.c",
+      "size": 5666,
+      "lang": "c",
+      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/flash_ops.h",
+      "size": 396,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/log_manager.c",
+      "size": 16337,
+      "lang": "c",
+      "summary": "C/C++ file with ~15 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/log_manager.h",
+      "size": 1023,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/lv_conf.h",
+      "size": 1339,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/lv_port_disp.c",
+      "size": 4993,
+      "lang": "c",
+      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/lv_port_disp.h",
+      "size": 223,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/lv_port_indev.c",
+      "size": 2386,
+      "lang": "c",
+      "summary": "C/C++ file with ~5 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/lv_port_indev.h",
+      "size": 227,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/main.c",
+      "size": 15592,
+      "lang": "c",
+      "summary": "C/C++ file with ~20 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/retarget.c",
+      "size": 209,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/stm32f4xx_it.c",
+      "size": 4704,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/stm32f4xx_it.h",
+      "size": 591,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/uart_callback.c",
+      "size": 377,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/uart_task.c",
+      "size": 16656,
+      "lang": "c",
+      "summary": "C/C++ file with ~28 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/uart_task.h",
+      "size": 820,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_core.h",
+      "size": 2600,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_font_mdi.c",
+      "size": 33130,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_icons.h",
+      "size": 1742,
+      "lang": "c",
+      "summary": "C/C++ file with ~1 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_lvgl.c",
+      "size": 76611,
+      "lang": "c",
+      "summary": "C/C++ file with ~40 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_lvgl.h",
+      "size": 604,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_primitives.c",
+      "size": 8303,
+      "lang": "c",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_utils.h",
+      "size": 916,
+      "lang": "c",
+      "summary": "C/C++ file with ~3 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_connections.c",
+      "size": 8730,
+      "lang": "c",
+      "summary": "C/C++ file with ~9 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_connections.h",
+      "size": 220,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_debug.c",
+      "size": 18476,
+      "lang": "c",
+      "summary": "C/C++ file with ~16 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_debug.h",
+      "size": 189,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_fan.c",
+      "size": 8000,
+      "lang": "c",
+      "summary": "C/C++ file with ~8 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_fan.h",
+      "size": 105,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.c",
+      "size": 4204,
+      "lang": "c",
+      "summary": "C/C++ file with ~6 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_log_manager.h",
+      "size": 213,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_settings.c",
+      "size": 3501,
+      "lang": "c",
+      "summary": "C/C++ file with ~4 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_wave2.c",
+      "size": 16911,
+      "lang": "c",
+      "summary": "C/C++ file with ~12 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/src/ui/ui_view_wave2.h",
+      "size": 255,
+      "lang": "c",
+      "summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in ui.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4/test/README",
+      "size": 529,
+      "lang": "unknown",
+      "summary": "Unknown file with 11 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4_Bootloader/extra_script.py",
+      "size": 115,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 0 functions. Key components include classes and method definitions relevant to extra_script module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4_Bootloader/platformio.ini",
+      "size": 249,
+      "lang": "unknown",
+      "summary": "Unknown file with 10 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4_Bootloader/stm32f469ni_flash.ld",
+      "size": 4875,
+      "lang": "unknown",
+      "summary": "Unknown file with 177 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "EcoflowSTM32F4_Bootloader/src/main.c",
+      "size": 27746,
+      "lang": "c",
+      "summary": "C/C++ file with ~40 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "proto/pd335_sys.proto",
+      "size": 19943,
+      "lang": "unknown",
+      "summary": "Unknown file with 549 lines. Provides configuration, documentation or supporting data for the repository.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/generate_keydata_header.py",
+      "size": 1076,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate_keydata_header module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/verify_layout_v3.py",
+      "size": 3481,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_layout_v3 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/verify_optimistic.py",
+      "size": 3464,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_optimistic module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/verify_power_logic.py",
+      "size": 3461,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_power_logic module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/verify_ui_v2.py",
+      "size": 3805,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to verify_ui_v2 module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "Test Scripts/tools/generate_mdi_font.py",
+      "size": 2141,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to generate_mdi_font module.",
+      "modified": "2026-06-27"
+    },
+    {
+      "path": "verification/verify_ota_ui.py",
+      "size": 17968,
+      "lang": "python",
+      "summary": "Python file with 0 classes and 1 functions. Key components include classes and method definitions relevant to verify_ota_ui module.",
+      "modified": "2026-06-27"
     }
   ],
   "stats": {
-    "total_files": 237,
+    "total_files": 392,
     "langs": {
-      "python": 14,
-      "unknown": 16,
-      "markdown": 17,
+      "markdown": 19,
+      "unknown": 34,
+      "python": 143,
+      "json": 9,
       "c": 170,
-      "json": 3,
       "cpp": 15,
       "html": 1,
       "css": 1
     },
     "top_dirs": [
-      "EcoflowRP2040/src",
-      "EcoflowSTM32F4/lib/bsp/Components/ili9325",
-      "EcoflowSTM32F4",
+      "docs/Python Implementation/ha-ef-ble-main/proto",
       "EcoflowSTM32F4/src/ui",
-      "EcoflowSTM32F4/lib/EcoFlowComm",
-      "EcoflowSTM32F4/lib/bsp/Components/ov2640",
-      "EcoflowSTM32F4/Inc",
-      "EcoflowSTM32F4/lib/bsp/Components/ov5640",
-      "EcoflowSTM32F4/lib/bsp/Components/lis302dl",
-      "EcoflowSTM32F4/lib/bsp/Components/mfxstm32l152"
+      "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model",
+      "docs/device_reference",
+      "docs/Python Implementation/ha-ef-ble-main",
+      "EcoflowESP32/src/proto",
+      "EcoflowESP32",
+      "EcoflowSTM32F4/lib/bsp/Components/ili9325",
+      "EcoflowSTM32F4/lib/bsp/Components/n25q512a",
+      "EcoflowSTM32F4/Inc"
     ]
   }
 }

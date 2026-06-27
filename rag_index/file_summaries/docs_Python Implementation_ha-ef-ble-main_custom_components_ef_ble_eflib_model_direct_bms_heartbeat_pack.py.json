@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to direct_bms_heartbeat_pack module.",
+  "chunks": [
+    {
+      "content": "class DirectBmsMDeltaHeartbeatPack(RawData):\n    num: Annotated[int, \"B\", \"num\"]\n    type_: Annotated[int, \"B\", \"type\"]\n    cell_id: Annotated[int, \"B\", \"cellId\"]\n    err_code: Annotated[int, \"I\", \"errCode\"]\n    sys_ver: Annotated[int, \"I\", \"sysVer\"]\n    soc: Annotated[int, \"B\", \"soc\"]\n    vol: Annotated[int, \"I\", \"vol\"]\n    amp: Annotated[int, \"I\", \"amp\"]\n    temp: Annotated[int, \"B\", \"temp\"]\n    open_bms_idx: Annotated[int, \"B\", \"openBmsIdx\"]\n    design_cap: Annotated[int, \"I\", \"designCap\"]\n    remain_cap: Annotated[int, \"I\", \"remainCap\"]\n    full_cap: Annotated[int, \"I\", \"fullCap\"]\n    cycles: Annotated[int, \"I\", \"cycles\"]\n    soh: Annotated[int, \"B\", \"soh\"]\n    max_cell_vol: Annotated[int, \"H\", \"maxCellVol\"]\n    min_cell_vol: Annotated[int, \"H\", \"minCellVol\"]\n    max_cell_temp: Annotated[int, \"B\", \"maxCellTemp\"]\n    min_cell_temp: Annotated[int, \"B\", \"minCellTemp\"]\n    max_mos_temp: Annotated[int, \"B\", \"maxMosTemp\"]\n    min_mos_temp: Annotated[int, \"B\", \"minMosTemp\"]\n    bms_fault: Annotated[int, \"B\", \"bmsFault\"]\n    bq_sys_stat_reg: Annotated[int, \"B\", \"bqSysStatReg\"]\n    tag_chg_amp: Annotated[int, \"I\", \"tagChgAmp\"]\n    f32_show_soc: Annotated[float, \"f\", \"f32ShowSoc\"]\n    input_watts: Annotated[int, \"I\", \"inputWatts\"]\n    output_watts: Annotated[int, \"I\", \"outputWatts\"]\n    remain_time: Annotated[int, \"I\", \"remainTime\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of DirectBmsMDeltaHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_bms_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_bms_heartbeat_pack.py:chunk0"
+    }
+  ]
+}

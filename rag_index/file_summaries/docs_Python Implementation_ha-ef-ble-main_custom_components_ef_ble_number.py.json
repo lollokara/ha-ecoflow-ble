@@ -1,0 +1,59 @@
+{
+  "full_summary": "Python file with 4 classes and 12 functions. Key components include classes and method definitions relevant to number module.",
+  "chunks": [
+    {
+      "content": "class EcoflowNumberEntityDescription[Device: DeviceBase](NumberEntityDescription):\n    async_set_native_value: Callable[[Device, float], Awaitable[bool]] | None = None\n    native_unit_of_measurement_field: Callable[[Device], str] | None = None\n\n    min_value_prop: str | None = None\n    max_value_prop: str | None = None\n    step_value_prop: str | None = None\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 27,
+        "lang": "python",
+        "desc": "Definition of EcoflowNumberEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk0"
+    },
+    {
+      "content": "class NumberSensorBuilder(EntityDescriptionBuilder):\n    _native_unit_of_measurement: str | None = None\n    _native_min_value: float | None = None\n    _native_max_value: float | None = None\n    _min_value_prop: str | None = None\n    _max_value_prop: str | None = None\n    _native_step: float | None = None\n    _async_set_native_value: Callable[[DeviceBase, float], Awaitable[bool]] | None = (\n        None\n    )\n    _device_class: NumberDeviceClass | None = None\n    _native_unit_of_measurement_field: Callable[[DeviceBase], str] | None = None\n\n    def device_class(self, device_class: NumberDeviceClass):\n        self._device_class = device_class\n        return self\n\n    def native_unit_of_measurement(self, unit: str):\n        self._native_unit_of_measurement = unit_to_hassunit(unit)\n        return self\n\n    def native_step(self, step: float):\n        self._native_step = step\n        return self\n\n    def native_min_value(self, min_value: float | Field):\n        if field := self._get_field(min_value):\n            self._min_value_prop = field.public_name\n            return self\n        self._native_min_value = min_value\n        return self\n\n    def native_max_value(self, max_value: float | Field | None):\n        if field := self._get_field(max_value):\n            self._max_value_prop = field.public_name\n            return self\n        self._native_max_value = max_value\n        return self\n\n    def native_unit_of_measurement_field(self, func: Callable[[DeviceBase], str]):\n        self._native_unit_of_measurement_field = func\n        return self\n\n    def async_set_native_value(\n        self, func: Callable[[DeviceBase, float], Awaitable[bool]]\n    ):\n        self._async_set_native_value = func\n        return self\n\n    def build(self):\n        return EcoflowNumberEntityDescription(\n            key=self._entity_key,\n            name=self._entity_name,\n            device_class=self._device_class,\n            native_unit_of_measurement=self._native_unit_of_measurement,\n            async_set_native_value=self._async_set_native_value,\n            native_min_value=self._native_min_value,\n            native_max_value=self._native_max_value,\n            min_value_prop=self._min_value_prop,\n            max_value_prop=self._max_value_prop,\n            native_step=self._native_step,\n            native_unit_of_measurement_field=self._native_unit_of_measurement_field,\n            translation_key=self._entity_translation_key,\n            entity_registry_enabled_default=self._entity_registry_enabled_default,\n            icon=self._icon,\n            availability_prop=self._availability_prop,\n        )",
+      "metadata": {
+        "start_line": 38,
+        "lang": "python",
+        "desc": "Definition of NumberSensorBuilder in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk1"
+    },
+    {
+      "content": "class _Builder[E: controls.NumberType]:\n    builder: Callable[[E, NumberSensorBuilder], NumberSensorBuilder]",
+      "metadata": {
+        "start_line": 108,
+        "lang": "python",
+        "desc": "Definition of _Builder in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk2"
+    },
+    {
+      "content": "def _liquefied_gas_unit(dev: DeviceBase) -> str:\n    unit = getattr(dev, \"liquefied_gas_unit\", None)\n    if (\n        unit is not None\n        and getattr(unit, \"value\", -1) == smart_generator.LiquefiedGasUnit.LB.value\n    ):\n        return UnitOfMass.POUNDS\n    return UnitOfMass.KILOGRAMS",
+      "metadata": {
+        "start_line": 112,
+        "lang": "python",
+        "desc": "Definition of _liquefied_gas_unit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk3"
+    },
+    {
+      "content": "async def async_setup_entry(\n    hass: HomeAssistant,\n    config_entry: DeviceConfigEntry,\n    async_add_entities: AddEntitiesCallback,\n) -> None:\n    device = config_entry.runtime_data\n\n    # New controls system (devices migrated to @controls decorators)\n    descriptions = [\n        (\n            _BUILDERS[number.__class__]\n            .builder(number, NumberSensorBuilder.from_entity(number))\n            .native_min_value(number.min)\n            .native_max_value(number.max)\n            .native_step(number.step)\n            .availability_prop(number.availability_prop)\n            .async_set_native_value(number.set_value_func)\n            .build()\n        )\n        for number in get_controls(device, control_type=controls.NumberType)\n    ]\n\n    if not descriptions:\n        # Deprecated: old hardcoded list (for devices not yet migrated)\n        descriptions = [desc for desc in NUMBER_TYPES if hasattr(device, desc.key)]\n\n    entities = [EcoflowNumber(device, desc) for desc in descriptions]\n    if entities:\n        async_add_entities(entities)",
+      "metadata": {
+        "start_line": 151,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk4"
+    },
+    {
+      "content": "class EcoflowNumber(EcoflowEntity, NumberEntity):\n    def __init__(\n        self,\n        device: DeviceBase,\n        entity_description: EcoflowNumberEntityDescription[DeviceBase],\n    ):\n        super().__init__(device)\n        self._attr_unique_id = f\"ef_{device.serial_number}_{entity_description.key}\"\n        self.entity_description = entity_description\n        self._native_unit_of_measurement_field = (\n            entity_description.native_unit_of_measurement_field\n        )\n        self._min_value_prop = entity_description.min_value_prop\n        self._max_value_prop = entity_description.max_value_prop\n        self._step_value_prop = getattr(entity_description, \"step_value_prop\", None)\n        self._availability_prop = entity_description.availability_prop\n        self._set_native_value = entity_description.async_set_native_value\n        self._prop_name = entity_description.key\n        self._attr_native_value = getattr(device, self._prop_name)\n\n        if entity_description.translation_key is None:\n            self._attr_translation_key = self.entity_description.key\n\n        self._register_update_callback(\"_attr_native_value\", self._prop_name)\n        self._register_update_callback(\n            \"_attr_available\",\n            self._availability_prop,\n            lambda state: state if state is not None else False,\n        )\n        self._register_update_callback(\n            \"_attr_native_min_value\",\n            self._min_value_prop,\n            lambda state: state if state is not None else self.SkipWrite,\n            0,\n        )\n        self._register_update_callback(\n            \"_attr_native_max_value\",\n            self._max_value_prop,\n            lambda state: state if state is not None else self.SkipWrite,\n        )\n\n        self._register_update_callback(\n            \"_attr_native_step\",\n            self._step_value_prop,\n            lambda state: state if state is not None else self.SkipWrite,\n        )\n\n    @property\n    def native_unit_of_measurement(self) -> str | None:\n        if (unit_func := self._native_unit_of_measurement_field) is not None:\n            return unit_func(self._device)\n        return super().native_unit_of_measurement\n\n    @property\n    def available(self):\n        is_available = super().available\n        if not is_available or self._availability_prop is None:\n            return is_available\n\n        return self._attr_available\n\n    async def async_set_native_value(self, value: float) -> None:\n        if self._set_native_value is not None:\n            await self._set_native_value(self._device, value)\n            return\n\n        await super().async_set_native_value(value)",
+      "metadata": {
+        "start_line": 182,
+        "lang": "python",
+        "desc": "Definition of EcoflowNumber in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/number.py:chunk5"
+    }
+  ]
+}

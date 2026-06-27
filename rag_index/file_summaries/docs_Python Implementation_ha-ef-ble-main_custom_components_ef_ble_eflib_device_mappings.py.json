@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to device_mappings module.",
+  "chunks": [
+    {
+      "content": "def battery_name_from_sn(sn: str | None) -> str:\n    if not sn:\n        return \"Extra Battery\"\n\n    for serial_num in [sn[:4], sn[:2]]:\n        if name := ADDON_BATTERY_MAP.get(serial_num):\n            return name\n    return \"Extra Battery\"",
+      "metadata": {
+        "start_line": 28,
+        "lang": "python",
+        "desc": "Definition of battery_name_from_sn in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/device_mappings.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/device_mappings.py:chunk0"
+    },
+    {
+      "content": "def battery_name_from_device(device: \"DeviceBase\", index: int) -> str:\n    return getattr(\n        device,\n        \"extra_battery_name\",\n        battery_name_from_sn(getattr(device, f\"battery_{index}_sn\", None)),\n    )",
+      "metadata": {
+        "start_line": 38,
+        "lang": "python",
+        "desc": "Definition of battery_name_from_device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/device_mappings.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/device_mappings.py:chunk1"
+    }
+  ]
+}

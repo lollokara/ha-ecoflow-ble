@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to switches module.",
+  "chunks": [
+    {
+      "content": "class EcoflowSwitchEntityDescription[T: DeviceBase](SwitchEntityDescription):\n    set_state: Callable[[T, bool], Awaitable] | None = None\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 13,
+        "lang": "python",
+        "desc": "Definition of EcoflowSwitchEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/switches.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/switches.py:chunk0"
+    }
+  ]
+}

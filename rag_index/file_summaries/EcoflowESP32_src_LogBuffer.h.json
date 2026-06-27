@@ -1,0 +1,14 @@
+{
+  "full_summary": "C/C++ file with ~0 functions. Handles low level operations or hardware interfaces typical for embedded systems in src.",
+  "chunks": [
+    {
+      "content": "#ifndef LOG_BUFFER_H\n#define LOG_BUFFER_H\n\n#include <Arduino.h>\n#include <vector>\n#include <string>\n#include <mutex>\n#include \"esp_log.h\"\n\nstruct LogMessage {\n    uint32_t seq;\n    uint32_t timestamp;\n    esp_log_level_t level;\n    String tag;\n    String message;\n};\n\nclass LogBuffer {\npublic:\n    static LogBuffer& getInstance();\n\n    void begin();\n    void setLoggingEnabled(bool enabled);\n    bool isLoggingEnabled() const;\n\n    // Re-installs the esp_log vprintf hook if logging is enabled. Other\n    // subsystems (Wi-Fi softAP, NimBLE init) can replace the global vprintf\n    // handler at runtime, which would silently stop log capture; call this\n    // periodically to keep ownership of the hook.\n    void reassertHook();\n\n    void setGlobalLevel(esp_log_level_t level);\n    void setTagLevel(const String& tag, esp_log_level_t level);\n\n    // Returns buffered logs whose sequence id is >= fromSeq (oldest first),\n    // capped to a bounded batch so the JSON response stays small.\n    std::vector<LogMessage> getLogs(uint32_t fromSeq = 0);\n    size_t getLogCount() const;\n    void clearLogs();\n\n    // Direct, hook-independent logging. The Arduino core remaps app-level\n    // ESP_LOGx macros to its own HAL logger, which bypasses esp_log_set_vprintf,\n    // so those never reach the vprintf hook. push() writes straight into the\n    // ring buffer (and mirrors to the STM32 / USB serial), guaranteeing the\n    // message is visible on the web log regardless of the framework's routing.\n    // Always captured, independent of the enable toggle.\n    void push(esp_log_level_t level, const char* tag, const char* fmt, ...);\n\n    // Internal use for the vprintf hook\n    void addLog(esp_log_level_t level, const char* tag, const char* format, va_list args);\n\nprivate:\n    LogBuffer();\n    LogBuffer(const LogBuffer&) = delete;\n    LogBuffer& operator=(const LogBuffer&) = delete;\n\n    // Core ring append (assumes formatted message). Thread-safe.\n    void _append(esp_log_level_t level, const char* tag, const char* message);\n\n    bool _enabled = false;\n    std::vector<LogMessage> _logs;\n    const size_t _maxLogs = 120; // Ring buffer depth (bounded RAM usage)\n    uint32_t _seqCounter = 0;    // Monotonic id for stable web pagination\n    mutable SemaphoreHandle_t _mutex;\n    uint32_t _droppedLogs = 0;\n};\n\n#endif // LOG_BUFFER_H",
+      "metadata": {
+        "start_line": 1,
+        "lang": "c",
+        "desc": "Code chunk from EcoflowESP32/src/LogBuffer.h lines 1-68"
+      },
+      "id": "EcoflowESP32/src/LogBuffer.h:chunk0"
+    }
+  ]
+}

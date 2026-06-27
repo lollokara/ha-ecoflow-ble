@@ -1,0 +1,59 @@
+{
+  "full_summary": "Python file with 6 classes and 0 functions. Key components include classes and method definitions relevant to pd_heart module.",
+  "chunks": [
+    {
+      "content": "class BasePdHeart(RawData):\n    model: Annotated[int, \"B\", \"model\"]\n    error_code: Annotated[bytes, \"4s\", \"errorCode\"]\n    sys_ver: Annotated[bytes, \"4s\", \"sysVer\"]\n    wifi_ver: Annotated[bytes, \"4s\", \"wifiVer\"]\n    wifi_auto_recovery: Annotated[int, \"B\", \"wifiAutoRecovery\"]\n    soc: Annotated[int, \"B\", \"soc\"]\n    watts_out_sum: Annotated[int, \"H\", \"wattsOutSum\"]\n    watts_in_sum: Annotated[int, \"H\", \"wattsInSum\"]\n    remain_time: Annotated[int, \"i\", \"remainTime\"]\n\n    quiet_mode: Annotated[int, \"B\", \"quietMode\"]\n    dc_out_state: Annotated[int, \"B\", \"dcOutState\"]\n\n    usb1_watt: Annotated[int, \"B\", \"usb1Watt\"]\n    usb2_watt: Annotated[int, \"B\", \"usb2Watt\"]\n    qc_usb1_watt: Annotated[int, \"B\", \"qcUsb1Watt\"]\n    qc_usb2_watt: Annotated[int, \"B\", \"qcUsb2Watt\"]\n    typec1_watts: Annotated[int, \"B\", \"typeC1Watts\"]\n    typec2_watts: Annotated[int, \"B\", \"typeC2Watts\"]\n    typec1_temp: Annotated[int, \"B\", \"typeC1Temp\"]\n    typec2_temp: Annotated[int, \"B\", \"typeC2Temp\"]\n\n    car_state: Annotated[int, \"B\", \"carState\"]\n    car_watts: Annotated[int, \"B\", \"carWatts\"]\n    car_temp: Annotated[int, \"B\", \"carTemp\"]\n\n    standby_min: Annotated[int, \"H\", \"standbyMin\"]\n    lcd_off_sec: Annotated[int, \"H\", \"lcdOffSec\"]\n    lcd_brightness: Annotated[int, \"B\", \"lcdBrightness\"]\n\n    dc_chg_power: Annotated[int, \"I\", \"dcChgPower\"]\n    sun_chg_power: Annotated[int, \"I\", \"sunChgPower\"]\n    ac_chg_power: Annotated[int, \"I\", \"acChgPower\"]\n    dc_dsg_power: Annotated[int, \"I\", \"dcDsgPower\"]\n    ac_dsg_power: Annotated[int, \"I\", \"acDsgPower\"]\n\n    usb_used_time: Annotated[int, \"I\", \"usbUsedTime\"]\n    usb_qc_used_time: Annotated[int, \"I\", \"usbQcUsedTime\"]\n    type_c_used_time: Annotated[int, \"I\", \"typeCUsedTime\"]\n    car_used_time: Annotated[int, \"I\", \"carUsedTime\"]\n    inv_used_time: Annotated[int, \"I\", \"invUsedTime\"]\n    dc_in_used_time: Annotated[int, \"I\", \"dcInUsedTime\"]\n    mppt_used_time: Annotated[int, \"I\", \"mpptUsedTime\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of BasePdHeart in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk0"
+    },
+    {
+      "content": "class Mr330PdHeart(BasePdHeart):\n    reverser: Annotated[int, \"H\", \"reverser\"]\n    screen_state: Annotated[bytes, \"14s\", \"screenState\"]\n    ext_rj45_port: Annotated[int, \"B\", \"extRj45Port\"]\n    ext_3p8_port: Annotated[int, \"B\", \"ext3P8Port\"]\n    ext_4p8_port: Annotated[int, \"B\", \"ext4P8Port\"]\n    syc_chg_dsg_state: Annotated[int, \"B\", \"sycChgDsgState\"]\n    wifi_rssi: Annotated[int, \"B\", \"wifiRssi\"]\n    wireless_watts: Annotated[int, \"B\", \"wirelessWatts\"]",
+      "metadata": {
+        "start_line": 52,
+        "lang": "python",
+        "desc": "Definition of Mr330PdHeart in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk1"
+    },
+    {
+      "content": "class Mr330PdHeartDelta2(Mr330PdHeart):\n    charge_type: Annotated[int, \"B\", \"chargeType\"]\n    ac_input_watts: Annotated[int, \"H\", \"acInputWatts\"]\n    ac_output_watts: Annotated[int, \"H\", \"acOutputWatts\"]\n    dc_pv_input_watts: Annotated[int, \"H\", \"dcPvInputWatts\"]\n    dc_pv_output_watts: Annotated[int, \"H\", \"dcPvOutputWatts\"]\n    cfg_ac_enabled: Annotated[int, \"B\", \"cfgAcEnabled\"]\n\n    pv_priority: Annotated[int, \"B\", \"pvPriority\"]\n    ac_auto_on: Annotated[int, \"B\", \"acAutoOn\"]  # or acAutoOutConfig based on flag\n\n    watthis_config: Annotated[int, \"B\", \"watthisConfig\"]\n    bp_power_soc: Annotated[int, \"B\", \"bppowerSoc\"]\n    hysteresis_soc: Annotated[int, \"B\", \"hysteresisSoc\"]\n    reply_switchcnt: Annotated[int, \"I\", \"replySwitchcnt\"]\n    ac_auto_out_config: Annotated[int, \"B\", \"acAutoOutConfig\"]\n    min_auto_soc: Annotated[int, \"B\", \"minAutoSoc\"]\n    ac_auto_out_pause: Annotated[int, \"B\", \"acAutoOutPause\"]\n\n    schedule_id: Annotated[int, \"I\", \"scheduleId\"]\n    heartbeat_duration: Annotated[int, \"I\", \"heartbeatDuration\"]\n    bkw_watts_in_power: Annotated[int, \"H\", \"bkwWattsInPower\"]\n    input_power_limit_flag: Annotated[int, \"B\", \"inputPowerLimitFlag\"]\n    ac_charge_flag: Annotated[int, \"B\", \"acChargeFlag\"]\n    cloud_ctrl_en: Annotated[int, \"B\", \"cloudCtrlEn\"]\n    redun_charge_flag: Annotated[int, \"B\", \"redunChargeFlag\"]",
+      "metadata": {
+        "start_line": 63,
+        "lang": "python",
+        "desc": "Definition of Mr330PdHeartDelta2 in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk2"
+    },
+    {
+      "content": "class Mr350PdHeartbeatCore(BasePdHeart):\n    bms_kit_state: Annotated[int, \"H\", \"bmsKitState\"]\n    other_kit_state: Annotated[int, \"B\", \"otherKitState\"]\n    reversed: Annotated[int, \"H\", \"reversed\"]\n    sys_chg_flag: Annotated[int, \"B\", \"sysChgFlag\"]\n    wifi_rssi: Annotated[int, \"B\", \"wifiRssi\"]\n    wireless_watts: Annotated[int, \"B\", \"wirelessWatts\"]\n    screen_state: Annotated[bytes, \"14s\", \"screenState\"]",
+      "metadata": {
+        "start_line": 91,
+        "lang": "python",
+        "desc": "Definition of Mr350PdHeartbeatCore in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk3"
+    },
+    {
+      "content": "class Mr350PdHeartbeatDelta2Max(Mr350PdHeartbeatCore):\n    first_xt150_watts: Annotated[int, \"H\", \"firstXt150Watts\"]\n    second_xt150_watts: Annotated[int, \"H\", \"secondXT150Watts\"]\n    inv_in_watts: Annotated[int, \"H\", \"invInWatts\"]\n    inv_out_watts: Annotated[int, \"H\", \"invOutWatts\"]\n    pv1_charge_type: Annotated[int, \"B\", \"pv1ChargeType\"]\n    pv1_charge_watts: Annotated[int, \"H\", \"pv1ChargeWatts\"]\n    pv2_charge_type: Annotated[int, \"B\", \"pv2ChargeType\"]\n    pv2_charge_watts: Annotated[int, \"H\", \"pv2ChargeWatts\"]\n    pv_charge_prio_set: Annotated[int, \"B\", \"pvChargePrioSet\"]\n    ac_auto_on_cfg_set: Annotated[int, \"B\", \"acAutoOnCfgSet\"]\n\n    ac_auto_out_config: Annotated[int, \"B\", \"acAutoOutConfig\"]\n    main_ac_out_soc: Annotated[int, \"B\", \"mainAcOutSoc\"]\n    ac_auto_out_pause: Annotated[int, \"B\", \"acAutoOutPause\"]\n\n    watthisconfig: Annotated[int, \"B\", \"watthisconfig\"]\n    bp_power_soc: Annotated[int, \"B\", \"bppowerSoc\"]\n    hysteresis_add: Annotated[int, \"B\", \"hysteresisAdd\"]\n    relayswitchcnt: Annotated[int, \"I\", \"relayswitchcnt\"]",
+      "metadata": {
+        "start_line": 101,
+        "lang": "python",
+        "desc": "Definition of Mr350PdHeartbeatDelta2Max in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk4"
+    },
+    {
+      "content": "class Mr350PdHeartbeatDeltaPro(Mr350PdHeartbeatCore):\n    first_xt150_watts: Annotated[int, \"H\", \"firstXt150Watts\"]\n    second_xt150_watts: Annotated[int, \"H\", \"secondXT150Watts\"]\n    inv_in_watts: Annotated[int, \"H\", \"invInWatts\"]\n    inv_in_type: Annotated[int, \"B\", \"invInType\"]\n    inv_out_watts: Annotated[int, \"H\", \"invOutWatts\"]\n    inv_out_type: Annotated[int, \"B\", \"invOutType\"]\n    pv1_charge_watts: Annotated[int, \"H\", \"pv1ChargeWatts\"]\n    pv1_charge_type: Annotated[int, \"B\", \"pv1ChargeType\"]\n    anderson_power: Annotated[int, \"H\", \"andersonPower\"]\n    pv_charge_prio_set: Annotated[int, \"B\", \"pvChargePrioSet\"]\n    ac_auto_on_cfg_set: Annotated[int, \"B\", \"acAutoOnCfgSet\"]\n    ac_auto_out_config: Annotated[int, \"B\", \"acAutoOutConfig\"]\n    main_ac_out_soc: Annotated[int, \"B\", \"mainAcOutSoc\"]\n    ac_auto_out_pause: Annotated[int, \"B\", \"acAutoOutPause\"]\n\n    watthisconfig: Annotated[int, \"B\", \"watthisconfig\"]\n    bp_power_soc: Annotated[int, \"B\", \"bppowerSoc\"]\n    hysteresis_add: Annotated[int, \"B\", \"hysteresisAdd\"]\n    relayswitchcnt: Annotated[int, \"I\", \"relayswitchcnt\"]",
+      "metadata": {
+        "start_line": 123,
+        "lang": "python",
+        "desc": "Definition of Mr350PdHeartbeatDeltaPro in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/pd_heart.py:chunk5"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "full_summary": "Python file with 3 classes and 13 functions. Key components include classes and method definitions relevant to binary_sensor module.",
+  "chunks": [
+    {
+      "content": "class EcoflowBinarySensorEntityDescription(BinarySensorEntityDescription):\n    \"\"\"Binary sensor entity description with optional indexed expansion support.\"\"\"\n\n    update_state: Callable[[bool], None] | None = None\n    indexed_range: range | None = None\n    state_attribute_fields: list[str] = field(default_factory=list)",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of EcoflowBinarySensorEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk0"
+    },
+    {
+      "content": "class _BinarySensorKwargs(TypedDict, total=False):\n    translation_key: str\n    translation_placeholders: dict[str, str]\n    indexed_range: range\n    entity_category: EntityCategory\n    state_attribute_fields: list[str]",
+      "metadata": {
+        "start_line": 32,
+        "lang": "python",
+        "desc": "Definition of _BinarySensorKwargs in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk1"
+    },
+    {
+      "content": "def _make_desc(\n    device_class: BinarySensorDeviceClass,\n    key: str = \"\",\n    *,\n    enabled: bool = True,\n    **kwargs: Unpack[_BinarySensorKwargs],\n) -> EcoflowBinarySensorEntityDescription:\n    return EcoflowBinarySensorEntityDescription(\n        key=key,\n        device_class=device_class,\n        entity_registry_enabled_default=enabled,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 40,
+        "lang": "python",
+        "desc": "Definition of _make_desc in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk2"
+    },
+    {
+      "content": "def lock(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.LOCK, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 55,
+        "lang": "python",
+        "desc": "Definition of lock in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk3"
+    },
+    {
+      "content": "def problem(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.PROBLEM, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 61,
+        "lang": "python",
+        "desc": "Definition of problem in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk4"
+    },
+    {
+      "content": "def safety(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.SAFETY, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 67,
+        "lang": "python",
+        "desc": "Definition of safety in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk5"
+    },
+    {
+      "content": "def plug(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.PLUG, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 73,
+        "lang": "python",
+        "desc": "Definition of plug in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk6"
+    },
+    {
+      "content": "def battery(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.BATTERY, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 79,
+        "lang": "python",
+        "desc": "Definition of battery in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk7"
+    },
+    {
+      "content": "def power(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(BinarySensorDeviceClass.POWER, key, enabled=enabled, **kwargs)",
+      "metadata": {
+        "start_line": 85,
+        "lang": "python",
+        "desc": "Definition of power in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk8"
+    },
+    {
+      "content": "def connectivity(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(\n        BinarySensorDeviceClass.CONNECTIVITY, key, enabled=enabled, **kwargs\n    )",
+      "metadata": {
+        "start_line": 91,
+        "lang": "python",
+        "desc": "Definition of connectivity in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk9"
+    },
+    {
+      "content": "def battery_charging(\n    key: str = \"\", *, enabled: bool = True, **kwargs: Unpack[_BinarySensorKwargs]\n) -> EcoflowBinarySensorEntityDescription:\n    return _make_desc(\n        BinarySensorDeviceClass.BATTERY_CHARGING, key, enabled=enabled, **kwargs\n    )",
+      "metadata": {
+        "start_line": 99,
+        "lang": "python",
+        "desc": "Definition of battery_charging in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk10"
+    },
+    {
+      "content": "def shp2_channel(\n    fn: Callable[..., EcoflowBinarySensorEntityDescription],\n    translation_key: str,\n    **kwargs,\n) -> EcoflowBinarySensorEntityDescription:\n    \"\"\"Indexed SHP2 channel binary sensor with channel placeholder pre-filled.\"\"\"\n    return fn(\n        translation_key=translation_key,\n        translation_placeholders={\"channel\": \"{n}\"},\n        indexed_range=_shp2_channel_range,\n        **kwargs,\n    )",
+      "metadata": {
+        "start_line": 110,
+        "lang": "python",
+        "desc": "Definition of shp2_channel in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk11"
+    },
+    {
+      "content": "async def async_setup_entry(\n    hass: HomeAssistant,\n    config_entry: DeviceConfigEntry,\n    async_add_entities: AddEntitiesCallback,\n) -> None:\n    \"\"\"Add binary sensors for passed config_entry in HA.\"\"\"\n    device = config_entry.runtime_data\n\n    new_sensors = [\n        EcoflowBinarySensor(device, sensor)\n        for sensor in BINARY_SENSOR_TYPES\n        if hasattr(device, sensor)\n    ]\n\n    if new_sensors:\n        async_add_entities(new_sensors)",
+      "metadata": {
+        "start_line": 186,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk12"
+    },
+    {
+      "content": "class EcoflowBinarySensor(EcoflowEntity, BinarySensorEntity):\n    def __init__(\n        self,\n        device: DeviceBase,\n        sensor: str,\n    ):\n        super().__init__(device)\n\n        self._attr_unique_id = f\"ef_{self._device.serial_number}_{sensor}\"\n        self._attr_is_on = getattr(self._device, sensor, None)\n\n        if sensor in BINARY_SENSOR_TYPES:\n            self.entity_description = BINARY_SENSOR_TYPES[sensor]\n            self._prop_name = self.entity_description.key\n            if self.entity_description.translation_key is None:\n                self._attr_translation_key = self.entity_description.key\n\n    async def async_added_to_hass(self):\n        \"\"\"Run when this Entity has been added to HA.\"\"\"\n        self._device.register_state_update_callback(self.state_updated, self._prop_name)\n        await super().async_added_to_hass()\n\n    async def async_will_remove_from_hass(self):\n        \"\"\"Entity being removed from hass.\"\"\"\n        self._device.remove_state_update_callback(self.state_updated, self._prop_name)\n        await super().async_will_remove_from_hass()\n\n    @property\n    def extra_state_attributes(self) -> dict[str, Any] | None:\n        \"\"\"Return extra state attributes from configured attribute fields.\"\"\"\n        if not isinstance(\n            self.entity_description, EcoflowBinarySensorEntityDescription\n        ):\n            return None\n\n        return {\n            field_name: getattr(self._device, field_name)\n            for field_name in self.entity_description.state_attribute_fields\n            if hasattr(self._device, field_name)\n        } or None\n\n    @callback\n    def state_updated(self, state: bool):\n        self._attr_is_on = state\n        self.async_write_ha_state()",
+      "metadata": {
+        "start_line": 204,
+        "lang": "python",
+        "desc": "Definition of EcoflowBinarySensor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/binary_sensor.py:chunk13"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 1 functions. Key components include classes and method definitions relevant to delta3_plus module.",
+  "chunks": [
+    {
+      "content": "class Device(delta3.Device):\n    \"\"\"Delta 3 Plus\"\"\"\n\n    SN_PREFIX = (b\"P351\",)\n\n    dc_charging_max_amps_2 = _DcAmpSettingField(\n        pd335_sys_pb2.PV_CHG_VOL_SPEC_12V, pd335_sys_pb2.PV_PLUG_INDEX_2\n    )\n    dc_charging_current_max_2 = _DcChargingMaxField(pd335_sys_pb2.PV_CHG_VOL_SPEC_12V)\n\n    dc_port_2_input_power = pb_field(pb.pow_get_pv2, pround(2))\n    dc_port_2_state = pb_field(pb.plug_in_info_pv2_type, DCPortState.from_value)\n\n    @computed_field\n    def solar_input_power_2(self) -> float:\n        if (\n            self.dc_port_2_state is DCPortState.SOLAR\n            and self.dc_port_2_input_power is not None\n        ):\n            return round(self.dc_port_2_input_power, 2)\n        return 0\n\n    @controls.current(dc_charging_max_amps_2, max=dynamic(dc_charging_current_max_2))\n    async def set_dc_charging_amps_max_2(self, value: float) -> bool:\n        return await self.set_dc_charging_amps_max(\n            value, plug_index=pd335_sys_pb2.PV_PLUG_INDEX_2\n        )",
+      "metadata": {
+        "start_line": 10,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_plus.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_plus.py:chunk0"
+    }
+  ]
+}

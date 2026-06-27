@@ -1,0 +1,167 @@
+{
+  "full_summary": "Python file with 14 classes and 24 functions. Key components include classes and method definitions relevant to controls module.",
+  "chunks": [
+    {
+      "content": "class HvacMode(enum.StrEnum):\n    OFF = \"off\"\n    HEAT = \"heat\"\n    COOL = \"cool\"\n    HEAT_COOL = \"heat_cool\"\n    AUTO = \"auto\"\n    DRY = \"dry\"\n    FAN_ONLY = \"fan_only\"",
+      "metadata": {
+        "start_line": 15,
+        "lang": "python",
+        "desc": "Definition of HvacMode in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk0"
+    },
+    {
+      "content": "def _resolve(value: float | DynamicValue | None, device: \"DeviceBase\") -> float | None:\n    if isinstance(value, DynamicValue):\n        raw = getattr(device, value.field.public_name, None)  # pyright: ignore[reportAttributeAccessIssue]\n        if raw is None:\n            return None\n        return value.transform(raw) if value.transform is not None else float(raw)\n    return value",
+      "metadata": {
+        "start_line": 25,
+        "lang": "python",
+        "desc": "Definition of _resolve in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk1"
+    },
+    {
+      "content": "class ControlType(EntityType):\n    pass",
+      "metadata": {
+        "start_line": 34,
+        "lang": "python",
+        "desc": "Definition of ControlType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk2"
+    },
+    {
+      "content": "class toggle(ControlType):\n    type SwitchFunc[D: \"DeviceBase\"] = Callable[[D, bool], Awaitable[None]]\n\n    enable_func: SwitchFunc = dataclasses.field(\n        default=cast(\"SwitchFunc\", None),\n        repr=False,\n        init=False,\n    )\n\n    def __call__[D: \"DeviceBase\"](\n        self,\n        func: Callable[[D, bool], Awaitable[None]],\n    ):\n        _check_value_param(func, bool, type(self).__name__)\n        self.enable_func = func\n        self._field.sensor(self)\n        return func",
+      "metadata": {
+        "start_line": 38,
+        "lang": "python",
+        "desc": "Definition of toggle in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk3"
+    },
+    {
+      "content": "class outlet(toggle):\n    pass",
+      "metadata": {
+        "start_line": 57,
+        "lang": "python",
+        "desc": "Definition of outlet in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk4"
+    },
+    {
+      "content": "class switch(toggle):\n    pass",
+      "metadata": {
+        "start_line": 61,
+        "lang": "python",
+        "desc": "Definition of switch in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk5"
+    },
+    {
+      "content": "class NumberType(ControlType):\n    type ValueFunc[D: \"DeviceBase\", float] = Callable[[D, float], Awaitable[bool]]\n\n    set_value_func: ValueFunc = dataclasses.field(\n        default=cast(\"Any\", None),\n        repr=False,\n        init=False,\n    )\n    max: float | None = None\n    min: float = 0\n    step: float = 1.0\n\n    def __call__[F: Callable[[Any, float], Awaitable[bool]]](\n        self,\n        func: F,\n    ) -> F:\n        _check_value_param(func, float, type(self).__name__)\n\n        control = self\n\n        async def _check_limits(\n            device: \"DeviceBase\", value: float, *args, **kwargs\n        ) -> bool:\n            if (low := _resolve(control.min, device)) is not None:\n                value = max(low, value)\n            if (high := _resolve(control.max, device)) is not None:\n                value = min(high, value)\n            return await func(device, value, *args, **kwargs)\n\n        self.set_value_func = _check_limits\n\n        self._field.sensor(self)\n        return cast(\"F\", _check_limits)",
+      "metadata": {
+        "start_line": 65,
+        "lang": "python",
+        "desc": "Definition of NumberType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk6"
+    },
+    {
+      "content": "class power(NumberType):\n    unit: units.Power = units.Power.WATT",
+      "metadata": {
+        "start_line": 100,
+        "lang": "python",
+        "desc": "Definition of power in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk7"
+    },
+    {
+      "content": "class battery(NumberType):\n    pass",
+      "metadata": {
+        "start_line": 104,
+        "lang": "python",
+        "desc": "Definition of battery in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk8"
+    },
+    {
+      "content": "class current(NumberType):\n    unit: units.Current = units.Current.AMPERE",
+      "metadata": {
+        "start_line": 108,
+        "lang": "python",
+        "desc": "Definition of current in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk9"
+    },
+    {
+      "content": "class voltage(NumberType):\n    unit: units.Voltage = units.Voltage.VOLT",
+      "metadata": {
+        "start_line": 112,
+        "lang": "python",
+        "desc": "Definition of voltage in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk10"
+    },
+    {
+      "content": "class temperature(NumberType):\n    unit: units.Temperature = units.Temperature.C",
+      "metadata": {
+        "start_line": 116,
+        "lang": "python",
+        "desc": "Definition of temperature in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk11"
+    },
+    {
+      "content": "class weight(NumberType):\n    pass",
+      "metadata": {
+        "start_line": 120,
+        "lang": "python",
+        "desc": "Definition of weight in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk12"
+    },
+    {
+      "content": "class select[E: IntFieldValue](ControlType):\n    type SetFunc = Callable[[DeviceBase, E], Awaitable[None]]\n\n    options: type[E] | list[str]\n    set_value_func: SetFunc = dataclasses.field(\n        repr=False,\n        init=False,\n    )\n\n    def __post_init__(self) -> None:\n        if isinstance(self.options, list):\n            self._value_type: type[E] | None = None\n        else:\n            self._value_type = self.options\n            self.options = self.options.options(include_unknown=False)\n\n    @property\n    def options_str(self) -> list[str]:\n        return (\n            self.options\n            if isinstance(self.options, list)\n            else self.options.options(include_unknown=False)\n        )\n\n    def __call__[D: \"DeviceBase\"](\n        self,\n        func: Callable[[D, E], Awaitable[None]],\n    ):\n        if self._value_type is not None:\n            _check_value_param(func, self._value_type, type(self).__name__)\n\n        value_type = self._value_type\n\n        async def _func(device: D, value: E | str) -> None:\n            if isinstance(value, str) and value_type is not None:\n                value = value_type[value.upper()]\n\n            await func(device, value)  # pyright: ignore[reportArgumentType]\n\n        self.set_value_func = _func  # pyright: ignore[reportAttributeAccessIssue]\n        self._field.sensor(self)\n        return _func",
+      "metadata": {
+        "start_line": 124,
+        "lang": "python",
+        "desc": "Definition of select in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk13"
+    },
+    {
+      "content": "def for_each(\n    fields: \"Iterable[updatable_props.Field]\",\n    *,\n    control: type[toggle],\n    availability: \"Iterable[updatable_props.Field | None] | None\" = None,\n    translation_key: str | None = None,\n    translation_placeholders: Callable[[int], dict[str, str]] | None = None,\n) -> Callable[[Callable], Callable]:\n    \"\"\"\n    Decorate a function to register a toggle control for each field in the list\n\n    The decorated function must accept (self, index: int, enabled: bool) where\n    index is 1-based (i.e. 1 for the first field, 2 for the second, etc.).\n    \"\"\"\n\n    def decorator(func: Callable) -> Callable:\n        avail_iter = iter(availability) if availability is not None else None\n        for i, field in enumerate(fields):\n            idx = i + 1\n            avail = next(avail_iter) if avail_iter is not None else None\n            placeholders = (\n                translation_placeholders(idx)\n                if translation_placeholders is not None\n                else None\n            )\n            ctrl = control(\n                field,\n                availability=avail,\n                translation_key=translation_key,\n                translation_placeholders=placeholders,\n            )\n\n            async def _enable(\n                device: \"DeviceBase\",\n                enabled: bool,\n                _id: int = idx,\n            ) -> None:\n                await func(device, _id, enabled)\n\n            ctrl.enable_func = _enable\n            field.sensor(ctrl)\n\n        return func\n\n    return decorator",
+      "metadata": {
+        "start_line": 168,
+        "lang": "python",
+        "desc": "Definition of for_each in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk14"
+    },
+    {
+      "content": "class climate(ControlType):\n    \"\"\"\n    Control type for composite climate entities\n\n    Bundles power, operating mode, target temperature, fan speed, and current\n    temperature into a single control that the climate platform discovers via\n    get_controls.\n    \"\"\"\n\n    hvac_modes: dict[str, Any] = dataclasses.field(default_factory=dict)\n    fan_modes: dict[str, Any] = dataclasses.field(default_factory=dict)\n\n    # shared, read-only field (no associated setter decorator). Typed as Any because\n    # `updatable_props.Field` is a data descriptor - annotating with it makes type\n    # checkers route plain assignments through Field.__set__, which only accepts\n    # `UpdatableProps` instances (devices), not this control dataclass\n    current_temperature_field: Any = None\n\n    temperature_unit: str = \"\u00b0C\"\n\n    target_temperature_step: float = dataclasses.field(\n        default=1.0, repr=False, init=False\n    )\n    min_temp: float | None = dataclasses.field(default=None, repr=False, init=False)\n    max_temp: float | None = dataclasses.field(default=None, repr=False, init=False)\n    target_temperature_range_step: float = dataclasses.field(\n        default=1.0, repr=False, init=False\n    )\n    min_range_temp: float | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    max_range_temp: float | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    min_humidity: int | None = dataclasses.field(default=None, repr=False, init=False)\n    max_humidity: int | None = dataclasses.field(default=None, repr=False, init=False)\n\n    power_field: Any = dataclasses.field(default=None, repr=False, init=False)\n    target_temperature_field: Any = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    target_temperature_low_field: Any = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    target_temperature_high_field: Any = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    target_humidity_field: Any = dataclasses.field(default=None, repr=False, init=False)\n    fan_speed_field: Any = dataclasses.field(default=None, repr=False, init=False)\n\n    set_power: \"_PowerSetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    set_operating_mode: \"_ModeSetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    set_target_temperature: \"_TargetTempSetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    set_target_temperature_range: \"_TargetTempRangeSetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    set_target_humidity: \"_HumiditySetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    set_fan_speed: \"_FanSpeedSetter | None\" = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n\n    target_temperature_hvac_modes: frozenset[str] | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    target_temperature_range_hvac_modes: frozenset[str] | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    target_humidity_hvac_modes: frozenset[str] | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n    fan_speed_hvac_modes: frozenset[str] | None = dataclasses.field(\n        default=None, repr=False, init=False\n    )\n\n    def __post_init__(self):\n        \"\"\"Register this climate control on its field.\"\"\"\n        self._field.sensor(self)\n\n    def __call__(self, func: Any) -> Any:\n        return func\n\n    def power(self, field: Any = None, /) -> _Decorator[_PowerSetter]:\n        def bind(f: _PowerSetter) -> _PowerSetter:\n            self.set_power = _virtual_dispatch(f, notify_fields=[field])\n            if field is not None:\n                self.power_field = field\n            return f\n\n        return bind\n\n    def mode(self) -> _Decorator[_ModeSetter]:\n        base_field = self._field\n\n        def bind(f: _ModeSetter) -> _ModeSetter:\n            self.set_operating_mode = _virtual_dispatch(f, notify_fields=[base_field])\n            return f\n\n        return bind\n\n    def target_temp(\n        self,\n        field: Any = None,\n        /,\n        *,\n        modes: Iterable[str] | None = None,\n        step: float | None = None,\n        min: float | None = None,\n        max: float | None = None,\n    ) -> _Decorator[_TargetTempSetter]:\n        def bind(f: _TargetTempSetter) -> _TargetTempSetter:\n            self.set_target_temperature = _virtual_dispatch(f, notify_fields=[field])\n            if field is not None:\n                self.target_temperature_field = field\n            if modes is not None:\n                self.target_temperature_hvac_modes = frozenset(modes)\n            if step is not None:\n                self.target_temperature_step = step\n            if min is not None:\n                self.min_temp = min\n            if max is not None:\n                self.max_temp = max\n            return f\n\n        return bind\n\n    def target_temp_range(\n        self,\n        low: Any = None,\n        high: Any = None,\n        /,\n        *,\n        modes: Iterable[str] | None = None,\n        step: float | None = None,\n        min: float | None = None,\n        max: float | None = None,\n    ) -> _Decorator[_TargetTempRangeSetter]:\n        def bind(f: _TargetTempRangeSetter) -> _TargetTempRangeSetter:\n            self.set_target_temperature_range = _virtual_dispatch(\n                f, notify_fields=[low, high]\n            )\n            if low is not None:\n                self.target_temperature_low_field = low\n            if high is not None:\n                self.target_temperature_high_field = high\n            if modes is not None:\n                self.target_temperature_range_hvac_modes = frozenset(modes)\n            if step is not None:\n                self.target_temperature_range_step = step\n            if min is not None:\n                self.min_range_temp = min\n            if max is not None:\n                self.max_range_temp = max\n            return f\n\n        return bind\n\n    def humidity(\n        self,\n        field: Any = None,\n        /,\n        *,\n        modes: Iterable[str] | None = None,\n        min: int | None = None,\n        max: int | None = None,\n    ) -> _Decorator[_HumiditySetter]:\n        def bind(f: _HumiditySetter) -> _HumiditySetter:\n            self.set_target_humidity = _virtual_dispatch(f, notify_fields=[field])\n            if field is not None:\n                self.target_humidity_field = field\n            if modes is not None:\n                self.target_humidity_hvac_modes = frozenset(modes)\n            if min is not None:\n                self.min_humidity = min\n            if max is not None:\n                self.max_humidity = max\n            return f\n\n        return bind\n\n    def fan(\n        self,\n        field: Any = None,\n        /,\n        *,\n        modes: Iterable[str] | None = None,\n    ) -> _Decorator[_FanSpeedSetter]:\n        def bind(f: _FanSpeedSetter) -> _FanSpeedSetter:\n            self.set_fan_speed = _virtual_dispatch(f, notify_fields=[field])\n            if field is not None:\n                self.fan_speed_field = field\n            if modes is not None:\n                self.fan_speed_hvac_modes = frozenset(modes)\n            return f\n\n        return bind",
+      "metadata": {
+        "start_line": 224,
+        "lang": "python",
+        "desc": "Definition of climate in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk15"
+    },
+    {
+      "content": "def _virtual_dispatch(func: Any, *, notify_fields: Iterable[Any] | None = None) -> Any:\n    name = func.__name__\n    fields = tuple(notify_fields) if notify_fields is not None else ()\n\n    async def _dispatch(device: \"DeviceBase\", *args: Any, **kwargs: Any) -> Any:\n        result = await getattr(device, name)(*args, **kwargs)\n        for field, value in zip(fields, args, strict=False):\n            if field is not None:\n                device.notify_field(field, value)\n        return result\n\n    return _dispatch",
+      "metadata": {
+        "start_line": 429,
+        "lang": "python",
+        "desc": "Definition of _virtual_dispatch in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk16"
+    },
+    {
+      "content": "def _check_value_param(func: Any, expected: type, decorator_name: str) -> None:\n    hints = get_type_hints(func)\n    params = list(inspect.signature(func).parameters.values())\n    if len(params) < 2:\n        raise TypeError(\n            f\"@{decorator_name}: decorated function must accept \"\n            f\"(self, value: {expected.__name__})\"\n        )\n    value_param = params[1]\n    value_type = hints.get(value_param.name)\n    if value_type is not None and value_type is not expected:\n        raise TypeError(\n            f\"@{decorator_name}: parameter '{value_param.name}' must be \"\n            f\"{expected.__name__}, got {value_type}\"\n        )",
+      "metadata": {
+        "start_line": 443,
+        "lang": "python",
+        "desc": "Definition of _check_value_param in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/entity/controls.py:chunk17"
+    }
+  ]
+}

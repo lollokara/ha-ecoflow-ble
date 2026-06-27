@@ -173,11 +173,12 @@ void CmdUtils::processInput(String input) {
 | Method name                        | cmd_id | Payload description                                                  |
 | ---------------------------------- | ------ | -------------------------------------------------------------------- |
 | set_ambient_light(status)          | 0x5C   | 1 byte: 0x01 = on, 0x02 = off    (no idea why 2 is off)              |
-| set_automatic_drain(enable)        | 0x59   | 1 byte: 0x01 = enable  0x00 = disable                                |
+| set_automatic_drain(enable)        | 0x59   | 1 byte bool; payload computed from current drain_mode state          |
+| set_drain_mode(mode)               | 0x59   | 1 byte: 0=EXTERNAL, 1=DRAIN_FREE; payload computed from device state |
 | set_beep_enabled(flag)             | 0x56   | 1 byte: 0x01 = on, 0x00 = off                                        |
 | set_fan_speed(fan_gear)            | 0x5E   | 1 byte, 0x0 -> low 0x1 -> medium 0x2 -> high                         |
 | set_main_mode(mode)                | 0x51   | 1 byte, 0x0 -> Cold, 0x1 -> Warm, 0x2 Fan                            |
-| set_power_state(mode)              | 0x5B   | 1 byte: 0x01 = on, 0x00 = off                                        |
+| set_power_state(mode)              | 0x5B   | 1 byte: 0x01=ON, 0x02=STANDBY(off), 0x03=OFF, 0x00=INIT             |
 | set_temperature(temp_value)        | 0x58   | 1 byte, 0x10 sets 16C 0x1F sets 30C                                  |
 | set_countdown_timer(time, status)  | 0x55   | 3 bytes: [0x00, 0x00, status], status meaning unidentified           |
 | set_idle_screen_timeout(time)      | 0x54   | 3 bytes: [0x00, 0x00, time], time possible values 0x00 and 0x01      |
@@ -209,6 +210,7 @@ void CmdUtils::printHelp() {
     cmd_println("  get_battery");
     cmd_println("  w2_set_light <0/1>");
     cmd_println("  w2_set_drain <0/1>");
+    cmd_println("  w2_set_drainmode <0=ext/1=free>");
     cmd_println("  w2_set_beep <0/1>");
     cmd_println("  w2_set_power <0/1>");
     cmd_println("  w2_set_timer <time> <status>");
@@ -348,7 +350,8 @@ void CmdUtils::handleWave2Command(String cmd, String args) {
 
     // Legacy names
     if (cmd.equalsIgnoreCase("set_ambient_light")) { if(w2) w2->setAmbientLight(val); }
-    else if (cmd.equalsIgnoreCase("set_automatic_drain")) { if(w2) w2->setAutomaticDrain(val); }
+    else if (cmd.equalsIgnoreCase("set_automatic_drain")) { if(w2) w2->setAutomaticDrain(val != 0); }
+    else if (cmd.equalsIgnoreCase("set_drain_mode")) { if(w2) w2->setDrainMode(val); }
     else if (cmd.equalsIgnoreCase("set_beep_enabled")) { if(w2) w2->setBeep(val); }
     else if (cmd.equalsIgnoreCase("set_fan_speed")) { if(w2) w2->setFanSpeed(val); }
     else if (cmd.equalsIgnoreCase("set_main_mode")) { if(w2) w2->setMainMode(val); }
@@ -362,7 +365,8 @@ void CmdUtils::handleWave2Command(String cmd, String args) {
 
     // New simplified names
     else if (cmd.equalsIgnoreCase("w2_set_light")) { if(w2) w2->setAmbientLight(val); }
-    else if (cmd.equalsIgnoreCase("w2_set_drain")) { if(w2) w2->setAutomaticDrain(val); }
+    else if (cmd.equalsIgnoreCase("w2_set_drain")) { if(w2) w2->setAutomaticDrain(val != 0); }
+    else if (cmd.equalsIgnoreCase("w2_set_drainmode")) { if(w2) w2->setDrainMode(val); }
     else if (cmd.equalsIgnoreCase("w2_set_beep")) { if(w2) w2->setBeep(val); }
     else if (cmd.equalsIgnoreCase("w2_set_fan")) { if(w2) w2->setFanSpeed(val); }
     else if (cmd.equalsIgnoreCase("w2_set_mode")) { if(w2) w2->setMainMode(val); }

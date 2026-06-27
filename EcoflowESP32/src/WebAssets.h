@@ -306,7 +306,7 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     <select id="log-level" onchange="setLogConfig()" style="margin-left: auto;">
                         <option value="5">Verbose</option>
                         <option value="4">Debug</option>
-                        <option value="3">Info</option>
+                        <option value="3" selected>Info</option>
                         <option value="2">Warn</option>
                         <option value="1">Error</option>
                     </select>
@@ -974,8 +974,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
 
     function startLogPoll() {
         if (logPollInterval) return;
-        lastLogCount = 0;
+        lastLogCount = 0;   // sequence cursor: id of the next log we expect
         el('console').innerHTML = '';
+        // Reflect the actual server-side logging state in the toggle.
+        fetch(API + '/log_config').then(r => r.json()).then(s => { el('log-enable').checked = !!s.enable; }).catch(() => {});
         logPollInterval = setInterval(() => {
             fetch(API + '/logs?index=' + lastLogCount).then(r => r.json()).then(logs => {
                 const c = el('console');
@@ -987,8 +989,10 @@ const char WEB_APP_HTML[] PROGMEM = R"rawliteral(
                     line.innerText = `[${time}] ${l.tag}: ${l.msg}`;
                     c.appendChild(line);
                 });
-                lastLogCount += logs.length;
-                if(logs.length > 0 && el('auto-scroll').checked) c.scrollTop = c.scrollHeight;
+                if (logs.length > 0) {
+                    lastLogCount = logs[logs.length-1].seq + 1;
+                    if (el('auto-scroll').checked) c.scrollTop = c.scrollHeight;
+                }
             });
         }, 1000);
     }

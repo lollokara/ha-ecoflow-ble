@@ -1,0 +1,41 @@
+{
+  "full_summary": "Python file with 4 classes and 6 functions. Key components include classes and method definitions relevant to dpu_x module.",
+  "chunks": [
+    {
+      "content": "class OperatingMode(IntFieldValue):\n    UNKNOWN = -1\n\n    NONE = 0\n    SELF_POWERED = 1\n    SCHEDULED = 2\n    INTELLIGENT = 3",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of OperatingMode in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py:chunk0"
+    },
+    {
+      "content": "class _AcOutPower(repeated_pb_field_type(pb.pow_get_ac_out_list.pow_get_ac_out_item)):\n    index: int\n\n    def get_item(self, value: Sequence[float]) -> float | None:\n        return round(value[self.index], 2) if len(value) > self.index else None",
+      "metadata": {
+        "start_line": 33,
+        "lang": "python",
+        "desc": "Definition of _AcOutPower in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py:chunk1"
+    },
+    {
+      "content": "class _AcOutCurrent(\n    repeated_pb_field_type(pb.plug_in_info_ac_out_amp_list.plug_in_info_ac_out_amp_item)\n):\n    index: int\n\n    def get_item(self, value: Sequence[float]) -> float | None:\n        return round(value[self.index], 2) if len(value) > self.index else None",
+      "metadata": {
+        "start_line": 40,
+        "lang": "python",
+        "desc": "Definition of _AcOutCurrent in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py:chunk2"
+    },
+    {
+      "content": "class Device(DeviceBase, ProtobufProps):\n    \"\"\"Delta Pro Ultra X\"\"\"\n\n    SN_PREFIX = (b\"P101\",)\n    NAME_PREFIX = \"EF-P10\"\n\n    battery_level = pb_field(pb.cms_batt_soc, pround(2))\n    cell_temperature = pb_field(pb.cms_batt_temp)\n\n    input_power = pb_field(pb.pow_in_sum_w, pround(2))\n    output_power = pb_field(pb.pow_out_sum_w, pround(2))\n\n    ac_input_power = pb_field(pb.pow_get_acp, pround(2))\n    ac_input_voltage = pb_field(pb.plug_in_info_acp_vol, pround(2))\n    ac_input_current = pb_field(pb.plug_in_info_acp_amp, pround(2))\n    ac_charging_speed = pb_field(pb.plug_in_info_acp_chg_pow_max)\n    plugged_in_ac = pb_field(pb.plug_in_info_ac_charger_flag)\n\n    pv_power_1 = pb_field(pb.pow_get_pv, pround(2))\n    pv_power_2 = pb_field(pb.pow_get_pv2, pround(2))\n    pv_voltage_1 = pb_field(pb.plug_in_info_pv_vol, pround(2))\n    pv_current_1 = pb_field(pb.plug_in_info_pv_amp, pround(2))\n    pv_voltage_2 = pb_field(pb.plug_in_info_pv2_vol, pround(2))\n    pv_current_2 = pb_field(pb.plug_in_info_pv2_amp, pround(2))\n\n    remaining_time_charging = pb_field(pb.cms_chg_rem_time)\n    remaining_time_discharging = pb_field(pb.cms_dsg_rem_time)\n\n    error_code = pb_field(pb.errcode)\n\n    wifi_rssi = pb_field(pb.module_wifi_rssi)\n    dev_sleep_state = pb_field(pb.dev_sleep_state)\n\n    ac_ports = pb_field(pb.flow_info_ac_out, flow_is_on)\n\n    backup_charge_limit = pb_field(attr=pb.cms_max_chg_soc)\n    backup_discharge_limit = pb_field(pb.cms_min_dsg_soc)\n    backup_reserve_level = pb_field(pb.energy_backup_start_soc)\n\n    _energy_strategy_operate_mode = pb_field(pb.energy_strategy_operate_mode)\n\n    ac_nema_5_20_1_power = _AcOutPower(0)\n    ac_nema_5_20_1_current = _AcOutCurrent(0)\n\n    ac_nema_5_20_2_power = _AcOutPower(1)\n    ac_nema_5_20_2_current = _AcOutCurrent(1)\n\n    ac_nema_l14_30_power = _AcOutPower(2)\n    ac_nema_l14_30_current = _AcOutCurrent(2)\n\n    ac_nema_14_50_power = _AcOutPower(3)\n    ac_nema_14_50_current = _AcOutCurrent(3)\n\n    def __init__(\n        self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str\n    ) -> None:\n        super().__init__(ble_dev, adv_data, sn)\n        self._time_commands = TimeCommands(self)\n\n    @classmethod\n    def check(cls, sn):\n        return sn[:4] in cls.SN_PREFIX\n\n    async def packet_parse(self, data: bytes):\n        return Packet.from_bytes(data, xor_payload=True)\n\n    async def data_parse(self, packet: Packet):\n        processed = False\n        self.reset_updated()\n\n        match packet.src, packet.cmd_set, packet.cmd_id:\n            case 0x02, 0xFE, 0x15:\n                self.update_from_bytes(pd100_pb2.DisplayPropertyUpload, packet.payload)\n                processed = True\n            case 0x35, 0x01, Packet.NET_BLE_COMMAND_CMD_SET_RET_TIME:\n                if len(packet.payload) == 0:\n                    self._time_commands.async_send_all()\n                processed = True\n            case 0x35, 0x35, 0x20:\n                # device-initiated BLE keepalive ping - no response expected\n                processed = True\n            case 0x30, 0x40, 0x30:\n                # V4-framed BMS telemetry forwarded from a connected battery pack - the\n                # inner protobuf schema is not in the EF Android app source, so we\n                # ignore it for now\n                processed = True\n\n        self._notify_updated()\n\n        return processed\n\n    @computed_field\n    def error_occurred(self) -> bool:\n        return bool(self.error_code)\n\n    @computed_field\n    def operating_mode_select(self) -> OperatingMode:\n        mode = self._energy_strategy_operate_mode\n        if mode is None:\n            return OperatingMode.NONE\n        if mode.operate_self_powered_open:\n            return OperatingMode.SELF_POWERED\n        if mode.operate_scheduled_open:\n            return OperatingMode.SCHEDULED\n        if mode.operate_intelligent_schedule_mode_open:\n            return OperatingMode.INTELLIGENT\n        return OperatingMode.NONE\n\n    @controls.outlet(ac_ports)\n    async def enable_ac_ports(self, enabled: bool):\n        await self._send_config_packet(pd100_pb2.ConfigWrite(cfg_ac_out_open=enabled))\n\n    @controls.select(operating_mode_select, options=OperatingMode)\n    async def set_operating_mode(self, mode: OperatingMode):\n        message = pd100_pb2.ConfigWrite()\n        cfg = message.cfg_energy_strategy_operate_mode\n        cfg.operate_self_powered_open = mode == OperatingMode.SELF_POWERED\n        cfg.operate_scheduled_open = mode == OperatingMode.SCHEDULED\n        cfg.operate_intelligent_schedule_mode_open = mode == OperatingMode.INTELLIGENT\n        await self._send_config_packet(message)\n\n    @controls.power(ac_charging_speed, min=600, max=12000, step=100)\n    async def set_ac_charging_speed(self, watts: float):\n        await self._send_config_packet(\n            pd100_pb2.ConfigWrite(cfg_plug_in_info_acp_chg_pow_max=int(watts))\n        )\n        return True\n\n    @controls.battery(backup_charge_limit, min=50, max=100)\n    async def set_backup_charge_limit(self, soc: float):\n        await self._send_config_packet(pd100_pb2.ConfigWrite(cfg_max_chg_soc=int(soc)))\n        return True\n\n    @controls.battery(backup_discharge_limit, min=0, max=30)\n    async def set_backup_discharge_limit(self, soc: float):\n        await self._send_config_packet(pd100_pb2.ConfigWrite(cfg_min_dsg_soc=int(soc)))\n        return True\n\n    @controls.battery(backup_reserve_level, min=5, max=100)\n    async def set_backup_reserve_level(self, soc: float):\n        await self._send_config_packet(\n            pd100_pb2.ConfigWrite(cfg_backup_reverse_soc=int(soc))\n        )\n        return True\n\n    async def _send_config_packet(self, message: pd100_pb2.ConfigWrite):\n        payload = message.SerializeToString()\n        packet = Packet(0x21, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)\n        await self._conn.sendPacket(packet)",
+      "metadata": {
+        "start_line": 49,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/dpu_x.py:chunk3"
+    }
+  ]
+}

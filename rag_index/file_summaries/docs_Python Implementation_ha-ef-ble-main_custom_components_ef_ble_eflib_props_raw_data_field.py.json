@@ -1,0 +1,68 @@
+{
+  "full_summary": "Python file with 3 classes and 12 functions. Key components include classes and method definitions relevant to raw_data_field module.",
+  "chunks": [
+    {
+      "content": "class _DataclassAttr:\n    def __init__(self, message_type: type[Any], name: str):\n        self.message_type = message_type\n        self.attr = name\n\n    @property\n    def name(self):\n        return self.attr\n\n    def __repr__(self):\n        return f\"dataclass_attr({self.attr})\"",
+      "metadata": {
+        "start_line": 13,
+        "lang": "python",
+        "desc": "Definition of _DataclassAttr in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk0"
+    },
+    {
+      "content": "class _DataclassAccessor[T1: RawData]:\n    message_type: type[T1]\n\n    def __getattr__(self, name: str):\n        if name not in self._field_names:\n            raise AttributeError(\n                f\"{self.message_type} does not contain field named '{name}'\"\n            )\n\n        return _DataclassAttr(self.message_type, name)\n\n    @cached_property\n    def _field_names(self):\n        return [field.name for field in fields(self.message_type)]",
+      "metadata": {
+        "start_line": 27,
+        "lang": "python",
+        "desc": "Definition of _DataclassAccessor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk1"
+    },
+    {
+      "content": "def dataclass_attr_mapper[T: RawData](dataclass: type[T]) -> type[T]:\n    return _DataclassAccessor(dataclass)  # pyright: ignore[reportReturnType]",
+      "metadata": {
+        "start_line": 43,
+        "lang": "python",
+        "desc": "Definition of dataclass_attr_mapper in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk2"
+    },
+    {
+      "content": "class RawDataField[T](Field[T]):\n    def __init__(\n        self,\n        data_attr: _DataclassAttr,\n        identifier: str = \"\",\n        transform_value: Callable[[Any], T] = lambda x: x,\n    ):\n        self.data_attr = data_attr\n        self.identifier = identifier\n        self._transform_value = transform_value\n\n    def _get_value(self, value: Any):\n        if not isinstance(value, RawData):\n            return value\n\n        return getattr(value, self.data_attr.attr)\n\n    def __set__(self, instance: \"RawDataProps\", value: Any):\n        value = self._get_value(value)\n        super().__set__(instance, value)",
+      "metadata": {
+        "start_line": 47,
+        "lang": "python",
+        "desc": "Definition of RawDataField in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk3"
+    },
+    {
+      "content": "def raw_field[T_ATTR](\n    attr: T_ATTR,\n    transform: None = None,\n) -> RawDataField[T_ATTR]: ...",
+      "metadata": {
+        "start_line": 70,
+        "lang": "python",
+        "desc": "Definition of raw_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk4"
+    },
+    {
+      "content": "def raw_field[T_ATTR, T_OUT](\n    attr: T_ATTR,\n    transform: Callable[[T_ATTR], T_OUT],\n) -> RawDataField[T_OUT]: ...",
+      "metadata": {
+        "start_line": 77,
+        "lang": "python",
+        "desc": "Definition of raw_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk5"
+    },
+    {
+      "content": "def raw_field(\n    attr: Any, transform: Callable[[Any], Any] | None = None\n) -> RawDataField[Any]:\n    if not isinstance(attr, _DataclassAttr):\n        raise TypeError(\n            \"Attribute has to be an instance returned from `dataclass_attr_mapper` \"\n            f\"after attribute access, but received value of '{attr}'\"\n        )\n\n    return RawDataField(\n        data_attr=attr,\n        transform_value=transform if transform is not None else lambda x: x,\n    )",
+      "metadata": {
+        "start_line": 83,
+        "lang": "python",
+        "desc": "Definition of raw_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/raw_data_field.py:chunk6"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "full_summary": "Python file with 6 classes and 0 functions. Key components include classes and method definitions relevant to direct_inv_heartbeat_pack module.",
+  "chunks": [
+    {
+      "content": "class DirectInvHeartbeatPack(RawData):\n    err_code: Annotated[int, \"I\", \"errCode\"]\n    sys_ver: Annotated[int, \"I\", \"sysVer\"]\n    charger_type: Annotated[int, \"B\", \"chargerType\"]\n    input_watts: Annotated[int, \"H\", \"inputWatts\"]\n    output_watts: Annotated[int, \"H\", \"outputWatts\"]\n    inv_type: Annotated[int, \"B\", \"invType\"]\n    inv_out_vol: Annotated[int, \"I\", \"invOutVol\"]\n    inv_out_amp: Annotated[int, \"I\", \"invOutAmp\"]\n    inv_out_freq: Annotated[int, \"B\", \"invOutFreq\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of DirectInvHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk0"
+    },
+    {
+      "content": "class DirectInvDeltaHeartbeatPack(DirectInvHeartbeatPack):\n    ac_in_vol: Annotated[int, \"I\", \"acInVol\"]\n    ac_in_amp: Annotated[int, \"I\", \"acInAmp\"]\n    ac_in_freq: Annotated[int, \"B\", \"acInFreq\"]\n    out_temp: Annotated[int, \"H\", \"outTemp\"]\n    dc_in_vol: Annotated[int, \"I\", \"dcInVol\"]\n    dc_in_amp: Annotated[int, \"I\", \"dcInAmp\"]\n    dc_in_temp: Annotated[int, \"H\", \"dcInTemp\"]\n    fan_state: Annotated[int, \"B\", \"fanState\"]\n    cfg_ac_enabled: Annotated[int, \"B\", \"cfgAcEnabled\"]\n    cfg_ac_xboost: Annotated[int, \"B\", \"cfgAcXboost\"]\n    cfg_ac_out_voltage: Annotated[int, \"I\", \"cfgAcOutVoltage\"]\n    cfg_ac_out_freq: Annotated[int, \"B\", \"cfgAcOutFreq\"]\n    cfg_ac_work_mode: Annotated[int, \"B\", \"cfgAcWorkMode\"]\n    cfg_pause_flag: Annotated[int, \"B\", \"cfgPauseFlag\"]\n    ac_dip_switch: Annotated[int, \"B\", \"acDipSwitch\"]\n    cfg_fast_chg_watts: Annotated[int, \"H\", \"cfgFastChgWatts\"]\n    cfg_slow_chg_watts: Annotated[int, \"H\", \"cfgSlowChgWatts\"]\n    standby_mins: Annotated[int, \"H\", \"standbyMins\"]\n    discharge_type: Annotated[int, \"B\", \"dischargeType\"]\n    ac_passby_auto_en: Annotated[int, \"B\", \"acPassbyAutoEn\"]\n    pr_balance_mode: Annotated[int, \"B\", \"prBalanceMode\"]\n    ac_chg_rated_power: Annotated[int, \"H\", \"acChgRatedPower\"]\n    cfg_gfci_enable: Annotated[int, \"B\", \"cfgGfciEnable\"]",
+      "metadata": {
+        "start_line": 18,
+        "lang": "python",
+        "desc": "Definition of DirectInvDeltaHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk1"
+    },
+    {
+      "content": "class DirectInvRiverHeartbeatPackBase(DirectInvHeartbeatPack):\n    inv_in_vol: Annotated[int, \"I\", \"invInVol\"]\n    inv_in_amp: Annotated[int, \"I\", \"invInAmp\"]\n    inv_in_freq: Annotated[int, \"B\", \"invInFreq\"]\n    out_temp: Annotated[int, \"H\", \"outTemp\"]\n    dc_in_vol: Annotated[int, \"I\", \"dcInVol\"]\n    dc_in_amp: Annotated[int, \"I\", \"dcInAmp\"]\n    in_temp: Annotated[int, \"H\", \"inTemp\"]\n    fan_state: Annotated[int, \"B\", \"fanState\"]\n    cfg_ac_enabled: Annotated[int, \"B\", \"cfgAcEnabled\"]\n    cfg_ac_xboost: Annotated[int, \"B\", \"cfgAcXboost\"]\n    cfg_ac_out_voltage: Annotated[int, \"I\", \"cfgAcOutVoltage\"]\n    cfg_ac_out_freq: Annotated[int, \"B\", \"cfgAcOutFreq\"]\n    cfg_ac_chg_mode_flg: Annotated[int, \"B\", \"cfgAcChgModeFlg\"]",
+      "metadata": {
+        "start_line": 44,
+        "lang": "python",
+        "desc": "Definition of DirectInvRiverHeartbeatPackBase in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk2"
+    },
+    {
+      "content": "class DirectInvRiverHeartbeatPack(DirectInvRiverHeartbeatPackBase):\n    cfg_standby_min: Annotated[int, \"H\", \"cfgStandbyMin\"]\n    cfg_fan_mode: Annotated[int, \"B\", \"cfgFanMode\"]\n    ac_auto_config: Annotated[int, \"B\", \"acAutoConfig\"]",
+      "metadata": {
+        "start_line": 60,
+        "lang": "python",
+        "desc": "Definition of DirectInvRiverHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk3"
+    },
+    {
+      "content": "class DirectInvRiverMiniHeartbeatPack(DirectInvRiverHeartbeatPackBase):\n    soc: Annotated[int, \"B\", \"soc\"]\n    vol: Annotated[int, \"I\", \"vol\"]\n    amp: Annotated[int, \"I\", \"amp\"]\n    temp: Annotated[int, \"H\", \"temp\"]\n    bat_err_code: Annotated[int, \"I\", \"batErrCode\"]\n    remain_cap: Annotated[int, \"I\", \"remainCap\"]\n    full_cap: Annotated[int, \"I\", \"fullCap\"]\n    cycles: Annotated[int, \"H\", \"cycles\"]\n    max_charge_soc: Annotated[int, \"B\", \"maxChargeSoc\"]\n    f_soc: Annotated[int, \"B\", \"fSoc\"]\n    standby_mins: Annotated[int, \"H\", \"standbyMins\"]",
+      "metadata": {
+        "start_line": 66,
+        "lang": "python",
+        "desc": "Definition of DirectInvRiverMiniHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk4"
+    },
+    {
+      "content": "class DirectInvDeltaProHeartbeatPack(DirectInvHeartbeatPack):\n    fan_state: Annotated[int, \"B\", \"fanState\"]\n    cfg_ac_enabled: Annotated[int, \"B\", \"cfgAcEnabled\"]\n    cfg_ac_xboost: Annotated[int, \"B\", \"cfgAcXboost\"]\n    cfg_ac_out_voltage: Annotated[int, \"I\", \"cfgAcOutVoltage\"]\n    cfg_ac_out_freq: Annotated[int, \"B\", \"cfgAcOutFreq\"]\n\n    ac_in_vol: Annotated[int, \"I\", \"acInVol\"]\n    ac_in_amp: Annotated[int, \"I\", \"acInAmp\"]\n    ac_in_freq: Annotated[int, \"B\", \"acInFreq\"]\n    out_temp: Annotated[int, \"H\", \"outTemp\"]\n    dc_in_vol: Annotated[int, \"I\", \"dcInVol\"]\n    dc_in_amp: Annotated[int, \"I\", \"dcInAmp\"]\n    dc_in_temp: Annotated[int, \"H\", \"dcInTemp\"]\n    cfg_ac_work_mode: Annotated[int, \"B\", \"cfgAcWorkMode\"]\n    cfg_pause_flag: Annotated[int, \"B\", \"cfgPauseFlag\"]\n    ac_dip_switch: Annotated[int, \"B\", \"acDipSwitch\"]\n    cfg_fast_chg_watts: Annotated[int, \"H\", \"cfgFastChgWatts\"]\n    cfg_slow_chg_watts: Annotated[int, \"H\", \"cfgSlowChgWatts\"]\n    standby_mins: Annotated[int, \"H\", \"standbyMins\"]\n    discharge_type: Annotated[int, \"B\", \"dischargeType\"]\n    ac_passby_auto_en: Annotated[int, \"B\", \"acPassbyAutoEn\"]\n    pr_balance_mode: Annotated[int, \"B\", \"prBalanceMode\"]\n    ac_chg_rated_power: Annotated[int, \"H\", \"acChgRatedPower\"]\n    cfg_gfci_enable: Annotated[int, \"B\", \"cfgGfciEnable\"]\n    reserved: Annotated[bytes, \"5s\", \"reserved\"]",
+      "metadata": {
+        "start_line": 80,
+        "lang": "python",
+        "desc": "Definition of DirectInvDeltaProHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_inv_heartbeat_pack.py:chunk5"
+    }
+  ]
+}

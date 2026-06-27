@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 1 functions. Key components include classes and method definitions relevant to smart_generator_4k module.",
+  "chunks": [
+    {
+      "content": "class XT150ChargeType(IntFieldValue):\n    UNKNOWN = -1\n\n    NONE = 0\n    CHARGE_OUT = 1\n    CHARGE = 2\n    OUT = 3",
+      "metadata": {
+        "start_line": 9,
+        "lang": "python",
+        "desc": "Definition of XT150ChargeType in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator_4k.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator_4k.py:chunk0"
+    },
+    {
+      "content": "class Device(smart_generator.Device, ProtobufProps):\n    \"\"\"Smart Generator 4000 (Dual Fuel)\"\"\"\n\n    SN_PREFIX = (b\"G351\",)\n\n    def __init__(\n        self,\n        ble_dev: smart_generator.BLEDevice,\n        adv_data: smart_generator.AdvertisementData,\n        sn: str,\n    ) -> None:\n        super().__init__(ble_dev, adv_data, sn)\n        self.dc_output_power_max = 3200\n        self.dc_output_power_min = 1000\n\n    xt150_battery_level = pb_field(pb.cms_batt_soc)\n    xt150_charge_type = pb_field(pb.plug_in_info_dcp_dsg_chg_type)\n\n    dc_output_power_limit = pb_field(pb.generator_dc_out_pow_max)\n\n    async def set_dc_output_power_max(self, limit: int):\n        if (\n            self.dc_output_power_max is None\n            or self.dc_output_power_min is None\n            or limit < self.dc_output_power_min\n            or limit > self.dc_output_power_max\n        ):\n            return False\n        await self._send_config_packet(\n            ge305_sys_pb2.ConfigWrite(cfg_generator_dc_out_pow_max=limit)\n        )\n        return True",
+      "metadata": {
+        "start_line": 18,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator_4k.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/smart_generator_4k.py:chunk1"
+    }
+  ]
+}

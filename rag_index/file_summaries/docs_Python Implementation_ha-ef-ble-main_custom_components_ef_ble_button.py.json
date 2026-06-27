@@ -1,0 +1,32 @@
+{
+  "full_summary": "Python file with 2 classes and 2 functions. Key components include classes and method definitions relevant to button module.",
+  "chunks": [
+    {
+      "content": "class EcoflowButtonEntityDescription(ButtonEntityDescription):\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 19,
+        "lang": "python",
+        "desc": "Definition of EcoflowButtonEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py:chunk0"
+    },
+    {
+      "content": "async def async_setup_entry(\n    hass: HomeAssistant,\n    config_entry: DeviceConfigEntry,\n    async_add_entities: AddEntitiesCallback,\n) -> None:\n    \"\"\"Add buttons for passed config_entry in HA.\"\"\"\n    device = config_entry.runtime_data\n\n    new_buttons = [\n        EcoflowButton(device, button_desc)\n        for button_desc in BUTTON_TYPES\n        if isinstance(getattr(device, button_desc.key, None), Callable)\n    ]\n\n    if new_buttons:\n        async_add_entities(new_buttons)",
+      "metadata": {
+        "start_line": 29,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py:chunk1"
+    },
+    {
+      "content": "class EcoflowButton(EcoflowEntity, ButtonEntity):\n    def __init__(self, device: DeviceBase, entity_description: ButtonEntityDescription):\n        super().__init__(device)\n\n        self._attr_unique_id = f\"ef_{device.serial_number}_{entity_description.key}\"\n        self._prop_name = entity_description.key\n        self._press = getattr(device, f\"{self._prop_name}\", None)\n        self.entity_description = entity_description\n        self._availability_prop = getattr(entity_description, \"availability_prop\", None)\n\n        if entity_description.translation_key is None:\n            self._attr_translation_key = self.entity_description.key\n\n        self._register_update_callback(\n            entity_attr=\"_attr_available\",\n            prop_name=self._availability_prop,\n            get_state=lambda state: state if state is not None else self.SkipWrite,\n        )\n\n    @callback\n    def availability_updated(self, state: bool):\n        self._attr_available = state\n        self.async_write_ha_state()\n\n    async def async_press(self) -> None:\n        \"\"\"Handle the button press.\"\"\"\n        if isinstance(self._press, Callable):\n            await self._press()",
+      "metadata": {
+        "start_line": 47,
+        "lang": "python",
+        "desc": "Definition of EcoflowButton in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/button.py:chunk2"
+    }
+  ]
+}

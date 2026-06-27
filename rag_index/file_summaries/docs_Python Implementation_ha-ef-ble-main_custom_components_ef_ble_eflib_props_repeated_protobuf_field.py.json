@@ -1,0 +1,59 @@
+{
+  "full_summary": "Python file with 5 classes and 12 functions. Key components include classes and method definitions relevant to repeated_protobuf_field module.",
+  "chunks": [
+    {
+      "content": "class ProtobufRepeatedField[T_ITEM, T_OUT](ProtobufField[T_OUT]):\n    \"\"\"\n    Represents field for repeated protobuf fields\n\n    Do not use this class directly - use `repeated_pb_field_type` for better typing\n    \"\"\"\n\n    def __init_subclass__(cls) -> None:\n        dataclass(cls, unsafe_hash=True)\n\n    def get_list(self, value: Message) -> Sequence[Message]:\n        \"\"\"\n        Get sequence from protobuf message\n\n        Parameters\n        ----------\n        value\n            Parsed protobuf message\n\n        Returns\n        -------\n            Sequence of values accessed from protobuf message\n        \"\"\"\n        list_attrs = self.pb_field.attrs\n        if not list_attrs:\n            raise ValueError(f\"Received accessor with no attributes: '{self.pb_field}'\")\n\n        try:\n            if not value.HasField(list_attrs[0]):\n                return []\n        except ValueError as e:\n            if \"not have presence\" not in str(e):\n                return []\n\n        for attr in list_attrs:\n            value = getattr(value, attr)\n\n        return cast(Sequence[Message], value)\n\n    @abc.abstractmethod\n    def get_item(self, value: Sequence[T_ITEM]) -> T_OUT | None:\n        \"\"\"Process item from sequence returned from `get_list`\"\"\"\n\n    def __set_name__(self, owner: type[\"ProtobufProps\"], name: str):\n        super().__set_name__(owner, name)\n        owner.add_repeated_field(self)\n\n    def __set__(self, instance: \"ProtobufProps\", value: Sequence[Any]):\n        if (item := self.get_item(value)) is None:\n            return\n\n        self._set_value(instance, item)",
+      "metadata": {
+        "start_line": 22,
+        "lang": "python",
+        "desc": "Definition of ProtobufRepeatedField in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk0"
+    },
+    {
+      "content": "class ProtobufCompositeRepeatedField[T_ITEM, T_OUT](\n    ProtobufRepeatedField[T_ITEM, T_OUT]\n):\n    def get_item(self, value: Sequence[T_ITEM]) -> T_OUT | None:\n        for item in value:\n            if (result := self.get_value(item)) is not None:\n                return result\n        return None\n\n    @abc.abstractmethod\n    def get_value(self, item: T_ITEM) -> T_OUT | None: ...",
+      "metadata": {
+        "start_line": 76,
+        "lang": "python",
+        "desc": "Definition of ProtobufCompositeRepeatedField in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk1"
+    },
+    {
+      "content": "def _raise[T_IN](v: T_IN, exc: type[Exception]) -> T_IN:\n    raise exc",
+      "metadata": {
+        "start_line": 89,
+        "lang": "python",
+        "desc": "Definition of _raise in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk2"
+    },
+    {
+      "content": "def repeated_pb_field_type[T_ITEM, T_OUT](\n    list_field: Sequence[T_ITEM],\n    value_field: Callable[[T_ITEM], T_OUT] = lambda x: _raise(x, NotImplementedError),\n    per_item: Literal[True] = True,\n) -> type[ProtobufCompositeRepeatedField[T_ITEM, T_OUT]]: ...",
+      "metadata": {
+        "start_line": 94,
+        "lang": "python",
+        "desc": "Definition of repeated_pb_field_type in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk3"
+    },
+    {
+      "content": "def repeated_pb_field_type[T_ITEM, T_OUT](\n    list_field: Sequence[T_ITEM],\n    value_field: Callable[[T_ITEM], T_OUT] = lambda x: _raise(x, NotImplementedError),\n    per_item: Literal[False] = False,\n) -> type[ProtobufRepeatedField[T_ITEM, T_OUT]]: ...",
+      "metadata": {
+        "start_line": 102,
+        "lang": "python",
+        "desc": "Definition of repeated_pb_field_type in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk4"
+    },
+    {
+      "content": "def repeated_pb_field_type[T_ITEM, T_OUT](\n    list_field: Sequence[T_ITEM],\n    value_field: Callable[[T_ITEM], T_OUT] = lambda x: _raise(x, NotImplementedError),\n    per_item: bool = False,\n) -> (\n    type[ProtobufRepeatedField[T_ITEM, T_OUT]]\n    | type[ProtobufCompositeRepeatedField[T_ITEM, T_OUT]]\n):\n    \"\"\"\n    Create repeated field type from protobuf accessor repesenting sequence type\n\n    Usage\n    -----\n    Assuming protobuf message looks like this\n    ```\n    message RecordType { int value = 1; }\n    messsage SomeMessageType { repeated RecordType some_list = 1; }\n    ```\n\n    We can create a field that processes items like so\n    ```\n    pb = proto_attr_mapper(some_pb2.SomeMessageType)\n\n    class SomeRepeatedField(\n        repeated_field_type(\n            list_field=pb.some_list,\n            value_field=lambda x: x.value,\n        )\n    ):\n        def get_item(self, value: Sequence[some_pb2.RecordType]):\n            return value[1].value\n    ```\n\n    Returns\n    -------\n        Type of repeated protobuf message\n    \"\"\"\n    if not per_item:\n\n        class CustomRepeatedField(ProtobufRepeatedField[T_ITEM, T_OUT]):\n            pb_field = list_field\n\n        return CustomRepeatedField\n\n    class CustomPerItemRepeatedField(ProtobufCompositeRepeatedField[T_ITEM, T_OUT]):\n        pb_field = list_field\n\n    return CustomPerItemRepeatedField",
+      "metadata": {
+        "start_line": 109,
+        "lang": "python",
+        "desc": "Definition of repeated_pb_field_type in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/repeated_protobuf_field.py:chunk5"
+    }
+  ]
+}

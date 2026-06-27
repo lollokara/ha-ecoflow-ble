@@ -1,0 +1,68 @@
+{
+  "full_summary": "Python file with 0 classes and 4 functions. Key components include classes and method definitions relevant to __init__ module.",
+  "chunks": [
+    {
+      "content": "async def async_setup_entry(hass: HomeAssistant, entry: DeviceConfigEntry) -> bool:\n    \"\"\"Set up EF BLE device from a config entry.\"\"\"\n    _LOGGER.debug(\"Init EcoFlow BLE Integration\")\n\n    address = entry.data.get(CONF_ADDRESS)\n    user_id = entry.data.get(CONF_USER_ID)\n    merged_options = entry.data | entry.options\n    update_period = merged_options.get(CONF_UPDATE_PERIOD, DEFAULT_UPDATE_PERIOD)\n    packet_version = PacketVersion.from_str(\n        entry.data.get(CONF_PACKET_VERSION, PacketVersion.V3)\n    )\n\n    if address is None or user_id is None:\n        return False\n\n    if not bluetooth.async_address_present(hass, address):\n        _register_reappear_callback(hass, entry, address)\n        raise ConfigEntryNotReady(translation_key=\"device_not_present\")\n\n    _cancel_reappear_callback(hass, entry)\n\n    _LOGGER.debug(\"Connecting Device\")\n    device: eflib.DeviceBase | None = getattr(entry, \"runtime_data\", None)\n    discovery_info = bluetooth.async_last_service_info(hass, address, connectable=True)\n\n    if device is None:\n        device = eflib.NewDevice(discovery_info.device, discovery_info.advertisement)\n        if device is None:\n            raise ConfigEntryNotReady(translation_key=\"unable_to_create_device\")\n\n        entry.runtime_data = device\n    elif discovery_info is not None:\n        device.update_ble_device(discovery_info.device)\n\n    diag_options = merged_options.get(CONF_DIAGNOSTICS_OPTIONS, {})\n    packet_collection_enabled = diag_options.get(\n        CONF_COLLECT_PACKETS, eflib.is_unsupported(device)\n    )\n    diagnostics_on_exception = diag_options.get(CONF_DIAGNOSTICS_ON_EXCEPTION, False)\n\n    advanced = merged_options.get(CONF_ADVANCED_CONNECTION_OPTIONS, {})\n    timeout = advanced.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT)\n    options = Connection.Options(\n        timeout=timeout,\n        bluez_start_notify=advanced.get(CONF_BLUEZ_START_NOTIFY, False),\n    )\n    issue_id = f\"{entry.entry_id}_max_connection_attempts\"\n\n    try:\n        await (\n            device.with_update_period(update_period)\n            .with_logging_options(ConfLogOptions.from_config(merged_options))\n            .with_disabled_reconnect()\n            .with_packet_version(packet_version.to_num())\n            .with_enabled_packet_diagnostics(packet_collection_enabled)\n            .with_diagnostics_on_exception(diagnostics_on_exception)\n            .with_connection_options(options)\n            .connect(\n                user_id=user_id,\n                max_attempts=0 if eflib.is_solar_only(device) else None,\n            )\n        )\n        async with asyncio.timeout(timeout):\n            state = await device.wait_until_authenticated_or_error(raise_on_error=True)\n    except (ConnectionTimeout, BleakError, TimeoutError) as e:\n        await device.disconnect()\n        raise ConfigEntryNotReady(\n            translation_key=\"could_not_connect\",\n            translation_placeholders={\"time\": str(timeout), \"error_msg\": str(e)},\n        ) from e\n    except AuthErrors.BaseException as e:\n        raise ConfigEntryNotReady(translation_key=\"authentication_failed\") from e\n    except MaxConnectionAttemptsReached as e:\n        await device.disconnect()\n        ir.async_create_issue(\n            hass,\n            DOMAIN,\n            issue_id,\n            is_fixable=False,\n            severity=ir.IssueSeverity.ERROR,\n            translation_key=\"max_connection_attempts_reached\",\n            translation_placeholders={\n                \"device_name\": device.name,\n                \"attempts\": str(e.attempts),\n            },\n        )\n        raise ConfigEntryError(\n            translation_key=\"could_not_connect_no_retry\",\n            translation_placeholders={\"attempts\": str(e.attempts)},\n        ) from e\n    except Exception as e:\n        _LOGGER.exception(\"Unknown error\")\n        await device.disconnect()\n        raise ConfigEntryNotReady(\n            translation_key=\"unknown_error\", translation_placeholders={\"error\": str(e)}\n        ) from e\n    else:\n        if not state.authenticated:\n            await device.disconnect()\n            raise ConfigEntryNotReady(\n                translation_key=\"failed_after_successful_connection\",\n                translation_placeholders={\"last_state\": state},\n            )\n    ir.async_delete_issue(hass, DOMAIN, issue_id)\n\n    _LOGGER.debug(\"Creating entities\")\n    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)\n\n    _LOGGER.debug(\"Setup done\")\n    entry.async_on_unload(entry.add_update_listener(_update_listener))\n\n    def _on_disconnect(exc: Exception | type[Exception] | None):\n        async def _disconnect_and_reload():\n            hass.config_entries.async_schedule_reload(entry.entry_id)\n\n        hass.async_create_task(_disconnect_and_reload())\n\n    entry.async_on_unload(device.on_disconnect(_on_disconnect))\n\n    return True",
+      "metadata": {
+        "start_line": 72,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk0"
+    },
+    {
+      "content": "async def async_unload_entry(hass: HomeAssistant, entry: DeviceConfigEntry) -> bool:\n    \"\"\"Unload a config entry.\"\"\"\n    _cancel_reappear_callback(hass, entry)\n    device = entry.runtime_data\n    try:\n        await device.disconnect()\n    except Exception:\n        _LOGGER.exception(\"Error disconnecting device during unload, continuing\")\n    device.with_logging_options(LogOptions.no_options())\n    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)",
+      "metadata": {
+        "start_line": 194,
+        "lang": "python",
+        "desc": "Definition of async_unload_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk1"
+    },
+    {
+      "content": "async def async_remove_entry(hass: HomeAssistant, entry: DeviceConfigEntry):\n    _cancel_reappear_callback(hass, entry)\n    ConnectionLog.clean_cache_for(entry.data[CONF_ADDRESS])",
+      "metadata": {
+        "start_line": 206,
+        "lang": "python",
+        "desc": "Definition of async_remove_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk2"
+    },
+    {
+      "content": "async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:\n    \"\"\"Migrate old config entry to a newer version.\"\"\"\n    _LOGGER.debug(\n        \"Migrating configuration from version %s.%s\",\n        config_entry.version,\n        config_entry.minor_version,\n    )\n\n    if config_entry.version < 2:\n        if config_entry.minor_version < 1:\n            address = config_entry.data.get(CONF_ADDRESS)\n            device_reg = dr.async_get(hass)\n            device_entry = device_reg.async_get_device(identifiers={(DOMAIN, address)})\n\n            if device_entry is not None and device_entry.serial_number is not None:\n                serial_number = device_entry.serial_number\n                old_prefix = device_entry.name + \"_\"\n\n                entity_reg = er.async_get(hass)\n                for entity_entry in er.async_entries_for_config_entry(\n                    entity_reg, config_entry.entry_id\n                ):\n                    old_unique_id = entity_entry.unique_id\n                    if old_unique_id.startswith(old_prefix):\n                        key = old_unique_id[len(old_prefix) :]\n                        new_unique_id = f\"ef_{serial_number}_{key}\"\n                        entity_reg.async_update_entity(\n                            entity_entry.entity_id, new_unique_id=new_unique_id\n                        )\n\n            hass.config_entries.async_update_entry(config_entry, minor_version=1)\n\n        if config_entry.minor_version < 2:\n            data = {**config_entry.data}\n            data.setdefault(CONF_EXTRA_BATTERY, [])\n            hass.config_entries.async_update_entry(\n                config_entry, data=data, minor_version=2\n            )\n\n    return True",
+      "metadata": {
+        "start_line": 211,
+        "lang": "python",
+        "desc": "Definition of async_migrate_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk3"
+    },
+    {
+      "content": "def _register_reappear_callback(\n    hass: HomeAssistant, entry: ConfigEntry, address: str\n) -> None:\n    callbacks: dict[str, Callable] = hass.data.setdefault(_REAPPEAR_CALLBACKS_KEY, {})\n\n    if entry.entry_id in callbacks:\n        return\n\n    def _on_device_reappear(\n        service_info: BluetoothServiceInfoBleak,\n        change: BluetoothChange,\n    ) -> None:\n        _LOGGER.info(\n            \"Device %s reappeared via BLE advertisement, scheduling reload\",\n            address,\n        )\n        _cancel_reappear_callback(hass, entry)\n        hass.config_entries.async_schedule_reload(entry.entry_id)\n\n    cancel = bluetooth.async_register_callback(\n        hass,\n        _on_device_reappear,\n        BluetoothCallbackMatcher(address=address, connectable=True),\n        BluetoothScanningMode.PASSIVE,\n    )\n    callbacks[entry.entry_id] = cancel\n    _LOGGER.debug(\"Registered BLE reappear callback for %s\", address)",
+      "metadata": {
+        "start_line": 253,
+        "lang": "python",
+        "desc": "Definition of _register_reappear_callback in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk4"
+    },
+    {
+      "content": "def _cancel_reappear_callback(hass: HomeAssistant, entry: ConfigEntry) -> None:\n    callbacks: dict[str, Callable] = hass.data.get(_REAPPEAR_CALLBACKS_KEY, {})\n    if cancel := callbacks.pop(entry.entry_id, None):\n        cancel()",
+      "metadata": {
+        "start_line": 282,
+        "lang": "python",
+        "desc": "Definition of _cancel_reappear_callback in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk5"
+    },
+    {
+      "content": "async def _update_listener(hass: HomeAssistant, entry: DeviceConfigEntry):\n    device = entry.runtime_data\n    merged_options = entry.data | entry.options\n    update_period = merged_options.get(CONF_UPDATE_PERIOD, DEFAULT_UPDATE_PERIOD)\n    diag_options = merged_options.get(CONF_DIAGNOSTICS_OPTIONS, {})\n    packet_collection = diag_options.get(\n        CONF_COLLECT_PACKETS, eflib.is_unsupported(device)\n    )\n    diagnostics_buffer_size = diag_options.get(CONF_COLLECT_PACKETS_AMOUNT, 100)\n    diagnostics_on_exception = diag_options.get(CONF_DIAGNOSTICS_ON_EXCEPTION, False)\n    advanced = merged_options.get(CONF_ADVANCED_CONNECTION_OPTIONS, {})\n    options = Connection.Options(\n        timeout=advanced.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT),\n        bluez_start_notify=advanced.get(CONF_BLUEZ_START_NOTIFY, False),\n    )\n\n    (\n        device.with_update_period(period=update_period)\n        .with_logging_options(ConfLogOptions.from_config(merged_options))\n        .with_enabled_packet_diagnostics(\n            enabled=packet_collection,\n            buffer_size=diagnostics_buffer_size,\n        )\n        .with_diagnostics_on_exception(diagnostics_on_exception)\n        .with_connection_options(options)\n    )",
+      "metadata": {
+        "start_line": 288,
+        "lang": "python",
+        "desc": "Definition of _update_listener in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/__init__.py:chunk6"
+    }
+  ]
+}

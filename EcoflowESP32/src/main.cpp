@@ -21,7 +21,7 @@
 #include "LightSensor.h"
 #include "ecoflow_protocol.h"
 #include "Stm32Serial.h"
-#include "RemoteLogger.h"
+#include "LogBuffer.h"
 
 // Hardware Pin Definitions
 #define POWER_LATCH_PIN 16 ///< GPIO pin to control the power latch (keeps device on).
@@ -63,7 +63,13 @@ void setup() {
     // Initialize the UART communication with the STM32F4 FIRST
     Stm32Serial::getInstance().begin();
 
-    RemoteLogger_Init();
+    // Route all ESP_LOGx output into the in-memory ring buffer (served on the
+    // web UI) and mirror important lines to the STM32. Enabled at boot so the
+    // BLE scan/connect/auth/data flow is captured from the very first packet.
+    LogBuffer::getInstance().setLoggingEnabled(true);
+    // Direct boot marker (hook-independent) — proves the web log pipeline works
+    // even though the Arduino core routes app ESP_LOGx away from our hook.
+    LogBuffer::getInstance().push(ESP_LOG_INFO, "Boot", "ESP32 logging online");
 
     // Initialize Light Sensor for ambient brightness detection
     LightSensor::getInstance().begin();
@@ -91,6 +97,22 @@ void loop() {
 
     static uint32_t last_data_refresh = 0;
     static uint32_t last_device_list_update = 0;
+    static uint32_t last_log_hook_check = 0;
+    static uint32_t last_heartbeat = 0;
+
+    // Keep ownership of the esp_log vprintf hook: Wi-Fi/BLE init can replace it
+    // at runtime, which would silently stop web-log capture. Re-assert it
+    // periodically and emit a heartbeat so the log pipeline is always alive.
+    if (millis() - last_log_hook_check > 1000) {
+        last_log_hook_check = millis();
+        LogBuffer::getInstance().reassertHook();
+    }
+    if (millis() - last_heartbeat > 15000) {
+        last_heartbeat = millis();
+        LogBuffer::getInstance().push(ESP_LOG_INFO, "Main",
+                 "Heartbeat: uptime %lus, free heap %u",
+                 (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap());
+    }
 
     // Process WebServer delayed tasks (e.g. log downloads)
     WebServer::update();

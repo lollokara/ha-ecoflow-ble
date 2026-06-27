@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 0 functions. Key components include classes and method definitions relevant to direct_mppt_heartbeat_pack module.",
+  "chunks": [
+    {
+      "content": "class DirectMpptHeartbeatPack(RawData):\n    fault_code: Annotated[int, \"I\", \"faultCode\"]\n    sw_ver: Annotated[int, \"I\", \"swVer\"]\n    in_vol: Annotated[int, \"I\", \"inVol\"]\n    in_amp: Annotated[int, \"I\", \"inAmp\"]\n    in_watts: Annotated[int, \"H\", \"inWatts\"]\n    out_vol: Annotated[int, \"I\", \"outVol\"]\n    out_amp: Annotated[int, \"I\", \"outAmp\"]\n    out_watts: Annotated[int, \"H\", \"outWatts\"]\n    mppt_temp: Annotated[int, \"H\", \"mpptTemp\"]\n    xt60_chg_type: Annotated[int, \"B\", \"xt60ChgType\"]\n    cfg_chg_type: Annotated[int, \"B\", \"cfgChgType\"]\n    chg_type: Annotated[int, \"B\", \"chgType\"]\n    chg_state: Annotated[int, \"B\", \"chgState\"]\n    dcdc_12v_vol: Annotated[int, \"I\", \"dcdc12vVol\"]\n    dcdc_12v_amp: Annotated[int, \"I\", \"dcdc12vAmp\"]\n    dcdc_12v_watts: Annotated[int, \"H\", \"dcdc12vWatts\"]\n    car_out_vol: Annotated[int, \"I\", \"carOutVol\"]\n    car_out_amp: Annotated[int, \"I\", \"carOutAmp\"]\n    car_out_watts: Annotated[int, \"H\", \"carOutWatts\"]\n    car_temp: Annotated[int, \"H\", \"carTemp\"]\n    car_state: Annotated[int, \"B\", \"carState\"]\n    dc24v_temp: Annotated[int, \"H\", \"dc24vTemp\"]\n    dc24v_state: Annotated[int, \"B\", \"dc24vState\"]\n    chg_pause_flag: Annotated[int, \"B\", \"chgPauseFlag\"]\n\n    cfg_dc_chg_current: Annotated[int, \"I\", \"cfgDcChgCurrent\"]\n    beep_mode: Annotated[int, \"B\", \"beepMode\"]\n    cfg_ac_enable: Annotated[int, \"B\", \"cfgAcEnable\"]\n    cfg_ac_xboost: Annotated[int, \"B\", \"cfgAcXboost\"]\n    cfg_ac_out_vol: Annotated[int, \"I\", \"cfgAcOutVol\"]\n    cfg_ac_out_freq: Annotated[int, \"B\", \"cfgAcOutFreq\"]\n    cfg_chg_watt: Annotated[int, \"H\", \"cfgChgWatt\"]\n    ac_standby_mins: Annotated[int, \"H\", \"acStandbyMins\"]\n    discharge_type: Annotated[int, \"B\", \"dischargeType\"]\n    car_standby_min: Annotated[int, \"H\", \"carStandbyMin\"]\n    power_standby_min: Annotated[int, \"H\", \"powerStandbyMin\"]\n    screen_standby_min: Annotated[int, \"H\", \"screenStandbyMin\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of DirectMpptHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_mppt_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_mppt_heartbeat_pack.py:chunk0"
+    },
+    {
+      "content": "class DirectMpptRiverMiniHeartbeatPack(RawData):\n    fault_code: Annotated[int, \"I\", \"faultCode\"]\n    sw_ver: Annotated[int, \"I\", \"swVer\"]\n    in_vol: Annotated[int, \"I\", \"inVol\"]\n    in_amp: Annotated[int, \"I\", \"inAmp\"]\n    in_watts: Annotated[int, \"H\", \"inWatts\"]\n    out_vol: Annotated[int, \"I\", \"outVol\"]\n    out_amp: Annotated[int, \"I\", \"outAmp\"]\n    out_watts: Annotated[int, \"H\", \"outWatts\"]\n    mppt_temp: Annotated[int, \"H\", \"mpptTemp\"]\n    xt60_chg_type: Annotated[int, \"B\", \"xt60ChgType\"]\n    cfg_chg_type: Annotated[int, \"B\", \"cfgChgType\"]\n    chg_type: Annotated[int, \"B\", \"chgType\"]\n    chg_state: Annotated[int, \"B\", \"chgState\"]\n    dcdc_12v_vol: Annotated[int, \"I\", \"dcdc12vVol\"]\n    dcdc_12v_amp: Annotated[int, \"I\", \"dcdc12vAmp\"]\n    dcdc_12v_watts: Annotated[int, \"H\", \"dcdc12vWatts\"]\n    car_out_vol: Annotated[int, \"I\", \"carOutVol\"]\n    car_out_amp: Annotated[int, \"I\", \"carOutAmp\"]\n    car_out_watts: Annotated[int, \"H\", \"carOutWatts\"]\n    car_temp: Annotated[int, \"H\", \"carTemp\"]\n    car_state: Annotated[int, \"B\", \"carState\"]\n    dc24v_temp: Annotated[int, \"H\", \"dc24vTemp\"]\n    dc24v_state: Annotated[int, \"B\", \"dc24vState\"]\n    chg_pause_flag: Annotated[int, \"B\", \"chgPauseFlag\"]\n    dc_dip_switch: Annotated[int, \"B\", \"dcDipSwitch\"]\n    cfg_fast_chg_watts: Annotated[int, \"H\", \"cfgFastChgWatts\"]\n    cfg_slow_chg_watts: Annotated[int, \"H\", \"cfgSlowChgWatts\"]",
+      "metadata": {
+        "start_line": 46,
+        "lang": "python",
+        "desc": "Definition of DirectMpptRiverMiniHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_mppt_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_mppt_heartbeat_pack.py:chunk1"
+    }
+  ]
+}

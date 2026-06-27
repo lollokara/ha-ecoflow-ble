@@ -1,0 +1,50 @@
+{
+  "full_summary": "Python file with 4 classes and 8 functions. Key components include classes and method definitions relevant to switch module.",
+  "chunks": [
+    {
+      "content": "class EcoflowSwitchEntityDescription[T: DeviceBase](SwitchEntityDescription):\n    set_state: Callable[[T, bool], Awaitable] | None = None\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of EcoflowSwitchEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py:chunk0"
+    },
+    {
+      "content": "class SwitchBuilder(EntityDescriptionBuilder):\n    _device_class: SwitchDeviceClass | None = None\n    _enable_func: Callable[[DeviceBase, bool], Awaitable[None]] | None = None\n\n    def device_class(self, device_class: SwitchDeviceClass):\n        self._device_class = device_class\n        return self\n\n    def enable_func(self, func: Callable[[DeviceBase, bool], Awaitable[None]]):\n        self._enable_func = func\n        return self\n\n    def build(self):\n        if self._enable_func is None:\n            raise ValueError(\"Cannot build switch entity without enable func\")\n        return EcoflowSwitchEntityDescription(\n            key=self._entity_key,\n            name=self._entity_name,\n            device_class=self._device_class,\n            entity_category=self._entity_category,\n            set_state=self._enable_func,\n            entity_registry_enabled_default=self._entity_registry_enabled_default,\n            translation_key=self._entity_translation_key,\n            translation_placeholders=self._translation_placeholders,\n            availability_prop=self._availability_prop,\n            icon=self._icon,\n        )",
+      "metadata": {
+        "start_line": 30,
+        "lang": "python",
+        "desc": "Definition of SwitchBuilder in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py:chunk1"
+    },
+    {
+      "content": "class _Builder[E: controls.ControlType]:\n    builder: Callable[[E, SwitchBuilder], SwitchBuilder]",
+      "metadata": {
+        "start_line": 60,
+        "lang": "python",
+        "desc": "Definition of _Builder in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py:chunk2"
+    },
+    {
+      "content": "async def async_setup_entry(\n    hass: HomeAssistant,\n    entry: DeviceConfigEntry,\n    async_add_entities: AddEntitiesCallback,\n):\n    device = entry.runtime_data\n\n    # New controls system (devices migrated to @controls decorators)\n    descriptions = [\n        (\n            _BUILDERS[switch.__class__]\n            .builder(switch, SwitchBuilder.from_entity(switch))\n            .enable_func(switch.enable_func)\n            .build()\n        )\n        for switch in get_controls(device, controls.toggle)\n    ]\n\n    if not descriptions:\n        # Deprecated: old hardcoded list (for devices not yet migrated)\n        descriptions = [\n            desc\n            for desc in DEPRECATED_SWITCH_TYPES\n            if (\n                hasattr(device, desc.key)\n                and (\n                    isinstance(desc, EcoflowSwitchEntityDescription)\n                    or hasattr(device, f\"enable_{desc.key}\")\n                )\n            )\n        ]\n\n    entities = [EcoflowSwitchEntity(device, desc) for desc in descriptions]\n    if entities:\n        async_add_entities(entities)",
+      "metadata": {
+        "start_line": 75,
+        "lang": "python",
+        "desc": "Definition of async_setup_entry in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py:chunk3"
+    },
+    {
+      "content": "class EcoflowSwitchEntity(EcoflowEntity, SwitchEntity):\n    def __init__(\n        self, device: DeviceBase, entity_description: SwitchEntityDescription\n    ) -> None:\n        super().__init__(device)\n\n        self._attr_unique_id = f\"ef_{device.serial_number}_{entity_description.key}\"\n        self._prop_name = entity_description.key\n        self._set_state = getattr(device, f\"enable_{self._prop_name}\", None)\n        self.entity_description = entity_description\n        self._on_off_state = getattr(device, self._prop_name, None)\n        self._availability_prop = getattr(entity_description, \"availability_prop\", None)\n\n        if entity_description.translation_key is None:\n            self._attr_translation_key = self.entity_description.key\n\n        self._register_update_callback(\n            entity_attr=\"_attr_available\",\n            prop_name=self._availability_prop,\n            get_state=lambda state: state if state is not None else self.SkipWrite,\n        )\n\n        custom_set_state = getattr(entity_description, \"set_state\", None)\n        if isinstance(custom_set_state, Callable):\n            self._set_state = partial(custom_set_state, device)\n\n    async def async_turn_on(self, **kwargs: Any) -> None:\n        if isinstance(self._set_state, Callable):\n            await self._set_state(True)\n\n    async def async_turn_off(self, **kwargs: Any) -> None:\n        if isinstance(self._set_state, Callable):\n            await self._set_state(False)\n\n    async def async_added_to_hass(self) -> None:\n        self._device.register_state_update_callback(self.state_updated, self._prop_name)\n        await super().async_added_to_hass()\n\n    async def async_will_remove_from_hass(self) -> None:\n        \"\"\"Entity being removed from hass.\"\"\"\n        self._device.remove_state_update_callback(self.state_updated, self._prop_name)\n        await super().async_will_remove_from_hass()\n\n    @callback\n    def state_updated(self, state: bool | None):\n        self._on_off_state = state\n        self.async_write_ha_state()\n\n    @callback\n    def availability_updated(self, state: bool):\n        self._attr_available = state\n        self.async_write_ha_state()\n\n    @property\n    def available(self):\n        if not super().available or self._on_off_state is None:\n            return False\n        if self._availability_prop is not None:\n            return self._attr_available\n        return True\n\n    @property\n    def is_on(self):\n        return self._on_off_state if self._on_off_state is not None else False",
+      "metadata": {
+        "start_line": 112,
+        "lang": "python",
+        "desc": "Definition of EcoflowSwitchEntity in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/switch.py:chunk4"
+    }
+  ]
+}

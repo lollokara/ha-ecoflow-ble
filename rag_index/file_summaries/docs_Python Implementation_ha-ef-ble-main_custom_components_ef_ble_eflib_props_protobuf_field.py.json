@@ -1,0 +1,167 @@
+{
+  "full_summary": "Python file with 7 classes and 28 functions. Key components include classes and method definitions relevant to protobuf_field module.",
+  "chunks": [
+    {
+      "content": "class _ProtoAttr:\n    def __init__(self, message_type: type[Message], names: str | list[str]):\n        if isinstance(names, list):\n            self.attrs = names.copy()\n        else:\n            self.attrs = [names]\n        self.message_type = message_type\n\n    def __getattr__(self, name: str):\n        return _ProtoAttr(self.message_type, [*self.attrs, name])\n\n    def __repr__(self):\n        return f\"proto_attr({self.attrs})\"\n\n    @property\n    def name(self):\n        return \".\".join(self.attrs)",
+      "metadata": {
+        "start_line": 14,
+        "lang": "python",
+        "desc": "Definition of _ProtoAttr in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk0"
+    },
+    {
+      "content": "class _ProtoAttrAccessor[T1: Message]:\n    message_type: type[T1]\n\n    def __getattr__(self, name: str):\n        if name not in self.message_type.DESCRIPTOR.fields_by_name:\n            raise AttributeError(\n                f\"{self.message_type} does not contain field named '{name}'\"\n            )\n        return _ProtoAttr(self.message_type, name)",
+      "metadata": {
+        "start_line": 34,
+        "lang": "python",
+        "desc": "Definition of _ProtoAttrAccessor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk1"
+    },
+    {
+      "content": "def proto_attr_mapper[T: Message](pb: type[T]) -> type[T]:\n    \"\"\"\n    Create proxy object for protobuf class that returns accessed attributes\n\n    This function is a convenience function for creating typed fields from protobuf\n    message classes.\n\n    Returns\n    -------\n        Proxy object that tracks all accessed attributes\n    \"\"\"\n    return _ProtoAttrAccessor(pb)  # type: ignore reportReturnType",
+      "metadata": {
+        "start_line": 45,
+        "lang": "python",
+        "desc": "Definition of proto_attr_mapper in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk2"
+    },
+    {
+      "content": "def proto_attr_name(proto_attr: _ProtoAttr | Any) -> str:\n    \"\"\"Get name of attribute from proto attr returned from `proto_attr_mapper`\"\"\"\n    return proto_attr.name",
+      "metadata": {
+        "start_line": 59,
+        "lang": "python",
+        "desc": "Definition of proto_attr_name in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk3"
+    },
+    {
+      "content": "def proto_has_attr(msg: Message, proto_attr: _ProtoAttr | Any) -> bool:\n    \"\"\"Return True if protobuf message has specified attribute\"\"\"\n    if proto_attr is None:\n        return False\n    for attr in proto_attr.attrs:\n        try:\n            if not msg.HasField(attr):\n                return False\n        except ValueError as e:\n            if \"not have pressence\" not in str(e):\n                return len(getattr(msg, attr)) > 0\n        msg = getattr(msg, attr)\n    return True",
+      "metadata": {
+        "start_line": 64,
+        "lang": "python",
+        "desc": "Definition of proto_has_attr in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk4"
+    },
+    {
+      "content": "class TransformIfMissing[T_ATTR, T_OUT]:\n    def __init__(self, transform_func: Callable[[T_ATTR], T_OUT | type[Skip]]):\n        self._func = transform_func\n\n    def __call__(self, value: T_ATTR) -> T_OUT | type[Skip]:\n        return self._func(value)",
+      "metadata": {
+        "start_line": 79,
+        "lang": "python",
+        "desc": "Definition of TransformIfMissing in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk5"
+    },
+    {
+      "content": "class ProtobufField[T](Field[T]):\n    \"\"\"\n    Field that allows value assignment from protocol buffer message\n\n    It is recommended to not use this class directly - use `pb_field` instead for\n    better typing.\n    \"\"\"\n\n    def __init__(\n        self,\n        pb_field: _ProtoAttr,\n        transform_value: Callable[[Any], T] = lambda x: x,\n        process_if_missing: bool = False,\n    ):\n        \"\"\"\n        Create protobuf field that allows value assignment from protobuf message\n\n        Parameters\n        ----------\n        pb_field\n            Instance of protobuf accessor created with `proto_attr_mapper`\n        transform_value, optional\n            Function that takes protobuf attribute value\n        process_if_missing, optional\n            If True, transform function receives None\n        \"\"\"\n        self.pb_field = pb_field\n        self._transform_value = transform_value\n        self.process_if_missing = process_if_missing\n\n    def _get_value(self, value: Message | Any):\n        if not isinstance(value, Message):\n            return value\n\n        n_attrs = len(self.pb_field.attrs)\n        for i, attr in enumerate(self.pb_field.attrs):\n            if not value.HasField(attr):\n                if i == n_attrs - 1 and self.process_if_missing:\n                    return None\n                return Skip\n            value = getattr(value, attr)\n        return value\n\n    def __set__(self, instance: \"ProtobufProps\", value: Any):\n        if (value := self._get_value(value)) is Skip:\n            return\n        super().__set__(instance, value)",
+      "metadata": {
+        "start_line": 87,
+        "lang": "python",
+        "desc": "Definition of ProtobufField in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk6"
+    },
+    {
+      "content": "def pb_field[T_ATTR](\n    attr: T_ATTR,\n    transform: None = None,\n) -> \"ProtobufField[T_ATTR]\": ...",
+      "metadata": {
+        "start_line": 137,
+        "lang": "python",
+        "desc": "Definition of pb_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk7"
+    },
+    {
+      "content": "def pb_field[T_ATTR, T_OUT](\n    attr: T_ATTR,\n    transform: Callable[[T_ATTR], T_OUT | type[Skip]],\n) -> \"ProtobufField[T_OUT]\": ...",
+      "metadata": {
+        "start_line": 144,
+        "lang": "python",
+        "desc": "Definition of pb_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk8"
+    },
+    {
+      "content": "def pb_field(\n    attr: Any,\n    transform: Callable[[Any], Any] | None = None,\n) -> \"ProtobufField[Any]\":\n    \"\"\"\n    Create field that allows value assignment from protocol buffer messages\n\n    Parameters\n    ----------\n    attr\n        Protobuf field attribute of instance returned from `proto_attr_mapper`\n    transform, optional\n        Function that is applied to raw protobuf value\n    \"\"\"\n    if not isinstance(attr, _ProtoAttr):\n        raise TypeError(\n            \"Attribute has to be an instance returned from \"\n            f\"`proto_attr_mapper`, but received value of '{attr}'\"\n        )\n    return ProtobufField(\n        pb_field=attr,\n        transform_value=transform if transform is not None else lambda x: x,\n        process_if_missing=isinstance(transform, TransformIfMissing),\n    )",
+      "metadata": {
+        "start_line": 150,
+        "lang": "python",
+        "desc": "Definition of pb_field in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk9"
+    },
+    {
+      "content": "def _match_to_regex(match: str) -> re.Pattern[str]:\n    return re.compile(\"^\" + re.escape(match).replace(r\"\\{n\\}\", r\"(\\d+)\") + \"$\")",
+      "metadata": {
+        "start_line": 176,
+        "lang": "python",
+        "desc": "Definition of _match_to_regex in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk10"
+    },
+    {
+      "content": "def _find_match_segment(\n    attr: _ProtoAttr,\n    regex: re.Pattern[str],\n) -> int:\n    for i, a in enumerate(attr.attrs):\n        if regex.match(a):\n            return i\n    raise ValueError(f\"No segment matching '{regex.pattern}' in path {attr.attrs}\")",
+      "metadata": {
+        "start_line": 180,
+        "lang": "python",
+        "desc": "Definition of _find_match_segment in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk11"
+    },
+    {
+      "content": "def _discover_pb_indices(\n    attr: _ProtoAttr,\n    pattern: re.Pattern[str],\n    match_idx: int,\n) -> tuple[int, int]:\n    descriptor = attr.message_type.DESCRIPTOR\n    for attr_name in attr.attrs[:match_idx]:\n        field_desc = descriptor.fields_by_name.get(attr_name)\n        if field_desc is None or field_desc.message_type is None:\n            raise ValueError(\n                f\"Cannot traverse protobuf path at '{attr_name}': \"\n                \"field not found or not a message type\"\n            )\n        descriptor = field_desc.message_type\n\n    indices = sorted(\n        int(m.group(1))\n        for name in descriptor.fields_by_name\n        if (m := pattern.match(name))\n    )\n    if not indices:\n        raise ValueError(f\"No fields matching '{pattern.pattern}' in {descriptor.name}\")\n    expected = list(range(indices[0], indices[0] + len(indices)))\n    if indices != expected:\n        raise ValueError(\n            f\"Non-contiguous indices {indices} for \"\n            f\"'{pattern.pattern}' in {descriptor.name}\"\n        )\n    return indices[0], len(indices)",
+      "metadata": {
+        "start_line": 190,
+        "lang": "python",
+        "desc": "Definition of _discover_pb_indices in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk12"
+    },
+    {
+      "content": "def pb_field_group[T](\n    attr: T,\n    match: str,\n    count: int | None = None,\n    *,\n    transform: Callable[[Any], Any] | None = None,\n    start: int | None = None,\n    name_template: str | None = None,\n    name_prefix: str | None = None,\n) -> \"FieldGroup[T]\":\n    \"\"\"\n    Create a FieldGroup of protobuf fields by indexing one path segment\n\n    Parameters\n    ----------\n    attr\n        A fully-typed protobuf path created via `proto_attr_mapper`, e.g.\n        `_hall1.ch1_sta.load_sta`\n    match\n        Pattern with {n} placeholder identifying the indexed segment, e.g. \"ch{n}_sta\"\n    count\n        Number of fields to create; when omitted, the count (and start) are discovered\n        automatically from the protobuf descriptor\n    transform\n        Optional transform passed to `pb_field` for every genertaed field\n    start\n        First index value. Defaults to 1 when *count* is given explicitly, or to the\n        lowest discovered index when count is omitted\n    name_template\n        Explicit naming pattern with {n} placeholder, e.g.  \"ch{n}_status\"\n    name_prefix\n        Prefix with {n} placeholder - the template is derived automaticaly from the\n        class attribute name (used by `pb_group`)\n    \"\"\"\n    if not isinstance(attr, _ProtoAttr):\n        raise TypeError(\n            \"First argument must be a protobuf path from \"\n            f\"`proto_attr_mapper`, got {type(attr)}\"\n        )\n\n    regex = _match_to_regex(match)\n    seg_idx = _find_match_segment(attr, regex)\n\n    if count is None:\n        discovered_start, count = _discover_pb_indices(\n            attr,\n            regex,\n            seg_idx,\n        )\n        if start is None:\n            start = discovered_start\n    elif start is None:\n        start = 1\n\n    def factory(n: int) -> ProtobufField:\n        new_attrs = list(attr.attrs)\n        new_attrs[seg_idx] = match.format(n=n)\n        return pb_field(\n            _ProtoAttr(attr.message_type, new_attrs),\n            transform,\n        )\n\n    return FieldGroup(\n        factory,\n        count,\n        start=start,\n        name_template=name_template,\n        name_prefix=name_prefix,\n    )",
+      "metadata": {
+        "start_line": 221,
+        "lang": "python",
+        "desc": "Definition of pb_field_group in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk13"
+    },
+    {
+      "content": "class _PbGroupFactory:\n    __slots__ = (\"_match\", \"_name_prefix\")\n\n    def __init__(\n        self,\n        match: str,\n        name_prefix: str | None = None,\n    ) -> None:\n        self._match = match\n        self._name_prefix = name_prefix\n\n    def __call__[T](\n        self,\n        attr: T,\n        *,\n        transform: Callable[[Any], Any] | None = None,\n        name_template: str | None = None,\n    ) -> \"FieldGroup[T]\":\n        return pb_field_group(\n            attr,\n            match=self._match,\n            transform=transform,\n            name_template=name_template,\n            name_prefix=self._name_prefix,\n        )",
+      "metadata": {
+        "start_line": 292,
+        "lang": "python",
+        "desc": "Definition of _PbGroupFactory in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk14"
+    },
+    {
+      "content": "def pb_group(\n    match: str,\n    name_prefix: str | None = None,\n) -> _PbGroupFactory:\n    \"\"\"\n    Create a factory for building FieldGroups with a fixed match pattern\n\n    Parameters\n    ----------\n    match\n        Pattern with {n} placeholder, e.g. \"Energy{n}_info\"\n    name_prefix\n        Optional prefix with {n} for automatic field naming, e.g. \"channel{n}\" - the\n        template is derived from the class attribute name at class creation time\n    \"\"\"\n    return _PbGroupFactory(match, name_prefix=name_prefix)",
+      "metadata": {
+        "start_line": 319,
+        "lang": "python",
+        "desc": "Definition of pb_group in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk15"
+    },
+    {
+      "content": "class _PbIndexedAccessor[T]:\n    msg: Any\n    attrs: list[str]\n    match_idx: int\n    match: str\n\n    def _resolve(self, index: int) -> tuple[Any, list[str]]:\n        attrs = list(self.attrs)\n        attrs[self.match_idx] = self.match.format(n=index)\n        return self.msg, attrs\n\n    def __getitem__(self, index: int) -> T:\n        msg, attrs = self._resolve(index)\n        for attr_name in attrs:\n            msg = getattr(msg, attr_name)\n        return msg\n\n    def __setitem__(self, index: int, value: T) -> None:\n        msg, attrs = self._resolve(index)\n        for attr_name in attrs[:-1]:\n            msg = getattr(msg, attr_name)\n        setattr(msg, attrs[-1], value)",
+      "metadata": {
+        "start_line": 338,
+        "lang": "python",
+        "desc": "Definition of _PbIndexedAccessor in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk16"
+    },
+    {
+      "content": "def pb_indexed_attr[T](msg: Any, attr: T, match: str) -> _PbIndexedAccessor[T]:\n    \"\"\"\n    Create an indexed view over a protobuf message using a typed path\n\n    Use [index] on the result to traverse the message with that index substituted\n    into the matched segment.\n\n    Parameters\n    ----------\n    msg\n        A real protobuf message instance to traverse\n    attr\n        A typed protobuf path from `proto_attr_mapper`, e.g.\n        `pb_push_set.load_incre_info.hall1_incre_info.ch1_sta`\n    match\n        Pattern with {n} placeholder identifying the indexed segment, e.g. \"ch{n}_sta\"\n    \"\"\"\n    if not isinstance(attr, _ProtoAttr):\n        raise TypeError(\n            \"Second argument must be a protobuf path from \"\n            f\"`proto_attr_mapper`, got {type(attr)}\"\n        )\n    regex = _match_to_regex(match)\n    match_idx = _find_match_segment(attr, regex)\n    return _PbIndexedAccessor(msg, list(attr.attrs), match_idx, match)",
+      "metadata": {
+        "start_line": 362,
+        "lang": "python",
+        "desc": "Definition of pb_indexed_attr in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/props/protobuf_field.py:chunk17"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "full_summary": "Python file with 2 classes and 2 functions. Key components include classes and method definitions relevant to delta3_ultra_plus module.",
+  "chunks": [
+    {
+      "content": "class _ACPortPower(repeated_pb_field_type(pb.pow_get_ac_out_list.pow_get_ac_out_item)):\n    index: int\n\n    def get_item(self, value: Sequence[float]) -> float | None:\n        return out_power(value[self.index]) if value else None",
+      "metadata": {
+        "start_line": 13,
+        "lang": "python",
+        "desc": "Definition of _ACPortPower in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra_plus.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra_plus.py:chunk0"
+    },
+    {
+      "content": "class Device(delta3_ultra.Device):\n    \"\"\"Delta 3 Ultra Plus\"\"\"\n\n    SN_PREFIX = (b\"D511\",)\n    NAME_PREFIX = \"EF-D5\"\n\n    ac_ports_2 = pb_field(pb.flow_info_ac2_out, flow_is_on)\n\n    ac_power_1_1 = _ACPortPower(0)\n    ac_power_1_2 = _ACPortPower(1)\n    ac_power_2_1 = _ACPortPower(2)\n    ac_power_2_2 = _ACPortPower(3)\n    ac_power_2_3 = _ACPortPower(4)\n\n    usbc3_output_power = pb_field(pb.pow_get_typec3, out_power)\n\n    dc_charging_max_amps_2 = _DcAmpSettingField(\n        pd335_sys_pb2.PV_CHG_VOL_SPEC_12V, pd335_sys_pb2.PV_PLUG_INDEX_2\n    )\n    dc_charging_current_max_2 = _DcChargingMaxField(pd335_sys_pb2.PV_CHG_VOL_SPEC_12V)\n\n    dc_port_2_input_power = pb_field(pb.pow_get_pv2, pround(2))\n    dc_port_2_state = pb_field(pb.plug_in_info_pv2_type, DCPortState.from_value)\n\n    @computed_field\n    def solar_input_power_2(self) -> float:\n        if (\n            self.dc_port_2_state is DCPortState.SOLAR\n            and self.dc_port_2_input_power is not None\n        ):\n            return round(self.dc_port_2_input_power, 2)\n        return 0\n\n    @controls.current(dc_charging_max_amps_2, max=dynamic(dc_charging_current_max_2))\n    async def set_dc_charging_amps_max_2(self, value: float) -> bool:\n        return await self.set_dc_charging_amps_max(\n            value, plug_index=pd335_sys_pb2.PV_PLUG_INDEX_2\n        )\n\n    @controls.outlet(ac_ports_2)\n    async def enable_ac_ports_2(self, enabled: bool):\n        await self._send_config_packet(\n            pd335_sys_pb2.ConfigWrite(cfg_ac2_out_open=enabled)\n        )",
+      "metadata": {
+        "start_line": 20,
+        "lang": "python",
+        "desc": "Definition of Device in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra_plus.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/devices/delta3_ultra_plus.py:chunk1"
+    }
+  ]
+}

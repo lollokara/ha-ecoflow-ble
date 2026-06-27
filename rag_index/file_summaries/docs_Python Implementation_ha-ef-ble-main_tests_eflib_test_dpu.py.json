@@ -1,0 +1,95 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_dpu module.",
+  "chunks": [
+    {
+      "content": "def packet_sequence():\n    \"\"\"\n    Raw packet sequence captured from a DPU device\n\n    Packet 1 (cmd_id=0x04): BpInfoReport - battery pack info (3 battery packs)\n    Packet 2 (src=0x06, cmd_id=0x10): APPParaHeartbeatReport - system parameters\n    Packet 3 (cmd_id=0x03): AppShowHeartbeatReport - system status and power data\n    \"\"\"\n    return [\n        \"aa134500662c14a1c602011d0221010102041e011c150c363114141494391414d4512caf2b54704c331e011c160c393114141494391414d4512cfe4154704c311e011c170c3f3114141494391414d4512cbb4454704c37f209\",\n        \"aa13c300ae2c92ff4317061d06210100fe109a9388b39a75420b2a948239690416948a6d95b082929212ad929292d9929292929292929288b39a4815132a9482061e0c56968a6d95b0829292929292929292929292929292929288b39a4815132a948279190c56968a7c95b0829292929292929292929292929292929288b39a7310132a9482792e6551968a6d95b082929212ad929292d9929292929292929288b39a7310132a9482152e6551968a7c95b082929212ad929212d09292929292929292b082cba5a3a0c8d3d0a6a6d5a7c6a2a2aba1531b\",\n        \"aa1349009a2c2da1c602011d022101010203252d3d2d35490d2d05331d2d15116d2c65497d2d752d4d2d45a5235da523552dad2c812fa52cfd28bd2cfd28b52c2d8d2c2c852cb22b9f2c3d6c40485f444e4c0263485a7274425f46ba5b\",\n    ]",
+      "metadata": {
+        "start_line": 8,
+        "lang": "python",
+        "desc": "Definition of packet_sequence in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk0"
+    },
+    {
+      "content": "def device(mocker: MockerFixture):\n    ble_dev = mocker.Mock()\n    ble_dev.address = \"AA:BB:CC:DD:EE:FF\"\n    adv_data = mocker.MagicMock()\n    device = Device(ble_dev, adv_data, \"Y711TEST1234\")\n    device._conn = mocker.AsyncMock()\n    return device",
+      "metadata": {
+        "start_line": 24,
+        "lang": "python",
+        "desc": "Definition of device in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk1"
+    },
+    {
+      "content": "async def test_dpu_parses_all_packets_successfully(device, packet_sequence):\n    expected_packets = [\n        (0x02, 0x02, 0x04),  # BpInfoReport\n        (0x06, 0xFE, 0x10),  # APPParaHeartbeatReport (not handled by device)\n        (0x02, 0x02, 0x03),  # AppShowHeartbeatReport (cmd_id=0x03, not 0x01)\n    ]\n\n    for i, hex_packet in enumerate(packet_sequence):\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        expected_src, expected_cmd_set, expected_cmd_id = expected_packets[i]\n\n        assert packet is not None, f\"Packet {i} failed to parse\"\n        assert packet.src == expected_src, (\n            f\"Packet {i} has unexpected src: {packet.src:#04x} != {expected_src:#04x}\"\n        )\n        assert packet.cmd_set == expected_cmd_set, (\n            f\"Packet {i} has unexpected cmd_set: \"\n            f\"{packet.cmd_set:#04x} != {expected_cmd_set:#04x}\"\n        )\n        assert packet.cmd_id == expected_cmd_id, (\n            f\"Packet {i} has unexpected cmd_id: \"\n            f\"{packet.cmd_id:#04x} != {expected_cmd_id:#04x}\"\n        )",
+      "metadata": {
+        "start_line": 33,
+        "lang": "python",
+        "desc": "Definition of test_dpu_parses_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk2"
+    },
+    {
+      "content": "async def test_dpu_processes_all_packets_successfully(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    processed = await device.data_parse(packet)\n    assert processed is True, \"BpInfoReport packet was not processed\"",
+      "metadata": {
+        "start_line": 58,
+        "lang": "python",
+        "desc": "Definition of test_dpu_processes_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk3"
+    },
+    {
+      "content": "async def test_dpu_updates_battery_pack_fields(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    battery_field_names = [\n        Device.battery_1_battery_level,\n        Device.battery_2_battery_level,\n        Device.battery_3_battery_level,\n    ]\n\n    updated_battery_fields = [\n        f for f in battery_field_names if f.public_name in device.updated_fields\n    ]\n    assert len(updated_battery_fields) > 0, \"No battery pack fields were updated\"\n\n    battery_1_level = device.get_value(Device.battery_1_battery_level)\n    assert battery_1_level is not None\n    assert isinstance(battery_1_level, (int, float))\n    assert 0 <= battery_1_level <= 100, (\n        f\"Battery 1 level {battery_1_level} out of range\"\n    )",
+      "metadata": {
+        "start_line": 64,
+        "lang": "python",
+        "desc": "Definition of test_dpu_updates_battery_pack_fields in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk4"
+    },
+    {
+      "content": "async def test_dpu_updates_power_fields(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    power_field_names = [\n        Device.input_power,\n        Device.output_power,\n        Device.lv_solar_power,\n        Device.hv_solar_power,\n    ]\n\n    for field_name in power_field_names:\n        if field_name.public_name in device.updated_fields:\n            value = device.get_value(field_name)\n            assert isinstance(value, (int, float)), (\n                f\"Power field {field_name} has wrong type: {type(value)}\"\n            )\n            assert value >= 0, f\"Power field {field_name} has negative value: {value}\"",
+      "metadata": {
+        "start_line": 87,
+        "lang": "python",
+        "desc": "Definition of test_dpu_updates_power_fields in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk5"
+    },
+    {
+      "content": "async def test_dpu_handles_zero_values_correctly(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    if Device.input_power.public_name in device.updated_fields:\n        input_power = device.input_power\n        if input_power is not None and input_power == 0:\n            assert isinstance(input_power, (int, float))",
+      "metadata": {
+        "start_line": 108,
+        "lang": "python",
+        "desc": "Definition of test_dpu_handles_zero_values_correctly in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk6"
+    },
+    {
+      "content": "async def test_dpu_field_types_are_consistent(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    numeric_fields = [\n        Device.battery_1_battery_level,\n        Device.battery_1_cell_temperature,\n        Device.battery_2_battery_level,\n        Device.battery_2_cell_temperature,\n        Device.battery_3_battery_level,\n        Device.battery_3_cell_temperature,\n        # TODO(gnox): needs more messages\n        # Device.input_power,\n        # Device.output_power,\n        # Device.lv_solar_power,\n        # Device.hv_solar_power,\n        # Device.ac_l1_1_out_power,\n        # Device.ac_l1_2_out_power,\n        # Device.ac_l2_1_out_power,\n        # Device.ac_l2_2_out_power,\n        # Device.ac_tt_out_power,\n        # Device.ac_l14_out_power,\n        # Device.ac_5p8_out_power,\n    ]\n\n    for field_name in numeric_fields:\n        value = device.get_value(field_name)\n        assert isinstance(value, (int, float)), (\n            f\"Field {field_name} has wrong type: {type(value)}\"\n        )",
+      "metadata": {
+        "start_line": 119,
+        "lang": "python",
+        "desc": "Definition of test_dpu_field_types_are_consistent in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk7"
+    },
+    {
+      "content": "async def test_dpu_battery_soc_values_are_valid(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    for i in range(1, 3):\n        field_name = f\"battery_{i}_battery_level\"\n        value = device.get_value(field_name)\n        assert value is not None, f\"{field_name} should not be None if updated\"\n        assert 0 <= value <= 100, (\n            f\"{field_name} value {value} is out of valid range (0-100)\"\n        )",
+      "metadata": {
+        "start_line": 152,
+        "lang": "python",
+        "desc": "Definition of test_dpu_battery_soc_values_are_valid in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk8"
+    },
+    {
+      "content": "async def test_dpu_exact_values_from_known_packets(device, packet_sequence):\n    \"\"\"Test that known packet data produces exact expected values\"\"\"\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    expected = {\n        Device.battery_1_battery_level: 34,\n        Device.battery_1_cell_temperature: 39,\n        Device.battery_2_battery_level: 45,\n        Device.battery_2_cell_temperature: 37,\n        Device.battery_3_battery_level: 43,\n        Device.battery_3_cell_temperature: 35,\n    }\n\n    for field_name, expected_value in expected.items():\n        actual_value = device.get_value(field_name)\n        assert actual_value == expected_value, (\n            f\"{field_name}: expected {expected_value}, got {actual_value}\"\n        )",
+      "metadata": {
+        "start_line": 165,
+        "lang": "python",
+        "desc": "Definition of test_dpu_exact_values_from_known_packets in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_dpu.py:chunk9"
+    }
+  ]
+}

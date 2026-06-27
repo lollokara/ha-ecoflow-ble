@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to direct_ems_heartbeat_pack module.",
+  "chunks": [
+    {
+      "content": "class DirectEmsDeltaHeartbeatPack(RawData):\n    chg_state: Annotated[int, \"B\", \"chgState\"]\n    chg_cmd: Annotated[int, \"B\", \"chgCmd\"]\n    dsg_cmd: Annotated[int, \"B\", \"dsgCmd\"]\n    chg_vol: Annotated[int, \"I\", \"chgVol\"]\n    chg_amp: Annotated[int, \"I\", \"chgAmp\"]\n    fan_level: Annotated[int, \"B\", \"fanLevel\"]\n    max_charge_soc: Annotated[int, \"B\", \"maxChargeSoc\"]\n    bms_model: Annotated[int, \"B\", \"bmsModel\"]\n    lcd_show_soc: Annotated[int, \"B\", \"lcdShowSoc\"]\n    open_ups_flag: Annotated[int, \"B\", \"openUpsFlag\"]\n    bms_warning_state: Annotated[int, \"B\", \"bmsWarningState\"]\n    chg_remain_time: Annotated[int, \"I\", \"chgRemainTime\"]\n    dsg_remain_time: Annotated[int, \"I\", \"dsgRemainTime\"]\n    ems_is_normal_flag: Annotated[int, \"B\", \"emsIsNormalFlag\"]\n    f32_lcd_show_soc: Annotated[float, \"f\", \"f32LcdShowSoc\"]\n    bms_is_connt: Annotated[bytes, \"3s\", \"bmsIsConnt\"]\n    max_available_num: Annotated[int, \"B\", \"maxAvailableNum\"]\n    open_bms_idx: Annotated[int, \"B\", \"openBmsIdx\"]\n    para_vol_min: Annotated[int, \"I\", \"paraVolMin\"]\n    para_vol_max: Annotated[int, \"I\", \"paraVolMax\"]\n    min_dsg_soc: Annotated[int, \"B\", \"minDsgSoc\"]\n    open_oil_eb_soc: Annotated[int, \"B\", \"openOilEbSoc\"]\n    close_oil_eb_soc: Annotated[int, \"B\", \"closeOilEbSoc\"]",
+      "metadata": {
+        "start_line": 6,
+        "lang": "python",
+        "desc": "Definition of DirectEmsDeltaHeartbeatPack in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_ems_heartbeat_pack.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/model/direct_ems_heartbeat_pack.py:chunk0"
+    }
+  ]
+}

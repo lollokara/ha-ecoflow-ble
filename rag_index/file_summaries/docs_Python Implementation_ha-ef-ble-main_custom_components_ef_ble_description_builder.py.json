@@ -1,0 +1,32 @@
+{
+  "full_summary": "Python file with 2 classes and 15 functions. Key components include classes and method definitions relevant to description_builder module.",
+  "chunks": [
+    {
+      "content": "class EntityDescriptionBuilder:\n    field: \"Field | None\"\n\n    _name: str | None = None\n    _key: str | None = None\n    _icon: str | None = None\n    _entity_category: EntityCategory | None = None\n    _translation_key: str | None = None\n    _translation_placeholders: dict[str, str] | None = None\n    _availability_prop: str | None = None\n    _entity_registry_enabled_default: bool = True\n\n    @classmethod\n    def from_entity(cls, entity: EntityType):\n        obj = cls()\n        obj.field = entity.field\n        builder = obj.key(entity.key).enabled(entity.enabled)\n        if entity.translation_key is not None:\n            builder = builder.translation_key(entity.translation_key)\n        if entity.translation_placeholders is not None:\n            builder = builder.translation_placeholders(entity.translation_placeholders)\n        if entity.availability is not None:\n            builder = builder.availability_prop(entity.availability_prop)\n        return builder\n\n    def name(self, name: str) -> Self:\n        self._name = name\n        return self\n\n    def key(self, key: str) -> Self:\n        self._key = key\n        return self\n\n    def icon(self, icon: str):\n        self._icon = icon\n        return self\n\n    def enabled(self, enabled: bool = True):\n        self._entity_registry_enabled_default = enabled\n        return self\n\n    def translation_key(self, translation_key: str) -> Self:\n        self._translation_key = translation_key\n        return self\n\n    def translation_placeholders(self, placeholders: dict[str, str]) -> Self:\n        self._translation_placeholders = placeholders\n        return self\n\n    def availability_prop(self, availability_prop: \"str | Field | None\") -> Self:\n        if field := self._get_field(availability_prop):\n            self._availability_prop = field.public_name\n        else:\n            self._availability_prop = availability_prop  # type: ignore[assignment]\n        return self\n\n    def entity_category(self, entity_category: EntityCategory):\n        self._entity_category = entity_category\n        return self\n\n    def _get_field(self, val: Any):\n        match val:\n            case Field():\n                return val\n            case DynamicValue():\n                return val.field\n            case _:\n                return None\n\n    @property\n    def _field(self) -> Field:\n        return self.field  # pyright: ignore[reportAttributeAccessIssue]\n\n    @property\n    def _entity_key(self):\n        if self._key is not None:\n            return self._key\n\n        if self._field is None:\n            raise ValueError(\"Cannot create sensor key without field\")\n\n        return self._field.public_name\n\n    @property\n    def _entity_name(self):\n        if self._name is not None:\n            return self._name\n\n        if self._field is None:\n            raise ValueError(\"Cannot create default sensor name without field\")\n\n        return \" \".join(\n            [\n                word.upper() if word in _UPPER_WORDS else word.capitalize()\n                for word in self._entity_key.split(\"_\")\n            ]\n        )\n\n    @property\n    def _entity_translation_key(self):\n        if self._translation_key is not None:\n            return self._translation_key\n\n        if self._field is None:\n            raise ValueError(\"Cannot create default translation key without field\")\n\n        return self._entity_key",
+      "metadata": {
+        "start_line": 21,
+        "lang": "python",
+        "desc": "Definition of EntityDescriptionBuilder in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py:chunk0"
+    },
+    {
+      "content": "class EcoflowSelectEntityDescription[T: DeviceBase](SelectEntityDescription):\n    set_state: Callable[[T, str], Awaitable] | None = None\n\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 131,
+        "lang": "python",
+        "desc": "Definition of EcoflowSelectEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py:chunk1"
+    },
+    {
+      "content": "def unit_to_hassunit(unit: str | units.Unit):\n    return _UNIT_CONVERSION.get(unit, unit)",
+      "metadata": {
+        "start_line": 145,
+        "lang": "python",
+        "desc": "Definition of unit_to_hassunit in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/description_builder.py:chunk2"
+    }
+  ]
+}

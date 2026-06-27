@@ -154,7 +154,8 @@ public:
 
     // Wave 2 Specific Commands
     void setAmbientLight(uint8_t status);
-    void setAutomaticDrain(uint8_t enable);
+    void setAutomaticDrain(bool enable);
+    void setDrainMode(uint8_t mode);
     void setBeep(uint8_t on);
     void setFanSpeed(uint8_t speed);
     void setMainMode(uint8_t mode);
@@ -200,6 +201,7 @@ public:
     uint32_t _lastScanTime = 0;
     uint32_t _lastAuthActivity = 0;
     uint32_t _lastRxTime = 0;
+    uint32_t _lastTimeSyncMs = 0;
 
     EcoflowCrypto _crypto;
     EcoflowData _data;
@@ -231,6 +233,12 @@ private:
     void _sendConfigPacket(const mr521_ConfigWrite& config);
     void _sendConfigPacket(const dc009_apl_comm_ConfigWrite& config);
     void _handleAuthHandshake(const std::vector<uint8_t>& payload);
+
+    // Answers the device's time-of-day request (src 0x35 / cmdSet 0x01 /
+    // cmdId 0x52). V3 devices (Delta Pro 3, Delta 3, Alternator Charger) will
+    // not stream telemetry/config until this is provided, mirroring the
+    // official app's behaviour. Throttled internally.
+    void _sendTimeSync();
     
     static std::vector<EcoflowESP32*> _instances;
     ConnectionState _state = ConnectionState::NOT_CONNECTED;

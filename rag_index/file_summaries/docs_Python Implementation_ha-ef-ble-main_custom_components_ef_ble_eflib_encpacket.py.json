@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 2 functions. Key components include classes and method definitions relevant to encpacket module.",
+  "chunks": [
+    {
+      "content": "class EncPacket:\n    \"\"\"Outside wrapper of Packet that actually transferred through the BLE channel\"\"\"\n\n    frame_type: int\n    payload_type: int\n    payload: bytes\n    cmd_id: int = 0\n    version: int = 0\n    enc_key: bytes | None = None\n    iv: bytes | None = None\n\n    PREFIX: ClassVar[bytes] = b\"\\x5a\\x5a\"\n\n    FRAME_TYPE_COMMAND: ClassVar[int] = 0x00\n    FRAME_TYPE_PROTOCOL: ClassVar[int] = 0x01\n    FRAME_TYPE_PROTOCOL_INT: ClassVar[int] = 0x10\n\n    PAYLOAD_TYPE_VX_PROTOCOL: ClassVar[int] = 0x00\n    PAYLOAD_TYPE_ODM_PROTOCOL: ClassVar[int] = 0x04\n\n    def encrypt_payload(self) -> bytes:\n        if self.enc_key is None or self.iv is None:\n            return self.payload  # Not encrypted\n\n        engine = AES.new(self.enc_key, AES.MODE_CBC, self.iv)\n        return engine.encrypt(pad(self.payload, AES.block_size))\n\n    def to_bytes(self) -> bytes:\n        \"\"\"Will serialize the internal data to bytes stream\"\"\"\n        payload = self.encrypt_payload()\n\n        data = (\n            EncPacket.PREFIX + struct.pack(\"<B\", self.frame_type << 4) + b\"\\x01\"\n        )  # Unknown byte\n        data += struct.pack(\"<H\", len(payload) + 2)  # +2 here is len(crc16)\n        data += payload\n        data += struct.pack(\"<H\", crc16(data))\n\n        return data",
+      "metadata": {
+        "start_line": 12,
+        "lang": "python",
+        "desc": "Definition of EncPacket in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encpacket.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/encpacket.py:chunk0"
+    }
+  ]
+}

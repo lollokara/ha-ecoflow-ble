@@ -1,0 +1,122 @@
+{
+  "full_summary": "Python file with 9 classes and 59 functions. Key components include classes and method definitions relevant to logging_util module.",
+  "chunks": [
+    {
+      "content": "class SensitiveMaskingFilter(logging.Filter):\n    def __init__(\n        self, mask_funcs: Sequence[Callable[[str], str | None]], name: str = \"\"\n    ) -> None:\n        super().__init__(name)\n        self._mask_funcs = mask_funcs\n\n    def filter(self, record: logging.LogRecord) -> bool | logging.LogRecord:\n        record.msg = self.mask_message(record.msg)\n        record.name = self.mask_message(record.name)\n\n        if isinstance(record.args, Mapping):\n            record.args = {k: self.mask_message(v) for k, v in record.args.items()}\n        elif record.args is not None:\n            record.args = tuple(self.mask_message(v) for v in record.args)\n\n        return True\n\n    def mask_message(self, msg: Any):\n        msg_str = msg\n        if not isinstance(msg, str):\n            msg_str = str(msg)\n\n        replaced = False\n        for func in self._mask_funcs:\n            if replacement := func(msg_str):\n                msg_str = replacement\n                replaced = True\n        return msg_str if replaced else msg\n\n    def __eq__(self, value: object) -> bool:\n        if not isinstance(value, SensitiveMaskingFilter):\n            return False\n        return self.name == value.name",
+      "metadata": {
+        "start_line": 27,
+        "lang": "python",
+        "desc": "Definition of SensitiveMaskingFilter in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk0"
+    },
+    {
+      "content": "class LogOptions(Flag):\n    MASKED = auto()\n\n    ENCRYPTED_PAYLOADS = auto()\n    DECRYPTED_PAYLOADS = auto()\n    PACKETS = auto()\n    DESERIALIZED_MESSAGES = auto()\n\n    CONNECTION_DEBUG = auto()\n    BLEAK_DEBUG = auto()\n\n    @property\n    def enabled(self):\n        return self & (\n            LogOptions.ENCRYPTED_PAYLOADS\n            | LogOptions.DECRYPTED_PAYLOADS\n            | LogOptions.PACKETS\n            | LogOptions.DESERIALIZED_MESSAGES\n            | LogOptions.CONNECTION_DEBUG\n        )\n\n    @staticmethod\n    def no_options():\n        return LogOptions(0)",
+      "metadata": {
+        "start_line": 63,
+        "lang": "python",
+        "desc": "Definition of LogOptions in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk1"
+    },
+    {
+      "content": "class MaskingLogger(logging.Logger):\n    def __init__(\n        self, logger: logging.Logger, mask_funcs: Sequence[Callable[[str], str | None]]\n    ) -> None:\n        self._logger = logger\n        self._mask_funcs = mask_funcs\n        self._options = LogOptions.no_options()\n\n    @cached_property\n    def _mask_filter(self):\n        return SensitiveMaskingFilter(self._mask_funcs)\n\n    def __getattr__(self, name: str):\n        return getattr(self._logger, name)\n\n    @property\n    def options(self):\n        return self._options\n\n    def set_options(self, options: LogOptions):\n        self._options = options\n        self._logger.setLevel(logging.DEBUG if options.enabled else logging.INFO)\n\n        if LogOptions.MASKED in options:\n            for handler in logging.root.handlers:\n                if self._mask_filter not in handler.filters:\n                    handler.addFilter(self._mask_filter)\n\n        bleak_logger = logging.getLogger(bleak.__name__)\n        if LogOptions.BLEAK_DEBUG in options:\n            bleak_logger.setLevel(logging.DEBUG)\n\n        elif bleak_logger.isEnabledFor(logging.DEBUG):\n            bleak_logger.setLevel(_ORIGINAL_BLEAK_LOG_LEVEL)\n\n        if LogOptions.MASKED not in options:\n            for handler in logging.root.handlers:\n                if self._mask_filter in handler.filters:\n                    handler.removeFilter(self._mask_filter)\n\n    def log_filtered(\n        self,\n        options: LogOptions,\n        msg: object,\n        *args: object,\n        level: int = logging.DEBUG,\n    ) -> None:\n        if options in self._options:\n            args = tuple(\n                _LazyHex(a) if isinstance(a, (bytes, bytearray)) else a for a in args\n            )\n            self._logger.log(level, msg, *args)",
+      "metadata": {
+        "start_line": 93,
+        "lang": "python",
+        "desc": "Definition of MaskingLogger in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk2"
+    },
+    {
+      "content": "def _mask_sn(sn: str):\n    regex = re.compile(sn)\n\n    def _mask(input: str):\n        match = regex.search(input)\n        if match:\n            return f\"{sn[:4]}{'*' * len(sn[4:-4])}{sn[-4:]}\"\n        return None\n\n    return _mask",
+      "metadata": {
+        "start_line": 147,
+        "lang": "python",
+        "desc": "Definition of _mask_sn in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk3"
+    },
+    {
+      "content": "def _mask_mac(mac_addr: str):\n    regex = re.compile(mac_addr.replace(\":\", \"(.)\"))\n\n    def _mask(input: str):\n        match = regex.search(input)\n        if match:\n            delim = match.group(1)\n            return regex.sub(\n                delim.join([mac_addr[:2], mac_addr[3:5], \"**\", \"**\", \"**\"]), input\n            )\n        return None\n\n    return _mask",
+      "metadata": {
+        "start_line": 159,
+        "lang": "python",
+        "desc": "Definition of _mask_mac in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk4"
+    },
+    {
+      "content": "def _mask_user_id(user_id: str):\n    regex = re.compile(user_id)\n\n    def _mask(input: str):\n        match = regex.search(input)\n        if match:\n            return f\"{user_id[:4]}{'*' * len(user_id[4:])}\"\n        return None\n\n    return _mask",
+      "metadata": {
+        "start_line": 174,
+        "lang": "python",
+        "desc": "Definition of _mask_user_id in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk5"
+    },
+    {
+      "content": "class DeviceLogger(MaskingLogger):\n    def __init__(self, device: \"DeviceBase\"):\n        super().__init__(\n            logging.getLogger(f\"{device.__module__} - {device._address}\"),\n            mask_funcs=[_mask_mac(device._address), _mask_sn(device._sn)],\n        )",
+      "metadata": {
+        "start_line": 186,
+        "lang": "python",
+        "desc": "Definition of DeviceLogger in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk6"
+    },
+    {
+      "content": "class ConnectionLogger(MaskingLogger):\n    def __init__(self, connection: \"Connection\") -> None:\n        super().__init__(\n            logging.getLogger(f\"{connection.__module__} - {connection._address}\"),\n            mask_funcs=[\n                _mask_mac(connection._address),\n                _mask_sn(connection._dev_sn),\n                _mask_user_id(connection._user_id),\n            ],\n        )",
+      "metadata": {
+        "start_line": 194,
+        "lang": "python",
+        "desc": "Definition of ConnectionLogger in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk7"
+    },
+    {
+      "content": "class ConnectionLog:\n    name: str\n    maxlen: int = 20\n    cache_to_file: bool = False\n\n    def __post_init__(self):\n        self._history_start = time.time()\n\n    @property\n    def history(self) -> deque[dict[str, float | str]]:\n        history = getattr(self, \"_history\", None)\n        if history is None:\n            self._history = deque(maxlen=self.maxlen)\n        return self._history\n\n    @staticmethod\n    def cache_file_for(address: str):\n        path = (\n            Path(__file__).parent / \".cache\" / f\"{address.replace(':', '_')}_setup.log\"\n        )\n        path.parent.mkdir(exist_ok=True)\n        return path\n\n    @property\n    def _cache_path(self):\n        return self.cache_file_for(self.name)\n\n    def append(self, state: \"ConnectionState\", reason: str | None = None):\n        entry: dict[str, float | str] = {\n            \"time\": time.time() - self._history_start,\n            \"state\": f\"{state.name}\",\n        }\n\n        if reason:\n            entry[\"reason\"] = reason\n\n        self.history.append(entry)\n        if self.cache_to_file:\n            with self._cache_path.open(\"a\") as f:\n                f.write(f\"{json.dumps(entry)}\\n\")\n\n    def load_from_cache(self):\n        if self._cache_path.exists():\n            try:\n                return [\n                    json.loads(line)\n                    for line in self._cache_path.read_text().splitlines()\n                ]\n            except:  # noqa: E722\n                return []\n        return []\n\n    @staticmethod\n    def clean_cache_for(address: str):\n        ConnectionLog.cache_file_for(address).unlink(missing_ok=True)",
+      "metadata": {
+        "start_line": 207,
+        "lang": "python",
+        "desc": "Definition of ConnectionLog in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk8"
+    },
+    {
+      "content": "class DeviceDiagnostics:\n    \"\"\"Diagnostics data collected from the device connection and packets\"\"\"\n\n    last_packets: list[tuple[float, bytes]]\n    last_errors: list[tuple[float, str]]\n    connect_times: list[float]\n    disconnect_times: list[float]\n    raw_data_connection: list[tuple[float, bytes]]\n    raw_data_messages: list[tuple[float, bytes]]\n    raw_data_send: list[tuple[float, bytes]]\n    iv: bytes\n    session_key: bytes\n    initial_session_key: bytes\n\n    def _encode_bytes(self, value: bytes, session: Session | None) -> str:\n        if session is not None:\n            return session.encrypt(value).hex()\n        return value.hex()\n\n    def serialize(self, session: Session | None = None):\n        return dataclasses.replace(\n            self,\n            last_packets=[\n                (t, self._encode_bytes(v, session)) for (t, v) in self.last_packets\n            ],\n            raw_data_connection=[\n                (k, self._encode_bytes(v, session))\n                for (k, v) in self.raw_data_connection\n            ],\n            raw_data_messages=[\n                (k, self._encode_bytes(v, session)) for (k, v) in self.raw_data_messages\n            ],\n            raw_data_send=[\n                (k, self._encode_bytes(v, session)) for (k, v) in self.raw_data_send\n            ],\n            iv=self._encode_bytes(self.iv, session),\n            session_key=self._encode_bytes(self.session_key, session),\n            initial_session_key=self._encode_bytes(self.initial_session_key, session),\n        )\n\n    def as_dict(self):\n        \"\"\"Get diagnostics data as dictionary\"\"\"\n        return dataclasses.asdict(self)",
+      "metadata": {
+        "start_line": 265,
+        "lang": "python",
+        "desc": "Definition of DeviceDiagnostics in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk9"
+    },
+    {
+      "content": "class DeviceDiagnosticsCollector:\n    \"\"\"Class for collecting diagnostics data from connected device\"\"\"\n\n    def __init__(self, device: \"DeviceBase\", buffer_size: int = 100):\n        self._device = device\n        self._enabled = False\n        self._save_on_exception = False\n        self._buffer_size = buffer_size\n\n        self._last_packets: deque[tuple[float, bytes]] = deque(maxlen=buffer_size)\n        self._last_errors: deque[tuple[float, str]] = deque(maxlen=buffer_size)\n        self._connect_times: deque[float] = deque(maxlen=buffer_size)\n        self._raw_data_connection: list[tuple[float, bytes]] = []\n        self._raw_data_messages: deque[tuple[float, bytes]] = deque(maxlen=1000)\n        self._raw_data_send: deque[tuple[float, bytes]] = deque(maxlen=1000)\n\n        self._disconnect_times: deque[float] = deque(maxlen=buffer_size)\n        self._skip_first_messages: int = 8\n        self._unlisten_callbacks: list[Callable[[], None]] = []\n\n        self._start_time = time.time()\n\n        self._logger = logging.getLogger(__name__)\n\n    def as_dict(self, session: Session | None = None):\n        \"\"\"Get diagnostics data as dictionary\"\"\"\n        return self.diagnostics.serialize(session).as_dict()\n\n    def build_diagnostics_dict(self, session: Session | None = None) -> dict:\n        device = self._device\n        result: dict = {\n            \"device\": device.device,\n            \"name\": device.name,\n            \"default_name\": device._default_name,\n            \"sn_prefix\": device._sn[:4],\n            \"connection_state\": device.connection_state,\n            \"connection_state_history\": list(device.connection_log.history),\n            \"manufacturer_data\": (\n                session.encrypt(device._manufacturer_data).hex()\n                if session is not None\n                else device._manufacturer_data.hex()\n            ),\n        }\n        if session is not None:\n            result[\"session\"] = session.header.hex()\n        if (conn := device._conn) is not None and conn.disconnect_log:\n            result[\"disconnect_log\"] = conn.disconnect_log\n        if self.is_enabled:\n            result |= self.as_dict(session)\n        return result\n\n    @property\n    def diagnostics(self):\n        \"\"\"Get diagnostics data\"\"\"\n        conn = self._device._conn\n        encryption = conn._encryption\n\n        return DeviceDiagnostics(\n            last_packets=list(self._last_packets),\n            last_errors=list(self._last_errors),\n            connect_times=list(self._connect_times),\n            disconnect_times=list(self._disconnect_times),\n            raw_data_connection=self._raw_data_connection,\n            raw_data_messages=list(self._raw_data_messages),\n            raw_data_send=list(self._raw_data_send),\n            iv=encryption.iv if encryption is not None else b\"\",\n            session_key=encryption.session_key if encryption is not None else b\"\",\n            initial_session_key=conn._initial_session_key,\n        )\n\n    @property\n    def is_enabled(self):\n        \"\"\"Return True if diagnostics collection is enabled\"\"\"\n        return self._enabled\n\n    def enabled(self, enabled: bool = True):\n        \"\"\"\n        Enable or disable diagnostics collection\n\n        This method will enable/disable the collection of diagnostics data by\n        registering to the device connection events.\n\n        Parameters\n        ----------\n        enabled\n            If True, enable diagnostics collection, otherwise disable it\n        \"\"\"\n        if enabled == self._enabled:\n            return self\n\n        self._enabled = enabled\n        self._clear_buffers()\n        self.clear_callbacks()\n\n        if enabled:\n            self._start_time = time.time()\n            self._unlisten_callbacks.extend(\n                [\n                    self._device.on_disconnect(self._on_disconnect),\n                    self._device.on_packet_received(self._on_packet_received),\n                    self._device.on_packet_parsed(self._on_packet_parsed),\n                    self._device.on_data_received(self._on_data_received),\n                    self._device.on_data_send(self._on_data_send),\n                ]\n            )\n            return self\n\n        return self\n\n    def add_error(self, error_message: str):\n        \"\"\"Add an error message to the diagnostics\"\"\"\n        self._last_errors.append((time.time() - self._start_time, error_message))\n\n    @property\n    def packets_collected(self):\n        \"\"\"Get number of packets collected\"\"\"\n        return len(self._last_packets)\n\n    @property\n    def packet_buffer_size(self):\n        \"\"\"\n        Get the packet buffer size\n\n        Returns\n        -------\n        The maximum number of packets stored in the diagnostics buffer\n        \"\"\"\n        return self._last_packets.maxlen or self._buffer_size\n\n    @property\n    def packet_target_reached(self):\n        \"\"\"\n        Check if number of packets collected reached the buffer size\n\n        Returns\n        -------\n        True if number of packets collected reached the buffer size\n        \"\"\"\n        return self.packets_collected >= self.packet_buffer_size\n\n    def clear_callbacks(self):\n        \"\"\"Remove all registered listeners from device events\"\"\"\n        for unlisten in self._unlisten_callbacks:\n            unlisten()\n\n        self._unlisten_callbacks.clear()\n\n    def with_buffer_size(self, buffer_size: int):\n        \"\"\"Set the diagnostics buffer size\"\"\"\n\n        self._buffer_size = buffer_size\n        self._last_packets = deque(self._last_packets, maxlen=buffer_size)\n        self._last_errors = deque(self._last_errors, maxlen=buffer_size)\n        self._connect_times = deque(self._connect_times, maxlen=buffer_size)\n        self._disconnect_times = deque(self._disconnect_times, maxlen=buffer_size)\n        return self\n\n    @property\n    def _now(self):\n        return time.time() - self._start_time\n\n    def _with_time[T](self, data: T) -> tuple[float, T]:\n        return (self._now, data)\n\n    def _on_disconnect(self, exc: Exception | type[Exception] | None = None):\n        self._disconnect_times.append(self._now)\n\n    def _on_packet_received(self, data: bytes):\n        self._last_packets.append(self._with_time(data))\n\n    def _on_packet_parsed(self, packet: Packet):\n        if Packet.is_invalid(packet):\n            self._last_errors.append(self._with_time(packet.error_message))\n            return\n\n    def _on_data_received(self, data: bytes, state: \"ConnectionState\"):\n        if not state.authenticated:\n            buffer = self._raw_data_connection\n        else:\n            buffer = self._raw_data_messages\n\n        buffer.append(self._with_time(data))\n\n    def _on_data_send(self, data: bytes):\n        self._raw_data_send.append(self._with_time(data))\n\n    def with_save_on_exception(self, enabled: bool = True):\n        \"\"\"\n        Enable or disable automatic diagnostics save on connection error\n\n        When enabled, packet collection is force-enabled and a state change\n        listener is registered. On any error state, collected diagnostics\n        are saved to disk automatically.\n        \"\"\"\n        if enabled == self._save_on_exception:\n            return self\n\n        self._save_on_exception = enabled\n\n        if enabled:\n            self.enabled(True)\n            self._unlisten_callbacks.append(\n                self._device.on_connection_state_change(self._on_state_change)\n            )\n\n        return self\n\n    def _on_state_change(self, state: \"ConnectionState\") -> None:\n        if not self._save_on_exception or not state.is_error:\n            return\n\n        conn = self._device._conn\n        exc = getattr(conn, \"_last_exception\", None) if conn is not None else None\n        try:\n            self._save_to_disk(state, exc)\n        except Exception:\n            self._device._logger.exception(\n                \"Failed to save diagnostics-on-exception snapshot\"\n            )\n\n    def _save_to_disk(\n        self,\n        state: \"ConnectionState\",\n        exc: Exception | type[Exception] | None = None,\n    ) -> None:\n        session = Session()\n\n        exc_message = None\n        exc_traceback = None\n        if exc is not None:\n            exc_message = session.encrypt(str(exc).encode()).hex()\n        if isinstance(exc, BaseException) and exc.__traceback__ is not None:\n            tb = \"\".join(traceback.format_tb(exc.__traceback__))\n            exc_traceback = session.encrypt(tb.encode()).hex()\n\n        data = {\n            \"timestamp\": datetime.now(UTC).isoformat(),\n            \"exception\": {\n                \"type\": type(exc).__name__ if exc is not None else None,\n                \"message\": exc_message,\n                \"traceback\": exc_traceback,\n                \"state_on_error\": state.name,\n            },\n            \"data\": self.build_diagnostics_dict(session),\n        }\n\n        sn_prefix = self._device._sn[:4]\n        ts = datetime.now(UTC).strftime(\"%Y%m%d_%H%M%S\")\n        cache_dir = Path(__file__).parent.parent / \".diagnostics\"\n        path = cache_dir / f\"{sn_prefix}_exception_{ts}.json\"\n        content = json.dumps(data, default=str, indent=2)\n\n        def _write() -> None:\n            cache_dir.mkdir(exist_ok=True)\n            path.write_text(content)\n\n        task = asyncio.get_running_loop().run_in_executor(None, _write)\n\n        def _log_result(future: asyncio.Future) -> None:\n            if (err := future.exception()) is not None:\n                self._device._logger.error(\n                    \"Failed to save diagnostics to %s: %s\", path, err\n                )\n            else:\n                self._device._logger.info(\"Diagnostics saved to %s\", path)\n\n        task.add_done_callback(_log_result)\n\n    def _clear_buffers(self):\n        self._last_packets.clear()\n        self._last_errors.clear()\n        self._connect_times.clear()\n        self._disconnect_times.clear()\n        self._raw_data_send.clear()",
+      "metadata": {
+        "start_line": 310,
+        "lang": "python",
+        "desc": "Definition of DeviceDiagnosticsCollector in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk10"
+    },
+    {
+      "content": "class _LazyHex:\n    __slots__ = (\"_data\",)\n\n    def __init__(self, data: bytes | bytearray) -> None:\n        self._data = data\n\n    def __str__(self) -> str:\n        return bytes(self._data).hex()\n\n    def __repr__(self) -> str:\n        return bytes(self._data).hex()",
+      "metadata": {
+        "start_line": 586,
+        "lang": "python",
+        "desc": "Definition of _LazyHex in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk11"
+    },
+    {
+      "content": "def caller_chain(depth: int = 4) -> str:\n    \"\"\"\n    Compact `->` chain of the innermost `depth` call frames, for tracing triggers\n\n    Drops this helper's own frame; awaited coroutine frames stay on the stack, so the\n    chain reaches across `await` boundaries to whatever ultimately triggered the call.\n    \"\"\"\n    frames = traceback.extract_stack()[:-1]\n    return \" -> \".join(frame.name for frame in frames[-depth:])",
+      "metadata": {
+        "start_line": 599,
+        "lang": "python",
+        "desc": "Definition of caller_chain in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/logging_util.py:chunk12"
+    }
+  ]
+}

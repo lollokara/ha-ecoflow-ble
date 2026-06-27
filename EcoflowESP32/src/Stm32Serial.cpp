@@ -114,10 +114,13 @@ void Stm32Serial::changeBaudRate(uint32_t baud) {
         xSemaphoreTake(_txMutex, portMAX_DELAY);
     }
 
-    Serial1.end();
+    // Reprogram the baud divisor IN PLACE. Serial1.end()/begin() tears down and
+    // reinstalls the UART driver, which re-mallocs the 16 KB RX buffer and
+    // aborts in uart_driver_install when heap is low (OTA runs right after a
+    // ~400 KB upload, leaving little free heap). updateBaudRate() allocates
+    // nothing and keeps the existing driver/buffer.
     resetRxBuffer();
-    Serial1.setRxBufferSize(16384);
-    Serial1.begin(baud, SERIAL_8N1, RX_PIN, TX_PIN);
+    Serial1.updateBaudRate(baud);
 
     if (_txMutex != NULL) {
         xSemaphoreGive(_txMutex);
@@ -142,6 +145,11 @@ void Stm32Serial::sendData(const uint8_t* data, size_t len) {
 
 void Stm32Serial::sendEspLog(uint8_t level, const char* tag, const char* msg) {
     if (_switchingBaud) return;
+    // Never inject log packets into the UART during an OTA transfer: the link is
+    // baud-switched and the STM32 bootloader/app expect only OTA frames. Stray
+    // traffic (especially at a mismatched baud) can cause UART overruns that
+    // wedge the STM32 receiver so it never sees the OTA Start.
+    if (_otaRunning) return;
     if (_txMutex != NULL) {
         if (xSemaphoreTake(_txMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             uint8_t buf[256];
@@ -405,6 +413,8 @@ void Stm32Serial::processPacket(uint8_t* rx_buf, uint8_t len) {
 }
 
 void Stm32Serial::sendDeviceList() {
+    // Don't transmit device-list packets while flashing the STM32 — see sendEspLog.
+    if (_otaRunning || _switchingBaud) return;
     DeviceList list = {0};
     DeviceSlot* slots[] = {
         DeviceManager::getInstance().getSlot(DeviceType::DELTA_3),
@@ -431,6 +441,8 @@ void Stm32Serial::sendDeviceList() {
 }
 
 void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
+    // Don't transmit telemetry while flashing the STM32 — see sendEspLog.
+    if (_otaRunning || _switchingBaud) return;
     DeviceType type = (DeviceType)device_id;
     EcoflowESP32* dev = DeviceManager::getInstance().getDevice(type);
 
@@ -483,6 +495,7 @@ void Stm32Serial::sendDeviceStatus(uint8_t device_id) {
         dst.fanValue = src.fanValue;
         dst.envTemp = src.envTemp;
         dst.tempSys = src.tempSys;
+        dst.outLetTemp = src.outLetTemp;
         dst.batSoc = src.batSoc;
         dst.remainingTime = src.remainingTime;
         dst.powerMode = src.powerMode;
@@ -651,9 +664,11 @@ void Stm32Serial::startOta(const String& filename) {
 void Stm32Serial::otaTask(void* parameter) {
     Stm32Serial* self = (Stm32Serial*)parameter;
     Serial.printf("[Stm32Serial] otaTask: Starting. Opening file: %s\n", otaFilename.c_str());
+    LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Flash task started (heap=%u)", (unsigned)ESP.getFreeHeap());
     File f = LittleFS.open(otaFilename, "r");
     if (!f) {
         Serial.printf("[Stm32Serial] otaTask: Failed to open firmware file in LittleFS: %s\n", otaFilename.c_str());
+        LogBuffer::getInstance().push(ESP_LOG_ERROR, "OTA", "Failed to open firmware file in LittleFS");
         ota_state = 4; ota_msg = "FS Error";
         LittleFS.remove(otaFilename);
         self->_otaRunning = false;
@@ -663,6 +678,7 @@ void Stm32Serial::otaTask(void* parameter) {
 
     uint32_t totalSize = f.size();
     Serial.printf("[Stm32Serial] otaTask: Binary size: %u bytes\n", totalSize);
+    LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Firmware size: %u bytes. Negotiating @921600...", (unsigned)totalSize);
 
     // Start immediately at 921600 baud to catch the bootloader on boot
     Serial.println("[Stm32Serial] otaTask: Switching UART to 921600 baud for bootloader...");
@@ -686,6 +702,8 @@ void Stm32Serial::otaTask(void* parameter) {
         otaNackReceived = false;
 
         Serial.printf("[Stm32Serial] otaTask: Sending OTA Start packet (Attempt %d/5)...\n", attempt+1);
+        ota_msg = String("Negotiating (attempt ") + String(attempt+1) + "/5)...";
+        LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Sending OTA Start (attempt %d/5)", attempt+1);
         self->sendData(buf, len);
 
         uint32_t startWait = millis();
@@ -699,6 +717,7 @@ void Stm32Serial::otaTask(void* parameter) {
         uint32_t elapsed = millis() - startWait;
         if (otaAckReceived) {
             Serial.printf("[Stm32Serial] otaTask: Received OTA Start ACK on Attempt %d (negotiation took %u ms)\n", attempt+1, elapsed);
+            LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Bootloader ACK (attempt %d). Streaming firmware...", attempt+1);
             startSuccess = true;
             break;
         }
@@ -707,6 +726,7 @@ void Stm32Serial::otaTask(void* parameter) {
             Serial.printf("[Stm32Serial] otaTask: Received OTA Start NACK on Attempt %d (elapsed %u ms)\n", attempt+1, elapsed);
             if (attempt == 1) {
                 Serial.println("[Stm32Serial] otaTask: NACK was expected from Main App. Waiting 2.5s for STM32 reboot and bootloader boot...");
+                LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Main app NACK (expected). Waiting for STM32 reboot to bootloader...");
                 vTaskDelay(2500); // Wait 2.5s for STM32 to reboot and enter the bootloader loop
             } else {
                 Serial.println("[Stm32Serial] otaTask: Unexpected NACK from Bootloader. Retrying...");
@@ -719,6 +739,7 @@ void Stm32Serial::otaTask(void* parameter) {
 
     if (!startSuccess) {
         Serial.println("[Stm32Serial] otaTask: OTA Start negotiation failed completely (Timeout/NACK)");
+        LogBuffer::getInstance().push(ESP_LOG_ERROR, "OTA", "Start negotiation FAILED (timeout/NACK). STM32 did not enter bootloader.");
         ota_state = 4; ota_msg = "Start Timeout";
         f.close();
         LittleFS.remove(otaFilename);
@@ -732,6 +753,7 @@ void Stm32Serial::otaTask(void* parameter) {
     }
 
     Serial.println("[Stm32Serial] otaTask: Flash Negotiation successful. Starting chunk stream...");
+    LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Negotiation OK. Streaming firmware chunks...");
     uint32_t offset = 0;
     uint8_t chunk[200];
     int last_log_progress = -1;
@@ -773,6 +795,7 @@ void Stm32Serial::otaTask(void* parameter) {
 
         if (!chunkSuccess) {
             ESP_LOGE(TAG, "otaTask: Chunk transfer failed at offset %u", offset);
+            LogBuffer::getInstance().push(ESP_LOG_ERROR, "OTA", "Chunk transfer failed at offset %u", (unsigned)offset);
             ota_state = 4; ota_msg = "Chunk Fail";
             transferFailed = true;
             break;
@@ -788,6 +811,8 @@ void Stm32Serial::otaTask(void* parameter) {
             }
             ESP_LOGI(TAG, "otaTask: OTA Progress: %d%% (%u/%u bytes) | Speed: %.2f KB/s | Time: %u s",
                      ota_progress, offset, totalSize, kbps, currentElapsed / 1000);
+            LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Progress %d%% (%u/%u) %.1f KB/s",
+                     ota_progress, (unsigned)offset, (unsigned)totalSize, kbps);
             last_log_progress = ota_progress;
         }
     }
@@ -798,6 +823,7 @@ void Stm32Serial::otaTask(void* parameter) {
         uint32_t totalElapsed = millis() - startTime;
         ESP_LOGI(TAG, "otaTask: Firmware stream complete in %u ms (average speed: %.2f KB/s). Final CRC32: 0x%08X", totalElapsed, (float)totalSize / (float)totalElapsed, crc);
         ESP_LOGI(TAG, "otaTask: Sending OTA End packet (verification CRC: 0x%08X)...", crc);
+        LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Firmware sent. Verifying CRC 0x%08X...", (unsigned)crc);
         len = pack_ota_end_message(buf, crc);
 
         bool endSuccess = false;
@@ -833,18 +859,21 @@ void Stm32Serial::otaTask(void* parameter) {
             ESP_LOGI(TAG, "otaTask: Deleting temporary update binary from LittleFS...");
             LittleFS.remove(otaFilename);
             ESP_LOGI(TAG, "otaTask: OTA Success! Delaying 10s for Web UI confirmation...");
+            LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "CRC verified! Update complete, applying in 10s...");
             ota_state = 3;
             ota_msg = "Update Complete! Rebooting in 10 seconds...";
             
             vTaskDelay(pdMS_TO_TICKS(10000));
 
             ESP_LOGI(TAG, "otaTask: Sending Apply/Reboot command to STM32...");
+            LogBuffer::getInstance().push(ESP_LOG_INFO, "OTA", "Sending Apply/Reboot to STM32 bootloader");
             len = pack_ota_apply_message(buf);
             self->sendData(buf, len);
             ota_state = 3; ota_msg = "STM32 Rebooting...";
             ESP_LOGI(TAG, "otaTask: Reboot command sent successfully.");
         } else {
              ESP_LOGE(TAG, "otaTask: End Verification failed.");
+             LogBuffer::getInstance().push(ESP_LOG_ERROR, "OTA", "CRC verification failed on STM32 (checksum mismatch)");
              ota_state = 4; ota_msg = "Checksum Fail";
              LittleFS.remove(otaFilename);
         }

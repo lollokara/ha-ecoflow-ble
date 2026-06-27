@@ -1,0 +1,32 @@
+{
+  "full_summary": "Python file with 3 classes and 4 functions. Key components include classes and method definitions relevant to login module.",
+  "chunks": [
+    {
+      "content": "class Region(StrEnum):\n    \"\"\"Selectable EcoFlow API host\"\"\"\n\n    AUTO = \"auto\"\n    API = \"api\"\n    API_E = \"api-e\"\n    API_A = \"api-a\"\n    API_J = \"api-j\"\n    API_R = \"api-r\"\n    API_CN = \"api-cn\"\n\n    @classmethod\n    def _missing_(cls, value: object) -> \"Region | None\":\n        if isinstance(value, str):\n            for member in cls:\n                if member.value.lower() == value.lower():\n                    return member\n        return None\n\n    @property\n    def base_url(self) -> str | None:\n        \"\"\"Hostname for this region, or None for `AUTO`\"\"\"\n        if self is Region.AUTO:\n            return None\n        return f\"{self.value}.ecoflow.com\"",
+      "metadata": {
+        "start_line": 11,
+        "lang": "python",
+        "desc": "Definition of Region in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py:chunk0"
+    },
+    {
+      "content": "class LoginResult:\n    user_id: str | None = None\n    error: str | None = None",
+      "metadata": {
+        "start_line": 39,
+        "lang": "python",
+        "desc": "Definition of LoginResult in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py:chunk1"
+    },
+    {
+      "content": "class EcoFlowLogin:\n    \"\"\"Resolve an EcoFlow user ID from credentials and a region selection\"\"\"\n\n    def __init__(self, session: aiohttp.ClientSession) -> None:\n        self._session = session\n\n    @staticmethod\n    def is_phone_identifier(identifier: str) -> bool:\n        \"\"\"Return True if identifier looks like an E.164 phone number\"\"\"\n        digits = identifier.removeprefix(\"+\").replace(\" \", \"\")\n        return digits.isdigit() and 6 <= len(digits) <= 15\n\n    async def login(\n        self,\n        identifier: str,\n        password: str,\n        region: Region | str,\n    ) -> LoginResult:\n        \"\"\"Resolve an EcoFlow user ID for the given identifier/password/region\"\"\"\n        region = Region(region)\n        identifier = identifier.strip()\n        is_phone = self.is_phone_identifier(identifier)\n\n        if region is Region.API_CN and not is_phone:\n            return LoginResult(error=\"api-cn requires phone number, not email\")\n\n        if region is Region.AUTO:\n            region = Region.API_CN if is_phone else Region.API\n\n        assert region.base_url is not None\n        return await self._try_login_at(\n            region.base_url,\n            identifier,\n            password,\n            is_phone=is_phone and region is Region.API_CN,\n        )\n\n    async def _try_login_at(\n        self,\n        base_url: str,\n        identifier: str,\n        password: str,\n        *,\n        is_phone: bool,\n    ) -> LoginResult:\n        json_payload: dict[str, Any] = {\n            \"scene\": \"IOT_APP\",\n            \"appVersion\": \"1.0.0\",\n            \"password\": base64.b64encode(password.encode()).decode(),\n            \"oauth\": {\"bundleId\": \"com.ef.EcoFlow\"},\n            \"userType\": \"ECOFLOW\",\n        }\n        if is_phone:\n            json_payload[\"phone\"] = identifier.removeprefix(\"+86\")\n        else:\n            json_payload[\"email\"] = identifier\n\n        async with self._session.post(\n            url=f\"https://{base_url}/auth/login\",\n            json=json_payload,\n            headers={\n                \"Accept\": \"application/json\",\n                \"Content-Type\": \"application/json\",\n            },\n        ) as response:\n            if not response.ok:\n                return LoginResult(\n                    error=(\n                        f\"Login failed with status code {response.status}: \"\n                        f\"{response.reason}\"\n                    )\n                )\n\n            result_json = await response.json()\n            if result_json[\"code\"] != \"0\":\n                return LoginResult(error=f\"Login failed: '{result_json['message']}'\")\n\n            return LoginResult(user_id=result_json[\"data\"][\"user\"][\"userId\"])",
+      "metadata": {
+        "start_line": 44,
+        "lang": "python",
+        "desc": "Definition of EcoFlowLogin in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/eflib/login.py:chunk2"
+    }
+  ]
+}

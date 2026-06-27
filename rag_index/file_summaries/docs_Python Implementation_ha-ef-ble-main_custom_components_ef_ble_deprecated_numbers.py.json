@@ -1,0 +1,14 @@
+{
+  "full_summary": "Python file with 1 classes and 0 functions. Key components include classes and method definitions relevant to numbers module.",
+  "chunks": [
+    {
+      "content": "class EcoflowNumberEntityDescription[Device: DeviceBase](NumberEntityDescription):\n    async_set_native_value: Callable[[Device, float], Awaitable[bool]] | None = None\n    native_unit_of_measurement_field: Callable[[Device], str] | None = None\n\n    min_value_prop: str | None = None\n    max_value_prop: str | None = None\n    step_value_prop: str | None = None\n    availability_prop: str | None = None",
+      "metadata": {
+        "start_line": 39,
+        "lang": "python",
+        "desc": "Definition of EcoflowNumberEntityDescription in docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/numbers.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/custom_components/ef_ble/deprecated/numbers.py:chunk0"
+    }
+  ]
+}

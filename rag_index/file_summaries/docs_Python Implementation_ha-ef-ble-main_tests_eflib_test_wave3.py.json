@@ -1,0 +1,104 @@
+{
+  "full_summary": "Python file with 0 classes and 2 functions. Key components include classes and method definitions relevant to test_wave3 module.",
+  "chunks": [
+    {
+      "content": "def packet_sequence():\n    return [\n        \"aa130d01920d13e10300000042210101fe153b0d9b122f831213be1013131313fb1012e11413bb1b77a11b10464750ab1b12e61a131313138b1f13b31e12861c13131313d31c13e31c13eb1c138303138b0313a60313131313e30313eb03138b0213db0213de0513131313c30513cb0513c30913cb0913f30913990813b60d622eaf52be0d2e195551a30d11e60dbd541551d60c13131313db0c13c30c12cb0c11f30c13fb0c13e60c131333519333129b331381332f1913191a1b1003070e1313c352191a1b12033b0e1313db5219171b120307191a1b12037736131333511902033b0ededfa7523ededfd75226dedfb75289341b1915131313131313de2313131313c32313cb23139115111b11fb3113c15d1803ecececec1c0bff9a831e\",\n        \"aa130d01920ddfe30300000042210101fe15f7c157dee34fdedf72dc1f60c7e237dcde2dd8df77d7bb6dd7dc8a8b9c67d7de2ad6dfdfdfdf47d3df7fd2de4ad0dfdfdfdf1fd0df2fd0df27d0df4fcfdf47cfdf6acfdfdfdfdf2fcfdf27cfdf47cedf17cedf12c9dfdfdfdf0fc9df07c9df0fc5df07c5df3fc5df55c4df7ac1cb71629e72c1973e889d6fc1dd2ac1b9b9dc9d1ac0dfdfdfdf17c0df0fc0de07c0dd3fc0df37c0df2ac0dfdfff9d5fffde57ffdf4dffe3d5dfd5d6d7dccfcbc2dfdf0f9ed5d6d7decff7c2dfdf179ed5dbd7decfcbd5d6d7decfbbfadfdfff9dd5cecff7c212136b9ef212131b9eea12137b9e45f8d7d5d9dfdfdfdfdfdf12ef1f60c7e20fefdf07efdf5dd9ddd7dd37fddf0d91d4cf20202020d0c733564fd2\",\n    ]",
+      "metadata": {
+        "start_line": 13,
+        "lang": "python",
+        "desc": "Definition of packet_sequence in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk0"
+    },
+    {
+      "content": "def device(mocker: MockerFixture):\n    ble_dev = mocker.Mock()\n    ble_dev.address = \"AA:BB:CC:DD:EE:FF\"\n    adv_data = mocker.MagicMock()\n    device = Device(ble_dev, adv_data, \"AC71TEST1234\")\n    device._conn = mocker.AsyncMock()\n    return device",
+      "metadata": {
+        "start_line": 21,
+        "lang": "python",
+        "desc": "Definition of device in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk1"
+    },
+    {
+      "content": "async def test_wave3_parses_all_packets_successfully(device, packet_sequence):\n    for i, hex_packet in enumerate(packet_sequence):\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n\n        assert packet is not None, f\"Packet {i} failed to parse\"\n        assert packet.src == 0x42, f\"Packet {i} has unexpected src: {packet.src:#04x}\"\n        assert packet.cmd_set == 0xFE, (\n            f\"Packet {i} has unexpected cmd_set: {packet.cmd_set:#04x}\"\n        )\n        assert packet.cmd_id == 0x15, (\n            f\"Packet {i} has unexpected cmd_id: {packet.cmd_id:#04x}\"\n        )",
+      "metadata": {
+        "start_line": 30,
+        "lang": "python",
+        "desc": "Definition of test_wave3_parses_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk2"
+    },
+    {
+      "content": "async def test_wave3_processes_all_packets_successfully(device, packet_sequence):\n    for i, hex_packet in enumerate(packet_sequence):\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        processed = await device.data_parse(packet)\n        assert processed is True, f\"Packet {i} was not processed\"",
+      "metadata": {
+        "start_line": 44,
+        "lang": "python",
+        "desc": "Definition of test_wave3_processes_all_packets_successfully in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk3"
+    },
+    {
+      "content": "async def test_wave3_updates_battery_level(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    assert Device.battery_level.public_name in device.updated_fields\n    battery_level = device.get_value(Device.battery_level)\n    assert isinstance(battery_level, (int, float))\n    assert 0 <= battery_level <= 100",
+      "metadata": {
+        "start_line": 51,
+        "lang": "python",
+        "desc": "Definition of test_wave3_updates_battery_level in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk4"
+    },
+    {
+      "content": "async def test_wave3_updates_temperature_fields(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    temp_fields = [\n        Device.ambient_temperature,\n        Device.temp_indoor_supply_air,\n    ]\n\n    for field in temp_fields:\n        value = device.get_value(field)\n        assert value is not None, f\"{field} should not be None\"\n        assert isinstance(value, float), f\"{field} has wrong type: {type(value)}\"",
+      "metadata": {
+        "start_line": 61,
+        "lang": "python",
+        "desc": "Definition of test_wave3_updates_temperature_fields in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk5"
+    },
+    {
+      "content": "async def test_wave3_derives_power_from_sleep_state(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    assert device.sleep_state == SleepState.STANDBY\n    assert device.power is False",
+      "metadata": {
+        "start_line": 76,
+        "lang": "python",
+        "desc": "Definition of test_wave3_derives_power_from_sleep_state in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk6"
+    },
+    {
+      "content": "async def test_wave3_extracts_mode_params(device, packet_sequence):\n    packet = await device.packet_parse(bytes.fromhex(packet_sequence[0]))\n    await device.data_parse(packet)\n\n    assert device.operating_mode == OperatingMode.HEATING\n    assert device.target_temperature_climate == 25.0\n    assert device.fan_speed_climate == FanSpeed.from_value(40)",
+      "metadata": {
+        "start_line": 84,
+        "lang": "python",
+        "desc": "Definition of test_wave3_extracts_mode_params in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk7"
+    },
+    {
+      "content": "async def test_wave3_updates_on_second_packet(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    assert device.ambient_temperature == 23.71\n    assert device.ambient_humidity == 53.97",
+      "metadata": {
+        "start_line": 93,
+        "lang": "python",
+        "desc": "Definition of test_wave3_updates_on_second_packet in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk8"
+    },
+    {
+      "content": "async def test_wave3_field_types_are_consistent(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    numeric_fields = [\n        Device.battery_level,\n        Device.ambient_temperature,\n        Device.ambient_humidity,\n        Device.ac_input_power,\n        Device.battery_power,\n        Device.temp_indoor_supply_air,\n        Device.cell_temperature,\n    ]\n\n    for field in numeric_fields:\n        value = device.get_value(field)\n        if value is not None:\n            assert isinstance(value, (int, float)), (\n                f\"Field {field} has wrong type: {type(value)}\"\n            )\n\n    enum_fields = {\n        Device.operating_mode: OperatingMode,\n        Device.sleep_state: SleepState,\n    }\n\n    for field, enum_type in enum_fields.items():\n        value = device.get_value(field)\n        if value is not None:\n            assert isinstance(value, enum_type), (\n                f\"Field {field} has wrong type: {type(value)}\"\n            )",
+      "metadata": {
+        "start_line": 102,
+        "lang": "python",
+        "desc": "Definition of test_wave3_field_types_are_consistent in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk9"
+    },
+    {
+      "content": "async def test_wave3_exact_values_from_known_packets(device, packet_sequence):\n    for hex_packet in packet_sequence:\n        packet = await device.packet_parse(bytes.fromhex(hex_packet))\n        await device.data_parse(packet)\n\n    expected = {\n        Device.battery_level: 0.0,\n        Device.ambient_temperature: 23.71,\n        Device.ambient_humidity: 53.97,\n        Device.operating_mode: OperatingMode.HEATING,\n        Device.ac_input_power: 0.0,\n        Device.battery_power: 0.0,\n        Device.temp_indoor_supply_air: 32.8,\n        Device.sleep_state: SleepState.STANDBY,\n        Device.en_pet_care: False,\n        Device.target_temperature_climate: 25.0,\n        Device.fan_speed_climate: FanSpeed.from_value(40),\n    }\n\n    for field, expected_value in expected.items():\n        actual_value = device.get_value(field)\n        assert actual_value == expected_value, (\n            f\"{field}: expected {expected_value}, got {actual_value}\"\n        )\n\n    # These fields lack presence in these packets, so they remain None\n    assert device.input_power is None\n    assert device.output_power is None\n    assert device.power is False",
+      "metadata": {
+        "start_line": 137,
+        "lang": "python",
+        "desc": "Definition of test_wave3_exact_values_from_known_packets in docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py"
+      },
+      "id": "docs/Python Implementation/ha-ef-ble-main/tests/eflib/test_wave3.py:chunk10"
+    }
+  ]
+}

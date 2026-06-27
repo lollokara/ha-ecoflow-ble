@@ -1,4 +1,5 @@
 #include "LogBuffer.h"
+#include "RemoteLogger.h"
 
 // We need a separate static function for the hook
 static vprintf_like_t old_vprintf = nullptr;
@@ -8,6 +9,11 @@ static int silent_vprintf(const char *fmt, va_list args) {
 }
 
 static int buffer_vprintf(const char *fmt, va_list args) {
+    // Keep a separate copy for the downstream handler: vsnprintf() consumes the
+    // original va_list, and reusing it afterwards is undefined behaviour.
+    va_list args_copy;
+    va_copy(args_copy, args);
+
     // Format the message
     char buffer[256];
     int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -35,15 +41,18 @@ static int buffer_vprintf(const char *fmt, va_list args) {
             msg = logLine.substring(colon + 2);
         }
 
-        LogBuffer::getInstance().addLog(level, tag.c_str(), logLine.c_str(), args);
+        LogBuffer::getInstance().addLog(level, tag.c_str(), msg.c_str(), args);
+        // Mirror important lines to the STM32 over the inter-chip UART.
+        RemoteLogger_Forward((int)level, tag.c_str(), msg.c_str());
     }
 
-    // Forward to original handler (UART)
+    // Forward to original handler (USB CDC debug serial)
+    int ret = len;
     if (old_vprintf) {
-        return old_vprintf(fmt, args);
-    } else {
-        return vprintf(fmt, args);
+        ret = old_vprintf(fmt, args_copy);
     }
+    va_end(args_copy);
+    return ret;
 }
 
 LogBuffer& LogBuffer::getInstance() {
@@ -69,11 +78,13 @@ void LogBuffer::setLoggingEnabled(bool enabled) {
         // Enable Logging: Restore Global Level and Switch to Buffer+UART
         esp_log_level_set("*", ESP_LOG_INFO);
 
-        // Restore NimBLE specific tags to INFO
-        esp_log_level_set("NimBLE", ESP_LOG_INFO);
-        esp_log_level_set("NimBLEScan", ESP_LOG_INFO);
-        esp_log_level_set("NimBLEClient", ESP_LOG_INFO);
-        esp_log_level_set("NimBLEAdvertisedDevice", ESP_LOG_INFO);
+        // Keep NimBLE at WARN: its INFO "GATT procedure initiated" lines are
+        // extremely high-frequency and churn String allocations through the log
+        // buffer, which exhausts the heap and causes bad_alloc -> abort crashes.
+        esp_log_level_set("NimBLE", ESP_LOG_WARN);
+        esp_log_level_set("NimBLEScan", ESP_LOG_WARN);
+        esp_log_level_set("NimBLEClient", ESP_LOG_WARN);
+        esp_log_level_set("NimBLEAdvertisedDevice", ESP_LOG_WARN);
 
         vprintf_like_t current = esp_log_set_vprintf(buffer_vprintf);
         if (current != silent_vprintf && current != buffer_vprintf) {
@@ -100,6 +111,16 @@ bool LogBuffer::isLoggingEnabled() const {
     return _enabled;
 }
 
+void LogBuffer::reassertHook() {
+    if (!_enabled) return;
+    // If some other subsystem replaced the global vprintf handler, take it back.
+    // Remember a foreign handler so console output still chains through.
+    vprintf_like_t current = esp_log_set_vprintf(buffer_vprintf);
+    if (current != silent_vprintf && current != buffer_vprintf) {
+        old_vprintf = current;
+    }
+}
+
 void LogBuffer::setGlobalLevel(esp_log_level_t level) {
     esp_log_level_set("*", level);
 }
@@ -117,17 +138,29 @@ void LogBuffer::setTagLevel(const String& tag, esp_log_level_t level) {
 
 void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* message, va_list args) {
     if (!_enabled) return;
+    _append(level, tag, message);
+}
 
-    // bounded — freeze plan F1
+void LogBuffer::push(esp_log_level_t level, const char* tag, const char* fmt, ...) {
+    char msg[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, args);
+    va_end(args);
+
+    // Always captured (ignores the enable toggle) so deliberately-placed
+    // diagnostics (boot, OTA, connection flow) are never silently lost.
+    _append(level, tag, msg);
+
+    // Mirror important lines to the STM32 (suppressed during OTA internally)
+    // and echo to USB CDC for wired debugging.
+    RemoteLogger_Forward((int)level, tag, msg);
+    Serial.printf("[%s] %s\n", tag, msg);
+}
+
+void LogBuffer::_append(esp_log_level_t level, const char* tag, const char* message) {
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
         _droppedLogs++;
-        static uint32_t last_warn_ms = 0;
-        uint32_t now = millis();
-        if (now - last_warn_ms >= 60000) {
-            last_warn_ms = now;
-            ESP_LOGW("LogBuffer", "LogBuffer dropped %u entries", _droppedLogs);
-            _droppedLogs = 0;
-        }
         return;
     }
 
@@ -136,10 +169,14 @@ void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* messa
     }
 
     LogMessage lm;
+    lm.seq = _seqCounter++;
     lm.timestamp = millis();
     lm.level = level;
     lm.tag = String(tag);
-    lm.message = String(message); // Already formatted
+    lm.message = String(message);
+    // Bound per-entry heap: long lines (protobuf dumps, etc.) are truncated so a
+    // burst of large messages can't exhaust the heap.
+    if (lm.message.length() > 160) lm.message.remove(160);
     if (lm.message.endsWith("\n")) lm.message.remove(lm.message.length()-1);
 
     _logs.push_back(lm);
@@ -147,34 +184,19 @@ void LogBuffer::addLog(esp_log_level_t level, const char* tag, const char* messa
     xSemaphoreGive(_mutex);
 }
 
-std::vector<LogMessage> LogBuffer::getLogs(size_t fromIndex) {
+std::vector<LogMessage> LogBuffer::getLogs(uint32_t fromSeq) {
     xSemaphoreTake(_mutex, portMAX_DELAY);
     std::vector<LogMessage> result;
-    // Check if fromIndex is valid
-    // If the client asks for index 50, but we dropped logs and now start at "logical index" X?
-    // The vector is a sliding window.
-    // Simple approach: The client tracks count.
-    // If we have 50 logs, and client asks for index 40, we return last 10?
-    // No, indices are relative to the current buffer.
-    // Better: Client sends "I have 0 logs". Server returns all 50. Client has 50.
-    // Client sends "I have 50 logs". Server has 50 (same). Return empty?
-    // But since we erase logs, the "count" isn't stable index.
 
-    // Let's assume fromIndex is "number of logs client already has" IF the buffer was append-only.
-    // But buffer rotates.
-    // If we rotate, the client's index is invalid.
-    // It's easier to just return *new* logs if we had a sequence ID.
-
-    // Compromise: We will use the `fromIndex` as "Skip this many items from the BEGINNING of current buffer".
-    // If fromIndex >= _logs.size(), return empty.
-
-    if (fromIndex < _logs.size()) {
-        // Return sub-vector
-        result.insert(result.end(), _logs.begin() + fromIndex, _logs.end());
-    } else if (fromIndex > _logs.size()) {
-        // Client index is out of sync (e.g. buffer cleared or client restart)
-        // In a more complex system we would return all logs or an error.
-        // For now, returning empty is safe, client will naturally just wait or clear.
+    // The buffer is a sliding window; entries carry a monotonic sequence id so
+    // the client can simply ask for "everything newer than the last id I saw".
+    // This is robust to ring rotation (unlike index-by-position pagination).
+    const size_t MAX_BATCH = 60;
+    for (const auto& lm : _logs) {
+        if (lm.seq >= fromSeq) {
+            result.push_back(lm);
+            if (result.size() >= MAX_BATCH) break;
+        }
     }
 
     xSemaphoreGive(_mutex);

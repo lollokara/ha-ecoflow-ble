@@ -13,12 +13,14 @@
 #include "EcoflowDataParser.h"
 #include <NimBLEDevice.h>
 #include "esp_log.h"
+#include "LogBuffer.h"
 #include "esp_task_wdt.h"
 #include "pd335_sys.pb.h"
 #include "mr521.pb.h"
 #include "dc009_apl_comm.pb.h"
 #include <pb_encode.h>
 #include <algorithm>
+#include <time.h>
 static const char* TAG = "EcoflowESP32";
 
 // Static vector to hold instances for the static notify callback
@@ -110,6 +112,15 @@ bool EcoflowESP32::begin(const std::string& userId, const std::string& deviceSn,
 
     if (!_pClient) {
         _pClient = NimBLEDevice::createClient();
+        if (!_pClient) {
+            // NimBLE refuses to create a client once CONFIG_BT_NIMBLE_MAX_CONNECTIONS
+            // is reached. Fail gracefully instead of dereferencing a null client
+            // (which crashes with LoadProhibited).
+            ESP_LOGE(TAG, "createClient() failed for %s (max BLE connections reached)", deviceSn.c_str());
+            LogBuffer::getInstance().push(ESP_LOG_ERROR, "EF",
+                "Cannot init %s: max BLE connections reached", deviceSn.c_str());
+            return false;
+        }
         _pClient->setClientCallbacks(_clientCallback);
     }
 
@@ -158,6 +169,14 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
         if (self->_state != self->_lastState) {
             ESP_LOGI(TAG, "State changed: %d -> %d", (int)self->_lastState, (int)self->_state);
             self->_lastState = self->_state;
+        }
+
+        // Guard: _pClient can be null if NimBLE refused to create a client
+        // (max connections). All the dereferences below would otherwise crash
+        // with LoadProhibited.
+        if (!self->_pClient) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
         }
 
         // --- Connection Management ---
@@ -251,7 +270,13 @@ void EcoflowESP32::ble_task_entry(void* pvParameters) {
                 notification->data, notification->length, self->_crypto,
                 self->_rxBuffer, self->isAuthenticated());
             if (packets.empty() && notification->length > 0) {
-                ESP_LOGW(TAG, "Received %d bytes but no packets parsed", notification->length);
+                if (!self->_rxBuffer.empty()) {
+                    // Partial frame buffered — waiting for next BLE fragment to complete the packet
+                    ESP_LOGD(TAG, "Buffering partial packet (%d bytes so far)", (int)self->_rxBuffer.size());
+                } else {
+                    // rxBuffer cleared with no output — data was genuinely unparseable
+                    ESP_LOGW(TAG, "Received %d bytes but no packets parsed", notification->length);
+                }
             }
             for (auto &packet : packets) {
               self->_handlePacket(&packet);
@@ -277,19 +302,46 @@ void EcoflowESP32::connectTo(NimBLEAdvertisedDevice* device) {
 }
 
 void EcoflowESP32::onConnect(NimBLEClient* pClient) {
+    ESP_LOGI(TAG, "onConnect: %s (type %d)", _deviceSn.c_str(), (int)_deviceType);
+    LogBuffer::getInstance().push(ESP_LOG_INFO, "EF", "Connected: %s (type %d)", _deviceSn.c_str(), (int)_deviceType);
     _connectionRetries = 0;
     _state = ConnectionState::SERVICE_DISCOVERY;
     _lastAuthActivity = millis();
     _lastRxTime = millis();
+    _lastTimeSyncMs = 0;
+
+    // Start the new connection from a clean slate: residual BLE data from a
+    // prior session can corrupt the handshake and trigger auth failures.
+    _rxBuffer.clear();
+    if (_ble_queue) {
+        BleNotification* n;
+        while (xQueueReceive(_ble_queue, &n, 0) == pdTRUE) {
+            delete[] n->data;
+            delete n;
+        }
+    }
 }
 
 void EcoflowESP32::onDisconnect(NimBLEClient* pClient) {
+    ESP_LOGI(TAG, "onDisconnect: %s (type %d)", _deviceSn.c_str(), (int)_deviceType);
+    LogBuffer::getInstance().push(ESP_LOG_WARN, "EF", "Disconnected: %s (type %d)", _deviceSn.c_str(), (int)_deviceType);
     _state = ConnectionState::DISCONNECTED;
-    if (_pAdvertisedDevice) {
-        delete _pAdvertisedDevice;
-        _pAdvertisedDevice = nullptr;
-    }
+
+    // IMPORTANT: do NOT delete _pAdvertisedDevice here. This callback runs on
+    // the NimBLE host task, while the BLE task may be passing _pAdvertisedDevice
+    // into _pClient->connect() for an auto-reconnect. Freeing it here is a
+    // use-after-free (NimBLEAddress reads freed m_address -> LoadProhibited).
+    // The advertised device is kept for auto-reconnect and is owned/freed by the
+    // BLE task (max retries) and by connectTo()/disconnectAndForget().
+    _lastTimeSyncMs = 0;
     _rxBuffer.clear();
+    if (_ble_queue) {
+        BleNotification* n;
+        while (xQueueReceive(_ble_queue, &n, 0) == pdTRUE) {
+            delete[] n->data;
+            delete n;
+        }
+    }
 }
 
 /**
@@ -385,23 +437,51 @@ void EcoflowESP32::_startAuthentication() {
  * @brief Main packet handler, routes packets to the correct handler based on auth state.
  */
 void EcoflowESP32::_handlePacket(Packet* pkt) {
-    ESP_LOGD(TAG, "_handlePacket: cmdId=0x%02x", pkt->getCmdId());
+    ESP_LOGD(TAG, "RX pkt src=0x%02x dst=0x%02x cmdSet=0x%02x cmdId=0x%02x len=%d seq=%u",
+             pkt->getSrc(), pkt->getDest(), pkt->getCmdSet(), pkt->getCmdId(),
+             (int)pkt->getPayload().size(), (unsigned)pkt->getSeq());
     // Valid packet received, update Rx timer
     _lastRxTime = millis();
     if (isAuthenticated()) {
+        // The device asks the host for the current time before it will start
+        // streaming telemetry/config data. Answer it (mirrors the official app)
+        // and do NOT echo-ACK the request, otherwise data never starts flowing.
+        if (pkt->getSrc() == 0x35 && pkt->getCmdSet() == 0x01 && pkt->getCmdId() == 0x52) {
+            ESP_LOGI(TAG, "Device requested time-of-day; sending time sync");
+            LogBuffer::getInstance().push(ESP_LOG_INFO, "EF", "%s: device requested time; sending time sync", _deviceSn.c_str());
+            _sendTimeSync();
+            return;
+        }
+
         EcoflowDataParser::parsePacket(*pkt, _data, _deviceType);
+
+        if (_deviceType == DeviceType::DELTA_PRO_3 && pkt->getSrc() == 0x02 &&
+            pkt->getCmdSet() == 0xFE) {
+            ESP_LOGD(TAG, "D3P telemetry parsed: SOC=%d%% in=%dW out=%dW",
+                     (int)_data.deltaPro3.batteryLevel, (int)_data.deltaPro3.inputPower,
+                     (int)_data.deltaPro3.outputPower);
+        }
 
         // For Protocol V2 (Wave 2), prevent infinite loops by NOT replying to Control/Status commands (0x51-0x5E)
         // These packets are likely notifications that share the same ID as the Set command.
         // Replying to them triggers the device to treat the ACK as a new Set command, creating a loop.
+        // Protocol V2 (Wave 2): stay completely passive after auth. The
+        // reference Python client never replies to Wave 2 packets; ACKing any of
+        // them (including the 0x50 telemetry frames) makes the device terminate
+        // the link with reason 531. So never reply for V2.
         bool shouldReply = true;
         if (_protocolVersion == 2) {
-             uint8_t cmdId = pkt->getCmdId();
-             // Range 0x51-0x5E covers all known Set/Control commands for Wave 2
-             if (cmdId >= 0x51 && cmdId <= 0x5E) {
-                 ESP_LOGD(TAG, "Skipping reply for Wave 2 Control Packet (CmdId: 0x%02x)", cmdId);
-                 shouldReply = false;
-             }
+             shouldReply = false;
+        }
+
+        // Delta Pro 3 streams its DisplayPropertyUpload telemetry autonomously
+        // (src 0x02 / cmdSet 0xFE / cmdId 0x11|0x15), exactly like the reference
+        // Python client. Echoing it back can be misread by the device as a new
+        // command, so never ACK telemetry frames.
+        if (_deviceType == DeviceType::DELTA_PRO_3 &&
+            pkt->getSrc() == 0x02 && pkt->getCmdSet() == 0xFE &&
+            (pkt->getCmdId() == 0x11 || pkt->getCmdId() == 0x15)) {
+            shouldReply = false;
         }
 
         // Reply to packets that require it to keep the data flowing
@@ -472,8 +552,10 @@ void EcoflowESP32::_handleAuthPacket(Packet* pkt) {
             if (payload.size() > 0 && (payload[0] == 0x00 || payload[0] == 0x04)) {
                 _state = ConnectionState::AUTHENTICATED;
                 ESP_LOGI(TAG, "Authentication successful!");
+                LogBuffer::getInstance().push(ESP_LOG_INFO, "EF", "%s: authentication successful", _deviceSn.c_str());
             } else {
                 ESP_LOGE(TAG, "Authentication failed!");
+                LogBuffer::getInstance().push(ESP_LOG_ERROR, "EF", "%s: authentication FAILED (0x%02x)", _deviceSn.c_str(), payload.empty() ? 0 : payload[0]);
             }
         }
     }
@@ -605,9 +687,13 @@ bool EcoflowESP32::isAuthenticated() { return _state == ConnectionState::AUTHENT
 bool EcoflowESP32::requestData() {
     if (!isAuthenticated()) return false;
 
+    // Wave 2 (protocol V2) streams telemetry autonomously and will terminate the
+    // connection (reason 531) if it receives unsolicited requests. The reference
+    // Python client stays passive after auth, so do nothing here for V2.
+    if (_protocolVersion == 2) return true;
+
     // Default to Delta 3 behavior (0x02) if version 3
     uint8_t dest = 0x02;
-    if (_protocolVersion == 2) dest = 0x42;
 
     if (_deviceType == DeviceType::DELTA_PRO_3) dest = 0x02; // D3P
     else if (_deviceType == DeviceType::ALTERNATOR_CHARGER) dest = 0x14; // AltChg
@@ -615,6 +701,69 @@ bool EcoflowESP32::requestData() {
     Packet packet(0x20, dest, 0xFE, 0x11, {}, 0x01, 0x01, _protocolVersion, _txSeq++, 0x0d);
     EncPacket enc_packet(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, packet.toBytes());
     return _sendCommand(enc_packet.toBytes(&_crypto));
+}
+
+void EcoflowESP32::_sendTimeSync() {
+    if (!isAuthenticated()) return;
+
+    // Throttle: some devices re-request the time in a tight loop until they
+    // accept it; collapse bursts so we don't flood the BLE link.
+    uint32_t now = millis();
+    if (_lastTimeSyncMs != 0 && (now - _lastTimeSyncMs) < 5000) {
+        return;
+    }
+    _lastTimeSyncMs = now;
+
+    // Resolve a plausible wall-clock time. If SNTP has set the system clock we
+    // use it; otherwise fall back to a fixed build-era epoch plus uptime so the
+    // device still receives a sane value (it just needs the response to start
+    // streaming data).
+    time_t epoch = time(nullptr);
+    if (epoch < 1700000000) { // clock not set (before ~2023-11)
+        epoch = (time_t)1782000000 + (time_t)(now / 1000); // ~2026 baseline + uptime
+    }
+    uint32_t t = (uint32_t)epoch;
+
+    // 1) UTC time as a SysUTCSync protobuf: field 1 'sys_utc_time' (varint).
+    {
+        std::vector<uint8_t> pb;
+        pb.push_back(0x08); // field 1, wire type 0 (varint)
+        uint32_t v = t;
+        do {
+            uint8_t b = v & 0x7F;
+            v >>= 7;
+            if (v) b |= 0x80;
+            pb.push_back(b);
+        } while (v);
+
+        Packet pkt(0x21, 0x0B, 0x01, 0x55, pb, 0x01, 0x01, 0x13, _txSeq++, 0x0d);
+        EncPacket enc(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, pkt.toBytes());
+        _sendCommand(enc.toBytes(&_crypto));
+    }
+
+    // Raw little-endian RTC payload: u32 time, i8 tz_major, i8 tz_minor.
+    // Default to UTC (0/0); no timezone configured on the controller.
+    int8_t tz_maj = 0;
+    int8_t tz_min = 0;
+    std::vector<uint8_t> rtc_payload = {
+        (uint8_t)(t & 0xFF), (uint8_t)((t >> 8) & 0xFF),
+        (uint8_t)((t >> 16) & 0xFF), (uint8_t)((t >> 24) & 0xFF),
+        (uint8_t)tz_maj, (uint8_t)tz_min
+    };
+
+    // 2) RTC respond (cmdId 0x52) and 3) RTC check (cmdId 0x53), version 0x03.
+    {
+        Packet pkt(0x21, 0x35, 0x01, 0x52, rtc_payload, 0x01, 0x01, 0x03, _txSeq++, 0x0d);
+        EncPacket enc(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, pkt.toBytes());
+        _sendCommand(enc.toBytes(&_crypto));
+    }
+    {
+        Packet pkt(0x21, 0x35, 0x01, 0x53, rtc_payload, 0x01, 0x01, 0x03, _txSeq++, 0x0d);
+        EncPacket enc(EncPacket::FRAME_TYPE_PROTOCOL, EncPacket::PAYLOAD_TYPE_VX_PROTOCOL, pkt.toBytes());
+        _sendCommand(enc.toBytes(&_crypto));
+    }
+
+    ESP_LOGI(TAG, "Time sync sent (epoch=%u)", (unsigned)t);
 }
 
 bool EcoflowESP32::setAC(bool on) {
@@ -786,8 +935,20 @@ void EcoflowESP32::setAmbientLight(uint8_t status) {
     _sendWave2Command(0x5C, {status});
 }
 
-void EcoflowESP32::setAutomaticDrain(uint8_t enable) {
-    _sendWave2Command(0x59, {enable});
+void EcoflowESP32::setAutomaticDrain(bool enable) {
+    // Mirrors Python enable_automatic_drain: payload = (0 if enabled else 0b10) | drain_mode.value
+    // drain_mode derived via DrainMode.from_wte(main_mode, wte_fth_en):
+    //   COLD mode:     DRAIN_FREE(1) if wte_fth_en in {1,3}, else EXTERNAL(0)
+    //   non-COLD mode: DRAIN_FREE(1) if wte_fth_en == 3,     else EXTERNAL(0)
+    int wte = _data.wave2.wteFthEn;
+    int drainMode;
+    if (_data.wave2.mode == 0) { // COLD
+        drainMode = (wte == 1 || wte == 3) ? 1 : 0;
+    } else {
+        drainMode = (wte == 3) ? 1 : 0;
+    }
+    uint8_t payload = (enable ? 0 : 2) | drainMode;
+    _sendWave2Command(0x59, {payload});
 }
 
 void EcoflowESP32::setBeep(uint8_t on) {
@@ -799,7 +960,23 @@ void EcoflowESP32::setFanSpeed(uint8_t speed) {
 }
 
 void EcoflowESP32::setMainMode(uint8_t mode) {
+    // Mirrors Python set_main_mode side-effect: when switching away from COLD with
+    // automatic_drain=True and drain_mode=DRAIN_FREE, send extra 0x59=1 afterward.
+    int wte = _data.wave2.wteFthEn;
+    bool autoDrain = (wte <= 1); // wte_fth_en in {0,1} means auto drain enabled
+    bool isDrainFree;
+    if (_data.wave2.mode == 0) { // current mode is COLD
+        isDrainFree = (wte == 1 || wte == 3);
+    } else {
+        isDrainFree = (wte == 3);
+    }
+    bool sendDrainReset = autoDrain && isDrainFree && (mode != 0); // mode != COLD
+
     _sendWave2Command(0x51, {mode});
+
+    if (sendDrainReset) {
+        _sendWave2Command(0x59, {0x01}); // enable + DRAIN_FREE (Python payload=1)
+    }
 }
 
 void EcoflowESP32::setPowerState(uint8_t on) {
@@ -830,6 +1007,21 @@ void EcoflowESP32::setTempDisplayType(uint8_t type) {
 
 void EcoflowESP32::setTempUnit(uint8_t unit) {
     _sendWave2Command(0x53, {unit});
+}
+
+void EcoflowESP32::setDrainMode(uint8_t mode) {
+    // Mirrors Python set_drain_mode(DrainMode): mode 0=EXTERNAL, 1=DRAIN_FREE
+    // payload depends on automatic_drain state and current main_mode
+    bool autoDrain = (_data.wave2.wteFthEn <= 1);
+    uint8_t payload;
+    if (!autoDrain) {
+        payload = (mode == 0) ? 2 : 3; // disabled + chosen drain mode
+    } else if (_data.wave2.mode != 0) { // not COLD
+        payload = 1; // in non-COLD mode with auto drain, always 1
+    } else {
+        payload = (mode == 0) ? 0 : 1; // COLD + auto drain
+    }
+    _sendWave2Command(0x59, {payload});
 }
 
 bool EcoflowESP32::setDC(bool on) {

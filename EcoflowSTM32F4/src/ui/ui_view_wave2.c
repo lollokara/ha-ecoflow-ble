@@ -15,6 +15,8 @@ static lv_style_t style_btn_selected;
 static lv_style_t style_btn_green;
 
 static lv_obj_t * label_cur_temp;
+static lv_obj_t * label_sys_temp;
+static lv_obj_t * label_outlet_temp;
 static lv_obj_t * arc_set_temp;
 static lv_obj_t * label_set_temp_val;
 static lv_obj_t * cont_sub_mode;
@@ -216,7 +218,7 @@ void ui_view_wave2_init(lv_obj_t * parent) {
 
     // Current Temp (Top Right)
     label_cur_temp = lv_label_create(scr_wave2);
-    lv_label_set_text(label_cur_temp, "-- C");
+    lv_label_set_text(label_cur_temp, "Temp. Amb: -- C");
     lv_obj_set_style_text_font(label_cur_temp, &lv_font_montserrat_32, 0);
     lv_obj_align(label_cur_temp, LV_ALIGN_TOP_RIGHT, -40, 30);
 
@@ -248,6 +250,13 @@ void ui_view_wave2_init(lv_obj_t * parent) {
     lv_label_set_text(lbl_set_title, "Set Temp");
     lv_obj_set_style_text_color(lbl_set_title, lv_color_white(), 0);
     lv_obj_align_to(lbl_set_title, arc_set_temp, LV_ALIGN_OUT_TOP_MID, 0, -10);
+
+    label_sys_temp = NULL;
+
+    label_outlet_temp = lv_label_create(panel);
+    lv_label_set_text(label_outlet_temp, "Temp. Uscita: -- C");
+    lv_obj_add_style(label_outlet_temp, &style_text_small, 0);
+    lv_obj_align_to(label_outlet_temp, arc_set_temp, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
 
     // Right Side: Controls
 
@@ -360,8 +369,10 @@ void ui_view_wave2_update(Wave2DataStruct * data) {
     int32_t fanValue = get_int32_aligned(&data->fanValue);
     int32_t powerMode = get_int32_aligned(&data->powerMode);
     int32_t mode = get_int32_aligned(&data->mode);
+    float outletTemp = get_float_aligned(&data->outLetTemp);
 
-    lv_label_set_text_fmt(label_cur_temp, "%d C", safe_float_to_int(envTemp));
+    lv_label_set_text_fmt(label_cur_temp, "Temp. Amb: %d C", safe_float_to_int(envTemp));
+    lv_label_set_text_fmt(label_outlet_temp, "Temp. Uscita: %d C", safe_float_to_int(outletTemp));
 
     if (lv_slider_is_dragged(arc_set_temp) == false) {
         lv_arc_set_value(arc_set_temp, setTemp);
